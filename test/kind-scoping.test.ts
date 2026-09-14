@@ -23,7 +23,7 @@ import { normaliseKinds } from "../src/core/settings-editors";
 import { trackerOptions } from "../src/trackers/entry-trackers";
 import { journalSurface, TrackerDef, normalizeTrackers } from "../src/trackers/trackers";
 import { DEFAULT_TRACKERS } from "../src/core/constants";
-import { kindTableProperties } from "../src/ui/tables";
+import { kindTableProperties, kindTablePropertiesFor } from "../src/ui/tables";
 
 import { readSrc } from "./sources";
 const asset = studyFile;
@@ -400,13 +400,26 @@ describe("the shipped templates show the split", () => {
     expect(byId("practice")).toEqual(["date", "accuracy", "status"]);
   });
 
-  it("writes one table per kind on the Topic index", () => {
-    // One table each rather than one combined table, which is what makes the
-    // per-kind column above possible at all — a single table would need a
-    // column for every rating in the type and leave most of it blank.
+  it("writes one table over both kinds on the Topic index", () => {
+    // ── AND THE SPLIT SURVIVES IT (1.0.16) ──────────────────────────
+    //
+    // This asserted a table per kind, on the argument that a combined table
+    // "would need a column for every rating in the type and leave most of it
+    // blank". The reader asked for the combined table — *"page types can be
+    // consolidated on journal index pages"* — and the argument was answered
+    // rather than dropped: the combined table carries one column per DISTINCT
+    // tracker, so Confidence and Accuracy are both there and each is half
+    // empty, and 1.0.15 had already stopped drawing an empty cell on the width
+    // where blankness hurt.
+    //
+    // WHAT THE SPLIT STILL MEANS IS THE TEST ABOVE. A Lesson is scored on
+    // Confidence and a Practice on Accuracy; that is a fact about the note and
+    // its tracker, and which table it appears in was never what made it true.
     const topic = studyTemplate("Topic Index.md");
-    expect(topic).toContain("kind-table:lesson");
-    expect(topic).toContain("kind-table:practice");
+    expect(topic).toContain("\nkind-table\n");
+    expect(topic).not.toContain("kind-table:");
+    expect(kindTablePropertiesFor(STUDY_JOURNAL.kinds)).toContain("confidence");
+    expect(kindTablePropertiesFor(STUDY_JOURNAL.kinds)).toContain("accuracy");
   });
 });
 

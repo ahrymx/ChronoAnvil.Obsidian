@@ -22,6 +22,7 @@ import type { JournalScan } from "../src/journals/journal-infer";
 import { buildJournalType, journalTemplateFiles } from "../src/journals/custom-journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import type { TrackerDef } from "../src/trackers/trackers";
+import { asPerKindTables } from "./legacy-children";
 
 // The Cooking journal from the dev vault, stated as the config that made it.
 // Two levels, two kinds, one of them paged, both rated on a tracker the vault
@@ -50,6 +51,31 @@ function templatesOf(cfg: JournalConfig): JournalScan["templates"] {
   return journalTemplateFiles(buildJournalType(cfg)).map((t) => ({
     name: t.name.toLowerCase(),
     file: scanFile([t.name], t.content),
+  }));
+}
+
+// And the same templates as every release up to 1.0.15 composed them: the
+// deepest index's one table put back into a head, a create button and a table
+// PER KIND (`test/legacy-children.ts`).
+//
+// WHY THE IMPORTER NEEDS BOTH FIXTURES. Most of what inference recovers about a
+// KIND is read off those three lines — the emoji from the head, the plural from
+// the head, the declaration order from the sequence of `new-<kind>` buttons —
+// and 1.0.16 composes none of them. A folder carrying the old shape is what
+// every existing vault has, and a folder carrying the new one is what a reader
+// who repairs theirs will have, so both are real and they recover different
+// amounts. The tests say which is which rather than one standing in for the
+// other.
+function agedTemplatesOf(cfg: JournalConfig): JournalScan["templates"] {
+  const type = buildJournalType(cfg);
+  return journalTemplateFiles(type).map((t) => ({
+    name: t.name.toLowerCase(),
+    file: scanFile(
+      [t.name],
+      t.content.includes(`button:${type.id}:new\nkind-table`)
+        ? asPerKindTables(t.content, type)
+        : t.content
+    ),
   }));
 }
 
@@ -175,6 +201,9 @@ describe("inferring a journal from its folder", () => {
     templates: templatesOf(COOKING),
     ...over,
   });
+  // The same folder as an older release left it — see `agedTemplatesOf`.
+  const aged = (over: Partial<JournalScan> = {}): JournalScan =>
+    scan({ templates: agedTemplatesOf(COOKING), ...over });
 
   it("recovers the id the notes already expect", () => {
     // From `button:cooking:*`, not from the folder name: renaming the folder
@@ -196,13 +225,44 @@ describe("inferring a journal from its folder", () => {
     // Both sources are alphabetical by accident (a directory listing, a note
     // walk), and the order is the order of the create buttons and of every
     // table in the index templates. The index's own button sequence settles it.
-    const out = inferJournalFromScan(scan(), NO_TRACKERS);
+    //
+    // ON THE AGED FIXTURE (1.0.16), because that sequence is what the deepest
+    // index stopped composing: one create button that asks which type, in place
+    // of one per type. Every vault written before this release still states the
+    // order this way and this is still how it is read.
+    const out = inferJournalFromScan(aged(), NO_TRACKERS);
     expect(out?.config.kinds.map((k) => k.id)).toEqual(["recipe", "attempt"]);
   });
 
   it("recovers each kind's emoji from the fence that creates it", () => {
-    const out = inferJournalFromScan(scan(), NO_TRACKERS);
+    const out = inferJournalFromScan(aged(), NO_TRACKERS);
     expect(out?.config.kinds.map((k) => k.emoji)).toEqual(["📋", "🔥"]);
+  });
+
+  it("says so, rather than inventing one, where the index names neither", () => {
+    // ── WHAT A CONSOLIDATED INDEX CANNOT TELL US (1.0.16) ────────────
+    //
+    // A folder whose index notes were composed by this release carries one
+    // table over every note type and names none of them, so there is no glyph
+    // to recover and no button sequence to read an order from. The structure
+    // still comes back exactly — the ids, the levels, the ratings, which kind
+    // is paged — and the two cosmetic facts do not.
+    //
+    // WHICH IS A SENTENCE, NOT A SILENCE. This function's own rule: *"a journal
+    // that comes back with every kind labelled 📝 reads as a failed recovery
+    // even when the structure is perfect"*. Naming the gap is what separates
+    // the two, and both halves are two clicks and a drag in the editor.
+    const out = inferJournalFromScan(scan(), NO_TRACKERS);
+    expect(out?.config.kinds.map((k) => k.emoji)).toEqual(["📝", "📝"]);
+    expect(out?.guesses.join(" ")).toContain("an icon and an order");
+    // The structure is untouched by the loss, which is the half worth pinning:
+    // an import that got the ids wrong would be a broken journal rather than a
+    // plain-looking one.
+    expect(out?.config.kinds.map((k) => k.id).sort()).toEqual([
+      "attempt",
+      "recipe",
+    ]);
+    expect(out?.config.kinds.find((k) => k.id === "recipe")?.pages).toBe(true);
   });
 
   it("recovers which kind is paged", () => {

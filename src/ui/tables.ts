@@ -2154,6 +2154,50 @@ export function kindTableProperties(
   ];
 }
 
+// THE COLUMN THAT SAYS WHICH NOTE TYPE A ROW IS, and it is a real frontmatter
+// property rather than a pseudo-column: `type:` is what a kind IS — the field
+// `kind-table` has always selected rows by. So it is spelled here as the
+// property it reads, and the row loop below renders it as the kind's LABEL
+// rather than its id, which is the one thing the raw value is not fit for.
+const TYPE_COLUMN = "type";
+
+// The columns a table over SEVERAL kinds carries. 1.0.16.
+//
+// ── THE OBJECTION THIS ANSWERS, WHICH THE CATALOGUE HAD WRITTEN DOWN ─────
+//
+// `journal-sections.ts` said, above the render that emitted one table per kind:
+// *"Per kind rather than one combined table because the kinds are rated on
+// different things — a single table would need a column for every rating in the
+// type and leave most of it blank."* That was true and it is still true: this
+// returns one column per DISTINCT rating tracker across the kinds, and a Study
+// journal whose Lessons carry confidence and whose Practice carries a score gets
+// both, each half empty.
+//
+// WHAT CHANGED IS THE COST OF BLANK. 1.0.15 stopped drawing an empty cell at all
+// once the columns collapse, so on the width where blankness actually hurt — a
+// phone, where every column is a line — the sparse half is simply not there. On
+// a desktop a dash under a column heading is what a table is for.
+//
+// AND WHAT IT BUYS. The reader's project card drew three heads, three create
+// buttons, three chevrons and three empty states for one note. One table with a
+// Type column is that card, honestly.
+//
+// A TRACKER IS THE COLUMN, NOT A KIND. Two kinds rating the same tracker share
+// one column, which is why this is distinct rather than one per kind — and it is
+// also why a row fills whichever rating column its own note carries rather than
+// only the one its kind declares. The column is the tracker's question; a note
+// that answered it says so.
+export function kindTablePropertiesFor(
+  kinds: readonly JournalKind[],
+  statusProperty = "status"
+): string[] {
+  const ratings: string[] = [];
+  for (const kind of kinds) {
+    if (kind.rating && !ratings.includes(kind.rating)) ratings.push(kind.rating);
+  }
+  return [TYPE_COLUMN, "date", ...ratings, statusProperty];
+}
+
 // Open work first, then newest first, then by name.
 //
 // Pure given the rows, exactly as sortBreakdown is, and for the same reason:
@@ -2210,46 +2254,72 @@ export function kindTable(
 ): HTMLElement {
   const app = plugin.app;
   const root = createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
-  const kind = type.kinds.find((k) => k.id === kindId);
+  // ── AN EMPTY ID MEANS EVERY KIND (1.0.16) ────────────────────────────
+  //
+  // *"I think page types can be consolidated on journal index pages,
+  // [Updates Decisions scratchpads] can become one."*
+  //
+  // THE BARE DIRECTIVE, NOT A NEW WORD. `kind-table:update` is one kind's notes
+  // and `kind-table` is all of them, which is the grammar this plugin already
+  // uses for exactly this distinction: `level-index` bare means "what is below
+  // THIS note", `launcher` bare means the default four. A second keyword would
+  // be a second thing to name, register, document and keep rendering forever,
+  // for a question the existing word already asks — and it would make the two
+  // shapes look unrelated in a fence where they are one section either way.
+  //
+  // BOTH SHAPES RENDER, PERMANENTLY. Every index note in every vault carries the
+  // per-kind spelling, and 4.16 §3's rule is that a word already on disk goes on
+  // working: what changes is what the catalogue COMPOSES. See `childrenParts`.
+  const kind = kindId ? type.kinds.find((k) => k.id === kindId) : null;
   // Named rather than silent, and this is the case that will actually happen:
   // removing a note kind leaves this directive behind in every template and
   // index note that carried it, and "nothing rendered here" is the least
   // useful thing to say about that. Same wording as the unknown-widget error
   // the block processor already prints, for the same reason.
-  if (!kind) {
+  if (kindId && !kind) {
     root.createDiv({
       cls: "ca-journal-widget-error",
       text: `Unknown ${type.name} note type: ${kindId}`,
     });
     return root;
   }
+  // The kinds this table is over: the one named, or all of them. Everything
+  // below reads THIS rather than `kind`, so the two shapes are one code path
+  // with two column sets and not two tables that have to be kept in step.
+  const shown = kind ? [kind] : type.kinds;
 
   // Both resolved from the registry rather than spelled out, the same rule
   // reviewProperties follows — a relabelled or re-keyed built-in must not
   // leave this reading a dead property.
   const statusId = getBuiltinTracker(plugin, "status")?.id ?? "status";
   const statusDef = getTracker(plugin, statusId) ?? null;
-  const ratingId = kind.rating ?? null;
-  const ratingDef = ratingId ? getTracker(plugin, ratingId) ?? null : null;
 
-  const notes = pagesUnder(app, folderPath).filter(
-    (p) => p.fm["type"] === kind.id
+  const wanted = new Set(shown.map((k) => k.id));
+  const kindOf = (fm: Record<string, unknown>): JournalKind | null => {
+    const id = typeof fm["type"] === "string" ? fm["type"] : "";
+    return shown.find((k) => k.id === id) ?? null;
+  };
+  const notes = pagesUnder(app, folderPath).filter((p) =>
+    wanted.has(typeof p.fm["type"] === "string" ? p.fm["type"] : "")
   );
 
   if (notes.length === 0) {
+    // BOTH SENTENCES NAME THE BUTTON THAT IS ACTUALLY ON THE SCREEN, which is
+    // the rule the per-kind wording already kept and the reason it is derived
+    // rather than typed: with one kind the button reads "New Lesson" and with
+    // several it reads "New", because it is one control that asks which. An
+    // empty state pointing at a control nobody can see is the near-miss that
+    // makes a page feel written rather than checked.
+    const noun = kind ? kindPlural(kind).toLowerCase() : "notes";
+    const press = kind ? `New ${kind.label}` : "New";
+    const rating = kind?.rating ? getTracker(plugin, kind.rating) ?? null : null;
     root.appendChild(
       emptyCallout(
         "file-plus",
-        `No ${kindPlural(kind).toLowerCase()} yet`,
-        // “New Lesson”, matching the button, not “Lesson”, matching the kind.
-        // The button is labelled `New ${kind.label}` (journalButtonSpec), so
-        // this told a reader to press something that is not on the screen —
-        // close enough to guess, and the sort of near-miss that makes an empty
-        // state feel written rather than checked. Both strings are derived from
-        // `kind.label`, so they agree by construction now.
-        `Press “New ${kind.label}” above to add one — it'll appear here with its date${
-          ratingId ? `, ${ratingWord(ratingDef)}` : ""
-        } and status.`
+        `No ${noun} yet`,
+        `Press “${press}” above to add one — it'll appear here with its ${
+          kind ? "" : "type, "
+        }date${kind?.rating ? `, ${ratingWord(rating)}` : ""} and status.`
       )
     );
     // THE SAME LIFT, ONE LEVEL DOWN (5.28) — a topic index's Lessons card is
@@ -2285,11 +2355,20 @@ export function kindTable(
   // `displayName` the base table set — "Lesson", not "Title" — then one per
   // property the kind carries, labelled from the registry where it has an
   // entry and from the property name where it doesn't.
-  const columns = kindTableProperties(kind, statusId);
+  const columns = kind
+    ? kindTableProperties(kind, statusId)
+    : kindTablePropertiesFor(shown, statusId);
+  // EVERY RATING COLUMN NAMED FROM ITS OWN TRACKER. With one kind there is at
+  // most one and `ratingDef` was enough; over several there is one per distinct
+  // tracker, so the definition is looked up per column rather than held in a
+  // variable that could only ever describe the first.
+  const defOf = (property: string): TrackerDef | null =>
+    getTracker(plugin, property) ?? null;
   const heading = (property: string): string => {
+    if (property === TYPE_COLUMN) return "Type";
     if (property === "date") return "Date";
     if (property === statusId) return ratingNoun(statusDef, "Status");
-    return ratingNoun(ratingDef, property);
+    return ratingNoun(defOf(property), property);
   };
 
   // Was a `<table>`; see `recordList` above for why these three dashboards'
@@ -2299,7 +2378,16 @@ export function kindTable(
   // THE THIRD ARGUMENT IS "EVERY ROW CARRIES A `⋯`" (4.50), so the heading strip
   // reserves the same width the rows spend. A slot that appeared only on hover
   // would shift the whole row's columns under the pointer.
-  const { row: addRow } = recordList(root, [kind.label, ...columns.map(heading)], true);
+  // THE TITLE COLUMN IS NAMED BY THE KIND WHERE THERE IS ONE — "Lesson", not
+  // "Title", which is the `displayName` the ```base table set and the reason
+  // this column has never said "Title". Over several kinds no single kind's
+  // name is true of the column, and the Type column beside it says what each
+  // row is, so it takes the neutral word rather than a list of three.
+  const { row: addRow } = recordList(
+    root,
+    [kind ? kind.label : "Name", ...columns.map(heading)],
+    true
+  );
 
   for (const { note, date, done } of sorted) {
     const { main, actions, row } = addRow({
@@ -2328,16 +2416,27 @@ export function kindTable(
     // WHAT THIS NOTE'S PAGES ARE MADE FROM, AND WHETHER IT SHOULD STILL EXIST —
     // both facts about the one note the row is, so the control goes on the row.
     // See `kind-row-menu.ts`, which owns all of it; this file draws tables.
-    attachKindRowMenu({ plugin, type, kind }, actions, note.file);
+    // THE ROW'S OWN KIND, NOT THE TABLE'S. With one kind these are the same
+    // object; over several the menu on a Decision's row must offer a Decision's
+    // acts. `kindOf` cannot return null here — the notes were filtered by the
+    // same set — and the fallback is a type guard rather than a case.
+    const rowKind = kindOf(note.fm) ?? shown[0];
+    attachKindRowMenu({ plugin, type, kind: rowKind }, actions, note.file);
     for (const property of columns) {
-      if (property === "date") {
+      if (property === TYPE_COLUMN) {
+        // THE LABEL, NOT THE ID. `type: decision` is the identity and "Decision"
+        // is what the reader called it — the same choice every other surface
+        // makes, and the reason this column is worth a cell rather than being
+        // left to the raw value.
+        recordCell(main, rowKind.label, "is-text");
+      } else if (property === "date") {
         recordCell(main, date ?? EMPTY_CELL);
       } else if (property === statusId) {
         recordCell(main, statusOf(note.fm) || EMPTY_CELL, "is-text");
       } else {
         const v = Number(note.fm[property]);
         const cell = recordCell(main, "");
-        ratingCell(cell, v, property === ratingId ? ratingDef : null);
+        ratingCell(cell, v, defOf(property));
       }
     }
   }

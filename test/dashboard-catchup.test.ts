@@ -14,71 +14,146 @@
 //
 // SO THE TESTS ARE ABOUT TWO THINGS. That the scan finds a stale dashboard and
 // says what it would gain (which is what the offer renders), and that applying
-// it inserts ONLY the missing table — because an offer that quietly rewrote the
-// rest of the note would be worse than the silence it replaces.
+// it changes ONLY what the offer named — because an offer that quietly rewrote
+// the rest of the note would be worse than the silence it replaces.
+//
+// ── AND WHAT IT FINDS CHANGED IN 1.0.16 ─────────────────────────────────
+//
+// *"I think page types can be consolidated on journal index pages."* A journal
+// with several note kinds draws ONE table over all of them now, and a table
+// that selects rows by frontmatter lists a kind added a minute ago without
+// being touched. So on the surface this door was written for — a multi-kind
+// journal's dashboards — there is no longer any such thing as a missing table,
+// and `extend` has nothing to say.
+//
+// The promise in `kind-change.ts` is unhedged and unchanged: *"Dashboards will
+// offer to list the new type."* What keeps it now is the merge. A reader's index
+// notes still carry the per-kind stack every release up to 1.0.15 composed, and
+// consolidating it is both the change they asked for and the thing that makes
+// the new kind appear. So this door runs `consolidateChildren` first and
+// `planSections` second, and these tests are about that pair: what each of the
+// two steps has to say on each shape, and that they cannot contradict each
+// other about one table.
+//
+// `extend` ITSELF IS NOT GONE and is still asserted below, on the journal that
+// still has a part to be short of: a one-kind type, whose card is bar, button
+// and table exactly as 5.11 composed it.
 
 import { describe, expect, it } from "vitest";
 import { studyTemplate } from "./study-template";
+import { asPerKindTables, perKindStack } from "./legacy-children";
 import { readCode } from "./sources";
 import { STUDY_JOURNAL } from "../src/journals/journal";
 import {
+  buildJournalType,
+  freshCustomJournal,
+  journalTemplateFiles,
+} from "../src/journals/custom-journal";
+import {
   sectionContext,
   detectSections,
+  templateTargets,
 } from "../src/journals/journal-sections";
 import { applySections, planSections } from "../src/journals/journal-plan";
+import { consolidateChildren } from "../src/journals/children-consolidate";
 
-// The deepest Study index, which is the surface `children` renders a table per
-// kind on — the one place a new kind can leave a dashboard short.
+// The deepest Study index, which is the surface `children` renders its table
+// on — the one place a new kind could leave a dashboard short.
 const ctx = () => sectionContext(STUDY_JOURNAL, { depth: 1 });
 
-// A Topic index written before "Practice" existed: its `children` fence carries
-// the Lessons header, button and table and nothing else. This is exactly the
-// file the follow-up describes, produced by deleting from the shipped one
-// rather than by hand, so it cannot drift from what the catalogue composes.
-function staleTopicIndex(): string {
-  const lines = studyTemplate("topic-index.md").split("\n");
-  // `header:2:` SINCE 5.12: a kind's head is a group inside the section's bar.
-  const from = lines.findIndex((l) => l.trim() === "header:2:🛠️ Practice");
-  expect(from).toBeGreaterThan(-1);
-  // Three lines per kind — header, button, table — which is what the fence
-  // carries and therefore what a dashboard written before the kind lacks.
-  expect(lines[from + 1].trim()).toBe("button:study:new-practice");
-  expect(lines[from + 2].trim()).toBe("kind-table:practice");
-  return [...lines.slice(0, from), ...lines.slice(from + 3)].join("\n");
+// A Topic index as every release up to 1.0.15 wrote it: a head, a create button
+// and a table PER NOTE KIND. Produced by ageing the shipped one rather than by
+// hand, so it cannot claim a spelling the plugin never composed — see
+// `test/legacy-children.ts`.
+function legacyTopicIndex(): string {
+  return asPerKindTables(studyTemplate("topic-index.md"), STUDY_JOURNAL);
+}
+
+// The two steps this door runs, in the order it runs them, with the write taken
+// off: consolidate, then plan. Every assertion about what a reader is shown and
+// what is written to their note is made through this pair, because the module
+// itself needs a vault and these are the only two things in it that decide
+// anything.
+function scan(text: string): {
+  merged: string;
+  merge: boolean;
+  extend: ReturnType<typeof planSections>;
+} {
+  const merged = consolidateChildren(text, STUDY_JOURNAL) ?? text;
+  const c = ctx();
+  return {
+    merged,
+    merge: merged !== text,
+    extend: planSections(merged, c, detectSections(merged, c)).filter(
+      (o) => o.kind === "extend"
+    ),
+  };
 }
 
 describe("what the scan finds", () => {
-  it("plans an extend on a dashboard missing a kind's table", () => {
-    const text = staleTopicIndex();
-    const c = ctx();
-    // `want` is what the file already has — the same question the section
-    // editor asks when a reader opens it and presses Save without touching a
-    // row. So the only op this can produce is `extend`.
-    const ops = planSections(text, c, detectSections(text, c));
-    const extend = ops.filter((o) => o.kind === "extend");
-    expect(extend.length).toBe(1);
-    expect(extend[0].sectionId).toBe("children");
+  it("merges a dashboard written before the consolidation", () => {
+    const { merge, merged } = scan(legacyTopicIndex());
+    expect(merge).toBe(true);
+    // THE STRONGEST STATEMENT AVAILABLE: catching up a note written by an older
+    // release lands on the shipped Topic index exactly, byte for byte. Anything
+    // short of that is a migration drifting from the composer, which no golden
+    // can catch because the golden and the composer move together.
+    expect(merged).toBe(studyTemplate("topic-index.md"));
   });
 
-  it("says which kind is missing, which is what the offer renders", () => {
-    // The dialog is the plan rather than a summary of it, so the line a reader
-    // reads is this string. "unchanged" was what 3.18.0 said here.
-    const text = staleTopicIndex();
-    const c = ctx();
-    const op = planSections(text, c, detectSections(text, c)).find(
-      (o) => o.kind === "extend"
-    );
-    expect(op?.detail).toContain("Practice");
-    expect(op?.detail).not.toBe("unchanged");
+  it("reports no missing table on the note it just merged", () => {
+    // THE TWO STEPS CANNOT CONTRADICT EACH OTHER, which is why the merge is
+    // read first and the plan second — the order the write runs them in. A note
+    // whose tables are about to become one is asked about its parts as the
+    // consolidated shape, so nothing can be reported as both merged away and
+    // missing, and the offer cannot list one table twice.
+    expect(scan(legacyTopicIndex()).extend).toEqual([]);
   });
 
-  it("finds nothing on a dashboard that is already current", () => {
+  it("finds nothing at all on a dashboard that is already current", () => {
     // NOTHING TO DO OPENS NOTHING. The common case for a reader who adds a kind
-    // to a journal whose dashboards do not exist yet, and the case that would
+    // to a journal whose dashboards this release wrote, and the case that would
     // otherwise train them to dismiss the window unread.
-    const text = studyTemplate("topic-index.md");
+    const { merge, extend } = scan(studyTemplate("topic-index.md"));
+    expect(merge).toBe(false);
+    expect(extend).toEqual([]);
+  });
+
+  it("plans no extend on the old shape either, which is why the merge is the offer", () => {
+    // THE GAP THE MERGE FILLS, stated as the plan's own answer. The per-kind
+    // fence is still attributed to `children` — `superseded` in the catalogue is
+    // what keeps that true, and `journal-groups.test.ts` is where it is pinned —
+    // so the section is present and short of nothing the catalogue declares.
+    // A reader adding a third note type to a journal whose notes carry the 5.12
+    // stack would be told nothing whatever without the step above.
+    const legacy = legacyTopicIndex();
     const c = ctx();
-    const ops = planSections(text, c, detectSections(text, c));
+    const ops = planSections(legacy, c, detectSections(legacy, c));
+    expect(ops.find((o) => o.sectionId === "children")?.kind).toBe("keep");
+  });
+
+  it("offers a one-kind journal nothing, because it has nothing to merge", () => {
+    // A type with ONE note kind composes what it always composed — bar, button,
+    // table — and `consolidateChildren` refuses it outright rather than
+    // retitling a card that is correctly named after the only thing in it.
+    //
+    // AND THE `extend` ARM IS NOT REACHABLE FROM THIS DOOR ANY MORE, which is
+    // worth stating where a reader will look for it. `want` here is
+    // `detectSections`, and `children`'s probe IS its table: a one-kind card
+    // short of its table is short of the thing that makes the section findable,
+    // so the planner is never asked about it. A multi-kind card has no per-kind
+    // part to be short of at all. The op and its write path are live and tested
+    // on the surface that can still produce one — `journal-plan.test.ts`, where
+    // `want` is the block model's answer rather than a probe's — and the filter
+    // below stays because it is what keeps this door to insert-only work if a
+    // catalogue ever grows a second part again.
+    const plain = buildJournalType(freshCustomJournal(new Set()));
+    const target = templateTargets(plain).find((t) => t.key === "index:0")!;
+    const text = journalTemplateFiles(plain).find(
+      (f) => f.name === target.file
+    )!.content;
+    expect(consolidateChildren(text, plain)).toBeNull();
+    const ops = planSections(text, target.ctx, detectSections(text, target.ctx));
     expect(ops.filter((o) => o.kind === "extend")).toEqual([]);
   });
 
@@ -86,61 +161,69 @@ describe("what the scan finds", () => {
     // The property that makes this safe to offer as one all-or-nothing button:
     // `want` is the file's own section list, so there is nothing to add and
     // nothing to take away.
-    const text = staleTopicIndex();
+    const merged = scan(legacyTopicIndex()).merged;
     const c = ctx();
-    const ops = planSections(text, c, detectSections(text, c));
-    for (const op of ops) {
+    for (const op of planSections(merged, c, detectSections(merged, c))) {
       expect(["keep", "extend"]).toContain(op.kind);
     }
   });
 });
 
 describe("what applying it writes", () => {
-  const before = staleTopicIndex();
-  const after = applySections(before, ctx(), detectSections(before, ctx()));
+  const before = legacyTopicIndex();
+  const { merged } = scan(before);
 
-  it("inserts the missing table", () => {
-    expect(after).not.toBeNull();
-    expect(before).not.toContain("kind-table:practice");
-    expect(after!).toContain("kind-table:practice");
+  it("replaces the per-type headings and buttons with one of each", () => {
+    // The window's own words, asserted as the diff they describe: three heads,
+    // three create buttons and three tables become one bar, one create and one
+    // table.
+    for (const kind of STUDY_JOURNAL.kinds) {
+      expect(before).toContain(`kind-table:${kind.id}`);
+      expect(merged).not.toContain(`kind-table:${kind.id}`);
+      expect(merged).not.toContain(`button:study:new-${kind.id}`);
+    }
+    expect(merged.split("kind-table").length - 1).toBe(1);
+    expect(merged).toContain("button:study:new");
   });
 
-  it("adds the kind's header and button with it", () => {
-    // A table with no header above it and no "new Practice" button beside it
-    // would be half a section, which is what the fence carries per kind.
-    expect(after!).toContain("header:2:🛠️ Practice");
-    expect(after!).toContain("button:study:new-practice");
-  });
-
-  it("leaves every line the file already had", () => {
-    // NOTHING IS MOVED OR REWRITTEN — the offer's own words, and the reason a
-    // reader can accept it over a dashboard they have edited. Insert-only means
-    // the previous text is a subsequence of the new one.
-    const from = before.split("\n");
-    const to = after!.split("\n");
-    let i = 0;
-    for (const line of to) if (i < from.length && line === from[i]) i++;
-    expect(i).toBe(from.length);
+  it("leaves every line outside the card exactly where it was", () => {
+    // NOTHING ELSE ON THE NOTE IS TOUCHED — the offer's other sentence, and the
+    // reason a reader can accept this over a dashboard they have edited. The
+    // card is welded into the banner's fence (5.28), so "outside" here includes
+    // the stack dividers and the tracker grid above it as well as the sections
+    // below.
+    // The card's own lines, both spellings of them, derived from the same
+    // helper that composed the fixture rather than typed out here — six lines
+    // in, two out, and everything else has to be equal.
+    const cardLines = new Set([
+      ...perKindStack(STUDY_JOURNAL),
+      "button:study:new",
+      "kind-table",
+    ]);
+    const kept = (text: string): string[] =>
+      text
+        .split("\n")
+        .filter((l) => !cardLines.has(l.trim()));
+    expect(kept(merged)).toEqual(kept(before));
   });
 
   it("does not append a second copy of the whole section", () => {
-    // The failure `extend` exists to avoid: before 3.18 the planner could only
-    // say `add`, which appends a duplicate fence beside the short one.
-    expect(after!.split("kind-table:lesson").length - 1).toBe(1);
-    expect(after!.split("header:2:📖 Lessons").length - 1).toBe(1);
-  });
-
-  it("restores the file the catalogue would have composed", () => {
-    // The strongest statement available: catching up a stale dashboard lands on
-    // the shipped Topic index exactly, so `extend` inserts in catalogue order
-    // rather than at the end of the fence.
-    expect(after).toBe(studyTemplate("topic-index.md"));
+    // The failure `extend` exists to avoid, and the one the consolidation could
+    // have re-introduced wholesale: a fence the parser cannot attribute reads as
+    // ABSENT, and the next write appends a duplicate card beside it.
+    expect(merged.split("What's below").length - 1).toBe(1);
+    expect(applySections(merged, ctx(), detectSections(merged, ctx()))).toBeNull();
   });
 
   it("is a no-op on a dashboard that is already current", () => {
     const current = studyTemplate("topic-index.md");
     const c = ctx();
+    expect(consolidateChildren(current, STUDY_JOURNAL)).toBeNull();
     expect(applySections(current, c, detectSections(current, c))).toBeNull();
+  });
+
+  it("is a no-op the second time it runs", () => {
+    expect(consolidateChildren(merged, STUDY_JOURNAL)).toBeNull();
   });
 });
 
@@ -155,11 +238,11 @@ describe("where the offer is made", () => {
     // one would be a window that appears to say there is nothing to confirm.
     //
     // AND ONLY A KIND, SINCE THE SAME WINDOW STARTED COVERING FOLDER DEPTH.
-    // `findDashboardCatchups` looks for an index note with no table for a note
-    // type it should list. A level added opens a different gap entirely — the
-    // notes that were the deepest indexes now need a folder table where they
-    // have a note table — and half-answering that here would leave a shape
-    // neither the reader nor `previewRepair` expects.
+    // `findDashboardCatchups` looks for an index note that does not list a note
+    // type it should. A level added opens a different gap entirely — the notes
+    // that were the deepest indexes now need a folder table where they have a
+    // note table — and half-answering that here would leave a shape neither the
+    // reader nor `previewRepair` expects.
     expect(settings()).toContain(
       'changes.some((c) => c.subject === "kind" && c.kind === "added")'
     );
@@ -183,6 +266,60 @@ describe("where the offer is made", () => {
     // after — and the window itself is shared, so there is one plan, one
     // sentence and one notice however a kind arrives.
     expect(offer()).toContain("p.ops.map((o) => `${o.label} — ${o.detail}`)");
+  });
+
+  it("says the merge in the same voice, from the same string", () => {
+    // 1.0.16. The merge is not an op — `SectionOpKind` has no member that means
+    // it and inventing one would put a word in the shared vocabulary three
+    // catalogues can never emit — so it travels as a fact and the sentence comes
+    // from `consolidateDetail`. THE SAME FUNCTION THE REPAIR WINDOW CALLS, which
+    // is what keeps one change from being described two ways at two doors.
+    expect(offer()).toContain("consolidateDetail(type)");
+    expect(readCode("scaffold")).toContain("consolidateDetail(type)");
+  });
+
+  it("drops the reassurance it cannot make about a rewrite", () => {
+    // The old blurb promises *"nothing already in them is moved, rewritten or
+    // removed"*. That is exactly true of an `extend` and exactly false of a
+    // merge, which deletes a head and a button per kind — so the window holding
+    // a merge says something else. Keeping the promise over a rewrite would be
+    // the plugin lying in the one place it asks permission.
+    const src = offer();
+    expect(src).toContain("const merging = pending.filter((p) => p.merge).length");
+    const both = src.slice(src.indexOf("merging"));
+    const reassure = both.indexOf("nothing already in them is moved");
+    const branch = both.indexOf("Merging them into a single");
+    expect(reassure).toBeGreaterThan(-1);
+    expect(branch).toBeGreaterThan(-1);
+    expect(branch).toBeLessThan(reassure);
+  });
+
+  it("merges from this door only, and says why in a type", () => {
+    // ONE FILE, ONE ROW. The repair window computes this migration itself, with
+    // a diff beside it, in the group whose subject is notes an older release
+    // wrote — and the `journals` group's blurb promises that *"nothing already
+    // in them is touched"*. Reporting the merge from both doors would put two
+    // rows about one file in front of a reader who reads one diff per file, and
+    // would make that promise false in the row that carries it. So it is a
+    // parameter with a default of off, and this door is the one that passes it.
+    const src = offer();
+    expect(src).toContain("export interface CatchupScope");
+    expect(src).toContain("scope: CatchupScope = {}");
+    expect(src).toContain("const scope = { merge: true };");
+    expect(src).toMatch(/scope\.merge \? consolidateChildren\(text, type\) : null/);
+  });
+
+  it("runs the two steps in the same order in both functions", () => {
+    // The preview cannot drift from the write because both call one pure
+    // function and then one planner. Two orders would be two answers.
+    const src = offer();
+    for (const fn of ["findDashboardCatchups", "applyDashboardCatchups"]) {
+      const body = src.slice(src.indexOf(`export async function ${fn}`));
+      const merge = body.indexOf("consolidateChildren");
+      const plan = body.search(/planSections|applySections/);
+      expect(merge, fn).toBeGreaterThan(-1);
+      expect(plan, fn).toBeGreaterThan(merge);
+    }
   });
 
   it("keeps the promise the kind-change window makes", () => {

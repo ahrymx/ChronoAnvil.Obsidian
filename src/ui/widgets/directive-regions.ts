@@ -337,12 +337,16 @@ export function buildKindTableRegion(
   // band directly above it cannot disagree about what is here — which
   // is exactly what the ```base block this replaces did (see
   // tables.ts::buildKindTable).
+  //
+  // AND BARE IT IS EVERY KIND (1.0.16), which is where the empty argument stops
+  // being a refusal and becomes the other half of the grammar — `level-index`
+  // bare and `launcher` bare read the same way. It drew NOTHING before this, so
+  // no note on disk means anything by the bare word and there is nothing to be
+  // compatible with.
   const file = fileOfCtx(plugin, ctx);
   if (!file?.parent) return null;
-  const kindId = rest.trim();
-  if (!kindId) return null;
   return liveScopedWidget(plugin, ctx, file.parent.path, () =>
-    buildKindTable(plugin, ctx, kindId)
+    buildKindTable(plugin, ctx, rest.trim())
   );
 }
 

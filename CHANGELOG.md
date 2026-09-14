@@ -5,6 +5,63 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16] - 2026-09-14
+
+### Changed
+
+- **A journal index note lists everything below it in ONE table, with a Type
+  column.** *What's below* drew a group per note type — a heading, a **New …**
+  button, a chevron and a table each — so a project with Updates, Decisions and
+  Scratchpads showed three of everything over a folder that might hold one note.
+  It is one card now: the bar, one **New** button that asks which type you want,
+  and one table whose first column says what each row is.
+
+  The objection the old shape was built on has an answer rather than a
+  dismissal. Note types are scored on different trackers, and a combined table
+  needs a column for each — so it has one per distinct tracker, and a journal
+  whose Lessons carry Confidence and whose Practice carries Accuracy gets both,
+  each half empty. On a phone, where blank columns actually cost a line, 1.0.15
+  had already stopped drawing an empty value at all.
+
+  Your existing index notes go on working exactly as they are: the per-type
+  tables are still read and still drawn, and nothing needs repairing for a vault
+  to keep opening. Bringing them onto the new shape is offered, with the diff
+  beside it, under **Run format migrations** in *Set up / repair vault* — it is
+  the only thing in this release that moves lines you may have edited, so it is a
+  tick and never a default. A journal's index templates are in the same offer,
+  because the next subject's note is made from one.
+
+  A journal with a single note type is untouched in every respect: its card is
+  still named after that type, its button still says **New Lesson**, and the
+  migration refuses it.
+
+- **Adding a note type to a journal offers to merge the tables, rather than to
+  add one.** The window after *Add note type* promised that dashboards would
+  offer to list the new type, and it kept that promise by offering the missing
+  table. A single table lists a type added a minute ago without being touched —
+  so on an index note still carrying the old per-type stack, merging IS how the
+  new type appears, and that is what the window now offers. Its wording says
+  which of the two is happening: the reassurance that nothing already on the note
+  is moved or rewritten belongs to the insert-only case and is not made over a
+  rewrite.
+
+- **A note type's heading is no longer a place to rename the type.** Renaming a
+  heading on an index note used to offer to rename the note type under it, which
+  worked because the heading sat directly above that type's table. A card
+  listing every type has one bar and it names the card, so retitling it retitles
+  your card and nothing else. The offer is unchanged on every note written before
+  this release, where the per-type headings are still there. Settings → Custom
+  Journals renames a type on every note at once, as it always has.
+
+- **Importing a journal folder this release wrote recovers its structure but not
+  its icons.** Adopting a folder with no manifest reads each note type's icon and
+  order off the index notes' per-type headings and create buttons, and a
+  consolidated card carries neither. The ids, levels, trackers, ratings and which
+  type has pages all come back exactly as before; the icons default and the order
+  is alphabetical, and the window says so in its list of guesses rather than
+  quietly handing you a journal of 📝. A folder written by an earlier release
+  still recovers everything.
+
 ## [1.0.15] - 2026-09-13
 
 ### Changed

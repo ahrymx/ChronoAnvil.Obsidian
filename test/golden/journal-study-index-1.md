@@ -15,12 +15,8 @@ tracker:status
 # chronoanvil:trackers:end
 stack
 header:🗂️ What's below
-header:2:📖 Lessons
-button:study:new-lesson
-kind-table:lesson
-header:2:🛠️ Practice
-button:study:new-practice
-kind-table:practice
+button:study:new
+kind-table
 ```
 
 %% chronoanvil-graph %%

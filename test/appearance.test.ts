@@ -225,8 +225,12 @@ describe("the record lists share one builder", () => {
   it("builds the heading strip and the tracks in one place", () => {
     const s = t();
     expect(s).toContain("function recordList(");
-    // Every list that has columns goes through it.
-    expect(s.match(/recordList\(root, \[/g)?.length).toBe(2);
+    // Every list that has columns goes through it. COUNTED ON THE CALL RATHER
+    // THAN ON ITS FIRST ARGUMENT (1.0.16): the kind table's heading row is
+    // derived now — the title column is named by the kind where there is one
+    // and neutral over several — so the call spans lines and `recordList(root,
+    // [` no longer matches it.
+    expect(s.match(/recordList\(\s*root,/g)?.length).toBe(2);
   });
 
   it("has no <table> left in tables.ts", () => {

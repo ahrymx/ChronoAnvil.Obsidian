@@ -23,12 +23,27 @@ import { argSpansIn, readArg } from "../src/core/directive-grammar";
 import { plural, singularGuess } from "../src/core/util";
 import { STUDY_JOURNAL } from "../src/journals/journal";
 import { studyTemplate } from "./study-template";
+import { asPerKindTables } from "./legacy-children";
 import { readCode, readSrc } from "./sources";
 import { normaliseKinds } from "../src/core/settings-editors";
 import { kindPlural } from "../src/journals/journal-sections";
 import type { JournalKind } from "../src/journals/journal";
 
-const topic = (): string[] => studyTemplate("topic-index.md").split("\n");
+// ── THE FIXTURE IS 1.0.15's COMPOSITION, DELIBERATELY (1.0.16) ────────────
+//
+// The offer reads a FILE, and the files with a heading per note type are the
+// ones every vault already has: every release up to 1.0.15 composed a head, a
+// create button and a table for each kind, and 4.16 §3's rule is that what is
+// on disk goes on rendering forever. This release composes one table over every
+// kind instead, so the shipped Topic index has no per-kind head left to ask
+// about — and reading the question off the shipped template would have deleted
+// the test rather than the shape.
+//
+// So the shape moved to `test/legacy-children.ts` and this file ages the
+// template it used to read. What the offer does on a CONSOLIDATED card is the
+// last test in the describe: nothing, because no head there names a kind.
+const topic = (): string[] =>
+  asPerKindTables(studyTemplate("topic-index.md"), STUDY_JOURNAL).split("\n");
 
 describe("which headings name a note type", () => {
   it("finds the kind under each per-kind heading", () => {
@@ -66,6 +81,19 @@ describe("which headings name a note type", () => {
       (s) => readArg(lines, s) === "2:📖 Lessons"
     )!;
     expect(kindHeadedBy(lines, lessons, STUDY_JOURNAL)?.id).toBe("lesson");
+  });
+
+  it("offers nothing on a card that lists every kind in one table", () => {
+    // 1.0.16, and it falls out of the walk rather than needing a rule of its
+    // own: the consolidated fence's only head is the section's bar, and the line
+    // the walk then looks for is `kind-table:<id>`. A bare `kind-table` names no
+    // id, so there is no note type to offer a rename for — which is the truth
+    // about a card listing all of them. A reader who retitles that bar has
+    // retitled their card and nothing else, which is what they did.
+    const lines = studyTemplate("topic-index.md").split("\n");
+    for (const s of argSpansIn(lines, "header")) {
+      expect(kindHeadedBy(lines, s, STUDY_JOURNAL), readArg(lines, s)).toBeNull();
+    }
   });
 
   it("still finds the kind after the heading has been renamed", () => {

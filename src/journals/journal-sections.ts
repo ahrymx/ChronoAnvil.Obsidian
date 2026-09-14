@@ -357,6 +357,26 @@ export interface JournalSection
   // section claims fails the build.
   claims: string[];
 
+  // FENCE SHAPES THIS SECTION USED TO COMPOSE, as keyword lists. 1.0.16.
+  //
+  // `supersedes` on a question maps an older KEYWORD to what that spelling
+  // means; this is the same idea one level up — an older SHAPE of the whole
+  // fence, kept so the planner can still tell whose block it is. A section that
+  // changes what it composes leaves every note already written carrying the old
+  // arrangement, and attribution here is by signature: unrecognised means
+  // nobody's, nobody's means the section reads as absent, and absent means the
+  // next Save appends a second copy of it beside the first. 3.18 §1 and 5.28 are
+  // both that failure, found the hard way.
+  //
+  // ON THIS TYPE AND NOT ON `Section`, on the rule stated above: `signaturesFor`
+  // — the one reader — is this catalogue's own planner. The diary and note
+  // surfaces attribute by probe and have no use for it.
+  //
+  // A LIST OF LISTS, because a shape can have had more than one release. Every
+  // entry is matched the way the composed signature is: exactly, then forgiven
+  // for being short of declared parts.
+  superseded?: (ctx: SectionContext) => string[][];
+
   // ── THE SECTION THIS ONE STACKS UNDER (5.28) ────────────────────────
   //
   // One fence is one card. Several sections in one fence is therefore ONE CARD
@@ -1236,7 +1256,14 @@ const TASKS_BAR = "header:⏳ Open tasks";
 // depths, and a card headed "What's below" on a Subject and something else on a
 // Topic would be the plugin having two names for its own answer. The section's
 // row in the editor has said "What's below this note" since 3.18.
-const CHILDREN_BAR = "🗂️ What's below";
+export const CHILDREN_BAR = "🗂️ What's below";
+// The directive that draws the notes under this one. 1.0.16.
+//
+// A CONSTANT BECAUSE IT IS NOW WRITTEN FOUR WAYS IN THIS FILE — composed bare,
+// composed with a kind id, probed for by `locate`, and declared as the old
+// shape's signature — and the four have to be the same word. Bare means every
+// kind of the host's journal; `:<id>` means one of them (see `kindTable`).
+const CHILDREN_TABLE = "kind-table";
 
 // ── THE STATE ROW IS GONE, AND THE GRID IS WHY (5.28) ───────────────────
 //
@@ -1682,31 +1709,44 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
           ]),
         ];
       }
-      // The deepest index: its children are notes, so one table per kind
-      // rather than a folder rollup. Per kind rather than one combined table
-      // because the kinds are rated on different things — a single table would
-      // need a column for every rating in the type and leave most of it blank.
+      // The deepest index: its children are notes, so a table rather than a
+      // folder rollup.
       //
-      // COMPOSED FROM `childrenParts`, which is also what `parts` returns
-      // (3.18 §1.3). One list, two readers: the renderer that writes the fence
-      // and the planner that notices a fence is short of one. Deriving them
-      // separately is the drift that would let the plan report a gap filling
-      // it could not close.
+      // ── ONE TABLE OVER EVERY KIND, AS OF 1.0.16 ──────────────────────
+      //
+      // IT WAS ONE TABLE PER KIND, and the reason was written here: *"Per kind
+      // rather than one combined table because the kinds are rated on different
+      // things — a single table would need a column for every rating in the type
+      // and leave most of it blank."* That objection was true, it is still true,
+      // and `kindTablePropertiesFor` answers it rather than denying it: the
+      // combined table does carry a column per distinct rating, and 1.0.15
+      // stopped drawing an empty cell at all on the width where blankness hurt.
+      //
+      // WHAT THE OLD SHAPE COST, on the reader's own project index: three heads,
+      // three create buttons, three chevrons and three empty states for a folder
+      // holding one note. The consolidated card is a bar, a create button that
+      // asks which type, and the notes.
+      //
+      // COMPOSED FROM `childrenBody`, which is `childrenParts` where the parts
+      // are still a list (3.18 §1.3). One derivation, two readers: the renderer
+      // that writes the fence and the planner that notices a fence is short of a
+      // part. Deriving them separately is the drift that would let the plan
+      // report a gap filling it could not close.
       //
       // UNDER ONE BAR AS OF 5.12 — see `childrenBar`. The parts are groups now,
       // level 2, and the fence they sit in is one section rather than a stack of
       // them sharing a card by accident of being one fence.
-      return [
-        fence([
-          ...childrenBar(ctx, opts),
-          ...childrenParts(ctx, opts).flatMap((p) => p.lines),
-        ]),
-      ];
+      return [fence([...childrenBar(ctx, opts), ...childrenBody(ctx, opts)])];
     },
     // Its `fields` keys are kind ids — see `fieldKeys`. This is the one section
     // whose overrides cannot cross a journal boundary unresolved.
     fieldKeys: "kinds",
     parts: (ctx, opts) => childrenParts(ctx, opts),
+    // The per-kind stack every index note in every vault is carrying today. See
+    // `supersededChildren` — this is the only section that has one, and the
+    // reason it needs one is that 1.0.16 made its fence SHORTER rather than
+    // longer, which is the one direction the planner's forgiveness cannot reach.
+    superseded: supersededChildren,
   },
 
   {
@@ -2373,6 +2413,31 @@ export function childrenParts(
   opts?: SectionOverrides
 ): SectionPart[] {
   if (ctx.hasSubContainers) return [];
+  // ── AND EMPTY OVER SEVERAL KINDS TOO, AS OF 1.0.16 ──────────────────
+  //
+  // *"I think page types can be consolidated on journal index pages, [Updates
+  // Decisions scratchpads] can become one."*
+  //
+  // The deepest index draws ONE table over every kind now — see `kindTable`,
+  // which argues the consolidation, and `childrenBar`, which composes it — so
+  // there is nothing repeatable left in this section on a multi-kind type. One
+  // table is not a list of tables.
+  //
+  // AND THIS IS THE LOAD-BEARING HALF OF THE CHANGE, not a tidy-up after it.
+  // `parts` is what `missingParts` compares a fence against, and a part it
+  // cannot find is offered as an `extend`. Left as it was, every freshly
+  // composed index note would open the repair window reporting two missing
+  // tables and offering to put the per-kind groups back — the consolidation
+  // undone by the machine that was supposed to be catching notes up. Empty is
+  // "this section has no pieces to be short of", which is exactly true of it
+  // now and is the same answer the container branch above gives for the same
+  // structural reason.
+  //
+  // A ONE-KIND TYPE KEEPS ITS PART, and keeps it deliberately: its fence is
+  // byte-for-byte what it has composed since 2.54, `extensible` stays true for
+  // it, and the 3.18 §1 forgiveness that attributes a short fence to its
+  // section goes on working there untouched.
+  if (ctx.type.kinds.length > 1) return [];
   // Per-kind headings, keyed by kind id — the same `fields` shape `resources`
   // uses for its shelves, because it is the same decision: a section that emits
   // several of one thing names them individually or not at all.
@@ -2409,7 +2474,7 @@ export function childrenParts(
       label: kindPlural(kind),
       // Last of the three, which is the rule SectionPart states and the reason
       // an inserted part lands after the group before it rather than inside it.
-      probe: `kind-table:${kind.id}`,
+      probe: `${CHILDREN_TABLE}:${kind.id}`,
       lines: [
         // LEVEL 2, WRITTEN OUT. The renderer reads a bare second head as a group
         // anyway — see the demotion rule in `widgets/index.ts`, which is what
@@ -2417,7 +2482,7 @@ export function childrenParts(
         // say what it draws rather than lean on a rule that fills in a blank.
         ...(grouped ? [`header:2:${heading}`] : []),
         ...(grouped ? [`button:${ctx.type.id}:new-${kind.id}`] : []),
-        `kind-table:${kind.id}`,
+        `${CHILDREN_TABLE}:${kind.id}`,
       ],
     };
   });
@@ -2450,24 +2515,117 @@ export function childrenBar(
   // 2.54. Nothing to migrate where there was never a stack of bars to unstack.
   const solo = ctx.type.kinds.length === 1 && primary;
   const named = solo ? `${primary.emoji} ${kindPlural(primary)}` : CHILDREN_BAR;
-  // ── THE BAR CARRIES AN ACTION ONLY WHERE NOTHING ELSE CAN ───────────
+  // ── THE BAR CARRIES THE ACTION, WHICHEVER SHAPE THIS IS (1.0.16) ────
   //
-  // With groups, each head takes its own kind's create (see `childrenParts`), so
-  // the bar composes a title and nothing else and its actions strip is dropped
-  // for being empty. With one kind there is no head to sit beside — the bar IS
-  // that kind's head — so the button belongs on it, which is also what keeps a
-  // one-kind fence byte-identical to every release since 2.54.
+  // IT USED TO BE "ONLY WHERE NOTHING ELSE CAN". With groups, each head took its
+  // own kind's create (see `childrenParts`), the bar composed a title and nothing
+  // else, and its actions strip was dropped for being empty. With one kind there
+  // was no head to sit beside — the bar IS that kind's head — so the button
+  // belonged on it.
+  //
+  // There are no group heads on a multi-kind index any more, so the second half
+  // of that sentence now covers both: one table, one bar over it, one create
+  // button on the bar. What changes is WHICH button. A solo type names its kind
+  // — `new-lesson`, the same line it has composed since 2.54 — and a multi-kind
+  // type composes the bare `new`, which asks. See `journalSubActionSpec` for why
+  // the bare word rather than `new-note`, and `newNoteAsking` for the question.
+  //
+  // AND 5.12'S REVERSAL IS REVERSED HONESTLY. That release raised the FIRST
+  // kind's button to the bar and was made to put it back, because a strip
+  // holding one button whose rows were six lines below it named one kind and
+  // added to one kind while the kind beside it showed an empty head. Neither
+  // half of that is true here: there is one set of rows, the button adds to all
+  // of them, and no head is left unserved because there are no heads.
   return [
     `header:${opts?.label ?? named}`,
-    ...(solo ? [`button:${ctx.type.id}:new-${primary.id}`] : []),
+    solo
+      ? `button:${ctx.type.id}:new-${primary.id}`
+      : `button:${ctx.type.id}:new`,
   ];
 }
 
+// The lines under that bar: the table, and — on a one-kind type — the part that
+// has always carried it.
+//
+// ONE READER MORE THAN IT LOOKS. `render` writes these, and `signaturesFor`
+// derives the section's fence signature from exactly what `render` writes, so
+// this is also the shape the planner recognises. Anything composed here that the
+// parts list cannot account for has to be accounted for there instead — which is
+// what `supersededChildren` is for.
+export function childrenBody(
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): string[] {
+  if (ctx.type.kinds.length > 1) return [CHILDREN_TABLE];
+  return childrenParts(ctx, opts).flatMap((p) => p.lines);
+}
+
+// The per-kind shape this section composed up to 1.0.15, as fence keyword lists.
+//
+// WHY THE PLANNER NEEDS TO BE TOLD (1.0.16). Attribution is by SIGNATURE here —
+// `ownersBySignature` deals a fence's keyword list against what each section
+// composes — and a note written before this release carries a fence that is
+// LONGER than the new composition rather than shorter: three heads, two buttons
+// and two tables against one of each. The 3.18 §1 forgiveness only reaches a
+// fence that is SHORT of declared parts, so every existing multi-kind index note
+// would be read as nobody's, `children` would be reported ABSENT, and pressing
+// Save in the section editor would append a SECOND copy of the card beside the
+// one already there. That is the exact failure 3.18 §1 and 5.28 were each written
+// to stop, arriving for the third time from a third direction.
+//
+// SO THE OLD SHAPE STAYS A SIGNATURE, WHICH IS THE SAME ANSWER `locate` HAS
+// ALWAYS GIVEN — it probes for either spelling (4.16 §1's rule: a word already
+// on disk goes on rendering, and what changes is what the catalogue COMPOSES).
+// This is that rule applied to the whole fence rather than to one word of it.
+//
+// NO `header` IN IT, AND THAT IS NOT A SIMPLIFICATION. A signature holds a
+// fence's CONTENT keywords: `fenceKeywords` drops every entry of
+// `MODIFIER_KEYWORDS` from both sides of the comparison, and `header:` is one of
+// the six (4.70) — which is also why a note written before the `actions` keyword
+// existed still attributes its banner. So the old shape's three heads are not
+// part of what the planner matches, and writing them here would produce a
+// signature no file in any vault can have.
+//
+// ONE LIST, WITH SHORTNESS LEFT TO THE MACHINERY THAT ALREADY FORGIVES IT. The
+// shape had more than one release — 5.12 gave every group its own create button,
+// and before that the first kind's was raised to the bar — so a real note may
+// carry fewer buttons than kinds. Declaring a list per release would be a
+// history to keep; declaring the LONGEST one and letting 3.18 §1's sub-multiset
+// fallback cover the rest is the same answer arrived at from the section's own
+// vocabulary, and it is why these signatures are `extensible`.
+//
+// A ONE-KIND TYPE IS EXCLUDED BECAUSE ITS FENCE DID NOT CHANGE: one button and
+// one table then, one button and one table now, and declaring it would hand the
+// planner a duplicate of the live signature.
+export function supersededChildren(ctx: SectionContext): string[][] {
+  if (ctx.hasSubContainers || ctx.type.kinds.length < 2) return [];
+  const perKind: string[] = [];
+  for (let i = 0; i < ctx.type.kinds.length; i++) {
+    perKind.push("button", CHILDREN_TABLE);
+  }
+  return [perKind];
+}
+
+// ── AND THE BARE WORD, WHICH IS WHAT IT COMPOSES NOW (1.0.16) ────────
+//
+// `kind-table` alone is every kind of the host's own journal, and it is what a
+// multi-kind index note composes as of this release. A probe that knew only the
+// per-kind spelling would report the section ABSENT on every note written from
+// today — the same failure this function's own comment describes for the
+// `topics-table` rename, with the releases the other way round.
+//
+// THE ID LIST IS STILL A LIST, so `kind-table:removed` — a directive left behind
+// by deleting a kind — matches neither arm and the section is still correctly
+// read as gone from that fence. The optional group cannot swallow it: an
+// argument that is present has to be one of the ids, or the anchor fails.
 function kindTableProbe(ctx: SectionContext): RegExp {
   const ids = ctx.type.kinds.map((k) =>
     k.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   );
-  return new RegExp(`^\\s*kind-table:(${ids.join("|")})\\s*$`, "m");
+  return new RegExp(
+    `^\\s*${CHILDREN_TABLE}(?::(${ids.join("|")}))?\\s*$`,
+    "m"
+  );
 }
 
 // The rating an index note's charts should plot: the first one any kind of

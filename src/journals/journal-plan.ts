@@ -137,13 +137,11 @@ import {
   STACK_KEYWORD,
   cutFromFence,
   insertBar,
-  isHeaderLine,
   isStackLine,
   stackParts,
   leadingBar,
   needsSoloBar,
   soloBar,
-  titledHeadersIn,
   splitDirective,
 } from "../core/directive-grammar";
 import {
@@ -358,6 +356,40 @@ function signaturesFor(ctx: SectionContext): {
         keywords: fenceKeywords(b.lines),
         fenceKind: b.info,
         extensible: (s.parts?.(ctx, sectionOverrides(ctx, s.id)) ?? []).length > 0,
+      });
+    }
+  }
+  // ── AND THE SHAPES A SECTION USED TO COMPOSE (1.0.16) ────────────────
+  //
+  // `JournalSection.superseded` makes the case in full. The short of it: this
+  // function is where "whose fence is this" is decided, it decides it from what
+  // the catalogue composes TODAY, and a section whose composition got SHORTER
+  // leaves every note already written holding a fence longer than any signature
+  // here. Longer is the one direction neither `ownerOf`'s sub-multiset fallback
+  // nor `ownersBySignature`'s short tail forgives, so the block becomes nobody's
+  // and the section reads as absent — and an absent section is `add`, which
+  // appends a second copy of a card the note already has.
+  //
+  // `extensible: true` ON EVERY ONE OF THEM, and it is what makes a note that
+  // has been hand-trimmed keep working: the old shape was built from repeatable
+  // parts, so a reader who deleted one kind's group from their own index note is
+  // short of a declared piece of it, which is exactly the case 3.18 §1's
+  // fallback exists for. The parts the CURRENT composition declares are what an
+  // `extend` would offer, and that list is empty for the sections that need this
+  // — so nothing is offered on the strength of a superseded shape.
+  //
+  // THE FENCE KIND IS `chronoanvil`, which is what a section's own fence is and
+  // what these lists were composed inside. Nothing here has ever written another
+  // kind, and a superseded shape in a `base` or `dataview` fence would be a
+  // different claim needing a different field.
+  for (const s of sectionsFor(ctx)) {
+    for (const keywords of s.superseded?.(ctx) ?? []) {
+      if (!keywords.length) continue;
+      fences.push({
+        section: s,
+        keywords,
+        fenceKind: "chronoanvil",
+        extensible: true,
       });
     }
   }
@@ -1023,43 +1055,26 @@ function isStackRun(run: SectionRun, ctx: SectionContext): boolean {
     .every((id) => byId.has(id) && WELDS_INTO_BANNER.has(id));
 }
 
-// ── A FENCE FULL OF GROUP HEADS AND NO SECTION BAR (5.12) ────────────────
+// ── A FENCE FULL OF GROUP HEADS AND NO SECTION BAR (5.12, GONE IN 1.0.16) ─
 //
-// `needsSoloBar` asks `isSectionFence`, which asks whether the fence carries a
-// `header:` at all — the right question while a fence carried at most one. The
-// deepest index carries one PER NOTE KIND, so every Topic index already in a
-// vault answers "titled" while missing the only bar that names the section those
-// heads sit in. Its first group's head is read as the section's, and the card
-// comes out headed "📝 Notes" with Lessons and Experiments inside it.
+// `missingGroupBar` stood here. What it repaired was the deepest index as 5.11
+// composed it — a head, a button and a table per note kind, and no bar naming
+// the section they sat in — by counting the heads against the parts the
+// catalogue declares and inserting the bar when the two agreed exactly.
 //
-// COUNTED, NOT MATCHED, and that is the whole of why this is safe. Comparing the
-// file's first head against the bar the catalogue would compose reports a
-// missing bar on every note whose reader RENAMED it — the one thing this must
-// never do, since renaming in place is the gesture that titles it. A count moves
-// with a rename: one head per group that is actually here, and nothing else, is
-// a fence with no bar; one more than that is a fence with one, whatever it says.
+// IT IS DELETED RATHER THAN LEFT UNREACHABLE. 1.0.16 consolidates that section:
+// `childrenParts` returns nothing over several kinds, so the "two or more groups
+// with heads" its first line tested for cannot be true of any section in this
+// catalogue, and every path through it returned null. A repair that can only
+// return null is not a repair a reader can be offered.
 //
-// STRICT ON BOTH SIDES. A head short (a reader deleted one and kept its table)
-// and a head over (something else in the fence titles itself) both decline —
-// the repair writes a line into somebody's note, so the only case it takes is
-// the one it can name exactly.
-export function missingGroupBar(
-  runLines: readonly string[],
-  section: JournalSection,
-  ctx: SectionContext
-): string | null {
-  const parts = section.parts?.(ctx, sectionOverrides(ctx, section.id)) ?? [];
-  const groups = parts.filter((p) => p.lines.some((l) => isHeaderLine(l.trim())));
-  // ONE GROUP IS NO GROUPING on this side too: a section whose parts carry no
-  // heads composes a bar and a body, which is exactly what `needsSoloBar`
-  // already reports. Two doors onto one case is two answers to be told apart.
-  if (groups.length < 2) return null;
-  const present = new Set(runLines.map((l) => l.trim()));
-  const here = groups.filter((g) => present.has(g.probe.trim())).length;
-  if (here === 0) return null;
-  if (titledHeadersIn(runLines).length !== here) return null;
-  return declaredBar(section, ctx) ?? null;
-}
+// AND WHAT REPLACES IT DOES MORE. `consolidateChildren` takes the same fence and
+// merges the tables, which means it also NAMES it: a bar left reading "📖
+// Lessons" over a table of lessons and practice would be a card naming a third
+// of itself, so the migration retitles exactly that bar (and only where it is
+// still the composed spelling). One door, one diff, and the note comes out as
+// the shape this release composes rather than as the 5.12 shape with a line put
+// back on top.
 
 // The bar this run is short of, by either door.
 //
@@ -1313,10 +1328,12 @@ export function missingBar(
   section: JournalSection,
   ctx: SectionContext
 ): string | null {
-  return (
-    missingSoloBar(runLines, run, section, ctx) ??
-    missingGroupBar(runLines, section, ctx)
-  );
+  // ONE DOOR SINCE 1.0.16, where there were two — see the note above
+  // `missingSoloBar` for what the second one repaired and what took it over.
+  // The function is kept, and kept named, because "the bar this run is short of"
+  // is the question `planSections` and `applySections` both ask and the place a
+  // second answer would be added again.
+  return missingSoloBar(runLines, run, section, ctx);
 }
 
 export function planSections(

@@ -1099,9 +1099,23 @@ export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
     reason: "needs-vault-answer",
     note: "must name a note type, and the section window has no list of this vault's journals",
   },
+  // ── STILL NOT OFFERED, AND NO LONGER FOR WANT OF AN ARGUMENT (1.0.16) ──
+  //
+  // `kind-table` takes a BARE form now — no argument at all, meaning every note
+  // type of the journal the host note sits in — so the sentence that kept it out
+  // of the window ("must name a note type") is half of what it was. It stays
+  // out, and the reason is the other half: the bare form is answered by the HOST
+  // NOTE, and it is answerable only on an index note of a journal. Offered from
+  // the section window it would be a row a reader can add to a diary page, to a
+  // leaf note or to a journal note one level too shallow, and draw an empty card
+  // on all three.
+  //
+  // What reaches those surfaces instead is the section — `children` composes
+  // this directive, and the catalogue knows which depth it belongs on. A widget
+  // whose correctness depends on where it is put is a section's business.
   "kind-table": {
     reason: "needs-vault-answer",
-    note: "must name a note type, and the section window has no list of this vault's journals",
+    note: "lists the note types of the journal the host note indexes, which is a fact about the note rather than an answer the section window can collect",
   },
 };
 

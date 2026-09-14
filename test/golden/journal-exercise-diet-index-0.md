@@ -14,12 +14,8 @@ tracker:status
 # chronoanvil:trackers:end
 stack
 header:🗂️ What's below
-header:2:🏋️ Workouts
-button:exercise-diet:new-workout
-kind-table:workout
-header:2:🍽️ Meals
-button:exercise-diet:new-meal
-kind-table:meal
+button:exercise-diet:new
+kind-table
 ```
 
 %% chronoanvil-graph %%

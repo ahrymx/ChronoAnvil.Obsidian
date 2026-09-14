@@ -12,6 +12,7 @@ import {
   hasLevelBelow,
   isCompletedStatus,
   kindTableProperties,
+  kindTablePropertiesFor,
   sortKindRows,
   KindRow,
 } from "../src/ui/tables";
@@ -27,6 +28,7 @@ import {
 import { composeTemplate } from "../src/journals/custom-journal";
 import { studyTemplate } from "./study-template";
 import { readCode } from "./sources";
+import { asPerKindTables } from "./legacy-children";
 
 // ── kind-table ────────────────────────────────────────────────────────────
 //
@@ -203,10 +205,23 @@ describe("what order rows come in", () => {
 describe("the section that writes it", () => {
   const deepest = sectionContext(COOKING, { depth: 1 });
 
-  it("emits one kind-table per kind and no base block", () => {
+  it("emits one kind-table over every kind, and no base block", () => {
+    // ── ONE TABLE, AND NO KIND ID IN THE FENCE (1.0.16) ──────────────
+    //
+    // This read `toContain("kind-table:recipe")` and `kind-table:attempt`. The
+    // section composed a table per note kind, and the reader's project index
+    // drew three heads, three create buttons, three chevrons and three empty
+    // states over a folder holding one note. It composes the bare directive
+    // now, which is every kind of the host's own journal.
+    //
+    // THE ID IS WHAT WENT, WHICH IS THE HALF WORTH ASSERTING. A line naming a
+    // kind is a line that goes out of date the moment a kind is added or
+    // renamed, and both of those had migrations because of it.
     const rendered = renderSection(findSection("children")!, deepest);
-    expect(rendered).toContain("kind-table:recipe");
-    expect(rendered).toContain("kind-table:attempt");
+    expect(rendered).toContain("\nkind-table\n");
+    for (const kind of COOKING.kinds) {
+      expect(rendered).not.toContain(kind.id);
+    }
     expect(rendered).not.toContain("```base");
   });
 
@@ -234,15 +249,23 @@ describe("the section that writes it", () => {
     expect(detectSections(composed, deepest)).toContain("children");
   });
 
-  it("still finds the section when a kind's table has been deleted by hand", () => {
-    // One block, several kinds: a reader who removed one table still has the
-    // section, and offering to append a second copy of the whole thing would
-    // be worse than leaving it alone.
-    const composed = composeTemplate(deepest).replace(
-      "kind-table:recipe\n",
-      ""
-    );
-    expect(detectSections(composed, deepest)).toContain("children");
+  it("still finds the section on a note an older release wrote", () => {
+    // WHAT THIS TEST USED TO ASK, and why the new question is the same one. It
+    // deleted one kind's table from a composed note — "one block, several
+    // kinds: a reader who removed one table still has the section, and offering
+    // to append a second copy of the whole thing would be worse than leaving it
+    // alone". There is one table now, so deleting it deletes the section, and
+    // the note that still carries several is the note every vault already has.
+    //
+    // So the probe is asked about 1.0.15's composition, which is the shape the
+    // duplicate-card failure would actually happen on.
+    const aged = asPerKindTables(composeTemplate(deepest), COOKING);
+    expect(detectSections(aged, deepest)).toContain("children");
+    // AND ABOUT ONE OF ITS TABLES ALONE, which is the original question with
+    // the fixture aged: a reader who deleted a group from that note still has
+    // the section.
+    const short = aged.replace("kind-table:recipe\n", "");
+    expect(detectSections(short, deepest)).toContain("children");
   });
 
   it("does not find it in a template that has no note tables", () => {
@@ -256,18 +279,70 @@ describe("the section that writes it", () => {
 });
 
 describe("Study composes the same way", () => {
-  it("writes both its kinds' tables into the Topic index", () => {
+  it("writes one table over both its kinds into the Topic index", () => {
     const topic = studyTemplate("Topic Index.md");
-    expect(topic).toContain("kind-table:lesson");
-    expect(topic).toContain("kind-table:practice");
+    expect(topic).toContain("\nkind-table\n");
+    expect(topic).not.toContain("kind-table:");
     expect(topic).not.toContain("```base");
   });
 
   it("gives each of them the rating that kind is scored on", () => {
+    // STILL PER KIND, because a table over ONE kind still exists: a journal
+    // with a single note type composes `kind-table:<id>`, and the widget takes
+    // this path for it. The two column sets are the two shapes, and the one
+    // below is the one that changed.
     const byId = (id: string) =>
       kindTableProperties(STUDY_JOURNAL.kinds.find((k) => k.id === id)!);
     expect(byId("lesson")).toEqual(["date", "confidence", "status"]);
     expect(byId("practice")).toEqual(["date", "accuracy", "status"]);
+  });
+
+  it("gives a table over several kinds a Type column and every tracker", () => {
+    // ── THE OBJECTION THE CATALOGUE HAD WRITTEN DOWN (1.0.16) ────────
+    //
+    // *"Per kind rather than one combined table because the kinds are rated on
+    // different things — a single table would need a column for every rating in
+    // the type and leave most of it blank."* That was true and it is still
+    // true: this is one column per DISTINCT tracker, so Study's confidence and
+    // accuracy both appear and each is half empty. What changed is the cost of
+    // blank — 1.0.15 stopped drawing an empty cell once the columns collapse,
+    // so on a phone the sparse half is simply not there, and on a desktop a
+    // dash under a heading is what a table is for.
+    expect(kindTablePropertiesFor(STUDY_JOURNAL.kinds)).toEqual([
+      "type",
+      "date",
+      "confidence",
+      "accuracy",
+      "status",
+    ]);
+  });
+
+  it("gives two kinds rating the same tracker one column, not two", () => {
+    // A TRACKER IS THE COLUMN, NOT A KIND. The column is the tracker's
+    // question, and two kinds asking it are asking one question.
+    const kinds = [
+      { id: "a", emoji: "🅰️", label: "A", rating: "confidence" },
+      { id: "b", emoji: "🅱️", label: "B", rating: "confidence" },
+      { id: "c", emoji: "🇨", label: "C" },
+    ];
+    expect(kindTablePropertiesFor(kinds)).toEqual([
+      "type",
+      "date",
+      "confidence",
+      "status",
+    ]);
+  });
+
+  it("names the status column from the journal's own status property", () => {
+    // The one argument both shapes share, and for the same reason: a journal
+    // whose status tracker is called something else says so in every table.
+    expect(kindTablePropertiesFor(STUDY_JOURNAL.kinds, "stage")).toEqual([
+      "type",
+      "date",
+      "confidence",
+      "accuracy",
+      "stage",
+    ]);
   });
 });
 

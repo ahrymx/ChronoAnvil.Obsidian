@@ -802,3 +802,84 @@ describe("moving the four dashboards", () => {
     expect(body).toContain("this.app.fileManager.renameFile");
   });
 });
+
+// ── §N+2. THE JOURNAL INDEX NOTES, WHICH ARE NOT SHIPPED NOTES (1.0.16) ───
+//
+// *"I think page types can be consolidated on journal index pages, [Updates
+// Decisions scratchpads] can become one."*
+//
+// The ninth migration, and the first that walks files the plugin did not
+// compose. Everything above reads `shippedNotes` — pages with a known
+// destination and a text this release can write again — and an index note is
+// the reader's: one per subject, named by them, made when they made the folder.
+// So it has a walk of its own, and the three properties below are what keep
+// that walk inside the window's promises.
+describe("merging a journal index's tables", () => {
+  const src = readSrc("scaffold");
+
+  it("reports it in migrations, where the rewrites with diffs live", () => {
+    // NOT IN `journals`, WHICH IS THE GROUP ABOUT THE SAME FILES. That group's
+    // blurb promises "nothing already in them is touched" and this deletes a
+    // group head and a create button per note type, so reporting it there would
+    // make the promise false in the row that carries it — and reporting it in
+    // both would put two rows about one file in front of a reader who reads one
+    // diff per file.
+    const plan = src.slice(
+      src.indexOf("private async planMigrations("),
+      src.indexOf("async surveyRepair(")
+    );
+    expect(plan).toContain("consolidateChildren(original, type)");
+    expect(plan).toContain('ops: [{ kind: "migrate", detail: consolidateDetail(type) }]');
+    // One row per file, with the diff the reader decides on — the same shape
+    // every other migration in this group reports.
+    expect(plan).toContain("diff: diffText(original, merged)");
+    // And the `journals` group is still the insert-only one it says it is.
+    expect(src).toContain(
+      "Only the missing tables — nothing already in them is touched."
+    );
+    const journalsGroup = src.slice(
+      src.indexOf('id: "journals",'),
+      src.indexOf('id: "migrations",')
+    );
+    expect(journalsGroup).not.toContain("consolidateChildren");
+  });
+
+  it("names it in the blurb, because the window is the plan", () => {
+    // Every other migration in the group is named in that sentence. A rewrite
+    // the group's own description does not mention is a file changing for a
+    // reason the reader was not given.
+    expect(src).toContain(
+      "a journal index's table per note type merged into one"
+    );
+  });
+
+  it("walks the templates with the notes, or it undoes itself", () => {
+    // A journal's index TEMPLATE is what the next subject's note is made from,
+    // so leaving it on the old shape would have the migration undone one folder
+    // at a time. `indexSurfaces` carries both, which is also what keeps this
+    // door and the kind-add offer looking at one set of files.
+    const at = src.indexOf("private async mergeChildrenTables(");
+    const body = src.slice(at, src.indexOf("\n  }", at));
+    expect(body).toContain("indexSurfaces(this.app, type)");
+    // READ, CALL A PURE FUNCTION, WRITE ONLY ON A NON-NULL ANSWER — the shape
+    // the eight before it have, and the repetition is the point: a migration
+    // that looks like the last one is a migration a reader can check.
+    expect(body).toContain("const merged = consolidateChildren(original, type);");
+    expect(body).toContain("if (merged == null || merged === original) continue;");
+    expect(body.indexOf("vault.read")).toBeLessThan(body.indexOf("vault.modify"));
+    // PER FILE ERRORS, on `splitEntryBanners`' rule: one unreadable index note
+    // in a journal of forty must not stop the other thirty-nine, and there is
+    // no outer `try` here to fall into.
+    expect(body).toContain("catch (e) {");
+    // And a one-kind journal is refused before a single file is read — its card
+    // is what it always was.
+    expect(body).toContain("if (type.kinds.length < 2) return 0;");
+  });
+
+  it("runs under the migrations tick and nowhere else", () => {
+    const apply = src.slice(src.indexOf('if (chosen.has("migrations")) {'));
+    expect(apply.slice(0, apply.indexOf('if (chosen.has("templates"))'))).toContain(
+      "await this.mergeChildrenTables(type)"
+    );
+  });
+});

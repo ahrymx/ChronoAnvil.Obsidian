@@ -15,12 +15,8 @@ tracker:status
 # chronoanvil:trackers:end
 stack
 header:🗂️ What's below
-header:2:📝 Updates
-button:projects:new-update
-kind-table:update
-header:2:⚖️ Decisions
-button:projects:new-decision
-kind-table:decision
+button:projects:new
+kind-table
 ```
 
 %% chronoanvil-graph %%

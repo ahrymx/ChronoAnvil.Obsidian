@@ -15,6 +15,7 @@ import {
 } from "../src/journals/custom-journal";
 import {
   childrenBar,
+  childrenParts,
   defaultSectionIds,
   detectSections,
   findSection,
@@ -27,6 +28,8 @@ import {
 } from "../src/journals/journal-sections";
 import type { SectionContext } from "../src/journals/journal-sections";
 import { segment } from "../src/core/layout";
+import { asPerKindTables } from "./legacy-children";
+import { studyTemplate } from "./study-template";
 import { wantFromJournalNote } from "../src/journals/journal-template";
 import { WIDGETS } from "../src/core/widget-registry";
 import { isPageWidgetId } from "../src/core/widget-sections";
@@ -906,32 +909,49 @@ describe("reordering", () => {
 
 // ── extending a section that is present and short of a part (3.18 §1) ──────
 //
-// `children` emits one header, button and table PER NOTE KIND, so a dashboard
-// written before a journal gained a kind is present, wanted, and missing a
+// `children` emitted one header, button and table PER NOTE KIND, so a dashboard
+// written before a journal gained a kind was present, wanted, and missing a
 // table. Until 3.18 the planner could not say that: exact keyword matching
 // called the short fence nobody's, the section read as ABSENT, and the plan
 // said `add` — which appends a SECOND copy of the whole section beside the
 // short one. The roadmap predicted a silent `keep`; the tree did something
 // worse, and it wrote. These tests pin the fixed behaviour and, first, the
 // property that makes the fix trustworthy.
+//
+// ── AND THE FIXTURE MOVED IN 1.0.16 ──────────────────────────────────────
+//
+// A journal with SEVERAL note kinds composes one table over all of them now,
+// so its card has no per-kind part to be short of and there is no such thing as
+// a Topic index written before `practice` existed — one table lists a kind
+// added a minute ago. What is left with parts is a journal with ONE kind, whose
+// card is bar, button and table exactly as 5.11 wrote it, and that is the
+// surface every assertion below is made on.
+//
+// NOT DELETED WITH THE SHAPE, for two reasons. The machinery is live — a reader
+// who deletes their one table is still offered it back, which is this op and
+// nothing else — and the failure it was written for is the one the
+// consolidation could have re-introduced wholesale: a fence the parser cannot
+// attribute reads as ABSENT and the next Save appends a second card. That the
+// old per-kind fences are still attributable is asserted next door, in
+// `journal-groups.test.ts`, against the shape they were actually written in.
 
 describe("parts and the extend op", () => {
-  // The Study Topic index — the deepest index, where children is per-kind.
-  const topic = richTopic;
-  const want = (ctx: SectionContext): string[] => sectionsPresent(topic().text, ctx);
-  // A file written before `practice` existed.
-  const dropPractice = (text: string): string =>
+  // A one-kind journal's only index — the surface where `childrenParts` still
+  // has a part to report.
+  const solo = (): { ctx: SectionContext; text: string } => {
+    const target = templateTargets(plain).find((t) => t.key === "index:0")!;
+    return {
+      ctx: target.ctx,
+      text: journalTemplateFiles(plain).find((f) => f.name === target.file)!
+        .content,
+    };
+  };
+  const want = (ctx: SectionContext): string[] => sectionsPresent(solo().text, ctx);
+  // A file whose table the reader deleted — the same fence, one line short.
+  const dropTable = (text: string): string =>
     text
       .split("\n")
-      .filter(
-        (l) =>
-          // `header:2:` SINCE 5.12 — a kind's head is a group inside the
-          // section's bar. Both spellings, so the fixture keeps deleting the
-          // same three lines whichever release composed the template.
-          !/^(header:(?:2:)?🛠️|button:study:new-practice|kind-table:practice)/.test(
-            l.trim()
-          )
-      )
+      .filter((l) => l.trim() !== "kind-table:entry")
       .join("\n");
 
   it("composes its fence out of exactly the parts it declares", () => {
@@ -1038,86 +1058,69 @@ describe("parts and the extend op", () => {
   });
 
   it("calls a short fence an extend, not an add", () => {
-    const { ctx, text } = topic();
-    const stale = dropPractice(text);
+    const { ctx, text } = solo();
+    const stale = dropTable(text);
     const ops = planSections(stale, ctx, want(ctx));
     const children = ops.find((o) => o.sectionId === "children")!;
     expect(children.kind).toBe("extend");
-    expect(children.detail).toContain("Practice");
+    expect(children.detail).toContain("Entries");
     // The failure this replaces: a second copy of the whole section.
     expect(ops.filter((o) => o.kind === "add")).toEqual([]);
   });
 
   it("writes exactly the file the catalogue would have composed", () => {
-    const { ctx, text } = topic();
-    const out = applySections(dropPractice(text), ctx, want(ctx));
+    const { ctx, text } = solo();
+    const out = applySections(dropTable(text), ctx, want(ctx));
     expect(out).toBe(text);
   });
 
   it("is idempotent, and a pristine file is not a write at all", () => {
-    const { ctx, text } = topic();
+    const { ctx, text } = solo();
     // Nothing to do on a file that already has every part — the property that
     // stops this becoming a formatter that changes a file every time it runs.
     expect(applySections(text, ctx, want(ctx))).toBeNull();
-    const once = applySections(dropPractice(text), ctx, want(ctx))!;
+    const once = applySections(dropTable(text), ctx, want(ctx))!;
     expect(applySections(once, ctx, want(ctx))).toBeNull();
   });
 
-  it("keeps a reader's order and a reader's retitled header", () => {
+  it("leaves every line it did not add exactly where it was", () => {
     // The rule at the top of journal-plan.ts: no reflowing, no reordering
     // blocks it did not move. An extension may INSERT lines; it may not tidy
-    // the ones around them.
-    const type = buildJournalType({
-      ...freshCustomJournal(new Set()),
-      id: "s3",
-      levels: [
-        { id: "subject", noun: "Subject", fallbackEmoji: "📚" },
-        { id: "topic", noun: "Topic", fallbackEmoji: "📂" },
-      ],
-      kinds: [
-        { id: "lesson", emoji: "📖", label: "Lesson" },
-        { id: "quiz", emoji: "❓", label: "Quiz" },
-        { id: "practice", emoji: "🛠️", label: "Practice" },
-      ],
-    });
-    const target = templateTargets(type).find((t) => t.key === "index:1")!;
-    const ctx = target.ctx;
-    const composed = journalTemplateFiles(type).find(
-      (f) => f.name === target.file
-    )!.content;
-    // Practice above Lessons, Lessons retitled by hand, and no Quiz yet.
+    // the ones around them — and on this surface the lines around them are the
+    // banner and the tracker grid the card is welded into (5.28), which is the
+    // strongest form of the claim available: the reader's whole fence survives
+    // an edit made in the middle of it.
     //
-    // EDITED IN PLACE INSIDE THE BANNER'S FENCE (5.28). The index is welded in
-    // there, so there is no fence of its own to swap out — the replacement
-    // starts at the section's bar and runs to the fence close, and the banner
-    // and tracker lines above it are the reader's file, untouched.
-    const edited = composed.replace(
-      /header:🗂️[\s\S]*?```/,
-      [
-        // The section's own bar, which the reader has left alone, and the two
-        // groups under it in THEIR order rather than the catalogue's.
-        "header:🗂️ What's below",
-        "button:s3:new-lesson",
-        "header:2:🛠️ Practice",
-        "button:s3:new-practice",
-        "kind-table:practice",
-        "header:2:📖 My Own Title",
-        "kind-table:lesson",
-        "```",
-      ].join("\n")
+    // WHAT THIS TEST USED TO ASSERT AS WELL, and cannot any more: that a THIRD
+    // kind's group landed after the kind it follows in the CATALOGUE, on a file
+    // whose reader had put Practice above Lessons. That was the strongest thing
+    // in this describe and it went with the groups — one part cannot be
+    // mis-ordered against itself. It is not replaced by a weaker version of the
+    // same claim: the order arithmetic is reachable only through a catalogue
+    // nobody ships, and a test that built one would pin the fixture rather than
+    // the plugin.
+    const { ctx, text } = solo();
+    const stale = dropTable(text);
+    const out = applySections(stale, ctx, want(ctx))!;
+    const before = stale.split("\n");
+    const after = out.split("\n");
+    expect(after.length).toBe(before.length + 1);
+    expect(after.filter((l) => l !== "kind-table:entry")).toEqual(
+      before.filter((l) => l !== "kind-table:entry")
     );
-    const out = applySections(edited, ctx, sectionsPresent(edited, ctx))!;
-    const fence = out.split("\n").map((l) => l.trim());
-    expect(out).toContain("header:2:📖 My Own Title");
-    // Their order survives: Practice still before Lessons.
-    expect(fence.indexOf("kind-table:practice")).toBeLessThan(
-      fence.indexOf("kind-table:lesson")
-    );
-    // And Quiz lands after the kind it follows in the CATALOGUE, expressed
-    // against the file's own order rather than imposed on it.
-    expect(fence.indexOf("kind-table:lesson")).toBeLessThan(
-      fence.indexOf("kind-table:quiz")
-    );
+  });
+
+  it("has nothing to extend where one table already lists every kind", () => {
+    // THE OTHER HALF OF 1.0.16, and the reason `consolidateChildren` has a
+    // second caller. A Topic index short of a kind is not short of anything —
+    // `kind-table` selects rows by frontmatter, so a kind added five minutes
+    // ago is already in the table. `kind-change.ts`'s promise that *"Dashboards
+    // will offer to list the new type"* is therefore kept by the merge offer at
+    // that door rather than by this op, and this assertion is what says so.
+    const { ctx, text } = richTopic();
+    const ops = planSections(text, ctx, sectionsPresent(text, ctx));
+    expect(ops.find((o) => o.sectionId === "children")?.kind).toBe("keep");
+    expect(childrenParts(ctx)).toEqual([]);
   });
 
   it("never extends a leaf note or a page, whatever the catalogue says", () => {
@@ -1133,6 +1136,85 @@ describe("parts and the extend op", () => {
         ops.some((o) => o.kind === "extend"),
         `${t.file} is a ${t.ctx.noteKind} and must never be extended`
       ).toBe(false);
+    }
+  });
+});
+
+// ── the shapes a section USED TO compose (1.0.16) ─────────────────────────
+//
+// Attribution is by SIGNATURE: `signaturesFor` derives each section's fence
+// keyword list from what `render` composes, and `ownersBySignature` deals a
+// welded fence's keywords against those lists. So a section whose composition
+// gets SHORTER leaves every note already on disk holding a fence LONGER than
+// any signature — and longer is the one direction neither `ownerOf`'s
+// sub-multiset fallback nor the welded-stack dealer forgives. The fence becomes
+// nobody's, the section reads ABSENT, and the next Save appends a SECOND copy
+// of a card the note already has: the exact failure 3.18 §1 and 5.28 were each
+// written to stop, arriving a third time from a third direction.
+//
+// `JournalSection.superseded` is the answer, and this is what it has to buy.
+
+describe("a fence an older release composed is still its section's", () => {
+  const ctx = () => sectionContext(STUDY_JOURNAL, { depth: 1 });
+
+  it("reads every section of a welded index note written by 1.0.15", () => {
+    // THE SHIPPED SHAPE, AGED — a Topic index whose *What's below* is composed
+    // inside the banner's own fence (5.28) with the tracker region above it, so
+    // this is the dealer's problem and not just `ownerOf`'s: four sections in
+    // one block, one of them carrying six lines where it now carries two.
+    const aged = asPerKindTables(studyTemplate("topic-index.md"), STUDY_JOURNAL);
+    const present = sectionsPresent(aged, ctx());
+    expect(present).toContain("banner");
+    expect(present).toContain("trackers");
+    expect(present).toContain("children");
+    // Nothing is missing, nothing is foreign, and nothing would be written.
+    const ops = planSections(aged, ctx(), present);
+    expect(ops.map((o) => o.kind)).toEqual(ops.map(() => "keep"));
+    expect(applySections(aged, ctx(), present)).toBeNull();
+    expect(
+      parseSections(aged, ctx()).filter((r) => r.sectionId === null && !r.filler)
+    ).toEqual([]);
+  });
+
+  it("names no `header` in the old shape, because a signature cannot hold one", () => {
+    // THE DEFECT THIS TEST EXISTS FOR, found by instrumenting the dealer. The
+    // first draft of `supersededChildren` wrote out the shape as composed — a
+    // head, a button and a table per kind — and the fence parsed as two
+    // `children` in a row, because `fenceKeywords` drops every entry of
+    // `MODIFIER_KEYWORDS` from BOTH sides of the comparison and `header` is one
+    // of them. A signature naming a head is a signature no file can ever have.
+    const lists = findSection("children")!.superseded!(ctx());
+    expect(lists).toEqual([["button", "kind-table", "button", "kind-table"]]);
+    for (const list of lists) expect(list).not.toContain("header");
+  });
+
+  it("declares nothing where the fence never changed", () => {
+    // A one-kind type composed one button and one table then and composes one
+    // button and one table now, so declaring it would hand the planner a
+    // duplicate of the live signature. The container levels never had a
+    // `kind-table` at all.
+    const solo = templateTargets(plain).find((t) => t.key === "index:0")!;
+    expect(findSection("children")!.superseded!(solo.ctx)).toEqual([]);
+    const shallow = sectionContext(STUDY_JOURNAL, { depth: 0 });
+    expect(findSection("children")!.superseded!(shallow)).toEqual([]);
+  });
+
+  it("is declared by one section, and offers nothing on the strength of it", () => {
+    // NOT A GENERAL ESCAPE HATCH. One section changed what it composes, one
+    // declares this, and the day a second does the field is there — but a
+    // superseded signature must never become a route to WRITING: the parts the
+    // current composition declares are what an `extend` offers, and that list
+    // is empty for the section that has this.
+    for (const target of templateTargets(STUDY_JOURNAL)) {
+      const declaring = sectionsFor(target.ctx).filter(
+        (s) => (s.superseded?.(target.ctx) ?? []).length > 0
+      );
+      expect(declaring.map((s) => s.id)).toEqual(
+        target.key === "index:1" ? ["children"] : []
+      );
+      for (const s of declaring) {
+        expect(s.parts?.(target.ctx) ?? []).toEqual([]);
+      }
     }
   });
 });
@@ -1168,27 +1250,32 @@ describe("renameable section titles", () => {
   });
 
   it("survives an extension, because extend never rewrites a header", () => {
-    // §3.4. A reader who renamed a heading and then gains a note kind keeps
-    // the name: `missing` reports parts by their `kind-table:` probe, and the
-    // header above it is neither matched nor re-emitted.
-    const { ctx, text } = topic();
-    const renamed = text.replace("header:2:📖 Lessons", "header:2:📖 My Lessons");
+    // §3.4. A reader who renamed a heading and then gains back a missing table
+    // keeps the name: `missing` reports parts by their `kind-table:` probe, and
+    // the header above it is neither matched nor re-emitted.
+    //
+    // ON A ONE-KIND JOURNAL SINCE 1.0.16, because that is where a part still
+    // exists to be missing — the fixture was the Study Topic index short of its
+    // `practice` group, and a card that composes one table over every kind is
+    // never short of a kind. The question is unchanged and so is the answer;
+    // only the note it is asked about is smaller.
+    const target = templateTargets(plain).find((t) => t.key === "index:0")!;
+    const ctx = target.ctx;
+    const text = journalTemplateFiles(plain).find(
+      (f) => f.name === target.file
+    )!.content;
+    const renamed = text.replace(
+      "header:📝 Entries",
+      "header:📓 Everything I wrote"
+    );
     const stale = renamed
       .split("\n")
-      .filter(
-        (l) =>
-          // `header:2:` SINCE 5.12 — a kind's head is a group inside the
-          // section's bar. Both spellings, so the fixture keeps deleting the
-          // same three lines whichever release composed the template.
-          !/^(header:(?:2:)?🛠️|button:study:new-practice|kind-table:practice)/.test(
-            l.trim()
-          )
-      )
+      .filter((l) => l.trim() !== "kind-table:entry")
       .join("\n");
     const out = applySections(stale, ctx, sectionsPresent(stale, ctx))!;
-    expect(out).toContain("header:2:📖 My Lessons");
-    expect(out).not.toContain("header:2:📖 Lessons\n");
-    expect(out).toContain("kind-table:practice");
+    expect(out).toContain("header:📓 Everything I wrote");
+    expect(out).not.toContain("header:📝 Entries");
+    expect(out).toContain("kind-table:entry");
   });
 });
 
@@ -1223,7 +1310,9 @@ describe("a chosen order is composed, and no order is still catalogue order", ()
     const moved = ["resources", ...ids.filter((i) => i !== "resources")];
     const out = composeTemplateOrdered(ctx, ids, moved);
     const at = (needle: string): number => out.indexOf(needle);
-    expect(at("attach:")).toBeLessThan(at("kind-table:lesson"));
+    // `kind-table`, BARE (1.0.16): the deepest index composes one table over
+    // every note kind, so there is no `kind-table:lesson` in a file any more.
+    expect(at("attach:")).toBeLessThan(at("kind-table"));
     // AND THE BANNER IS STILL FIRST, even though the order asked for Resources
     // ahead of it. That is not the composer ignoring the reader: the banner's
     // first block is `chronoanvil:spacer`, which has to be on line 0 of the body or

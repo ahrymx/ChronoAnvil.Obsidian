@@ -52,6 +52,10 @@ import {
   sectionContext,
 } from "./journal-sections";
 import { applySections, planSections } from "./journal-plan";
+import {
+  consolidateChildren,
+  consolidateDetail,
+} from "./children-consolidate";
 import type { JournalType } from "./journal";
 import type { SectionOp } from "../core/section-model";
 import { noteTypeOf } from "../core/util";
@@ -64,6 +68,34 @@ export interface DashboardCatchup {
   // here rather than an edge one.
   label: string;
   ops: SectionOp[];
+  // Whether this file's per-kind tables would be merged into one. 1.0.16.
+  //
+  // NOT AN `op`, AND NOT FOR WANT OF LOOKING. `SectionOpKind` has eight members
+  // and this is none of them: it is not an `add`, it removes nothing the reader
+  // asked about, and `regroup` already means a page break inside a group and is
+  // on `repair-plan.ts`'s FORBIDDEN list. Inventing a ninth would put a word in
+  // the shared vocabulary that three catalogues can never emit, for one
+  // release's migration — so the fact travels as a fact and the sentence comes
+  // from `consolidateDetail`, which is the same string the repair window shows.
+  merge: boolean;
+}
+
+// Whether this door consolidates as well as extends. 1.0.16.
+//
+// ONE FILE, ONE ROW, WHICH IS WHY THIS IS A PARAMETER AND NOT A CONSTANT. The
+// repair window has a group whose entire subject is notes an older release
+// wrote — it computes this migration itself, with a diff beside it — and the
+// `journals` group's own blurb promises that *"nothing already in them is
+// touched"*. Reporting the merge from both would put two rows about one file in
+// front of a reader who reads one diff per file, and would make that promise
+// false in the row that carries it.
+//
+// THE KIND-ADD DOOR IS THE ONE THAT NEEDS IT. `kind-change.ts` promises that
+// dashboards will offer to list the new type; a consolidated card lists it by
+// construction and has no part to be short of, so on a note still carrying the
+// per-kind stack the merge IS the offer. See `children-consolidate.ts`.
+export interface CatchupScope {
+  merge?: boolean;
 }
 
 // The index surfaces of one journal: its dashboards, and the templates they are
@@ -77,7 +109,11 @@ export interface DashboardCatchup {
 // catalogue; scanning only index surfaces here means the enforcement never has
 // to fire, and the two agreeing is deliberate belt-and-braces rather than one
 // check standing in for the other.
-function indexSurfaces(
+// EXPORTED IN 1.0.16 FOR A SECOND WALKER. The repair window's migration group
+// needs exactly this set — every index note of a type, and the templates the
+// next one will be made from — and deriving it a second time there is how two
+// doors come to disagree about which files a journal has.
+export function indexSurfaces(
   app: App,
   type: JournalType
 ): { file: TFile; ctx: SectionContext }[] {
@@ -127,14 +163,24 @@ function indexSurfaces(
 // of a wider result.
 export async function findDashboardCatchups(
   app: App,
-  type: JournalType
+  type: JournalType,
+  scope: CatchupScope = {}
 ): Promise<DashboardCatchup[]> {
   const out: DashboardCatchup[] = [];
   for (const { file, ctx } of indexSurfaces(app, type)) {
     const text = await app.vault.read(file);
-    const want = detectSections(text, ctx);
-    const ops = planSections(text, ctx, want).filter((o) => o.kind === "extend");
-    if (ops.length) out.push({ file, label: file.path, ops });
+    // THE MERGE IS READ FIRST AND PLANNED SECOND, in the order the write runs
+    // them: a note whose tables are about to become one is asked about its
+    // parts as the consolidated shape, which has none, so the two cannot report
+    // a table as both merged away and missing.
+    const merged =
+      (scope.merge ? consolidateChildren(text, type) : null) ?? text;
+    const want = detectSections(merged, ctx);
+    const ops = planSections(merged, ctx, want).filter(
+      (o) => o.kind === "extend"
+    );
+    const merge = merged !== text;
+    if (ops.length || merge) out.push({ file, label: file.path, ops, merge });
   }
   return out;
 }
@@ -156,15 +202,22 @@ export async function findDashboardCatchups(
 export async function applyDashboardCatchups(
   app: App,
   type: JournalType,
-  files: readonly TFile[]
+  files: readonly TFile[],
+  scope: CatchupScope = {}
 ): Promise<number> {
   const wanted = new Set(files.map((f) => f.path));
   let written = 0;
   for (const { file, ctx } of indexSurfaces(app, type)) {
     if (!wanted.has(file.path)) continue;
     const text = await app.vault.read(file);
-    const next = applySections(text, ctx, detectSections(text, ctx));
-    if (next == null || next === text) continue;
+    // THE SAME TWO STEPS THE SCAN RAN, IN THE SAME ORDER, which is the whole of
+    // why the preview cannot drift from the write: both call one pure function
+    // and then one planner, and `scope` decides whether the first of them runs
+    // at all.
+    const merged = (scope.merge ? consolidateChildren(text, type) : null) ?? text;
+    const next =
+      applySections(merged, ctx, detectSections(merged, ctx)) ?? merged;
+    if (next === text) continue;
     await app.vault.modify(file, next);
     written++;
   }
@@ -194,30 +247,54 @@ export async function offerDashboardCatchup(
   app: App,
   type: JournalType
 ): Promise<number> {
-  const pending = await findDashboardCatchups(app, type);
+  // MERGING, FROM THIS DOOR ONLY — see `CatchupScope`. A note carrying the
+  // per-kind stack has no part to be short of once the section is one table, so
+  // without this a reader who adds a second note type to a journal would be
+  // offered nothing at all and their index notes would go on listing the first
+  // kind alone.
+  const scope = { merge: true };
+  const pending = await findDashboardCatchups(app, type, scope);
   if (!pending.length) return 0;
 
+  // ── THE SENTENCE SAYS WHICHEVER OF THE TWO THINGS IS HAPPENING ───────
+  //
+  // The old wording is a promise: *"nothing already in them is moved, rewritten
+  // or removed"*. That is exactly true of an `extend` and exactly false of a
+  // merge, which deletes a group head and a create button per kind — so a
+  // window holding one merge says so instead. Keeping the reassurance over a
+  // rewrite would be the plugin lying in the one place it asks permission.
+  const merging = pending.filter((p) => p.merge).length;
   const ok = await confirmPlan(
     app,
     `List the new note type on ${pending.length} dashboard${
       pending.length === 1 ? "" : "s"
     }?`,
-    "These index notes and templates were written before the note type " +
-      "existed, so they have no table for it. Only the missing tables are " +
-      "added — nothing already in them is moved, rewritten or removed, and " +
-      "no note you have written is touched.",
+    merging
+      ? "These index notes and templates draw a separate table for each note " +
+        "type, written before this one existed. Merging them into a single " +
+        "table is what makes the new type appear: the per-type headings and " +
+        "their create buttons are replaced by one of each, and everything else " +
+        "on the note stays where it is. No note you have written is touched."
+      : "These index notes and templates were written before the note type " +
+        "existed, so they have no table for it. Only the missing tables are " +
+        "added — nothing already in them is moved, rewritten or removed, and " +
+        "no note you have written is touched.",
     pending.map((p) => ({
       label: p.file.basename,
-      lines: p.ops.map((o) => `${o.label} — ${o.detail}`),
+      lines: [
+        ...(p.merge ? [`${type.name} — ${consolidateDetail(type)}`] : []),
+        ...p.ops.map((o) => `${o.label} — ${o.detail}`),
+      ],
     })),
-    "Add the tables"
+    merging ? "Update the notes" : "Add the tables"
   );
   if (!ok) return 0;
 
   const written = await applyDashboardCatchups(
     app,
     type,
-    pending.map((p) => p.file)
+    pending.map((p) => p.file),
+    scope
   );
   if (written) {
     new Notice(

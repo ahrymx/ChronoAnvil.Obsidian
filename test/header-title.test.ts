@@ -66,6 +66,8 @@ const RICH_TOPIC = [
   "charts",
 ];
 
+import { asPerKindTables } from "./legacy-children";
+
 const topicIndex = (): string[] =>
   studyComposed("Topic Index.md", RICH_TOPIC).split("\n");
 
@@ -218,9 +220,22 @@ describe("a bar finding its own line back", () => {
   });
 
   it("separates the two headers sharing one fence", () => {
-    // The deepest index emits one header per note kind into a SINGLE fence, so
-    // these two are the case that no whole-file rule can tell apart — and the
-    // case §3.2 of the roadmap gave up on for exactly that reason.
+    // The deepest index emitted one header per note kind into a SINGLE fence,
+    // so these two are the case that no whole-file rule can tell apart — and
+    // the case §3.2 of the roadmap gave up on for exactly that reason.
+    //
+    // ON 1.0.15's COMPOSITION, DELIBERATELY (1.0.16). The section draws one
+    // table over every kind now, so a template no longer puts two heads in one
+    // fence — and the rule that tells them apart is not retired by that: a weld
+    // puts a banner's head and a section's in one fence on every journal note,
+    // and every index note written before this release has the pair this test
+    // is about. The shape comes from `test/legacy-children.ts` rather than from
+    // a template, because a fixture that has nothing to separate would leave
+    // this passing vacuously.
+    const lines = asPerKindTables(
+      studyComposed("Topic Index.md", RICH_TOPIC),
+      STUDY_JOURNAL
+    ).split("\n");
     const lessons = lines.findIndex((l) => l.trim() === "header:2:📖 Lessons");
     const practice = lines.findIndex((l) => l.trim() === "header:2:🛠️ Practice");
     expect(lessons).toBeGreaterThan(-1);

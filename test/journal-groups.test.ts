@@ -15,10 +15,14 @@ import {
   journalTemplateFiles,
 } from "../src/journals/custom-journal";
 import {
+  CHILDREN_BAR,
   childrenBar,
+  childrenBody,
   childrenParts,
   sectionContext,
 } from "../src/journals/journal-sections";
+import { consolidateChildren } from "../src/journals/children-consolidate";
+import { asPerKindTables, bareHeadStack, perKindStack } from "./legacy-children";
 import { applySections, planSections, sectionsPresent } from "../src/journals/journal-plan";
 import {
   argSpansIn,
@@ -197,7 +201,16 @@ describe("no catalogue composes two sections in one fence", () => {
   it("finds the bars it is sweeping, so the sweep cannot pass on nothing", () => {
     const heads = everything().flatMap((n) => headsIn(n.text));
     expect(heads.filter((h) => h.level === 1).length).toBeGreaterThan(20);
-    expect(heads.filter((h) => h.level === 2).length).toBeGreaterThan(0);
+    // ── AND NO GROUP HEAD ANYWHERE, AS OF 1.0.16 ──────────────────────
+    //
+    // This line read `toBeGreaterThan(0)`. The deepest index was the only
+    // section in any catalogue that composed a level-2 head — one per note kind
+    // — and it composes one table over every kind now, so the count is zero by
+    // construction rather than by omission. Asserted as zero instead of deleted,
+    // because the sweep above is what keeps the `2:` rule honest and a reader
+    // who brings a group head back needs to be told, here, that it is the first
+    // one in the tree.
+    expect(heads.filter((h) => h.level === 2)).toEqual([]);
   });
 });
 
@@ -210,52 +223,67 @@ describe("what the deepest index composes", () => {
     kinds: [{ id: "recipe", emoji: "🍽️", label: "Recipe" }],
   });
 
-  it("opens with the section's own bar and nothing else", () => {
-    // NO ACTIONS STRIP WHERE EVERY GROUP CARRIES ITS OWN. The bar composes a
-    // title alone, so `.ca-journal-header-widgets` is empty and the frame drops
-    // it — the card opens with one line instead of a title, a hairline and a
-    // full-width row holding one button whose rows are six lines below it.
-    expect(childrenBar(study())).toEqual(["header:🗂️ What's below"]);
+  // ── ONE TABLE OVER EVERY KIND (1.0.16) ──────────────────────────────
+  //
+  // *"I think page types can be consolidated on journal index pages, [Updates
+  // Decisions scratchpads] can become one."*
+  //
+  // WHAT THESE ASSERTIONS SAID A RELEASE AGO, because the change is the whole
+  // subject of the file they are in. 5.12 put one bar over a group per note
+  // kind: a head, a create button and a table each, level 2 spelled out, with
+  // the section's own bar carrying a title and nothing else. The reader's
+  // project index drew that as three heads, three buttons, three chevrons and
+  // three empty states over a folder holding one note.
+  //
+  // So the groups are gone and what is left is the shape the bar was always
+  // heading towards: a title, one create that asks which type, one table with a
+  // Type column. The 5.12 argument that a create button belongs beside the rows
+  // it adds to is not reversed — there is one set of rows now, and the bar is
+  // beside them.
+  it("opens with its bar and the create that asks which type", () => {
+    expect(childrenBar(study())).toEqual([
+      "header:🗂️ What's below",
+      "button:study:new",
+    ]);
   });
 
-  it("writes every kind as a group, at level 2, spelled out", () => {
-    const parts = childrenParts(study());
-    expect(parts.map((p) => p.lines[0])).toEqual([
-      "header:2:📖 Lessons",
-      "header:2:🛠️ Practice",
-    ]);
-    expect(parts.map((p) => p.probe)).toEqual([
-      "kind-table:lesson",
-      "kind-table:practice",
-    ]);
-  });
-
-  it("puts every create beside the head of the rows it adds to", () => {
-    const fence = [...childrenBar(study()), ...childrenParts(study()).flatMap((p) => p.lines)];
-    // Once each — never the doubling the first draft of this section risked.
-    expect(fence.filter((l) => l === "button:study:new-lesson").length).toBe(1);
-    expect(fence.filter((l) => l === "button:study:new-practice").length).toBe(1);
-    // And each one directly under its own head, which is what puts it inline in
-    // that head's bar rather than in a strip of the section's.
+  it("composes no group, because one table is not a list of tables", () => {
+    // `parts` IS THE LOAD-BEARING ONE. It is what `missingParts` compares a
+    // fence against, so a parts list left as it was would have the repair window
+    // offer to put the per-kind groups back on every note composed today — the
+    // consolidation undone by the machinery meant to be catching notes up.
+    expect(childrenParts(study())).toEqual([]);
+    const fence = [
+      ...childrenBar(study()),
+      ...childrenBody(study()),
+    ];
     expect(fence).toEqual([
       "header:🗂️ What's below",
-      "header:2:📖 Lessons",
-      "button:study:new-lesson",
-      "kind-table:lesson",
-      "header:2:🛠️ Practice",
-      "button:study:new-practice",
-      "kind-table:practice",
+      "button:study:new",
+      "kind-table",
     ]);
-    // The FIRST kind is not special. It was, for one build: its button sat on
-    // the section bar and its head showed none, which read as the one group
-    // nobody could add to.
-    expect(childrenParts(study())[0].lines).toContain("button:study:new-lesson");
+  });
+
+  it("names no kind in the fence it writes", () => {
+    // THE POINT OF THE BARE DIRECTIVE. Every line of this card used to carry a
+    // kind id, in triplicate, which is why adding a note type needed a
+    // migration to reach a note at all. One table over the host's own journal
+    // has nothing per-kind in it to go out of date.
+    const fence = [...childrenBar(study()), ...childrenBody(study())];
+    for (const kind of STUDY_JOURNAL.kinds) {
+      expect(fence.join("\n")).not.toContain(kind.id);
+    }
   });
 
   it("gives a one-kind type its kind's name and no group at all", () => {
     // R5: one group is no grouping. The section and the group are the same
     // object, so it takes the name the reader gave the kind rather than a word
     // that would fit any of them.
+    //
+    // AND ITS LINES ARE UNTOUCHED BY 1.0.16, which is the second half of the
+    // same rule: with one kind there is nothing to consolidate, so the bar still
+    // names the kind, the button still names the kind, and the table still names
+    // the kind. `consolidateChildren` refuses this type outright.
     const ctx = sectionContext(oneKind, { depth: 0 });
     expect(childrenBar(ctx)).toEqual([
       "header:🍽️ Recipes",
@@ -264,6 +292,7 @@ describe("what the deepest index composes", () => {
     expect(childrenParts(ctx).flatMap((p) => p.lines)).toEqual([
       "kind-table:recipe",
     ]);
+    expect(childrenBody(ctx)).toEqual(["kind-table:recipe"]);
   });
 
   it("leaves a one-kind journal's lines exactly as 5.11 composed them", () => {
@@ -281,15 +310,14 @@ describe("what the deepest index composes", () => {
     expect(text).not.toContain("```chronoanvil\nheader:🍽️ Recipes");
   });
 
-  it("keeps the shipped Topic index to one bar over two groups", () => {
-    const heads = headsIn(studyTemplate("topic-index.md")).filter(
+  it("keeps the shipped Topic index to one bar and one table", () => {
+    const text = studyTemplate("topic-index.md");
+    const heads = headsIn(text).filter(
       (h) => h.title.includes("What's below") || h.title.includes("Lessons") || h.title.includes("Practice")
     );
-    expect(heads).toEqual([
-      { title: "🗂️ What's below", level: 1 },
-      { title: "2:📖 Lessons", level: 2 },
-      { title: "2:🛠️ Practice", level: 2 },
-    ]);
+    expect(heads).toEqual([{ title: "🗂️ What's below", level: 1 }]);
+    expect(text).toContain("button:study:new\nkind-table\n");
+    expect(text).not.toContain("kind-table:lesson");
   });
 });
 
@@ -393,93 +421,98 @@ describe("the group head is a division, not a bar", () => {
   });
 });
 
-describe("a Topic index written before 5.12", () => {
-  // Exactly what the catalogue composed through 5.11: one bare head per kind,
-  // its button and its table, and no bar naming the section they sit in.
-  const legacy = [
-    "```chronoanvil",
-    "header:📖 Lessons",
-    "button:study:new-lesson",
-    "kind-table:lesson",
-    "header:🛠️ Practice",
-    "button:study:new-practice",
-    "kind-table:practice",
-    "```",
-  ].join("\n");
+describe("a Topic index written before 1.0.16", () => {
+  // ── WHAT THIS DESCRIBE USED TO BE, AND WHY IT IS NOT THAT ─────────────
+  //
+  // "a Topic index written before 5.12": a fence of bare per-kind heads with no
+  // bar over them, and the repair that put the bar back. The repair is gone with
+  // the shape it was repairing — the section composes one table over every kind
+  // now, so there are no groups for a bar to be missing from, and
+  // `missingGroupBar` was deleted rather than left as a door that can only
+  // return null.
+  //
+  // WHAT REPLACES IT IS THE HAZARD THE CHANGE CREATED. Both old shapes are
+  // still on disk, in every vault, on every deepest index note — and a section
+  // whose composition got SHORTER is the one direction attribution does not
+  // forgive by itself. An unrecognised fence is nobody's, a section nobody owns
+  // reads as ABSENT, and the next Save appends a SECOND *What's below* under the
+  // first: 3.18 §1's shape, and 5.28's. So `superseded` declares the old
+  // keyword lists alongside the composed one, and these are the assertions that
+  // it does.
   const ctx = () => sectionContext(STUDY_JOURNAL, { depth: 1 });
-  const want = () => sectionsPresent(legacy, ctx());
+  const tiered = () => ["```chronoanvil", `header:${CHILDREN_BAR}`, ...perKindStack(STUDY_JOURNAL), "```"].join("\n");
+  const bare = () => ["```chronoanvil", ...bareHeadStack(STUDY_JOURNAL), "```"].join("\n");
 
-  it("is reported as short of its title, in the words 5.10 wrote", () => {
-    const op = planSections(legacy, ctx(), want()).find(
-      (o) => o.sectionId === "children"
-    );
-    expect(op?.kind).toBe("extend");
-    expect(op?.detail).toContain("no title over it");
+  for (const [era, note] of [
+    ["5.12, a bar over one group per kind", tiered],
+    ["5.11, bare heads and no bar at all", bare],
+  ] as const) {
+    describe(era, () => {
+      it("is still read as this section, so Save appends no second card", () => {
+        expect(sectionsPresent(note(), ctx())).toContain("children");
+      });
+
+      it("is kept, not extended and not re-added", () => {
+        const op = planSections(note(), ctx(), sectionsPresent(note(), ctx())).find(
+          (o) => o.sectionId === "children"
+        );
+        expect(op?.kind).toBe("keep");
+        expect(applySections(note(), ctx(), sectionsPresent(note(), ctx()))).toBeNull();
+      });
+    });
+  }
+
+  it("is consolidated by the migration, to the byte the composer writes", () => {
+    // THE ROUND TRIP IS THE ASSERTION. `asPerKindTables` ages a note this
+    // release composed by putting 5.12's six lines back where its two are, and
+    // the migration has to return the note it started from — not something
+    // equivalent, the same text. Anything else is a rewrite drifting from the
+    // composer, which is the failure no golden can catch because the golden and
+    // the migration would drift together.
+    const fresh = studyTemplate("topic-index.md");
+    const aged = asPerKindTables(fresh, STUDY_JOURNAL);
+    expect(aged).not.toBe(fresh);
+    expect(consolidateChildren(aged, STUDY_JOURNAL)).toBe(fresh);
   });
 
-  it("gains exactly one line, at the top of the fence", () => {
-    const out = applySections(legacy, ctx(), want())!;
-    const before = legacy.split("\n");
-    const after = out.split("\n");
-    expect(after.length).toBe(before.length + 1);
-    expect(after[1]).toBe("header:🗂️ What's below");
-    // NOTHING IS REWRITTEN IN PLACE. The bare heads stay bare — the renderer
-    // reads them as groups by position, and a repair that also retyped them
-    // would be editing lines the reader may have renamed.
-    expect(after.filter((l) => l.startsWith("header:2:"))).toEqual([]);
-    expect(out).toContain("header:📖 Lessons");
-  });
-
-  it("is a no-op the second time", () => {
-    const once = applySections(legacy, ctx(), want())!;
-    expect(applySections(once, ctx(), sectionsPresent(once, ctx()))).toBeNull();
-  });
-
-  it("renders as one section over two groups once repaired", () => {
-    const once = applySections(legacy, ctx(), want())!;
-    expect(headsIn(once)).toEqual([
-      { title: "🗂️ What's below", level: 1 },
-      { title: "📖 Lessons", level: 2 },
-      { title: "🛠️ Practice", level: 2 },
-    ]);
-  });
-
-  it("leaves a bar the reader renamed alone", () => {
-    // COUNTED, NOT MATCHED. Comparing the file's first head against the bar the
-    // catalogue would compose reports a missing bar on every note whose reader
-    // renamed it — the one thing this must never do.
-    const renamed = applySections(legacy, ctx(), want())!.replace(
-      "header:🗂️ What's below",
-      "header:📚 Everything here"
-    );
-    expect(applySections(renamed, ctx(), sectionsPresent(renamed, ctx()))).toBeNull();
-  });
-
-  it("declines a fence that is short a head, rather than guessing", () => {
-    // A reader deleted one group's head and kept its table. Two tables, one
-    // head: the count says nothing certain, so nothing is written.
-    const odd = legacy.split("\n").filter((l) => l !== "header:🛠️ Practice").join("\n");
-    const out = applySections(odd, ctx(), sectionsPresent(odd, ctx()));
-    expect(out === null || !out.includes("What's below")).toBe(true);
-  });
-
-  it("still reports a missing table as a missing table", () => {
-    // The two doors do not fight: a note short of a KIND is an extend about
-    // that kind, whether or not it is also short of its bar.
-    const short = legacy
+  it("reports no missing kind, which is why the merge is the offer", () => {
+    // 5.12's answer to a kind added to the journal was `extend`: a new kind was
+    // a new part, and a note short of a part was offered the three lines. One
+    // table lists a kind added five minutes ago without being touched, so there
+    // is nothing left for `extend` to say — and `kind-change.ts`'s unhedged
+    // promise that *"Dashboards will offer to list the new type"* is kept at
+    // that door by `consolidateChildren` instead, which is why the pure
+    // function has two callers.
+    const short = tiered()
       .split("\n")
-      .filter((l) => !l.includes("practice") && l !== "header:🛠️ Practice")
+      .filter((l) => !l.includes("practice") && !l.includes("Practice"))
       .join("\n");
     const op = planSections(short, ctx(), sectionsPresent(short, ctx())).find(
       (o) => o.sectionId === "children"
     );
-    expect(op?.kind).toBe("extend");
-    expect(op?.detail).toContain("Practice");
+    expect(op?.kind).toBe("keep");
+  });
+
+  it("offers no group back to a note composed today", () => {
+    // `missingParts` only ever ADDS, and it compares a fence against `parts`.
+    // A parts list left as it was would have the repair window offer to put the
+    // per-kind groups back onto every note this release writes — the
+    // consolidation undone by the machinery meant to be catching notes up.
+    const fresh = studyTemplate("topic-index.md");
+    expect(planSections(fresh, ctx(), sectionsPresent(fresh, ctx())).find(
+      (o) => o.sectionId === "children"
+    )?.kind).toBe("keep");
   });
 });
 
 describe("which head names a note kind", () => {
-  const lines = () => studyTemplate("topic-index.md").split("\n");
+  // ON A NOTE IN THE OLD SHAPE, which is the only shape that has a head per
+  // kind to ask about. The rename offer reads a file, not a catalogue, and the
+  // files carrying group heads are the ones every vault already has — so the
+  // fixture is 1.0.15's composition (`test/legacy-children.ts`) rather than the
+  // template this release ships.
+  const lines = () =>
+    asPerKindTables(studyTemplate("topic-index.md"), STUDY_JOURNAL).split("\n");
   const kindOf = (title: string): string | undefined => {
     const src = lines();
     const span = argSpansIn(src, "header").find(
@@ -496,7 +529,20 @@ describe("which head names a note kind", () => {
   it("names none under the section's own bar", () => {
     // The rename offer acts on a note type; the bar names the section, and
     // "What's below" is not a kind however many kinds sit under it.
-    expect(kindOf("🗂️ What's below")).toBeUndefined();
+    expect(kindOf(CHILDREN_BAR)).toBeUndefined();
+  });
+
+  it("names none on a consolidated card, where no head names a kind", () => {
+    // 1.0.16, and it falls out of the walk rather than needing a rule: the bar
+    // is the fence's only head, so the level test passes it through, and the
+    // line it then looks for is `kind-table:<id>`. A bare `kind-table` names no
+    // kind, so there is no kind to offer a rename for — which is the truth about
+    // a card listing all of them.
+    const src = studyTemplate("topic-index.md").split("\n");
+    const span = argSpansIn(src, "header").find(
+      (s) => readArg(src, s) === CHILDREN_BAR
+    )!;
+    expect(kindHeadedBy(src, span, STUDY_JOURNAL)).toBeNull();
   });
 
   it("names the kind on a one-head fence, where the two are one line", () => {
