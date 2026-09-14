@@ -2511,9 +2511,8 @@ export function childrenBar(
   // 1.0.16 PUT A BARE `new` HERE, on every shape, because there were no group
   // heads left to carry one. That release is reversed — see `childrenParts` for
   // the reader's words — and with the heads back the button goes back beside
-  // its own rows. The bare `new` keyword and the question it asked
-  // (`newNoteAsking`) survive one release for the notes it already wrote, and
-  // nothing composes it.
+  // its own rows. The bare keyword and the question it asked are gone from the
+  // tree along with the notes that carried them.
   return [
     `header:${opts?.label ?? named}`,
     ...(solo ? [`button:${ctx.type.id}:new-${primary.id}`] : []),
@@ -2525,9 +2524,10 @@ export function childrenBar(
 // `kind-table:<kind id>`, which is what this section composes and has composed
 // every release but one. 1.0.16 composed a BARE `kind-table` — one table over
 // every kind — and this probe accepted both, on 4.16 §1's rule that a word
-// already on disk goes on rendering. That release is reversed and its notes are
-// migrated (`children-split.ts`), so the bare arm goes with them: an optional
-// group left standing here would attribute a fence nothing composes.
+// already on disk goes on rendering. That release is reversed and its notes
+// were migrated back, so the bare arm went with them: an optional group left
+// standing here would attribute a fence nothing composes, in a vault where no
+// file can carry it.
 //
 // THE ID LIST IS A LIST, so `kind-table:removed` — a directive left behind by
 // deleting a kind — matches nothing and the section is correctly read as gone

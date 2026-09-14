@@ -938,59 +938,40 @@ export function buildLevelIndex(
   }
 
   // The deepest level: its children are notes, so one table per kind rather
-  // than a folder rollup.
-  perKindTables(root, plugin, ctx, type, folder.path);
-  return root;
-}
-
-// A head and a table per note kind, appended to one element.
-//
-// PER KIND rather than one combined table because the kinds are rated on
-// different things — a single table would need a column for every rating in the
-// type and leave most of it blank. That was the catalogue's argument for
-// emitting several fences and it is unchanged; what changed is that one widget
-// can draw them, so a note does not have to have been written knowing how many
-// kinds its journal has.
-//
-// 1.0.16 COMBINED THEM, WITH A TYPE COLUMN, and the objection above was
-// answered rather than denied: one column per DISTINCT rating, and 1.0.15 had
-// already stopped drawing an empty cell at the width where blankness hurt. On
-// the reader's own Topic index it drew `Name | Type | Date | Confidence |
-// Accuracy | Status` over two Lessons — "Lesson" twice down the Type column and
-// Accuracy empty on both rows. Reversed on their verdict: *"the type field can
-// be removed entirely and reverted to the collapsible sections"*. What was
-// right about it moved up a level, where a column per kind is paid for by every
-// row — see `folderRollup`.
-//
-// EXTRACTED FOR TWO CALLERS, which is the whole reason it is a function. The
-// bare `kind-table` directive 1.0.16 composed still stands in the notes it
-// wrote, and it draws THIS rather than a second combined table of its own, so
-// an unmigrated note shows the shape it is about to be migrated into. See
-// `buildKindTable`; both go when the migration does.
-//
-// A HEADING PER TABLE, because two tables with no names between them read as
-// one table that changed its columns halfway down.
-//
-// THE KIND'S OWN EMOJI AND THE KIND'S OWN PLURAL, which is what
-// `childrenParts` writes into the composed fence — "📖 Lessons", "🛠️
-// Practice". This drew "🗂️ Lessons" and "🗂️ Practices": the folder glyph over
-// tables of notes, and a pluralisation the kind explicitly overrides. Two
-// spellings of one heading is one too many when the composer's is on the next
-// note down.
-export function perKindTables(
-  root: HTMLElement,
-  plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext,
-  type: JournalType,
-  folderPath: string
-): void {
+  // than a folder rollup. PER KIND rather than one combined table because the
+  // kinds are rated on different things — a single table would need a column
+  // for every rating in the type and leave most of it blank. That was the
+  // catalogue's argument for emitting several fences and it is unchanged; what
+  // changed is that one widget now draws them, so the note does not have to
+  // have been written knowing how many kinds its journal has.
+  //
+  // 1.0.16 COMBINED THEM, WITH A TYPE COLUMN, and the objection above was
+  // answered rather than denied: one column per DISTINCT rating, and 1.0.15 had
+  // already stopped drawing an empty cell at the width where blankness hurt. On
+  // the reader's own Topic index it drew `Name | Type | Date | Confidence |
+  // Accuracy | Status` over two Lessons — "Lesson" twice down the Type column
+  // and Accuracy empty on both rows. Reversed on their verdict: *"the type
+  // field can be removed entirely and reverted to the collapsible sections"*.
+  // What was right about it moved up a level, where a column per kind is paid
+  // for by every row — see `folderRollup`.
+  //
+  // A HEADING PER TABLE, because two tables with no names between them read as
+  // one table that changed its columns halfway down.
+  //
+  // THE KIND'S OWN EMOJI AND THE KIND'S OWN PLURAL, which is what
+  // `childrenParts` writes into the composed fence — "📖 Lessons", "🛠️
+  // Practice". This drew "🗂️ Lessons" and "🗂️ Practices": the folder glyph over
+  // tables of notes, and a pluralisation the kind explicitly overrides. Two
+  // spellings of one heading is one too many when the composer's is on the next
+  // note down.
   for (const kind of type.kinds) {
     root.createDiv({
       cls: "ca-journal-level-index-head",
       text: `${kind.emoji} ${kindPlural(kind)}`,
     });
-    root.appendChild(kindTable(plugin, ctx, type, folderPath, kind.id));
+    root.appendChild(kindTable(plugin, ctx, type, folder.path, kind.id));
   }
+  return root;
 }
 
 // Which journal and which folder this index is about, or the sentence to draw
@@ -2209,10 +2190,10 @@ export function buildJournalTally(
 //
 // ONE KIND, AND THE ARGUMENT IS ALWAYS ITS ID. 1.0.16 let the id be empty and
 // read that as "every kind of this journal", with a Type column naming which
-// each row was; `perKindTables` records what that looked like on the reader's
-// own index and why it is gone. The bare directive is still honoured, but one
-// level up and by drawing the per-kind stack — nothing here has two shapes to
-// keep in step.
+// each row was. `buildLevelIndex` records what that looked like on the reader's
+// own index and why it is gone; the bare spelling is gone with it, and the
+// notes that carried it are migrated. An empty argument is an unknown note
+// type again, which is what it was for every release but one.
 //
 // NO VIEW SWITCHER. The base table shipped three views — Not Completed,
 // Completed, All — and reproducing them would mean interactive state, which a
@@ -2285,21 +2266,6 @@ export function sortKindRows<T extends KindRow>(rows: T[]): T[] {
   });
 }
 
-// ── AND THE BARE WORD, FOR AS LONG AS AN UNMIGRATED NOTE HAS IT ──────
-//
-// `kind-table` with no kind is 1.0.16's spelling for "every kind of this
-// journal in one table". That release is reversed (`perKindTables` says what
-// the reader saw), and the notes it wrote are being migrated back
-// (`children-split.ts`) — but the migration is a tick in the repair window, so
-// between installing this build and pressing it a reader's index note carries
-// the bare word and must draw something. It draws the shape it is about to
-// become: a head and a table per kind, through the same function the composed
-// fence's own renderer uses.
-//
-// TRANSITIONAL, AND DATED. This branch, the bare `new` button, `newNoteAsking`
-// and `children-split.ts` are one set and go together, the release after the
-// development vaults are migrated — which is the rule CLAUDE.md states for a
-// shape no reader outside this machine can have.
 export function buildKindTable(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
@@ -2312,11 +2278,6 @@ export function buildKindTable(
   }
   const type = hostType(plugin, file.path);
   if (!type) return createDiv({ cls: "ca-journal-table ca-journal-kind-table" });
-  if (!kindId) {
-    const root = createDiv({ cls: "ca-journal-level-index" });
-    perKindTables(root, plugin, ctx, type, file.parent.path);
-    return root;
-  }
   return kindTable(plugin, ctx, type, file.parent.path, kindId);
 }
 

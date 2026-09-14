@@ -8,13 +8,7 @@
 import { App, Notice, TFile, TFolder, normalizePath } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import type { TemplateLayout , SectionOverrides } from "./journal-sections";
-import {
-  only,
-  promptChoice,
-  promptText,
-  promptSuggester,
-  promptNewNote,
-} from "../ui/modals";
+import { only, promptText, promptSuggester, promptNewNote } from "../ui/modals";
 import {
   DEFAULT_ENERGY_FACES,
   DEFAULT_SUBJECT_EMOJI,
@@ -1816,58 +1810,6 @@ export class JournalManager {
     await this.rebuildJournalHome();
     await openFile(this.app, indexFile);
     notify.ok(`${level.noun} "${item}" added to ${parent}!`);
-  }
-
-  // ── Create a leaf note, ASKING WHICH KIND FIRST (1.0.16) ────────────────
-  //
-  // TRANSITIONAL, AND IT IS THE ONLY REASON THIS IS STILL HERE. 1.0.16 drew a
-  // consolidated *What's below* — one table over every kind — so it drew one
-  // create button, and that button had to ask the question the per-kind buttons
-  // answered by which one you pressed. The reader reversed that release
-  // (`childrenParts` quotes them), so nothing composes the bare `new` any more;
-  // the notes it already wrote still carry it, and this answers them until the
-  // repair window's migration replaces those lines. It goes with
-  // `children-split.ts`.
-  //
-  // A consolidated *What's below* draws ONE table over every kind, so it draws
-  // one create button, so that button has to ask the question the three buttons
-  // used to answer by which one you pressed. The kind is still chosen by the
-  // reader before anything is written — it has moved from the bar into the
-  // dialogue, which is the same move `kind-row-menu.ts` argues for when it puts
-  // a scope in the question rather than in the menu.
-  //
-  // `promptChoice` AND NOT `promptDetailedSuggester`: this is one run of rows
-  // with nothing to group and no consequence to spell out — the consequence of
-  // picking *Decision* is a decision — and the detailed modal's second line
-  // would be a sentence invented to fill it. It returns the kind rather than its
-  // label, which is that helper's whole reason: two kinds are free to share a
-  // label and the wrong one must not be the one that gets created.
-  //
-  // `only()` SHORT-CIRCUITS, which is the INCIDENTAL case of §modals' two: with
-  // one kind there is no question — a card drawing a single note type and a
-  // reader pressing its create button have already said which — so the modal
-  // would be a keystroke charged for nothing. It is not the *"Add which
-  // section?"* case, where auto-picking writes a block whose name was never
-  // shown: here the kind is named by the card, by the row that appears and by
-  // the title dialogue this hands straight on to.
-  async newNoteAsking(type: JournalType, folderArg?: string): Promise<void> {
-    // A type with no kinds can exist — a half-configured journal in Settings —
-    // and the honest report is that there is nothing to create, not a modal
-    // with no rows in it.
-    if (type.kinds.length === 0) {
-      notify.fail(`${type.name} has no note types configured`);
-      return;
-    }
-    const kind =
-      only(type.kinds) ??
-      (await promptChoice(
-        this.app,
-        type.kinds,
-        (k) => `${k.emoji} ${k.label}`,
-        "Which note type?"
-      ));
-    if (!kind) return;
-    return this.newNote(type, kind.id, folderArg);
   }
 
   // ── Create a leaf note of a given kind (Study: lesson / practice) ───────

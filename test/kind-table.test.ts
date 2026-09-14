@@ -343,16 +343,7 @@ describe("what is below this note decides which table to draw", () => {
     expect(body).not.toContain("journalChildFolders");
     // Both branches, and the folder one first.
     expect(body).toContain("folderRollup(plugin, ctx, type, folder)");
-    // THE DEEPEST BRANCH IS ONE CALL NOW, and it has a second caller: the bare
-    // `kind-table` 1.0.16 composed draws the same per-kind stack while the
-    // notes it wrote are waiting on the repair window's migration. Extracted
-    // rather than copied, so the widget and the directive cannot draw two
-    // different answers to "what is below this note" — see
-    // `children-split.test.ts`, which is where both callers are pinned.
-    expect(body).toContain("perKindTables(root, plugin, ctx, type, folder.path)");
-    expect(fnBody(tables(), "export function perKindTables(")).toContain(
-      "kindTable(plugin, ctx, type, folderPath, kind.id)"
-    );
+    expect(body).toContain("kindTable(plugin, ctx, type, folder.path, kind.id)");
   });
 
   // ── the question the branch asks ────────────────────────────────────

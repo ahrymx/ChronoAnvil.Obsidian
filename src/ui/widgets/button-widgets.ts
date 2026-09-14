@@ -175,38 +175,6 @@ export function journalSubActionSpec(
   // "Refresh" beside a type name was exactly the false per-type scope the
   // consolidation removed. runJournalAction still routes it.
   if (sub === "refresh") return { label: "Refresh all", icon: "refresh-cw" };
-  // BARE `new` IS "A NOTE OF ANY KIND", the other half of the grammar
-  // `kind-table` bare took in 1.0.16: one table over every kind got one create
-  // button, and the button asked which kind instead of the bar answering it.
-  // See `JournalManager.newNoteAsking`.
-  //
-  // NOTHING COMPOSES IT ANY MORE. That release is reversed — `childrenParts`
-  // carries the reader's words and `perKindTables` what they were looking at —
-  // and the per-kind buttons are back beside their own heads. This spelling
-  // survives for the notes 1.0.16 already wrote, which press it until the
-  // repair window's migration takes it out (`children-split.ts`), and it goes
-  // with that migration and the bare `kind-table` branch in one release.
-  //
-  // BARE, RATHER THAN `new-note`, AND THE COLLISION IS THE WHOLE REASON. A kind
-  // labelled "Note" slugs to `note`, so `new-note` is already the create action
-  // for that kind in any vault that has one — and a word whose meaning depends on
-  // whether a reader happens to have configured a kind of that name is a word
-  // that changes meaning the day they add one. `new-<id>` needs a non-empty id
-  // by construction, so nothing can ever spell this second.
-  //
-  // NO EMOJI, WHERE EVERY `new-<kind>` BUTTON HAS ONE. The kinds' glyphs are the
-  // reader's own identity marks for the things below, and no single one of them
-  // is true of a button that makes any of them — so this takes a Lucide icon,
-  // which is the split the kinds branch below states: a glyph naming a THING the
-  // reader configured stays theirs, a glyph naming an ACTION is ours.
-  //
-  // "New", with nothing after it: the noun is what the dialogue asks for, and
-  // "New note" would name a kind ("Note") in half the journals that exist. The
-  // empty state beside it derives the same word — see `kindTable`, which quotes
-  // the button by name — so the two cannot drift.
-  if (sub === "new") {
-    return { label: "New", icon: "file-plus", primary: true };
-  }
   if (sub === "new-page") {
     // Labelled from whichever kind of this type carries pages, so a journal
     // that calls them Sections says so.
@@ -323,12 +291,6 @@ export async function runJournalAction(
   // through would look up a kind that cannot exist and report it as unknown.
   if (sub === "new-page") {
     return void journals.newPage(type, arg || ctx.sourcePath);
-  }
-  // Bare `new`: the kind comes from the reader rather than from the directive.
-  // `startsWith("new-")` below cannot claim it — there is no hyphen — which is
-  // the point of spelling it this way; see journalSubActionSpec.
-  if (sub === "new") {
-    return void journals.newNoteAsking(type, arg || undefined);
   }
   if (sub.startsWith("new-")) {
     const kindId = sub.slice("new-".length);

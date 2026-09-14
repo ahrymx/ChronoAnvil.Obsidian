@@ -77,11 +77,7 @@ export interface DashboardCatchup {
 // catalogue; scanning only index surfaces here means the enforcement never has
 // to fire, and the two agreeing is deliberate belt-and-braces rather than one
 // check standing in for the other.
-// EXPORTED FOR A SECOND WALKER. The repair window's migration group needs
-// exactly this set — every index note of a type, and the templates the next one
-// will be made from — and deriving it a second time there is how two doors come
-// to disagree about which files a journal has.
-export function indexSurfaces(
+function indexSurfaces(
   app: App,
   type: JournalType
 ): { file: TFile; ctx: SectionContext }[] {

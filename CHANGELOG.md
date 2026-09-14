@@ -5,7 +5,7 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.16] - 2026-09-14
+## [1.0.17] - 2026-09-14
 
 ### Changed
 
@@ -36,11 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what it was: a heading, a **New …** button, a chevron and a table for each
   note type, each group folding on its own.
 
-  Nothing in your vault changes. If you installed the intermediate build, its
-  merged tables are offered back under **Run format migrations** in *Set up /
-  repair vault*, with the diff beside them — it moves lines you may have edited,
-  so it is a tick and never a default — and a merged note goes on drawing the
-  right thing until you press it.
+  Nothing in your vault changes. The merged shape never reached a release, so
+  there is nothing to migrate and nothing to repair.
 
 - **Adding a note type to a journal offers the missing tables again.** The
   window after *Add note type* promises that dashboards will offer to list the
