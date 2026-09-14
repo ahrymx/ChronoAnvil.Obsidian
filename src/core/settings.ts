@@ -253,6 +253,14 @@ export interface ChronoAnvilSettings {
   openGroupTabs: Record<string, number>;
   // Which filter sources are turned off for a time-grid, keyed by "<notePath>::time-grid" (or "<notePath>::time-grid:<rest>").
   timeGridFilters: Record<string, string[]>;
+  // Which time-grids have been expanded out of their compact form, under the
+  // SAME key — one grid on one note has one identity here, and both records
+  // hold view state about the same block.
+  //
+  // ONLY EVER `true`. Compact-below-400px is the default, so "not expanded" is
+  // the absence of a row rather than a stored `false`, and a vault that has
+  // never pressed the control writes nothing.
+  timeGridExpanded?: Record<string, boolean>;
   // Unsaved quick-capture text, kept so closing the box doesn't lose it.
   // Lives here rather than in memory so it survives a restart.
   captureDraft: string;

@@ -134,6 +134,7 @@ export function remapConfiguredPaths(
     revealedNoteSections?: Record<string, boolean>;
     openGroupTabs?: Record<string, number>;
     timeGridFilters?: Record<string, string[]>;
+    timeGridExpanded?: Record<string, boolean>;
   },
   oldPath: string,
   newPath: string,
@@ -183,17 +184,19 @@ export function remapConfiguredPaths(
   // function has retargeted on rename since it was written; these records were
   // added later and never joined in.
   //
-  // ONE LOOP, FOUR RECORDS (5.28). This was three copies of the same eight
-  // lines, and the fourth — the banner's reveals — is why they became one: the
-  // copies had already drifted, since the fold one wrote `true` back where the
-  // other two preserved the value they moved. `remapNoteKeys` preserves it,
-  // which is strictly more correct for a record whose values are booleans and
-  // was already required of the two that hold numbers and lists.
+  // ONE LOOP, FIVE RECORDS (5.28, and a fifth in 1.0.18). This was three copies
+  // of the same eight lines, and the fourth — the banner's reveals — is why they
+  // became one: the copies had already drifted, since the fold one wrote `true`
+  // back where the other two preserved the value they moved. `remapNoteKeys`
+  // preserves it, which is strictly more correct for a record whose values are
+  // booleans and was already required of the two that hold numbers and lists.
+  // The fifth cost one line, which is the whole argument for the loop.
   const perNote: [Record<string, unknown> | undefined, string][] = [
     [settings.collapsedNoteSections, "collapsed sections"],
     [settings.revealedNoteSections, "revealed sections"],
     [settings.openGroupTabs, "open group tabs"],
     [settings.timeGridFilters, "time-grid filters"],
+    [settings.timeGridExpanded, "time-grid expansion"],
   ];
   for (const [record, label] of perNote) {
     if (record && remapNoteKeys(record, oldPath, newPath) > 0) {

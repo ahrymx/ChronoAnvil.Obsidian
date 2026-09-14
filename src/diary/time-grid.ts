@@ -243,22 +243,68 @@ export function gridWindow(
   return { startHour, endHour };
 }
 
+// How many hours apart the rail's marks stand when the grid is compact.
+//
+// THREE, BECAUSE THE GUTTER IS 24px AND THE ROW IS 22px. Twenty-five marks in
+// 528px is one every twenty-two pixels, which is barely taller than the label —
+// they would crowd before the first of them was read. Every third hour is nine
+// marks, one every 66px, and the three-hour step is the one a reader already
+// counts in.
+export const COMPACT_RAIL_STEP = 3;
+
+// Which hour marks the rail draws.
+//
+// THE LAST MARK IS THE FOOT OF THE WINDOW AND IS NOT OPTIONAL AT STEP 1 — a
+// midnight-to-midnight grid has twenty-five marks, not twenty-four, because
+// `endHour` is an instant and the grid ends at it. At a wider step the mark
+// that would land past the foot is DROPPED rather than pulled back to it: a
+// rail whose last two labels are three hours apart in words and one hour apart
+// in pixels is a rail that has stopped meaning anything.
+export function railHours(win: GridWindow, step: number): number[] {
+  const out: number[] = [];
+  const by = Math.max(1, Math.floor(step));
+  for (let h = win.startHour; h <= win.endHour; h += by) out.push(h);
+  return out;
+}
+
+// An hour, in the least room a label can take.
+//
+// `12a`, `3a`, `12p`, `9p` — `h A` is "12 AM" and does not fit a 24px gutter,
+// and dropping the meridiem instead would make 3 and 15 the same label. The
+// hour keeps its full digits; only the word shrinks.
+export function shortHourLabel(hour: number): string {
+  const h = ((Math.floor(hour) % 24) + 24) % 24;
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve}${h < 12 ? "a" : "p"}`;
+}
+
 // Where a block sits in its column, as fractions of the window — 0 at the top,
 // 1 at the foot. Fractions rather than pixels so the stylesheet carries no
 // arithmetic and the grid holds at any pane width.
 //
 // CLIPPED AT BOTH ENDS rather than allowed to overhang: a block that started
 // before the window would draw above the rail and over the day heads.
-export function placeInWindow(
-  item: GridItem,
+export function placeSpan(
+  start: number,
+  end: number,
   win: GridWindow
 ): { top: number; height: number } {
   const winStart = win.startHour * 60;
   const winSpan = (win.endHour - win.startHour) * 60;
-  const top = Math.max(0, Math.min(1, (item.start - winStart) / winSpan));
-  const rawEnd = (itemEnd(item) - winStart) / winSpan;
-  const end = Math.max(0, Math.min(1, rawEnd));
-  return { top, height: Math.max(0, end - top) };
+  const top = Math.max(0, Math.min(1, (start - winStart) / winSpan));
+  const foot = Math.max(0, Math.min(1, (end - winStart) / winSpan));
+  return { top, height: Math.max(0, foot - top) };
+}
+
+// The same, for an item that is its own span. A COMPACT BOX IS NOT — its foot
+// is the last thing inside it, floored to something a finger can land on — so
+// the two-number form above is the one the view calls at both widths and this
+// is the shorthand for the ordinary case.
+export function placeInWindow(
+  item: GridItem,
+  win: GridWindow
+): { top: number; height: number } {
+  return placeSpan(item.start, itemEnd(item), win);
 }
 
 // Where the current minute sits in the window, as a fraction — or null when it
@@ -376,12 +422,29 @@ export function resizedTo(item: GridItem, end: number): GridItem | null {
 // and the long thing beside it — the order a reader scans, and stable, so a
 // repaint never reshuffles a day that did not change.
 export function packDay(items: GridItem[]): PlacedItem[] {
-  const sorted = items
-    .slice()
-    .sort((a, b) => a.start - b.start || itemEnd(a) - itemEnd(b));
+  return packSpans(items.map((item) => ({ ...item, end: itemEnd(item) })));
+}
 
-  const out: PlacedItem[] = [];
-  let cluster: PlacedItem[] = [];
+// Anything with a start and an end, both in minutes past midnight.
+//
+// THE PACKER WORKS ON THESE AND NOT ON `GridItem` because a compact box is a
+// span too, and its foot is not `itemEnd`'s arithmetic — it is the last thing
+// inside the box, floored to something that can be seen. Two copies of the
+// cluster walk below, one reading each kind of end, is how a grid comes to pack
+// its boxes differently from its blocks.
+interface Span {
+  start: number;
+  end: number;
+}
+
+function packSpans<T extends Span>(
+  spans: T[]
+): (T & { col: number; cols: number })[] {
+  type Packed = T & { col: number; cols: number };
+  const sorted = spans.slice().sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const out: Packed[] = [];
+  let cluster: Packed[] = [];
   let clusterEnd = -Infinity;
 
   const flush = (): void => {
@@ -391,7 +454,7 @@ export function packDay(items: GridItem[]): PlacedItem[] {
     for (const item of cluster) {
       let c = 0;
       while (colEnds[c] !== undefined && colEnds[c] > item.start) c++;
-      colEnds[c] = itemEnd(item);
+      colEnds[c] = item.end;
       item.col = c;
     }
     for (const item of cluster) item.cols = colEnds.length;
@@ -403,9 +466,131 @@ export function packDay(items: GridItem[]): PlacedItem[] {
   for (const item of sorted) {
     if (cluster.length && item.start >= clusterEnd) flush();
     cluster.push({ ...item, col: 0, cols: 1 });
-    clusterEnd = Math.max(clusterEnd, itemEnd(item));
+    clusterEnd = Math.max(clusterEnd, item.end);
   }
   flush();
+  return out;
+}
+
+// ── the compact week draws boxes, not bars (1.0.18) ──────────────────
+//
+// WHAT 1.0.18 SHIPPED AND WHY IT WAS NOT ENOUGH. Seven days and twenty-four
+// hours fit, which was the ask, and then a half-hour meeting was a hairline
+// four pixels tall in a 45px column — the week was legible and the things in it
+// were not. Height alone does not fix that: doubling the row height doubles a
+// hairline into two hairlines, and a day of six captures is still six of them
+// stacked inside one hour.
+//
+// SO THE SHORT THINGS GROW AND THE CROWDED ONES COUNT. Every box is at least
+// `COMPACT_MIN_MINUTES` tall, and anything that would then be drawn on top of a
+// box of the same colour is drawn INSIDE it instead, with a number saying how
+// many. Two work logs are one box reading `2`; four meetings are one reading
+// `4`.
+
+// The least time a compact box may stand for.
+//
+// FORTY-FIVE MINUTES IS SIXTEEN PIXELS at the compact row height — 22px an
+// hour, in `99-time-grid.css` — and sixteen pixels is the least a box can be
+// and still hold a digit. THIS NUMBER AND THAT ROW HEIGHT ARE ONE MEASUREMENT:
+// change the row and this follows it, or the grid goes back to drawing boxes
+// too short to read the count in.
+export const COMPACT_MIN_MINUTES = 45;
+
+// One box on a compact grid: everything of one colour close enough together
+// that no reader could tell the pieces apart at this size.
+//
+// COLOUR IS THE KEY, NOT SOURCE. A box wears one fill and the fill is read as
+// what kind of thing is in it, so two meetings drawn blue merge and say `2`,
+// and a blue meeting and a red task never merge however close they sit.
+// Grouping by source would put two differently-coloured events in one box and
+// force it to pick one of their colours to lie with.
+export interface CompactBox extends Span {
+  color: string;
+  day: number;
+  // Everything inside, in start order. One of them is what a press opens; more
+  // than one and the press offers the list.
+  items: GridItem[];
+}
+
+export type PlacedBox = CompactBox & { col: number; cols: number };
+
+export function boxDay(items: GridItem[], minMinutes: number): CompactBox[] {
+  const floor = Math.max(1, minMinutes);
+  const byColor = new Map<string, GridItem[]>();
+  for (const item of items) {
+    const list = byColor.get(item.color);
+    if (list) list.push(item);
+    else byColor.set(item.color, [item]);
+  }
+
+  const out: CompactBox[] = [];
+  for (const list of byColor.values()) {
+    const sorted = list
+      .slice()
+      .sort((a, b) => a.start - b.start || itemEnd(a) - itemEnd(b));
+    let open: CompactBox | null = null;
+    for (const item of sorted) {
+      // THE FLOOR IS APPLIED BEFORE THE COMPARISON, WHICH IS THE WHOLE POINT.
+      // Two twenty-minute logs an hour apart do not overlap in minutes and do
+      // overlap on screen; it is the drawn box, not the item, that has to have
+      // room for the next one.
+      const foot = Math.max(itemEnd(item), item.start + floor);
+      if (open && item.start < open.end) {
+        open.items.push(item);
+        open.end = Math.max(open.end, foot);
+        continue;
+      }
+      open = {
+        color: item.color,
+        day: item.day,
+        items: [item],
+        start: item.start,
+        end: foot,
+      };
+      out.push(open);
+    }
+  }
+
+  // In reading order, and stable — colour breaks the tie between two boxes that
+  // begin at the same minute, so a repaint of an unchanged week draws the same
+  // grid rather than reshuffling the colours in a column.
+  return out.sort((a, b) => a.start - b.start || a.color.localeCompare(b.color));
+}
+
+export function packBoxes(boxes: CompactBox[]): PlacedBox[] {
+  return packSpans(boxes);
+}
+
+// The all-day lane, at the same size: one chip per colour, carrying what it
+// stands for.
+//
+// THE LANE HAS THE SAME PROBLEM AND NO HEIGHT TO SOLVE IT WITH. A block can
+// grow downward until it is legible; a lane chip cannot, so four tasks due on a
+// Thursday are four stubs sharing a 45px cell. One chip reading `4` is the same
+// fact in one glance.
+//
+// NO TIME IS INVOLVED, so nothing here is about overlap: an all-day item is a
+// fact about the whole column and every one of a colour belongs in one chip.
+export interface ColorTally {
+  color: string;
+  items: AllDayItem[];
+}
+
+export function tallyAllDay(items: AllDayItem[]): ColorTally[] {
+  // FIRST APPEARANCE ORDER, which is the order the lane already drew them in —
+  // sorting here would reorder a lane that nobody asked to be reordered.
+  const out: ColorTally[] = [];
+  const byColor = new Map<string, ColorTally>();
+  for (const item of items) {
+    const tally = byColor.get(item.color);
+    if (tally) {
+      tally.items.push(item);
+      continue;
+    }
+    const made: ColorTally = { color: item.color, items: [item] };
+    byColor.set(item.color, made);
+    out.push(made);
+  }
   return out;
 }
 
@@ -422,13 +607,6 @@ export function packDay(items: GridItem[]): PlacedItem[] {
 export const DAY_COUNTS = [7, 3, 1] as const;
 export type DayCount = (typeof DAY_COUNTS)[number];
 
-// Below these widths a grid cannot honestly draw the count it was asked for.
-// Numbers rather than a media query because the choice is WHICH days, and CSS
-// can hide a column but cannot decide that the three to keep are the three
-// around today.
-export const NARROW_3_PX = 520;
-export const NARROW_1_PX = 330;
-
 // The second piece of the argument, read. Empty is the whole week.
 export function parseDays(arg: string): {
   days: DayCount;
@@ -441,18 +619,6 @@ export function parseDays(arg: string): {
     return { days: n as DayCount, unknown: null };
   }
   return { days: 7, unknown: word };
-}
-
-// What a pane this wide can actually draw, given what it was asked for.
-//
-// NARROWS ONLY. A reader who asked for one day gets one day in a pane wide
-// enough for seven — they said what they wanted and the pane does not disagree
-// with them, it only ever admits it has no room.
-export function fitDays(asked: DayCount, width: number): DayCount {
-  if (width <= 0) return asked;
-  if (width < NARROW_1_PX) return 1;
-  if (width < NARROW_3_PX) return Math.min(asked, 3) as DayCount;
-  return asked;
 }
 
 // Which columns of the week to draw, as indices into its seven dates.

@@ -86,6 +86,43 @@
   background: color-mix(in srgb, var(--ca-tg-grey) 15%, transparent);
 }
 
+/* ── the way back to the desk grid ───────────────────────────────────
+   HIDDEN EVERYWHERE THE GRID IS ALREADY FULL SIZE, which is why this is a
+   `display: none` here and a `display: inline-flex` inside the container
+   query rather than a branch in the view. The bar is drawn once, before
+   anything has been laid out and therefore before any width is knowable; CSS
+   is the half of the plugin that knows how wide this widget ended up, so CSS
+   decides whether the control exists.
+
+   IT IS NOT A SOURCE CHIP. The chips say what the grid draws and this says
+   how; it sits after them, wears no source colour, and carries an icon rather
+   than a word because the four words beside it are already the sentence. */
+.ca-tg-expand {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 1px 4px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  box-shadow: none;
+  height: auto;
+}
+
+.ca-tg-expand svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ca-tg-expand.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
 .ca-tg-status,
 .ca-tg-empty {
   font-size: var(--font-ui-small);
@@ -203,8 +240,8 @@
    position among the hours and putting it at 00:00 would be a claim. */
 
 .ca-tg-lane {
-  border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary-alt);
+  border-bottom: 1px solid var(--ca-tg-lane-edge);
+  background: var(--ca-tg-lane-bg);
   min-height: 52px;
 }
 
@@ -215,7 +252,7 @@
   position: sticky;
   left: 0;
   z-index: 4;
-  background: var(--background-secondary-alt);
+  background: var(--ca-tg-lane-bg);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -347,8 +384,11 @@
   );
 }
 
+/* TODAY IS THE ACCENT, NOT A HOVER. `--ca-tg-lane-bg` says the rest of it;
+   the colour sits behind the hour lines rather than over them, because a
+   column's lines are its `background-image` and this is its background. */
 .ca-tg-col.is-today {
-  background-color: var(--background-modifier-hover);
+  background-color: var(--ca-tg-today-bg);
 }
 
 /* ── the now line (4.62) ─────────────────────────────────────────────
@@ -425,6 +465,18 @@
 .ca-tg-blk-when {
   opacity: 0.85;
   font-variant-numeric: tabular-nums;
+}
+
+/* THE COMPACT GRID'S ONLY TEXT, AND NOWHERE ELSE'S. A block with room for its
+   own title carries it, and a number beside a title would be a second answer to
+   what is in the block. It takes its colour by inheritance rather than by rule
+   because the two things that carry one — a filled block and a tinted chip —
+   are not on the same ground. */
+.ca-tg-count {
+  display: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 /* A MOMENT IS NOT A SHORT SPAN. An item with no duration claims one minute,
@@ -601,11 +653,349 @@
 .ca-tg-fill-pink { background: var(--ca-tg-pink); }
 .ca-tg-fill-grey { background: var(--ca-tg-grey); }
 
-/* One column per line below a phone's width would be seven screens of
-   scrolling, so the grid keeps its shape and the container scrolls. What
-   changes is the rail, which has no room for "12 PM" at this width. */
+/* ── the compact week ────────────────────────────────────────────────
+   WHAT THIS BLOCK USED TO SAY, AND WHY IT WAS WRONG. "One column per line
+   below a phone's width would be seven screens of scrolling, so the grid
+   keeps its shape and the container scrolls." The first half is still true —
+   nobody wants a day per screen — but the conclusion was a grid that kept a
+   570px floor and a 1200px body inside a 400px phone and a 620px cap, which
+   is 3.9 days by 12.4 hours: 29% of the week, on the one view whose entire
+   job is the shape of a week.
+
+   THE THIRD OPTION IS THE SAME SHAPE, SMALLER. Seven columns that divide the
+   width instead of setting a floor under it, and a 22px hour — so midnight to
+   midnight is 528px and the whole week is on screen with nothing scrolling
+   inside a page that already scrolls.
+
+   AND THEREFORE READ-ONLY, WHICH IS NOT A SECOND DECISION. At 22px an hour a
+   quarter-hour stand-up is five pixels tall. `.ca-tg-grip` is a twelve-pixel
+   handle on the bottom edge of that, and a drag that begins on it is a drag
+   that has already missed. The gestures come back with the pixels — see
+   `--ca-tg-compact`, which is how the view learns that they must not be wired
+   — and a press that OPENS is kept, because it needs no accuracy in time.
+
+   WHAT THIS BLOCK GOT WRONG THE FIRST TIME, at a 15px hour and a three-pixel
+   bar: the week became legible and the things in it did not. A half-hour
+   meeting was a hairline in a 45px column, and no row height fixes that on its
+   own — twice the height is twice the hairline, and a morning of captures is
+   still a morning of captures stacked inside one hour. So the row grew to 22px
+   AND the short things stopped being drawn short: every box is at least
+   forty-five minutes tall, and whatever would land on top of a box of the same
+   colour is drawn inside it with a count. Two work logs are one box reading
+   `2`. `COMPACT_MIN_MINUTES` in `time-grid.ts` is the other half of it.
+
+   A block carries no title here and does not pretend to: its name is on the
+   element as a `title` attribute, and one press away in the note it came
+   from. */
 @container (max-width: 400px) {
   .ca-tg {
+    --ca-tg-compact: 1;
+    --ca-tg-gutter: 30px;
+    --ca-tg-row: 22px;
+  }
+
+  /* THE WEEK GETS A ROW AND THE CONTROLS GET A ROW. Three chips, a button and
+     a date range do not fit across a phone, and a flex row that cannot wrap
+     answered that by squeezing the date until the date wrapped instead — "14
+     Sep – 20 Sep" over "2026", beside the chips, in a bar two lines tall
+     either way. Wrapped at the row it reads as two things rather than as one
+     thing that ran out of room.
+
+     AND IT IS NOT UNDONE WHEN THE GRID IS EXPANDED, which every other rule in
+     this block is. Expanding the grid gives the reader back the hours; it does
+     not widen the phone. */
+  .ca-tg-bar {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+  }
+
+  .ca-tg-span {
+    flex: 1 0 100%;
+  }
+
+  .ca-tg-sources {
+    margin-left: 0;
+  }
+
+  /* THE GUTTER IS 30px AND THE THREE LABELS IN IT HAVE TO FIT. The corner is a
+     flex cell with no `overflow` and the hour marks are absolutely positioned
+     against its right edge with `white-space: nowrap`, so at 24px "W38" and
+     "12a" did not clip — they drew straight past the left edge of the grid and
+     sat on the note behind it. Six more pixels and a smaller label each. */
+  .ca-tg-corner {
+    font-size: 10px;
+    padding: 0 3px 4px 0;
+    overflow: hidden;
+  }
+
+  .ca-tg-hour {
+    right: 3px;
+    font-size: 10px;
+  }
+
+  /* THE RAIL'S STEP, DRAWN. The darker line every third hour is the one the
+     label beside it names; `300%` is three of the hour rows, and a compact
+     window always starts at midnight, which is what keeps the two in step. */
+  .ca-tg-col {
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        var(--ca-tg-line-major) 0 1px,
+        transparent 1px calc(300% / var(--ca-tg-hours))
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        var(--background-modifier-border-hover) 0 1px,
+        transparent 1px calc(100% / var(--ca-tg-hours))
+      );
+  }
+
+  /* NOTHING SCROLLS INSIDE A PAGE THAT SCROLLS. Both axes were named in 4.62
+     so the vertical one could be capped; with the whole day at 360px there is
+     nothing left to cap, and a widget that swallows a finger travelling down
+     the note is worse than a tall one. */
+  .ca-tg-scroll {
+    overflow: visible;
+    max-height: none;
+  }
+
+  /* THE FLOOR COMES OFF THE COLUMNS, WHICH IS THE WHOLE TRICK. 74px was a
+     minimum width for a column that had to hold "Design review" and a time
+     range; a column that holds a coloured bar has no such minimum, and seven
+     of them divide 316px into 45 each. */
+  .ca-tg-grid {
+    min-width: 0;
+  }
+
+  .ca-tg-head,
+  .ca-tg-lane,
+  .ca-tg-body {
+    grid-template-columns: var(--ca-tg-gutter) repeat(var(--ca-tg-cols), minmax(0, 1fr));
+  }
+
+  .ca-tg-day {
+    padding: 4px 1px 3px;
+  }
+
+  .ca-tg-dnum {
+    font-size: 1.1em;
+  }
+
+  .ca-tg-day.is-today .ca-tg-dnum {
+    min-width: 1.6em;
+  }
+
+  /* THE LANE KEEPS ITS ROW AND LOSES ITS WORDS. A task due with no hour still
+     has nowhere else to be, and 52px of it above a 360px day would be an
+     eighth of the widget spent on the things that have no time. */
+  .ca-tg-lane {
+    min-height: 24px;
+  }
+
+  /* "all day" OVER TWO LINES RATHER THAN "day" OVER ONE. The label is capped at
+     the gutter and clipped with an ellipsis, and at 24px the ellipsis ate the
+     first word — leaving a lane labelled `day` sitting against the 12a mark.
+     Wrapping is the fix, because the words are already the shortest true ones.
+     */
+  .ca-tg-lane-label {
+    font-size: 10px;
+    line-height: 1.05;
+    padding-right: 3px;
+    white-space: normal;
+    text-align: right;
+  }
+
+  /* THE CHIPS SIT SIDE BY SIDE HERE, one per colour rather than one per item —
+     `tallyAllDay` is the other half of that. Stacked, four of them would be
+     four rows of lane above a grid whose whole job is to be a week. */
+  .ca-tg-lane-cell {
+    padding: 2px;
+    gap: 2px;
+    flex-flow: row wrap;
+    align-items: stretch;
+  }
+
+  .ca-tg-chip {
+    flex: 1 1 0;
+    min-height: 14px;
+    padding: 0;
+    border-left-width: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* A BOX WITH A NUMBER IN IT, NOT A BAR. The 17px floor above exists so a
+     block can show its own title; a box shows a digit, which needs sixteen.
+
+     AND THE ARITHMETIC REACHES THAT FLOOR FIRST, which is the part that
+     matters: forty-five minutes at 22px an hour is 16.5px, so `boxDay` has
+     already grown every box past this rule before the box is drawn. This is
+     what a box falls back on when the two numbers drift apart — not the
+     mechanism. `COMPACT_MIN_MINUTES` is. */
+  .ca-tg-blk {
+    min-height: 16px;
+    padding: 0;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ca-tg-count {
+    display: block;
+    font-size: 10px;
+  }
+
+  .ca-tg-blk-title,
+  .ca-tg-blk-when,
+  .ca-tg-blk-open,
+  .ca-tg-grip {
+    display: none;
+  }
+
+  /* NO CURSOR PROMISES A GESTURE THAT IS NOT WIRED. The crosshair on a column
+     meant "drag here to book this hour" and the grab hand meant "this moves";
+     neither is true below this width, and a pointer that lies about what the
+     next press does is worse than no affordance at all. */
+  .ca-tg-col {
+    cursor: default;
+  }
+
+  .ca-tg-blk,
+  .ca-tg-blk.is-fixed {
+    cursor: pointer;
+  }
+
+  /* THE WAY OUT, AND IT ONLY EXISTS WHERE THERE IS SOMETHING TO LEAVE. At the
+     end of the controls' row, which is the far side of the chips it is not
+     one of. */
+  .ca-tg-expand {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  /* ── expanded: the desk grid, on a phone, because the reader asked ──
+     EVERY OVERRIDE ABOVE, UNDONE IN THE SAME ORDER, and the control itself
+     deliberately left alone — a reader who cannot get back is a reader who
+     has to reopen the note. `--ca-tg-compact` goes to 0 here as well as the
+     geometry, because the view reads it off `.ca-tg` and the gestures have to
+     come back with the pixels they need. */
+  .ca-tg.is-expanded {
+    --ca-tg-compact: 0;
     --ca-tg-gutter: 40px;
+    --ca-tg-row: 50px;
+  }
+
+  .ca-tg.is-expanded .ca-tg-scroll {
+    overflow: auto;
+    max-height: min(70vh, 620px);
+  }
+
+  .ca-tg.is-expanded .ca-tg-grid {
+    min-width: calc(var(--ca-tg-gutter) + var(--ca-tg-cols) * 74px);
+  }
+
+  .ca-tg.is-expanded .ca-tg-head,
+  .ca-tg.is-expanded .ca-tg-lane,
+  .ca-tg.is-expanded .ca-tg-body {
+    grid-template-columns: var(--ca-tg-gutter) repeat(var(--ca-tg-cols), minmax(74px, 1fr));
+  }
+
+  .ca-tg.is-expanded .ca-tg-corner {
+    font-size: var(--font-ui-smaller);
+    padding: 0 6px 5px 0;
+    overflow: visible;
+  }
+
+  .ca-tg.is-expanded .ca-tg-hour {
+    right: 6px;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .ca-tg.is-expanded .ca-tg-col {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      var(--background-modifier-border-hover) 0 1px,
+      transparent 1px calc(100% / var(--ca-tg-hours))
+    );
+  }
+
+  .ca-tg.is-expanded .ca-tg-day {
+    padding: 8px 4px 6px;
+  }
+
+  .ca-tg.is-expanded .ca-tg-dnum {
+    font-size: 1.3em;
+  }
+
+  .ca-tg.is-expanded .ca-tg-day.is-today .ca-tg-dnum {
+    min-width: 1.9em;
+  }
+
+  .ca-tg.is-expanded .ca-tg-lane {
+    min-height: 52px;
+  }
+
+  .ca-tg.is-expanded .ca-tg-lane-label {
+    font-size: 11px;
+    line-height: 1;
+    padding-right: 6px;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .ca-tg.is-expanded .ca-tg-lane-cell {
+    padding: 4px;
+    gap: 3px;
+    flex-flow: column nowrap;
+    align-items: stretch;
+  }
+
+  .ca-tg.is-expanded .ca-tg-chip {
+    flex: 0 0 auto;
+    display: block;
+    height: auto;
+    min-height: 0;
+    padding: 2px 6px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
+  }
+
+  .ca-tg.is-expanded .ca-tg-blk {
+    display: block;
+    min-height: 17px;
+    padding: 1px 4px;
+    box-shadow: var(--ca-shadow-sm);
+  }
+
+  .ca-tg.is-expanded .ca-tg-count {
+    display: none;
+  }
+
+  .ca-tg.is-expanded .ca-tg-blk-title {
+    display: block;
+  }
+
+  .ca-tg.is-expanded .ca-tg-blk-when {
+    display: inline;
+  }
+
+  .ca-tg.is-expanded .ca-tg-grip,
+  .ca-tg.is-expanded .ca-tg-blk-open {
+    display: flex;
+  }
+
+  .ca-tg.is-expanded .ca-tg-col {
+    cursor: crosshair;
+  }
+
+  .ca-tg.is-expanded .ca-tg-blk {
+    cursor: grab;
+  }
+
+  .ca-tg.is-expanded .ca-tg-blk.is-fixed {
+    cursor: pointer;
   }
 }

@@ -36,6 +36,7 @@
 import {
   MarkdownPostProcessorContext,
   MarkdownRenderChild,
+  Menu,
   Notice,
   TFile,
   setIcon,
@@ -65,25 +66,33 @@ import { draftEvent, openEventEditor } from "../events/event-ui";
 import { parseLogItems, serializeLogItems, type LogItem } from "./log-items";
 import { partsOf } from "../core/section-model";
 import {
+  COMPACT_MIN_MINUTES,
+  COMPACT_RAIL_STEP,
   DAY_COUNTS,
   DEFAULT_OPEN_HOUR,
   FULL_DAY_WINDOW,
   GRID_SOURCES,
   SNAP_MINUTES,
+  boxDay,
   describeWhen,
   dayIndex,
   formatClock,
   minuteAt,
   movedTo,
   nowOffset,
+  packBoxes,
   packDay,
   parseClock,
   parseDays,
   parseSources,
   placeInWindow,
+  placeSpan,
+  railHours,
   resizedTo,
   resolveOffSources,
+  shortHourLabel,
   spanFromDrag,
+  tallyAllDay,
   timeGridFilterKey,
   visibleDays,
   weekDates,
@@ -92,6 +101,7 @@ import {
   type GridItem,
   type GridSource,
   type GridWindow,
+  type PlacedBox,
 } from "./time-grid";
 
 // The one swatch every task wears.
@@ -198,14 +208,34 @@ export function buildTimeGrid(
     ? loadTimeGridFilters(plugin, filterKey, sources)
     : new Set<GridSource>();
 
+  // WHETHER THIS GRID IS TOO NARROW TO BE WRITTEN ON, ASKED OF THE STYLESHEET.
+  //
+  // `99-time-grid.css` holds the breakpoint — it is a `@container` query, and
+  // the container is this element — and raises `--ca-tg-compact` to 1 inside
+  // it. Nothing here knows the number. A width measured in TypeScript and a
+  // width written in CSS is two files holding one breakpoint, which is how a
+  // grid comes to be drawn at fifteen pixels an hour and wired for dragging at
+  // the same time.
+  //
+  // AN EMPTY STRING MEANS "NOT LAID OUT YET" and reads as false, which is the
+  // safe way round: a full-size grid drawn into a narrow pane is corrected by
+  // the observer below on the first frame it has a box.
+  const readCompact = (): boolean =>
+    getComputedStyle(root).getPropertyValue("--ca-tg-compact").trim() === "1";
+
   let drawn: Collected = { items: [], allDay: [] };
   let ready = false;
   let showing: DayCount = asked;
   let opened = false;
+  let compact = false;
+  const ticker: TickerSlot = { current: null };
+  let expanded = filterKey ? loadTimeGridExpanded(plugin, filterKey) : false;
+  root.toggleClass("is-expanded", expanded);
 
   const render = (): void => {
     if (!ready) return;
     showing = asked;
+    compact = readCompact();
     const cols = visibleDays(dates, showing, moment().format("YYYY-MM-DD"));
     span.setText(
       cols.length === 1
@@ -224,14 +254,20 @@ export function buildTimeGrid(
       // A NEW BLOCK HAS TO BE VISIBLE ONCE IT IS MADE. On a grid drawing only
       // logbooks — or one whose events chip the reader has just turned off —
       // drawing a meeting would save it into a week that then does not show it.
-      canDraw: sources.includes("events") && !off.has("events"),
+      canDraw: sources.includes("events") && !off.has("events") && !compact,
       filtered: off.size > 0,
       // THE GRID OPENS ON NOW ONCE, not on every repaint. A reader who turned
       // a source off has not asked to be scrolled back to this hour, and a
       // pane being resized has certainly not.
-      scrollToNow: !opened,
+      //
+      // AND NEVER WHEN COMPACT, because nothing scrolls: the whole day is on
+      // screen. The flag is spent on the first paint that HAS a scroller, so a
+      // reader who presses expand on a phone still arrives at this hour.
+      scrollToNow: !opened && !compact,
+      compact,
+      ticker,
     });
-    opened = true;
+    if (!compact) opened = true;
   };
 
   // WHAT AN EDIT DOES AFTERWARDS. A grid that wrote a file and then sat there
@@ -256,9 +292,55 @@ export function buildTimeGrid(
     render();
   });
 
+  expandControl(bar, expanded, (want) => {
+    expanded = want;
+    root.toggleClass("is-expanded", expanded);
+    if (filterKey) saveTimeGridExpanded(plugin, filterKey, expanded);
+    render();
+  });
+
+  // The one thing that can change the answer without anything being pressed.
+  ctx.addChild(
+    new CompactWatcher(root, () => {
+      if (ready && readCompact() !== compact) render();
+    })
+  );
+
   reload();
 
   return root;
+}
+
+// Re-asks the stylesheet whether the grid is compact, whenever the grid's box
+// changes.
+//
+// A RENDER CHILD BECAUSE AN OBSERVER OUTLIVES ITS ELEMENT OTHERWISE, which is
+// `NowTicker`'s reason one class down: a homepage is opened and closed all day,
+// and an observer registered on the plugin would go on measuring a node that is
+// no longer in a document. `ctx.addChild` ties it to the block.
+//
+// IT DOES NOT DECIDE ANYTHING. It re-reads one custom property and calls back;
+// the stylesheet still owns the breakpoint, and a resize that does not cross it
+// repaints nothing.
+class CompactWatcher extends MarkdownRenderChild {
+  private observer: ResizeObserver | null = null;
+
+  constructor(
+    private readonly root: HTMLElement,
+    private readonly onChange: () => void
+  ) {
+    super(root);
+  }
+
+  onload(): void {
+    this.observer = new ResizeObserver(() => this.onChange());
+    this.observer.observe(this.root);
+  }
+
+  onunload(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+  }
 }
 
 export function loadTimeGridFilters(
@@ -286,6 +368,81 @@ export function saveTimeGridFilters(
     at[key] = Array.from(off);
   }
   void plugin.saveSettings();
+}
+
+// Whether this grid was expanded out of its compact form, and where that is
+// remembered.
+//
+// THE SAME KEY THE FILTER CHIPS USE, so one grid on one note has one identity
+// in settings. Both are view state about the same block: what it draws, and how
+// big. Two key shapes for one widget would be two things to migrate the day a
+// note is renamed.
+//
+// A RECORD THAT ONLY EVER HOLDS `true`. The default is compact-below-400px, so
+// "not expanded" is the absence of a row rather than a stored `false` — the
+// shape `saveTimeGridFilters` already uses for "nothing is turned off", and it
+// keeps a vault that has never pressed the control out of the settings file.
+export function loadTimeGridExpanded(
+  plugin: ChronoAnvilPlugin,
+  key: string
+): boolean {
+  return plugin.settings.timeGridExpanded?.[key] === true;
+}
+
+export function saveTimeGridExpanded(
+  plugin: ChronoAnvilPlugin,
+  key: string,
+  expanded: boolean
+): void {
+  if (!plugin.settings.timeGridExpanded) {
+    plugin.settings.timeGridExpanded = {};
+  }
+  const at = plugin.settings.timeGridExpanded;
+  if (expanded) {
+    at[key] = true;
+  } else {
+    if (!(key in at)) return;
+    delete at[key];
+  }
+  void plugin.saveSettings();
+}
+
+// The way back to the desk grid.
+//
+// DRAWN ALWAYS AND SHOWN BY CSS, which is the only order that works: the bar is
+// built before this element has been laid out, so nothing here can know how
+// wide the grid ended up. `.ca-tg-expand` is `display: none` until the
+// container query says otherwise, so on every pane wide enough to draw the full
+// grid the control is not merely useless, it is absent.
+//
+// AN ICON AND NOT A WORD. Three source names are already in this corner and a
+// fourth word would read as a fourth source.
+function expandControl(
+  bar: HTMLElement,
+  expanded: boolean,
+  onChange: (want: boolean) => void
+): void {
+  const btn = bar.createEl("button", {
+    cls: `ca-tg-expand${expanded ? " is-on" : ""}`,
+    attr: {
+      type: "button",
+      "aria-pressed": expanded ? "true" : "false",
+      "aria-label": expanded ? "Show the compact grid" : "Show the full grid",
+      title: expanded ? "Show the compact grid" : "Show the full grid",
+    },
+  });
+  setIcon(btn, expanded ? "minimize-2" : "maximize-2");
+  btn.addEventListener("click", () => {
+    const want = !btn.hasClass("is-on");
+    btn.toggleClass("is-on", want);
+    btn.setAttribute("aria-pressed", want ? "true" : "false");
+    const label = want ? "Show the compact grid" : "Show the full grid";
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("title", label);
+    btn.empty();
+    setIcon(btn, want ? "minimize-2" : "maximize-2");
+    onChange(want);
+  });
 }
 
 // The source list in the bar, as controls.
@@ -560,6 +717,11 @@ function firstLine(text: string): string {
 
 // ── painting ──────────────────────────────────────────────────────────
 
+// One repaint's worth of timer, handed back to the next.
+interface TickerSlot {
+  current: MarkdownRenderChild | null;
+}
+
 interface PaintOpts {
   ctx: MarkdownPostProcessorContext;
   scroll: HTMLElement;
@@ -571,6 +733,10 @@ interface PaintOpts {
   // grid is allowed to say.
   filtered: boolean;
   scrollToNow: boolean;
+  // Too narrow to be written on. The stylesheet decides; see `readCompact`.
+  compact: boolean;
+  // The one-minute timer, held across repaints so there is only ever one.
+  ticker: TickerSlot;
 }
 
 function paint(
@@ -611,10 +777,15 @@ function paint(
     const cell = head.createDiv({
       cls: `ca-tg-day${iso === todayIso ? " is-today" : ""}`,
     });
-    // A ONE-DAY GRID HAS ROOM TO SAY WEDNESDAY, and a seven-day one does not.
+    // A ONE-DAY GRID HAS ROOM TO SAY WEDNESDAY, a seven-day one says WED, and a
+    // compact one says We. NOT ONE LETTER: `M T W T F S S` has two pairs in it
+    // and asks the reader to count from Monday instead of reading. The date
+    // number never abbreviates at any width — it is the part being pointed at.
     cell.createDiv({
       cls: "ca-tg-dow",
-      text: moment(iso).format(cols.length === 1 ? "dddd" : "ddd"),
+      text: moment(iso).format(
+        cols.length === 1 ? "dddd" : opts.compact ? "dd" : "ddd"
+      ),
     });
     cell.createDiv({ cls: "ca-tg-dnum", text: moment(iso).format("D") });
   });
@@ -625,17 +796,43 @@ function paint(
   lane.createDiv({ cls: "ca-tg-lane-label", text: "all day" });
   cols.forEach((day) => {
     const cell = lane.createDiv({ cls: "ca-tg-lane-cell" });
-    for (const item of shownAllDay.filter((a) => a.day === day)) {
+    const mine = shownAllDay.filter((a) => a.day === day);
+
+    // THE LANE COUNTS TOO, AND FOR A HARDER REASON THAN THE BODY'S: a block
+    // that is too short can be grown downward and a chip cannot. Four tasks due
+    // on a Thursday share one 45px cell however tall the grid is, so they share
+    // one chip instead, and it says `4`. `tallyAllDay` has the rest of it.
+    if (opts.compact) {
+      for (const tally of tallyAllDay(mine)) {
+        const chip = cell.createDiv({
+          cls: `ca-tg-chip ca-tg-fill-${tally.color}`,
+        });
+        if (tally.items.length === 1) {
+          const only = tally.items[0];
+          chip.setAttribute("title", laneTitle(only));
+          wire(plugin, chip, only.key);
+          continue;
+        }
+        const entries = tally.items.map((item) => ({
+          key: item.key,
+          label: laneTitle(item),
+        }));
+        chip.createSpan({
+          cls: "ca-tg-count",
+          text: String(entries.length),
+        });
+        chip.setAttribute("title", stackTitle(entries));
+        wireStack(plugin, chip, entries);
+      }
+      return;
+    }
+
+    for (const item of mine) {
       const chip = cell.createDiv({
         cls: `ca-tg-chip ca-tg-fill-${item.color}`,
         text: item.title,
       });
-      chip.setAttribute(
-        "title",
-        item.source === "tasks"
-          ? `${item.title} — due, no time`
-          : `${item.title} — all day`
-      );
+      chip.setAttribute("title", laneTitle(item));
       wire(plugin, chip, item.key);
     }
   });
@@ -650,10 +847,16 @@ function paint(
   // copies of it — which is the failure the stylesheet's own header warns
   // about ("a grid comes to draw its lines an hour out from its blocks").
   body.style.setProperty("--ca-tg-hours", String(hours));
-  for (let h = win.startHour; h <= win.endHour; h++) {
+  // EVERY THIRD HOUR IN A 24px GUTTER, AND THE WORD SHRINKS WITH IT. Twenty-five
+  // marks down 360px is one every fifteen pixels; they would overlap before the
+  // first was read. Which marks and what they say are both in `time-grid.ts`,
+  // because both are arithmetic about a window and neither needs a vault.
+  for (const h of railHours(win, opts.compact ? COMPACT_RAIL_STEP : 1)) {
     const mark = rail.createDiv({
       cls: "ca-tg-hour",
-      text: moment().startOf("day").add(h, "hours").format("h A"),
+      text: opts.compact
+        ? shortHourLabel(h)
+        : moment().startOf("day").add(h, "hours").format("h A"),
     });
     mark.style.top = `${((h - win.startHour) / hours) * 100}%`;
   }
@@ -672,7 +875,21 @@ function paint(
     columns.push({ el: col, day, iso });
     if (iso === todayIso) todayCol = col;
 
-    for (const placed of packDay(shown.filter((i) => i.day === day))) {
+    const mine = shown.filter((i) => i.day === day);
+
+    // A COMPACT COLUMN IS DRAWN IN BOXES, NOT IN BARS — `boxDay` says why. What
+    // the view adds is that everything in the loop below belongs to a block big
+    // enough to hold it: a title, a span, a resize handle, and an entry in the
+    // map the gesture layer reads. A box is none of those things. It is a
+    // colour, a number and a press.
+    if (opts.compact) {
+      for (const box of packBoxes(boxDay(mine, COMPACT_MIN_MINUTES))) {
+        drawBox(plugin, col, box, win);
+      }
+      return;
+    }
+
+    for (const placed of packDay(mine)) {
       const { top, height } = placeInWindow(placed, win);
       const moment_ = placed.mins == null;
       const block = col.createDiv({
@@ -707,6 +924,7 @@ function paint(
         // no length to pull on. Drawn as an element rather than as a hit zone
         // on the block so `closest` can tell the two gestures apart without
         // measuring anything.
+        //
         if (!moment_) block.createDiv({ cls: "ca-tg-grip" });
       }
       wire(plugin, block, placed.key);
@@ -717,7 +935,10 @@ function paint(
     // WHAT AN EMPTY GRID IS ALLOWED TO SAY DEPENDS ON WHY IT IS EMPTY. With a
     // source folded away, "nothing scheduled" would be a claim about the week
     // that the reader's own chip has made untrue.
-    grid.parentElement?.parentElement?.createDiv({
+    // INSIDE THE ELEMENT `paint` EMPTIES. It used to be appended two levels up,
+    // on the root — which `paint` does not clear — so an empty week grew one
+    // more of these every time a source chip was pressed.
+    grid.createDiv({
       cls: "ca-tg-empty",
       text: opts.filtered
         ? "Nothing here from the sources you have switched on."
@@ -725,17 +946,32 @@ function paint(
     });
   }
 
-  // The week, made writable.
-  wireGestures({
-    plugin,
-    win,
-    body,
-    columns,
-    blocks,
-    datesAll: weekDatesAll,
-    canDraw: opts.canDraw,
-    reload: opts.reload,
-  });
+  // The week, made writable — ON A GRID WITH ROOM FOR THE GESTURES.
+  //
+  // A quarter-hour is five pixels tall at the compact row height, and the boxes
+  // drawn over it are floored to forty-five minutes whatever they hold. Every
+  // one of the three gestures is a claim about a minute the reader pointed at,
+  // and neither number lets a finger point at one: a drag meant to move Tuesday
+  // 09:30 would as easily move the thing above it, and a resize would pull the
+  // foot of a box that is showing a floor rather than an end. So the grid below the
+  // breakpoint takes no gesture at all except the press that opens, which is
+  // `wire()` and needs no accuracy in time.
+  //
+  // CSS SAYS THE SAME THING IN CURSORS, one file over, and it has to — an
+  // affordance drawn for a gesture that is not wired is a promise the grid
+  // cannot keep.
+  if (!opts.compact) {
+    wireGestures({
+      plugin,
+      win,
+      body,
+      columns,
+      blocks,
+      datesAll: weekDatesAll,
+      canDraw: opts.canDraw,
+      reload: opts.reload,
+    });
+  }
 
   // The block the keyboard was on, back under the focus ring after the repaint
   // its own edit caused.
@@ -749,7 +985,18 @@ function paint(
 
   // The line, and the timer that keeps it honest. Only on the week that holds
   // today: on any other week there is no minute of it to draw.
-  if (showsToday) opts.ctx.addChild(new NowTicker(body, todayCol, win));
+  //
+  // THE PREVIOUS ONE IS PUT DOWN FIRST. `paint` rebuilds the body on every
+  // repaint and this used to register a ticker each time, so four presses of a
+  // source chip left four one-minute timers running — three of them moving a
+  // line on a body that had been thrown away.
+  opts.ticker.current?.unload();
+  opts.ticker.current = null;
+  if (showsToday) {
+    const ticker = new NowTicker(body, todayCol, win);
+    opts.ticker.current = ticker;
+    opts.ctx.addChild(ticker);
+  }
 
   if (opts.scrollToNow) {
     openOn(
@@ -1181,8 +1428,11 @@ function wireGestures(edit: EditCtx): void {
 // A drag lands on the quarter hour a pointer happened to be over; four presses
 // of Down move a meeting exactly an hour, and a reader who knows the block is
 // half an hour late does not want to aim at anything.
+// The ARROWS only. Enter and Space moved to `wire`, which is the half of this
+// that is still there when the grid is compact: a bar that can be clicked open
+// and not opened from the keyboard is a bar half the readers cannot reach, and
+// `wireKeys` is not called below the breakpoint because its arrows all edit.
 function wireKeys(edit: EditCtx, el: HTMLElement, item: GridItem): void {
-  el.setAttribute("tabindex", "0");
   el.setAttribute("data-focus", focusKeyOf(item.key));
   el.addEventListener("keydown", (evt: KeyboardEvent) => {
     if (evt.altKey || evt.ctrlKey || evt.metaKey) return;
@@ -1201,10 +1451,6 @@ function wireKeys(edit: EditCtx, el: HTMLElement, item: GridItem): void {
       // sideways to, and the week's edges are the week's edges.
       if (!edit.columns.some((c) => c.day === day)) return;
       next = movedTo(item, { day, start: item.start });
-    } else if (evt.key === "Enter" || evt.key === " ") {
-      evt.preventDefault();
-      el.click();
-      return;
     } else {
       return;
     }
@@ -1437,11 +1683,142 @@ function openTimeGridItem(plugin: ChronoAnvilPlugin, key: string): void {
   }
 }
 
+// ── the compact grid's boxes (1.0.18) ────────────────────────────────
+
+// What a lane chip says about itself, at either width. A task with no hour is
+// a different fact from an event with no hour, and the tooltip is the only
+// place a compact lane can say which.
+function laneTitle(item: AllDayItem): string {
+  return item.source === "tasks"
+    ? `${item.title} — due, no time`
+    : `${item.title} — all day`;
+}
+
+// One thing inside a box, reduced to what a menu row and a tooltip line need.
+interface StackEntry {
+  key: string;
+  label: string;
+}
+
+function stackTitle(entries: StackEntry[]): string {
+  return [
+    `${entries.length} here — press to choose`,
+    ...entries.map((entry) => entry.label),
+  ].join("\n");
+}
+
+// One box on a compact grid: a fill, a number when it stands for more than one
+// thing, and a press that opens what is inside it.
+function drawBox(
+  plugin: ChronoAnvilPlugin,
+  col: HTMLElement,
+  box: PlacedBox,
+  win: GridWindow
+): void {
+  const lead = box.items[0];
+  const alone = box.items.length === 1;
+  // A MOMENT KEEPS ITS FLAT FOOT, BUT ONLY WHILE THE BOX IS ONE MOMENT. Two
+  // things in a box have minutes between them, and a rule under it reading
+  // "this took no time" would be a claim about a box that is mostly somebody
+  // else's afternoon.
+  const el = col.createDiv({
+    cls:
+      `ca-tg-blk ca-tg-fill-${box.color}` +
+      (alone && lead.mins == null ? " is-moment" : ""),
+  });
+  const { top, height } = placeSpan(box.start, box.end, win);
+  el.style.top = `${top * 100}%`;
+  el.style.height = `${height * 100}%`;
+  const width = 100 / box.cols;
+  el.style.left = `calc(${box.col * width}% + 2px)`;
+  el.style.width = `calc(${width}% - 4px)`;
+
+  // THE COUNT IS THE ONLY TEXT A COMPACT GRID CARRIES, and a box holding one
+  // thing carries none: `1` on every bar on the week is noise a reader has to
+  // look past, and a box that stands for one thing already says so by being
+  // one. The name is on the element as a `title` and one press away in the note
+  // it came from — which is what a 45px column has always had to do.
+  if (alone) {
+    el.setAttribute("title", `${lead.title} — ${describeWhen(lead)}`);
+    wire(plugin, el, lead.key);
+    return;
+  }
+  el.createSpan({ cls: "ca-tg-count", text: String(box.items.length) });
+  const entries = box.items.map((item) => ({
+    key: item.key,
+    label: `${formatClock(item.start)} · ${item.title}`,
+  }));
+  el.setAttribute("title", stackTitle(entries));
+  wireStack(plugin, el, entries);
+}
+
+// A box that stands for several things opens the list of them.
+//
+// NOT THE FIRST OF THEM. Opening one of four because it happens to start
+// earliest is opening the wrong note three times out of four, and a press that
+// does that is worse than a press that does nothing. The menu is Obsidian's
+// own, which is the one thing on a phone that is already the right size.
+function wireStack(
+  plugin: ChronoAnvilPlugin,
+  el: HTMLElement,
+  entries: StackEntry[]
+): void {
+  el.addClass("is-clickable");
+  el.setAttribute("tabindex", "0");
+
+  const show = (evt: MouseEvent | null): void => {
+    const menu = new Menu();
+    for (const entry of entries) {
+      menu.addItem((item) =>
+        item.setTitle(entry.label).onClick(() => {
+          openTimeGridItem(plugin, entry.key);
+        })
+      );
+    }
+    if (evt) {
+      menu.showAtMouseEvent(evt);
+      return;
+    }
+    // FROM THE KEYBOARD THERE IS NO POINTER TO HANG IT ON, so it opens under
+    // the box the focus ring is on.
+    const rect = el.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom });
+  };
+
+  el.addEventListener("click", (evt: MouseEvent) => {
+    evt.preventDefault();
+    show(evt);
+  });
+  el.addEventListener("contextmenu", (evt: MouseEvent) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    show(evt);
+  });
+  el.addEventListener("keydown", (evt: KeyboardEvent) => {
+    if (evt.key !== "Enter" && evt.key !== " ") return;
+    if (evt.altKey || evt.ctrlKey || evt.metaKey) return;
+    evt.preventDefault();
+    show(null);
+  });
+}
+
 function wire(plugin: ChronoAnvilPlugin, el: HTMLElement, key: string): void {
   el.addClass("is-clickable");
 
+  // A TAB STOP, BECAUSE THIS IS THE THING THAT OPENS. It was `wireKeys`' job
+  // and `wireKeys` is about the arrows, which edit — so it is not wired on a
+  // compact grid, and it was never wired on an all-day chip at any width.
+  el.setAttribute("tabindex", "0");
+
   // Left click opens the item
   el.addEventListener("click", () => {
+    openTimeGridItem(plugin, key);
+  });
+
+  el.addEventListener("keydown", (evt: KeyboardEvent) => {
+    if (evt.key !== "Enter" && evt.key !== " ") return;
+    if (evt.altKey || evt.ctrlKey || evt.metaKey) return;
+    evt.preventDefault();
     openTimeGridItem(plugin, key);
   });
 

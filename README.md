@@ -62,6 +62,17 @@ queries, no Templater scripts, no external chart plugins.
 | **2** | Click a block | Opens it to edit the title, times and colour *(coming soon)* |
 | **3** | Drag a block | Moves it to another day or hour — the dashed outline is where it lands |
 
+On a phone, or in any pane too narrow for those three, the grid draws the whole
+week and the whole day at once — all seven columns, midnight to midnight,
+nothing scrolling inside it. Everything on it becomes a box in its own colour,
+never shorter than three quarters of an hour so it can be seen, and where
+several things of one colour would land on top of each other they become one
+box carrying the count: two work logs read **2**, four meetings read **4**. A
+press opens what is in a box, or offers the list when it holds several. It is
+read-only there — nothing moves — and the **⤢** button beside the source names
+hands back the full grid, gestures and all, with that note remembering which
+you chose.
+
 ## Install
 
 Download `main.js`, `manifest.json` and `styles.css` into

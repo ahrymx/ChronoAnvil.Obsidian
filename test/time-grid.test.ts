@@ -38,7 +38,16 @@ import {
   type GridItem,
   describeWhen,
   dayIndex,
-  fitDays,
+  COMPACT_MIN_MINUTES,
+  COMPACT_RAIL_STEP,
+  FULL_DAY_WINDOW,
+  boxDay,
+  packBoxes,
+  placeSpan,
+  tallyAllDay,
+  type AllDayItem,
+  railHours,
+  shortHourLabel,
   SNAP_MINUTES,
   formatClock,
   gridWindow,
@@ -248,21 +257,13 @@ describe("how many days are drawn (4.62)", () => {
     expect(visibleDays(week, 3, "2026-03-04")).toEqual([0, 1, 2]);
   });
 
-  it("narrows for a pane that has no room, and never widens", () => {
-    expect(fitDays(7, 900)).toBe(7);
-    expect(fitDays(7, 400)).toBe(3);
-    expect(fitDays(7, 300)).toBe(1);
-    // A reader who asked for one day meant it.
-    expect(fitDays(1, 900)).toBe(1);
-    expect(fitDays(3, 900)).toBe(3);
-  });
-
-  it("keeps what it was asked for until it has been measured", () => {
-    // A width of zero is an element that has not been laid out yet, not a pane
-    // with no room in it.
-    expect(fitDays(7, 0)).toBe(7);
-  });
 });
+
+// `fitDays`, `NARROW_3_PX` and `NARROW_1_PX` were tested here and called by
+// nothing in `src/`, and they answered the opposite question to the one a
+// narrow pane now asks: they cut a phone down to three days or one, where the
+// compact grid draws all seven at a density that fits. Two unreachable answers
+// to one question is one more than the file needs, so they are gone.
 
 describe("the now line", () => {
   const win = { startHour: 8, endHour: 18 };
@@ -605,6 +606,406 @@ describe("mobile controls and horizontal scrolling", () => {
     expect(src).toContain("TOUCH_LONG_PRESS_MS");
     expect(src).toContain("TOUCH_SLOP_PX");
     expect(src).toContain("evt.pointerType === \"touch\"");
+  });
+});
+
+// ── the compact week (1.0.18) ────────────────────────────────────────
+//
+// THE BREAKPOINT LIVES IN THE STYLESHEET AND THE VIEW READS IT BACK, so these
+// are two halves of one assertion: the container query must raise
+// `--ca-tg-compact`, and `time-grid-view` must ask for it rather than measure a
+// width of its own. A grid drawn at fifteen pixels an hour and wired for
+// dragging is the failure both halves exist to prevent.
+
+describe("the rail, when there is no room for it", () => {
+  it("marks every hour and both ends of the window at step 1", () => {
+    expect(railHours({ startHour: 8, endHour: 12 }, 1)).toEqual([8, 9, 10, 11, 12]);
+    // Twenty-four hours is twenty-five marks: `endHour` is an instant, and the
+    // grid ends at it.
+    expect(railHours(FULL_DAY_WINDOW, 1)).toHaveLength(25);
+  });
+
+  it("steps by three when compact, and never past the foot", () => {
+    // Nine marks, because midnight lands on the step at both ends of the day
+    // and the foot of the window is a real hour.
+    expect(railHours(FULL_DAY_WINDOW, COMPACT_RAIL_STEP)).toEqual([
+      0, 3, 6, 9, 12, 15, 18, 21, 24,
+    ]);
+    // 8 to 18 is ten hours: the mark that would land at 20 is dropped, not
+    // pulled back to 18 — two labels three hours apart in words and one hour
+    // apart in pixels is a rail that has stopped meaning anything.
+    expect(railHours({ startHour: 8, endHour: 18 }, 3)).toEqual([8, 11, 14, 17]);
+  });
+
+  it("keeps the foot when the step lands on it", () => {
+    expect(railHours({ startHour: 6, endHour: 18 }, 3)).toEqual([6, 9, 12, 15, 18]);
+  });
+
+  it("refuses a step that would draw every mark twice", () => {
+    expect(railHours({ startHour: 8, endHour: 10 }, 0)).toEqual([8, 9, 10]);
+  });
+
+  it("says the hour in the least room a label can take", () => {
+    expect(shortHourLabel(0)).toBe("12a");
+    expect(shortHourLabel(3)).toBe("3a");
+    expect(shortHourLabel(11)).toBe("11a");
+    expect(shortHourLabel(12)).toBe("12p");
+    expect(shortHourLabel(21)).toBe("9p");
+    // The meridiem is what shrinks, never the hour: without it 3 and 15 would
+    // be the same label.
+    expect(shortHourLabel(3)).not.toBe(shortHourLabel(15));
+  });
+
+  it("wraps a window that runs to the end of the day", () => {
+    expect(shortHourLabel(24)).toBe("12a");
+  });
+});
+
+// The tail of the stylesheet, from the container query to the end of the file.
+function compactRules(): string {
+  const css = readCss();
+  const at = css.indexOf("@container (max-width: 400px)");
+  expect(at).toBeGreaterThan(-1);
+  return css.slice(at);
+}
+
+describe("the compact week", () => {
+  const compactBlock = compactRules;
+
+  it("raises the flag the view reads, and defines it unconditionally", () => {
+    expect(readCss()).toContain("--ca-tg-compact: 0");
+    expect(compactBlock()).toContain("--ca-tg-compact: 1");
+  });
+
+  it("fits the whole day and the whole week with nothing scrolling", () => {
+    const block = compactBlock();
+    expect(block).toContain("--ca-tg-row: 22px");
+    // Thirty rather than twenty-four: the corner's "W38" and the rail's "12a"
+    // are a flex cell with no overflow and an absolutely positioned label, so
+    // at 24px neither clipped — both drew past the left edge of the grid.
+    expect(block).toContain("--ca-tg-gutter: 30px");
+    // The 74px column floor is what made a phone scroll sideways.
+    expect(block).toContain("minmax(0, 1fr)");
+    expect(block).toContain("min-width: 0");
+    expect(block).toContain("overflow: visible");
+    expect(block).toContain("max-height: none");
+  });
+
+  it("draws a box rather than a block, and no handle on it", () => {
+    const block = compactBlock();
+    // Sixteen pixels is what a digit needs. The arithmetic reaches it first —
+    // forty-five minutes at 22px an hour — and this is the floor under that.
+    expect(block).toContain("min-height: 16px");
+    expect(block).toContain(".ca-tg-blk-title");
+    expect(block).toContain(".ca-tg-grip");
+    expect(block).toContain("cursor: default");
+  });
+
+  it("gives the week a row and the controls a row", () => {
+    const block = compactBlock();
+    // The bar is one flex row at every width; below the breakpoint it wraps,
+    // and the span takes a whole row so the wrap lands between them rather
+    // than inside the date.
+    expect(block).toContain("flex-wrap: wrap");
+    expect(block).toContain("flex: 1 0 100%");
+    // And this one is NOT undone when the grid is expanded: expanding gives
+    // the hours back, it does not widen the phone.
+    expect(block).not.toContain(".ca-tg.is-expanded .ca-tg-bar");
+  });
+
+  it("keeps the gutter's three labels inside the gutter", () => {
+    const block = compactBlock();
+    const corner = block.indexOf(".ca-tg-corner {");
+    expect(corner).toBeGreaterThan(-1);
+    expect(block.slice(corner, block.indexOf("}", corner))).toContain(
+      "overflow: hidden"
+    );
+    // The hour marks are positioned against the corner's own right edge.
+    const hour = block.indexOf(".ca-tg-hour {");
+    expect(hour).toBeGreaterThan(-1);
+    expect(block.slice(hour, block.indexOf("}", hour))).toContain("right: 3px");
+  });
+
+  it("hides the way out everywhere there is nothing to leave", () => {
+    const css = readCss();
+    const at = css.indexOf(".ca-tg-expand {");
+    expect(at).toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("}", at))).toContain("display: none");
+    expect(compactBlock()).toContain("display: inline-flex");
+  });
+
+  it("puts every override back when the reader expands it", () => {
+    const block = compactBlock();
+    expect(block).toContain(".ca-tg.is-expanded");
+    expect(block).toContain("--ca-tg-compact: 0");
+    expect(block).toContain("--ca-tg-row: 50px");
+    expect(block).toContain("minmax(74px, 1fr)");
+    expect(block).toContain("min-height: 17px");
+    expect(block).toContain("cursor: crosshair");
+  });
+
+  it("asks the stylesheet rather than measuring a width of its own", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("--ca-tg-compact");
+    expect(src).toContain("getComputedStyle");
+    expect(src).toContain("ResizeObserver");
+    // And puts the observer down with the block it belongs to.
+    expect(src).toContain("this.observer?.disconnect()");
+  });
+
+  it("wires no gesture on a grid with no room for one", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("if (!opts.compact) {");
+    // The press that opens is not a gesture about a minute, so it stays.
+    expect(src).toContain("wire(plugin, block, placed.key)");
+  });
+
+  it("draws its columns and its lane in boxes, from the arithmetic", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("packBoxes(boxDay(mine, COMPACT_MIN_MINUTES))");
+    expect(src).toContain("drawBox(plugin, col, box, win)");
+    expect(src).toContain("tallyAllDay(mine)");
+    expect(src).toContain('cls: "ca-tg-count"');
+  });
+
+  it("offers the list rather than opening one of several", () => {
+    const src = readSrc("time-grid-view");
+    const at = src.indexOf("function wireStack(");
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, at + 1400);
+    expect(body).toContain("new Menu()");
+    expect(body).toContain("openTimeGridItem(plugin, entry.key)");
+    // And from a keyboard, where there is no pointer to hang a menu on.
+    expect(body).toContain("menu.showAtPosition(");
+    expect(body).toContain('evt.key !== "Enter"');
+  });
+
+  it("keeps the thing that opens reachable from a keyboard", () => {
+    const src = readSrc("time-grid-view");
+    const at = src.indexOf("function wire(");
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, at + 2000);
+    expect(body).toContain('el.setAttribute("tabindex", "0")');
+    expect(body).toContain('evt.key !== "Enter"');
+  });
+
+  it("remembers an expanded grid under the key the chips already use", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("loadTimeGridExpanded");
+    expect(src).toContain("saveTimeGridExpanded");
+    expect(src).toContain("plugin.settings.timeGridExpanded");
+    expect(src).toContain("timeGridFilterKey(ctx.sourcePath, rest)");
+  });
+});
+
+// ── boxes, and the counts in them (1.0.18) ───────────────────────────
+//
+// THE SECOND HALF OF THE COMPACT GRID, and the half a reader complained about.
+// 1.0.18 fit the whole week on a phone and then drew a half-hour meeting as a
+// hairline; these are the numbers that stop that happening. A box is at least
+// `COMPACT_MIN_MINUTES` tall, and what would land on top of one of its own
+// colour goes inside it with a count.
+
+// ── the grid's surfaces (1.0.19) ─────────────────────────────────────
+//
+// THE TINTS ARE TOKENS AND THE TOKENS ARE ON `body`, which is the whole of
+// what a stylesheet test can check about a colour — and it is the half that
+// has gone wrong before: a theme colour aliased on `:root` resolves against
+// an element that has never had a theme, and every rule reading it draws
+// `currentColor`. `tokens.test.ts` owns that rule; this owns the reads.
+
+describe("the lane and today are the theme's own colour", () => {
+  it("tints the lane rather than leaving it a shade off the grid", () => {
+    const css = readCss();
+    const at = css.indexOf(".ca-tg-lane {");
+    expect(at).toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toContain("var(--ca-tg-lane-bg)");
+    expect(rule).toContain("var(--ca-tg-lane-edge)");
+    // The label is sticky over the lane and paints its own ground, so it has
+    // to be the same one or it draws a notch in the tint.
+    const label = css.indexOf(".ca-tg-lane-label {");
+    expect(css.slice(label, css.indexOf("}", label))).toContain(
+      "var(--ca-tg-lane-bg)"
+    );
+  });
+
+  it("stops drawing today as a column somebody is hovering", () => {
+    const css = readCss();
+    const at = css.indexOf(".ca-tg-col.is-today {");
+    expect(at).toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toContain("var(--ca-tg-today-bg)");
+    expect(rule).not.toContain("--background-modifier-hover");
+  });
+
+  it("gives every compact rail label a line to point at", () => {
+    // Three hours of rows is 300% of one, and a compact window always starts
+    // at midnight — which is what keeps the darker line under the label.
+    expect(compactRules()).toContain("calc(300% / var(--ca-tg-hours))");
+    expect(compactRules()).toContain("var(--ca-tg-line-major)");
+  });
+});
+
+describe("boxes on a compact week", () => {
+  // A block of a named colour, because colour is what these group by.
+  const tinted = (
+    start: number,
+    mins: number | null,
+    color: string,
+    key: string
+  ): GridItem => ({ ...at(start, mins, key), color, title: key });
+
+  it("grows a thing too short to see to the least a box can be", () => {
+    const [box] = boxDay([tinted(540, 20, "blue", "a")], COMPACT_MIN_MINUTES);
+    expect(box.start).toBe(540);
+    expect(box.end).toBe(540 + COMPACT_MIN_MINUTES);
+    expect(box.items.map((i) => i.key)).toEqual(["a"]);
+  });
+
+  it("leaves a thing long enough to see its own length", () => {
+    const [box] = boxDay([tinted(540, 120, "blue", "a")], COMPACT_MIN_MINUTES);
+    expect(box.end).toBe(660);
+  });
+
+  it("gives a moment room to be seen without claiming it took time", () => {
+    // The item's own `mins` is untouched — the view reads it back to decide
+    // whether to draw the flat foot.
+    const [box] = boxDay([tinted(872, null, "teal", "m")], COMPACT_MIN_MINUTES);
+    expect(box.end - box.start).toBe(COMPACT_MIN_MINUTES);
+    expect(box.items[0].mins).toBeNull();
+  });
+
+  it("counts what it cannot draw apart", () => {
+    const boxes = boxDay(
+      [tinted(540, 30, "blue", "a"), tinted(560, 30, "blue", "b")],
+      COMPACT_MIN_MINUTES
+    );
+    expect(boxes).toHaveLength(1);
+    expect(boxes[0].items.map((i) => i.key)).toEqual(["a", "b"]);
+    // The foot is the last thing in it, floored like any other: 09:20 + 45.
+    expect(boxes[0].end).toBe(605);
+  });
+
+  it("merges on the drawn box and not on the minutes", () => {
+    // 09:00–09:20 and 09:30–09:50 do not overlap in minutes, and at 22px an
+    // hour they overlap on screen — because the first is forty-five minutes
+    // tall the moment it is drawn. Comparing the items would draw the second
+    // one on top of the first and call it two bars.
+    const boxes = boxDay(
+      [tinted(540, 20, "blue", "a"), tinted(570, 20, "blue", "b")],
+      COMPACT_MIN_MINUTES
+    );
+    expect(boxes).toHaveLength(1);
+    expect(boxes[0].items).toHaveLength(2);
+  });
+
+  it("keeps a morning and an evening apart", () => {
+    const boxes = boxDay(
+      [tinted(540, 30, "blue", "am"), tinted(1080, 30, "blue", "pm")],
+      COMPACT_MIN_MINUTES
+    );
+    expect(boxes.map((b) => b.items.length)).toEqual([1, 1]);
+  });
+
+  it("never merges two colours, however close they sit", () => {
+    const boxes = boxDay(
+      [tinted(540, 30, "blue", "meeting"), tinted(545, 30, "red", "task")],
+      COMPACT_MIN_MINUTES
+    );
+    expect(boxes).toHaveLength(2);
+    expect(boxes.map((b) => b.color)).toEqual(["blue", "red"]);
+  });
+
+  it("draws in reading order whatever order it was handed", () => {
+    const boxes = boxDay(
+      [tinted(1080, 30, "blue", "late"), tinted(540, 30, "red", "early")],
+      COMPACT_MIN_MINUTES
+    );
+    expect(boxes.map((b) => b.items[0].key)).toEqual(["early", "late"]);
+  });
+
+  it("is nothing at all on a day with nothing on it", () => {
+    expect(boxDay([], COMPACT_MIN_MINUTES)).toEqual([]);
+  });
+
+  it("sets two colours side by side when they share an hour", () => {
+    const packed = packBoxes(
+      boxDay(
+        [tinted(540, 60, "blue", "a"), tinted(560, 60, "red", "b")],
+        COMPACT_MIN_MINUTES
+      )
+    );
+    expect(packed.map((b) => b.cols)).toEqual([2, 2]);
+    expect(packed.map((b) => b.col).sort()).toEqual([0, 1]);
+  });
+
+  it("gives one colour's box the whole column", () => {
+    const packed = packBoxes(
+      boxDay(
+        [tinted(540, 60, "blue", "a"), tinted(560, 60, "blue", "b")],
+        COMPACT_MIN_MINUTES
+      )
+    );
+    expect(packed).toHaveLength(1);
+    expect(packed[0].cols).toBe(1);
+    expect(packed[0].items).toHaveLength(2);
+  });
+
+  it("places a box by its own foot", () => {
+    // Which is not its first item's: `placeInWindow` would put a 09:00 box
+    // twenty minutes tall whatever else was inside it.
+    expect(placeSpan(0, 720, FULL_DAY_WINDOW)).toEqual({ top: 0, height: 0.5 });
+    const [box] = boxDay([tinted(540, 20, "blue", "a")], COMPACT_MIN_MINUTES);
+    const { height } = placeSpan(box.start, box.end, FULL_DAY_WINDOW);
+    expect(height).toBeCloseTo(COMPACT_MIN_MINUTES / 1440, 6);
+  });
+});
+
+describe("the all-day lane, counted", () => {
+  const due = (color: string, key: string): AllDayItem => ({
+    source: "tasks",
+    color,
+    title: key,
+    day: 2,
+    key,
+  });
+
+  it("is one chip per colour, holding everything of it", () => {
+    const tallies = tallyAllDay([due("red", "a"), due("red", "b"), due("blue", "c")]);
+    expect(tallies.map((t) => t.color)).toEqual(["red", "blue"]);
+    expect(tallies[0].items.map((i) => i.key)).toEqual(["a", "b"]);
+    expect(tallies[1].items).toHaveLength(1);
+  });
+
+  it("keeps the order the lane already drew them in", () => {
+    const tallies = tallyAllDay([due("blue", "c"), due("red", "a")]);
+    expect(tallies.map((t) => t.color)).toEqual(["blue", "red"]);
+  });
+
+  it("is nothing at all on a day with nothing due", () => {
+    expect(tallyAllDay([])).toEqual([]);
+  });
+});
+
+describe("a repaint leaves nothing behind", () => {
+  it("draws the empty line inside the element paint clears", () => {
+    const src = readSrc("time-grid-view");
+    // It was `grid.parentElement?.parentElement?.createDiv`, two levels above
+    // the element `paint` empties, so an empty week grew one more of these on
+    // every chip press.
+    expect(src).not.toContain("parentElement?.parentElement?.createDiv");
+    const at = src.indexOf('cls: "ca-tg-empty"');
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at - 200, at)).toContain("grid.createDiv(");
+  });
+
+  it("puts the previous minute timer down before starting another", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("opts.ticker.current?.unload()");
+    const at = src.indexOf("new NowTicker(");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at - 400, at)).toContain("opts.ticker.current?.unload()");
   });
 });
 

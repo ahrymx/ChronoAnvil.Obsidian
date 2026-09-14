@@ -5,6 +5,136 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] - 2026-09-14
+
+### Changed
+
+- **The compact week grid is legible, not just complete.** 1.0.18 fit all seven
+  days and all twenty-four hours on a phone and then drew a half-hour meeting as
+  a blue hairline three pixels tall in a 45-pixel column: the week was readable
+  and the things in it were not.
+
+  An hour is **22 pixels** now rather than 15, so the day is 528 rather than 360
+  — and height alone was never the answer, because twice the height is twice the
+  hairline and a morning of captures is still six of them stacked inside one
+  hour. So the short things stopped being drawn short. **Every box is at least
+  three quarters of an hour tall**, whatever it holds, and anything that would
+  then be drawn on top of a box of its own colour is drawn *inside* it with a
+  number saying how many: two work logs are one box reading **2**, four meetings
+  one reading **4**.
+
+  Colour is what groups them, not source — a box wears one fill and that fill is
+  read as what kind of thing is in it, so two meetings drawn blue merge and a
+  blue meeting and a red task never do, however close they sit. A morning and an
+  evening stay two boxes. A box that holds one thing carries no number, because
+  `1` on every bar on the week is noise and a lone box already says one by being
+  one.
+
+  **A press on a box that holds several offers the list of them.** Opening the
+  earliest of four because it happens to start first is opening the wrong note
+  three times out of four. One thing in a box, and the press opens it as before.
+
+  The all-day lane counts the same way and for a harder reason: a block too
+  short can be grown downward and a lane chip cannot, so four tasks due on a
+  Thursday were four stubs sharing one cell. They are one chip reading **4**,
+  and the chips sit side by side rather than stacking the lane into four rows.
+
+- **The bar above a narrow grid is two rows: the week, then the controls.** A
+  date range, three source chips and the ⤢ button do not fit across a phone,
+  and a flex row that could not wrap answered that by squeezing the date until
+  the date wrapped instead — "14 Sep – 20 Sep" over "2026", beside the chips.
+  It is a bar two lines tall either way; now it reads as two things rather than
+  as one thing that ran out of room.
+
+- **The all-day lane is the theme's own colour.** It was
+  `--background-secondary-alt` and nothing else, which on most dark themes is
+  within a shade of the grid beside it — the lane was invisible and the chips
+  in it read as blocks that had escaped the rail. It is tinted with the theme's
+  accent over that darker ground now, edge included, so it wears whatever
+  palette the vault is wearing.
+
+  **Today's column is tinted the same way.** It was
+  `--background-modifier-hover`, the grey a surface goes under a pointer, so
+  today read as a column somebody happened to be hovering. And on a compact
+  grid **every third hour line is darker** — the rail labels every third hour,
+  and twenty-four identical lines gave each label nothing in particular to
+  point at.
+
+### Fixed
+
+- **The all-day lane is no longer labelled `day`.** Its label is capped at the
+  gutter and clipped with an ellipsis; at the compact gutter of 24 pixels the
+  ellipsis ate the first word, leaving a lane labelled `day` sitting against the
+  midnight mark. It wraps to two lines instead — the words were already the
+  shortest true ones.
+
+- **`W38` and `12a` no longer draw outside the grid.** The corner cell is a flex
+  box with no `overflow` and the hour marks are positioned against its right
+  edge with `white-space: nowrap`, so at a 24-pixel gutter neither of them
+  clipped — they drew straight past the left edge of the grid and sat on the
+  note behind it. The compact gutter is 30 pixels and those two labels are
+  smaller inside it.
+
+## [1.0.18] - 2026-09-14
+
+### Changed
+
+- **The week by the hour fits on a phone.** It did not. The grid set a floor of
+  570 pixels under itself — a 52-pixel gutter and seven columns that could not
+  go below 74 — and drew midnight to midnight at 50 pixels an hour, which is
+  1,200 pixels tall inside a scroller capped at 620. On a phone that is Monday
+  to halfway through Thursday, midnight to ten: **29% of the week**, on the one
+  view whose entire job is the shape of a week, with both of its axes scrolling
+  inside a note that scrolls.
+
+  Below 400 pixels of pane it now draws **all seven days and all twenty-four
+  hours at once**, and nothing inside it scrolls. The columns divide the width
+  instead of setting a floor under it, an hour is 15 pixels so the day is 360,
+  the rail marks every third hour in the least room a label can take (`12a`,
+  `3a`, `6a`), and the day heads read `Mo Tu We` — not one letter, which has two
+  pairs in it and asks you to count from Monday instead of read. The date
+  numbers never abbreviate at any width; they are the part being pointed at.
+
+  The now line and its dot, today's tinted column and its date pill, the all-day
+  lane, the source chips and a moment's flat foot all survive the shrink. What
+  does not is the text on a block: a quarter-hour is four pixels tall here and
+  cannot hold a word. The title is on the block for a long press, and one press
+  away in the note it came from.
+
+- **And it is read-only there, which is not a second decision.** Since 4.62 the
+  grid has been a surface you write on — sweep an empty column to block out a
+  slot, drag a block to another hour, pull its bottom edge to make it longer. At
+  four pixels a finger cannot point at a minute, and the resize handle alone is
+  twelve pixels tall: it would reach past both ends of the bar it claims to
+  resize, onto the blocks either side. So below the breakpoint the grid takes no
+  gesture about time at all. A press still opens, because opening needs no
+  accuracy, and the cursors say the same thing the wiring does.
+
+  **The ⤢ button beside the source names hands the full grid back** — 50-pixel
+  hours, scrolling, and all three gestures — and the note remembers which you
+  chose, the way it already remembers which sources you have switched off.
+  Renaming the note keeps the choice.
+
+  Nothing here is a setting and nothing is written to a note. The breakpoint
+  lives in the stylesheet, as a container query, so a half-width pane on a desk
+  and a phone are asked the same question.
+
+### Fixed
+
+- **An empty week stopped collecting its own explanation.** "Nothing scheduled
+  this week" was drawn two levels above the element the repaint clears, so every
+  press of a source chip left another copy of it under the grid.
+
+- **A repainted grid no longer leaves its clock running.** The one-minute timer
+  behind the now line was registered afresh on every repaint, on a body that had
+  just been thrown away — four chip presses meant four timers, three of them
+  moving a line nobody could see.
+
+- **An all-day chip can be reached from the keyboard.** Blocks were tab stops
+  and the chips in the all-day lane never were, at any width. Both are now, and
+  Enter or Space opens what is focused — including on the compact grid, where
+  the arrow keys are absent because all of them edit.
+
 ## [1.0.17] - 2026-09-14
 
 ### Changed

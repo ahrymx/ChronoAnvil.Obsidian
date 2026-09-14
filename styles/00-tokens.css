@@ -573,6 +573,20 @@
   --ca-tg-row: 50px;
   --ca-tg-now: #e0484d;
 
+  /* ── IS THE GRID COMPACT? THE STYLESHEET ANSWERS AND THE VIEW READS IT ──
+     `time-grid` is the one widget whose narrow form is not only a different
+     shape but a different set of GESTURES: a fifteen-minute stand-up is five
+     pixels tall at the compact row height, and a drag handle on five pixels
+     is a handle that moves the wrong meeting. So the view has to know, and
+     the width it would have to measure is already a number in this file.
+
+     Declared here as 0 and raised to 1 by the container query in
+     `99-time-grid.css`, then read back through `getComputedStyle`. Two files
+     holding one breakpoint is how a grid comes to be drawn compact and wired
+     for dragging at the same time — the failure `--ca-tg-hours` exists to
+     prevent, one row down the same widget. */
+  --ca-tg-compact: 0;
+
   /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
      DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the
      same shape 3.8's patch 4 used and it is deliberate: a scale is reviewable
@@ -887,6 +901,37 @@ body {
      wrong for exactly the same reason. `tokens.test.ts` refuses any `:root`
      token that reads a variable `:root` does not itself define, so this cannot
      drift back one alias at a time. */
+
+  /* ── the grid's own surfaces (1.0.19) ─────────────────────────────────
+     HERE AND NOT BESIDE `--ca-tg-gutter`, for the reason at the head of this
+     block: all four read a theme colour and three of them mix one.
+
+     THE ALL-DAY LANE HAS TO READ AS A DIFFERENT SURFACE FROM THE HOURS,
+     because what sits in it is a different kind of fact: something true of a
+     whole day, not of a minute of one. It was `--background-secondary-alt`
+     and nothing else, which on most dark themes is within a shade of the
+     grid beside it — on a phone the lane was invisible and the chips in it
+     read as blocks that had escaped the rail.
+
+     TINTED WITH THE THEME'S OWN ACCENT OVER THAT DARKER GROUND, so the lane
+     wears whatever palette the vault is wearing rather than a colour this
+     file picked. The same mix makes its edge, so the lane is bounded by its
+     own colour rather than by the border every other row uses.
+
+     TODAY'S COLUMN IS TINTED THE SAME WAY AND FOR THE MATCHING REASON. It
+     was `--background-modifier-hover`, which is the grey a surface goes
+     under a pointer — so today read as a column somebody happened to be
+     hovering. The date pill above it is already the accent; this is the rest
+     of that sentence, at a fraction of the strength because it is a wash
+     over a whole day and not a badge.
+
+     AND THE MAJOR HOUR LINE IS THE RAIL'S OWN STEP, DRAWN. A compact rail
+     labels every third hour above twenty-four identical lines, which gives
+     each label nothing in particular to point at. */
+  --ca-tg-lane-bg: color-mix(in srgb, var(--interactive-accent) 9%, var(--background-secondary-alt));
+  --ca-tg-lane-edge: color-mix(in srgb, var(--interactive-accent) 28%, var(--background-modifier-border));
+  --ca-tg-today-bg: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
+  --ca-tg-line-major: var(--background-modifier-border-focus);
 
   /* Surface depth hierarchy & Frames (4.24 §1) */
   --ca-surface-card: var(--background-secondary);
