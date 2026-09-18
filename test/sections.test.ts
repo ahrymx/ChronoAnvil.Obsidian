@@ -80,16 +80,28 @@ describe("plannedWrites", () => {
     expect(plannedWrites([op("foreign", null)]).any).toBe(false);
   });
 
-  // Each of the five on its own, because `any` is an OR and an OR is the shape
-  // that silently loses a term.
+  // Each of the six on its own, because `any` is an OR and an OR is the shape
+  // that silently loses a term. `prune` is the sixth, as of 1.0.23, and it is
+  // the one that proves the point: a write that fell out of `any` would leave
+  // Save disabled over a plan that had something to do.
   it.each([
     ["remove", "removing"],
     ["add", "adding"],
     ["move", "moving"],
     ["reconfigure", "rewriting"],
     ["extend", "extending"],
-  ] as const)("counts a lone %s as work", (kind) => {
-    expect(plannedWrites([op(kind, "a")]).any).toBe(true);
+    ["prune", "pruning"],
+  ] as const)("counts a lone %s as work", (kind, set) => {
+    const w = plannedWrites([op(kind, "a")]);
+    expect(w.any).toBe(true);
+    // AND IN ITS OWN FIELD, not merely in the OR. `applySections` reads the
+    // fields rather than the flag, so a kind that counts as work and lands in
+    // nothing is a plan the writer performs half of. `moving` is a bare
+    // boolean — a reorder is a fact about the file rather than about one
+    // section — so it is asserted as one.
+    const named = w[set];
+    if (typeof named === "boolean") expect(named).toBe(true);
+    else expect([...named]).toContain("a");
   });
 
   it("keeps the order the reader asked for in `adding`", () => {

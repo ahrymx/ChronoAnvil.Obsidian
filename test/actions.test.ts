@@ -137,8 +137,9 @@ describe("every name names its owner", () => {
   });
 
   it("keeps a parenthetical that asks, drops one that explains", () => {
-    // `(pick a date)` says what you are about to be asked. `(template + Diary.base)`,
-    // `(asks first)` and `(it can then hold pages)` describe mechanism.
+    // `(pick a date)` says what you are about to be asked. `(template + Diary.base)`
+    // and `(asks first)` describe mechanism. A third example — `(it can then hold
+    // pages)`, on `note-convert-to-dashboard` — went with that command in 1.0.23.
     // In 4.23, `(overwrites)` was retired from entry templates as it gained diff-preview
     // parity with journal templates.
     expect(byId("diary-new-entry")?.name).toContain("(pick a date)");
@@ -147,7 +148,6 @@ describe("every name names its owner", () => {
     expect(byId("maint-sync-trackers")?.name).not.toContain("Diary.base");
     expect(byId("maint-refresh-entry-templates")?.name).not.toContain("overwrites");
     expect(byId("maint-refresh-journal-templates")?.name).not.toContain("asks");
-    expect(byId("note-convert-to-dashboard")?.name).not.toContain("pages");
   });
 });
 
@@ -237,11 +237,15 @@ describe("the table holds what cannot be derived", () => {
     // 25 until 4.34's two page commands. They are the first entries here that
     // exist to be BOUND rather than to be found — a group's pages are switched
     // by a key, and the palette is where a reader discovers that they can be.
-    // 28 in 4.67 with `maint-generate-vault-canvas`, 29 in 4.81 with `maint-setup-graph-groups`.
-    expect(ACTIONS).toHaveLength(29);
+    // 28 in 4.67 with `maint-generate-vault-canvas`, 29 in 4.81 with
+    // `maint-setup-graph-groups`, and back to 28 in 1.0.23 — the first entry
+    // this table has LOST. `note-convert-to-dashboard` promoted a note without
+    // making a page, and once every leaf template shipped the Pages section
+    // there was nothing left of it but the move `newPage` already makes.
+    expect(ACTIONS).toHaveLength(28);
   });
 
-  it("splits them 13 / 0 / 7 / 9", () => {
+  it("splits them 13 / 0 / 6 / 9", () => {
     // `maint-find-journals` is the one that moved groups: it was with the
     // journals because of its subject, and everything else there MAKES a
     // journal note where this one reconciles the vault. It stays in the table
@@ -251,8 +255,9 @@ describe("the table holds what cannot be derived", () => {
     // strictest sense: it reads the note in front of the reader and writes
     // nothing anywhere. 5 until 4.34's two, which are note-scoped in that same
     // sense and narrower still: they act on one block of the note in front of
-    // the reader and touch no file at all.
-    expect(groupOf("notes")).toHaveLength(7);
+    // the reader and touch no file at all. Back to 6 in 1.0.23, with
+    // `note-convert-to-dashboard`.
+    expect(groupOf("notes")).toHaveLength(6);
     // 6 until 4.31's export, 7 until 4.34, 8 in 4.67 with `maint-generate-vault-canvas`, 9 with `maint-setup-graph-groups`.
     expect(groupOf("maintenance")).toHaveLength(9);
   });

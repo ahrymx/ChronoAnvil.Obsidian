@@ -176,7 +176,18 @@ export function writesIntoExisting(survey: RepairSurvey): boolean {
 // The op kinds a repair may produce. Everything else the model can emit is
 // either not a change (`keep`), not ours (`foreign`), or forbidden.
 const ADDITIVE = new Set<SectionOp["kind"]>(["add", "extend", "reconfigure"]);
-const FORBIDDEN = new Set<SectionOp["kind"]>(["remove", "move", "regroup"]);
+// `prune` IS FORBIDDEN HERE RATHER THAN MERELY ABSENT (1.0.23). It is produced
+// by a section that declares `parts`, and no page this module repairs has one —
+// parts are `children`'s, on a journal index, which is the other reconciler. So
+// one arriving means `want` was built wrong, which is what the throw below says
+// and is a better outcome than a real write falling silently between the two
+// sets the way `keep` does.
+const FORBIDDEN = new Set<SectionOp["kind"]>([
+  "remove",
+  "move",
+  "prune",
+  "regroup",
+]);
 
 // What converging this note on this composition would change, and the text it
 // would leave behind.

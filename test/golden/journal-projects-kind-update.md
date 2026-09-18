@@ -15,6 +15,10 @@ stack
 # chronoanvil:trackers:start
 tracker:status
 # chronoanvil:trackers:end
+stack
+header:📄 Pages
+button:projects:new-page
+pages-table
 ```
 
 <!--chronoanvil-skeleton-->

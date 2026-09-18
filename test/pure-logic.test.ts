@@ -6191,14 +6191,27 @@ describe("per-entry trackers", () => {
       ).toEqual(["Sauces"]);
     });
 
-    it("never returns more containers than the type has levels", () => {
+    it("never returns more containers than the levels plus a promotion", () => {
       // A note filed deeper than the type's hierarchy allows shouldn't invent
-      // crumbs for folders the type has no noun for.
+      // crumbs for folders the type has no noun for — and the one folder past
+      // the levels that IS describable is a promoted note's own, because a page
+      // sits inside the note it is part of.
+      //
+      // THE CAP USED TO BE `levels.length` FOR AN UNPAGED TYPE, so this asked
+      // for `["Sauces"]` and Warm was read as the stray folder it might have
+      // been. Every journal can promote a note as of 1.0.23, so Warm is a
+      // Béchamel-shaped container and belongs in the trail; one more folder
+      // down is still capped.
       expect(
         journalAncestors(cooking,
           "03 - Journals/Cooking/Sauces/Warm/Hollandaise.md"
         ).map((a) => a.name)
-      ).toEqual(["Sauces"]);
+      ).toEqual(["Sauces", "Warm"]);
+      expect(
+        journalAncestors(cooking,
+          "03 - Journals/Cooking/Sauces/Warm/Deeper/Hollandaise.md"
+        ).map((a) => a.name)
+      ).toEqual(["Sauces", "Warm"]);
     });
 
     it("returns nothing for a note sitting at the type's root", () => {
@@ -6226,8 +6239,16 @@ describe("per-entry trackers", () => {
     const byName = (name: string): string =>
       files.find((f) => f.name === name)!.content;
 
-    it("writes one template per level and one per kind", () => {
-      expect(files.map((f) => f.name)).toEqual(["section-index.md", "entry.md"]);
+    it("writes one per level, one per kind, and the page", () => {
+      // `page.md` JOINED THE LIST IN 1.0.23. It used to be written only for a
+      // journal with a paged kind, which meant the commonest journal a reader
+      // makes — one level, one kind, nothing ticked — had no page surface to
+      // lay out and nowhere for `New page` to write. Every journal has it now.
+      expect(files.map((f) => f.name)).toEqual([
+        "section-index.md",
+        "entry.md",
+        "page.md",
+      ]);
     });
 
     it("gives the kind template a banner with a managed tracker region", () => {

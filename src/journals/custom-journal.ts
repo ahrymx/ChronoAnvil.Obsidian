@@ -76,12 +76,16 @@ export interface JournalKindConfig {
   // gone, and a field read by nothing but `kindsCarrying` would be exactly the
   // invisible state journal-plan.ts rules against.
   rating?: string;
-  // Whether notes of this kind can be split across pages, as Study's Lesson
-  // can. A boolean rather than the JournalKind shape it becomes: the id,
-  // label and template file are the same for every paged kind, so asking for
-  // them would be three fields to get wrong in exchange for nothing a reader
-  // would ever want to vary.
-  pages?: boolean;
+  // A `pages?: boolean` sat here until 1.0.23 and is GONE. It said whether notes
+  // of this kind could be split across pages; every kind's can, so the field had
+  // one answer and the tick that wrote it asked a question with one answer too.
+  // What replaced it is the 📄 Pages section on the ordinary tick list — see
+  // `JournalPages`, which carries the whole argument.
+  //
+  // A STORED `pages: true` IS DROPPED RATHER THAN MIGRATED, exactly as
+  // `trackers` was in 3.18 §7: `normaliseKinds` rebuilds every row from the
+  // fields the editor knows about, this is not one of them, and there is nothing
+  // for it to migrate INTO — the capability it granted is now unconditional.
   // Plural label, when the crude pluraliser would get it wrong.
   plural?: string;
   // Saved layouts this kind can be created from, beyond the default one.

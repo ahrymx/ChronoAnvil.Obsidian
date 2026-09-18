@@ -71,16 +71,20 @@ describe("what counts as a change", () => {
     expect(out[0].detail).toContain("already written keep");
   });
 
-  it("says a kind that loses pages keeps the notes already split", () => {
-    // Those notes are folder notes with a pages-table in them; the widget does
-    // not consult the config, so they go on working. Saying so matters more
-    // than it sounds — the alternative reading is that they break.
+  it("has nothing to say about pages, because nothing about them changes", () => {
+    // A `"paged"` ROW STOOD HERE UNTIL 1.0.23 — reported when a kind's pages
+    // tick flipped, and carrying the reassurance that notes already split
+    // *"go on working"*. Every kind can be split now, so the tick is gone, the
+    // row has no producer, and a config that still carries a stored `pages`
+    // field is not a change to report: it is a field nothing reads.
     const out = diffKinds(
-      [k("lesson", "Lesson", { pages: true })],
+      [k("lesson", "Lesson", { pages: true } as never)],
       [k("lesson", "Lesson")]
     );
-    expect(out[0].kind).toBe("paged");
-    expect(out[0].detail).toContain("go on working");
+    expect(out).toEqual([]);
+    expect(readSrc("journal-plan")).toContain(
+      "A `\"paged\"` STOOD HERE UNTIL 1.0.23"
+    );
   });
 });
 

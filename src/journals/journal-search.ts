@@ -54,7 +54,7 @@ export function journalKinds(plugin: ChronoAnvilPlugin): string[] {
       // but they are a note you can search for, and `is:page` is the natural
       // way to ask. Filtering is display, and display is the one thing pages
       // are allowed to appear in.
-      if (kind.pages) out.add(kind.pages.id);
+      out.add(kind.pages.id);
     }
     for (const level of type.levels) out.add(level.noun.toLowerCase());
   }

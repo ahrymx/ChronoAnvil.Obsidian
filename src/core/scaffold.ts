@@ -1932,7 +1932,7 @@ export class Scaffold {
           id: "journals",
           title: "Catch up journal index notes",
           blurb:
-            "Index notes and their templates gain a table for any note type added since they were written. Only the missing tables — nothing already in them is touched.",
+            "Index notes and their templates gain a table for any note type added since they were written, and lose one naming a note type this journal no longer has. Only those tables — nothing else in them is touched.",
           glyph: "📚",
           noun: "note",
           items: byType.flatMap((g) =>

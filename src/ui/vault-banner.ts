@@ -549,7 +549,7 @@ export class VaultBanner {
     // and its reason: *"a control next to it would be a control one slip away
     // from renaming the note."* The title is click-to-edit here for exactly the
     // reason it is there.
-    const build = this.menuFor(file, surface, isIndex, view);
+    const build = this.menuFor(file, surface, view);
     if (build) {
       const cog = trail.createDiv({
         cls: "ca-avb-cog",
@@ -676,7 +676,6 @@ export class VaultBanner {
   private menuFor(
     file: TFile,
     surface: BannerSurface,
-    isIndex: boolean,
     host: HTMLElement
   ): ((menu: Menu) => void) | null {
     // ── THE JOURNAL LIST, OR THE FLAT ONE UNDER IT (5.20) ──────────────
@@ -691,7 +690,7 @@ export class VaultBanner {
     // its `type:` frontmatter against the journal's own levels and kinds. These
     // three pages are composed by `composeFlatNote` and write no frontmatter at
     // all, so it answers null for every one of them — correctly, since there is
-    // no Template…, no tracker and no Convert to a dashboard to offer. It used
+    // no Template… and no tracker to offer. It used
     // to be read as "no menu", and the cog opened on *Banner art & settings…*
     // alone: three pages with a full section catalogue, a section model and a
     // working `editSectionsHere`, and no door to any of it.
@@ -705,7 +704,7 @@ export class VaultBanner {
     // still draws no list rather than one that opens and apologises.
     const build =
       (surface === "journal"
-        ? journalBannerMenu(this.plugin, file.path, isIndex)
+        ? journalBannerMenu(this.plugin, file.path)
         : null) ??
       sectionsMenuFor(this.plugin, file.path, () =>
         host.hasClass(WIDE_PAGE_CLASS)

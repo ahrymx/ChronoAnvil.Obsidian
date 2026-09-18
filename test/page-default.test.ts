@@ -27,9 +27,10 @@ import {
   pageLayoutOf,
   pageLayoutShown,
   pagePathsOf,
+  pathHoldsPages,
 } from "../src/journals/page-default";
 import type { JournalConfig, JournalVariantConfig } from "../src/journals/custom-journal";
-import { readCode, readCss, readSrc, srcFiles } from "./sources";
+import { fnBody, readCode, readCss, readSrc, srcFiles } from "./sources";
 
 // A config with only what these questions read. Cast at the boundary rather
 // than built in full: `JournalConfig` carries two dozen fields, none of which
@@ -357,6 +358,67 @@ describe("the default is absent rather than a word", () => {
   });
 });
 
+// ── which notes hold pages, from the path alone (1.0.23) ─────────────────
+
+describe("what the palette asks before it offers `New page`", () => {
+  // Study's shape: two levels under a root, which is the deepest journal the
+  // presets ship and the one whose arithmetic is worth spelling out.
+  const study = { root: "03 - Journals/Study", levels: [{}, {}] };
+  const at = (p: string): boolean => pathHoldsPages(study, p);
+
+  it("says yes to a leaf, written either way", () => {
+    // A PLAIN LEAF sits at the level depth — two folders below the root.
+    expect(at("03 - Journals/Study/Maths/Algebra/Quadratics.md")).toBe(true);
+    // A PROMOTED LEAF is the same note after it grew a folder of its own, so it
+    // is one deeper AND a folder note. Both are notes a reader splits, and the
+    // second is what a note looks like once they have.
+    expect(
+      at("03 - Journals/Study/Maths/Algebra/Quadratics/Quadratics.md")
+    ).toBe(true);
+  });
+
+  it("says no to a page, which is what stops the refusal being needed", () => {
+    // The sibling of the folder note above: same depth, NOT a folder note. This
+    // is the surface the reader met *"only lessons can hold pages"* on.
+    expect(at("03 - Journals/Study/Maths/Algebra/Quadratics/Part 1.md")).toBe(
+      false
+    );
+  });
+
+  it("says no to an index at either depth, which holds notes not pages", () => {
+    expect(at("03 - Journals/Study/Maths/Algebra/Algebra.md")).toBe(false);
+    expect(at("03 - Journals/Study/Maths/Maths.md")).toBe(false);
+  });
+
+  it("says no to a note filed where the journal puts none", () => {
+    // Too shallow, too deep, and outside the root entirely. The last is the
+    // one that matters most: this runs on every palette keystroke against every
+    // registered journal, and a blind slice would answer for all of them.
+    expect(at("03 - Journals/Study/Stray.md")).toBe(false);
+    expect(at("03 - Journals/Study/A/B/C/D/Deep.md")).toBe(false);
+    expect(at("99 - Elsewhere/Random/Note.md")).toBe(false);
+    expect(pathHoldsPages({ root: "", levels: [] }, "Note.md")).toBe(false);
+  });
+
+  it("reads a flat journal, whose leaves sit at the root", () => {
+    // NO LEVELS IS A LEGAL JOURNAL and the arithmetic has to hold at zero: the
+    // leaf is the note in the root folder, and its page is one below.
+    const flat = { root: "J/Notes", levels: [] };
+    expect(pathHoldsPages(flat, "J/Notes/Thoughts.md")).toBe(true);
+    expect(pathHoldsPages(flat, "J/Notes/Thoughts/Thoughts.md")).toBe(true);
+    expect(pathHoldsPages(flat, "J/Notes/Thoughts/Part 1.md")).toBe(false);
+  });
+
+  it("asks nothing of the vault, which is the whole reason it exists", () => {
+    // The rule is `core/actions.ts`' and it is enforced there; what this pins
+    // is that the answer lives in a module that COULD not break it — no `App`,
+    // no plugin, no frontmatter. See the header of `page-default.ts`.
+    const fn = fnBody("pathHoldsPages", "page-default");
+    expect(fn).not.toContain("frontmatter");
+    expect(fn).not.toContain("app");
+  });
+});
+
 // ── the `⋯` on a row ──────────────────────────────────────────────────────
 
 describe("the control on a title's row", () => {
@@ -380,8 +442,14 @@ describe("the control on a title's row", () => {
     expect(src()).not.toContain("setSubmenu");
   });
 
-  it("offers no page rows for a kind that cannot hold pages", () => {
-    expect(src()).toContain("if (kind.pages) addPageLayoutRows(");
+  it("offers the page rows on every kind, unconditionally", () => {
+    // THE GUARD WAS `if (kind.pages)`, and it is gone with the capability it
+    // read: every kind holds pages as of 1.0.23, so every row in every kind
+    // table gets the layout rows. The menu is built from `kind.pages` directly
+    // now — a required field, so there is nothing left to branch on.
+    expect(src()).toContain("addPageLayoutRows(menu, table, live, path);");
+    expect(src()).not.toContain("if (kind.pages)");
+    expect(src()).toContain("const label = kind.pages.label;");
   });
 
   it("ticks what would be used, not what is stored", () => {

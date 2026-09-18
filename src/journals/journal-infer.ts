@@ -291,12 +291,15 @@ function kindLabelsFromFences(files: ScannedFile[]): Map<
   return out;
 }
 
-// Does anything about this kind create pages?
-function kindHasPages(files: ScannedFile[]): boolean {
-  return files.some((f) =>
-    buttonsIn(f).some((b) => b.action === "new-page")
-  );
-}
+// A `kindHasPages` STOOD HERE UNTIL 1.0.23. It asked *"does anything about this
+// kind create pages?"* — a sweep for a `new-page` button in the kind's template
+// or notes — and set `pages: true` on the recovered config where it found one.
+//
+// EVERY KIND HOLDS PAGES NOW, so there is no flag to recover: the config field
+// is gone, and a `new-page` button found in a scanned template is read back as
+// what it always was — a SECTION of that template's text, which survives the
+// import by the template surviving it. Recovering it into a config field would
+// have been recovering a fact into a place nothing reads.
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^\d{1,2}:\d{2}$/;
@@ -485,6 +488,15 @@ export function inferJournalFromScan(
   // templates folder that isn't an index or the page template is a kind.
   const levelSet = new Set(levelIds);
   const kindIds: string[] = [];
+  // The `new-*` actions that are NOT a kind, spelled here because this file is
+  // the one that reads an action backwards. `button-widgets.ts` answers them
+  // before its `sub.startsWith("new-")` arm, and `test/journal-import.test.ts`
+  // checks the two lists still agree — a sixth reserved action added there and
+  // not here would be imported as a kind named after a control.
+  //
+  // `new-page` is not listed because `pushKind` already refuses `page`, which is
+  // the same refusal for the same reason.
+  const NOT_A_KIND = new Set(["journal", "top", "topic", "container"]);
   const pushKind = (k: string | null): void => {
     if (!k) return;
     if (k === "page" || levelSet.has(k)) return;
@@ -501,9 +513,9 @@ export function inferJournalFromScan(
     if (isIndexFile(note.segments)) continue;
     pushKind(typeOf(note));
   }
-  if (kindIds.length === 0) return null;
 
-  // Put the kinds back in DECLARATION order.
+  // Put the kinds back in DECLARATION order — and find the ones the two sweeps
+  // above cannot see at all.
   //
   // The two sources above are both alphabetical by accident — a directory
   // listing is, and the note walk follows one — so Cooking came back
@@ -515,17 +527,47 @@ export function inferJournalFromScan(
   // `type.kinds` in order (journal-sections.ts), so the sequence of
   // `new-<kind>` buttons down that file IS the declaration order. Anything not
   // mentioned there keeps its existing relative position at the end.
+  //
+  // ── AND A BUTTON DECLARES A KIND, AS OF 1.0.23 ──────────────────────────
+  //
+  // This loop read those buttons and used them only to SORT, so a kind named by
+  // one and by nothing else was dropped from the config while every trace of it
+  // stayed in the vault. The reader's report is what that looks like from the
+  // note: an imported Study whose topic index still drew a `📝 Cheatsheets`
+  // group, a create button reading `new-cheatsheets` because no kind answered to
+  // it, and a red *"Unknown Study note type: cheatsheets"* under it.
+  //
+  // A kind has three possible traces and the old sweeps saw two — a `<kind>.md`
+  // template, and a note carrying `type: <kind>`. Neither exists for a kind
+  // nobody has written a note of yet, in a vault whose templates folder moved or
+  // was never copied; the button in the index is then the only record, and it is
+  // a better one than either. It is not a guess: it names the type id and the
+  // action the plugin itself composed.
+  //
+  // FILTERED ON THIS JOURNAL'S OWN id, because an index note may link out to
+  // another journal and a `button:cooking:new-recipe` on a Study page says
+  // nothing about Study.
+  //
+  // AND ON `NOT_A_KIND`, which is the cost of letting a button introduce one.
+  // While this loop only SORTED, an action naming no kind simply matched nothing
+  // in `kindIds` and fell through; now it would be believed. Cooking imported a
+  // kind called `container` the first time this ran, from the `New Cuisine`
+  // button its own top-level index composes.
   const declared: string[] = [];
   const noteIndexes = scan.notes.filter((n) => isIndexFile(n.segments));
   for (const file of [...templateFiles, ...noteIndexes]) {
     for (const button of buttonsIn(file)) {
+      if (button.typeId !== id) continue;
       if (!button.action.startsWith("new-")) continue;
       const kindId = button.action.slice("new-".length);
+      if (NOT_A_KIND.has(kindId)) continue;
+      pushKind(kindId);
       if (kindIds.includes(kindId) && !declared.includes(kindId)) {
         declared.push(kindId);
       }
     }
   }
+  if (kindIds.length === 0) return null;
   kindIds.sort((a, b) => {
     const ai = declared.indexOf(a);
     const bi = declared.indexOf(b);
@@ -586,7 +628,6 @@ export function inferJournalFromScan(
       ...(declaredPlural && declaredPlural !== plural(label)
         ? { plural: declaredPlural }
         : {}),
-      ...(kindHasPages(files) ? { pages: true } : {}),
       ...(ratingOf(files) ? { rating: ratingOf(files) } : {}),
     };
   });

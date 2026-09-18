@@ -1499,6 +1499,10 @@ export interface PlannedWrites {
   moving: boolean;
   rewriting: Set<string>;
   extending: Set<string>;
+  // `extending` READ BACKWARDS (1.0.23): a section staying on the page with a
+  // part in it that names something the catalogue no longer has. Counted as
+  // work for the same reason every other set here is — see `SectionOpKind`.
+  pruning: Set<string>;
   // False means "nothing would change", which every reconciler answers with
   // null rather than with the text it was given.
   any: boolean;
@@ -1515,18 +1519,21 @@ export function plannedWrites(ops: readonly SectionOp[]): PlannedWrites {
   const moving = ops.some((o) => o.kind === "move");
   const rewriting = new Set(named("reconfigure"));
   const extending = new Set(named("extend"));
+  const pruning = new Set(named("prune"));
   return {
     removing,
     adding,
     moving,
     rewriting,
     extending,
+    pruning,
     any: Boolean(
       removing.size ||
         adding.length ||
         moving ||
         rewriting.size ||
-        extending.size
+        extending.size ||
+        pruning.size
     ),
   };
 }

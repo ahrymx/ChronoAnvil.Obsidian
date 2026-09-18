@@ -162,7 +162,7 @@ describe("every entry is drawable", () => {
       .filter(([, spec]) => spec.needs !== undefined)
       .map(([k]) => k)
       .sort();
-    expect(needy).toEqual(["entry-rollup", "period-nav"]);
+    expect(needy).toEqual(["entry-rollup", "pages-table", "period-nav"]);
   });
 
   it("says what each needy widget does when the need is unmet", () => {
@@ -181,6 +181,17 @@ describe("every entry is drawable", () => {
     );
     expect(repoFile("src/ui/widgets/button-widgets.ts")).toContain(
       'shiftPeriod(ctx.sourcePath, "week-start"'
+    );
+    // `pages-table` is the third kind of answer, and the reason the field
+    // exists at all: it is WITHHELD. Unmet, it drew a table of the host's own
+    // siblings on a page, or an empty one with a "press New Page" sentence and
+    // no such button in reach, on a surface that holds no pages — a defunct
+    // widget the reader could add from the door and not weld into the banner,
+    // because the weld list names the SECTION `pages`. The journal catalogue
+    // supplies the need on a leaf and nowhere else, so the door stops offering
+    // it everywhere else.
+    expect(repoFile("src/journals/journal-sections.ts")).toContain(
+      'ctx.hasPages ? ["pages"] : []'
     );
   });
 

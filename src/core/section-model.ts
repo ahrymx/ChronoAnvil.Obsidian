@@ -105,6 +105,28 @@ import {
 // "unchanged" over a file that is about to be edited, which is the exact silence
 // `reconfigure` was introduced to end. Counted, so Save is enabled for a reader
 // whose only change is that two blocks became one.
+// `prune` IS 1.0.23's, and it is a ninth value for the reason the sixth, the
+// seventh and the eighth were: it is a write the plan would otherwise have to
+// call something else.
+//
+// IT IS `extend` READ BACKWARDS, and the same section is the case. `children`
+// composes one header, button and table per note kind, so a dashboard written
+// while a kind existed carries a group for it forever — and a journal can lose a
+// kind (deleted in Settings, or, as reported, dropped by an IMPORT that could
+// not see it). What the reader gets is a `📝 Cheatsheets` group whose button
+// reads `new-cheatsheets` because nothing answers to it, over a red *"Unknown
+// Study note type: cheatsheets"*.
+//
+// WHY NOT `remove`. That word means the reader unticked a section, and repair is
+// forbidden from producing one for exactly that reason — see `repair-plan.ts`,
+// which throws rather than filters. This removes PART of a section that is
+// staying, and it removes generated lines naming a type the journal does not
+// have: nothing a reader wrote is in the span, which is what makes it offerable
+// at all.
+//
+// WHY NOT `reconfigure`. That recomposes the whole section from the catalogue,
+// which is a bigger write than the case needs and would take a per-kind heading
+// the reader renamed along with it.
 export type SectionOpKind =
   | "add"
   | "remove"
@@ -112,6 +134,7 @@ export type SectionOpKind =
   | "keep"
   | "reconfigure"
   | "extend"
+  | "prune"
   | "regroup"
   | "foreign";
 

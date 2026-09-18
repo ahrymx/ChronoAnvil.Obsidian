@@ -172,11 +172,26 @@ export interface SectionContext {
   // and it is structural rather than Study-flavoured: "are my children folders
   // or notes" is a question every journal type can answer about every level.
   hasSubContainers: boolean;
-  // Whether notes of this kind can be split across pages.
+  // Whether a note on this surface can be split across pages.
+  //
+  // A FACT ABOUT THE SURFACE, NOT ABOUT THE KIND, as of 1.0.23. It was
+  // `kind.pages != null` — the per-kind capability tick — and it is now
+  // "this is a leaf": every kind of every journal can hold pages, an index
+  // holds notes rather than pages, and a page holds neither. See `JournalPages`
+  // for what went with the tick.
+  //
+  // THE NAME STAYS AND SO DOES ITS ONE READER'S SHAPE. `applies: (ctx) =>
+  // ctx.hasPages` on the 📄 Pages section is the same line it always was; what
+  // changed is the answer it gets, which is the whole of this release on this
+  // surface.
   hasPages: boolean;
   // Long-form: either a note that can be split across pages, or one of those
   // pages. What `recall` turns on — the structural fact behind Study's
   // Lesson/Practice split rather than a list of kind ids.
+  //
+  // TRUE ON EVERY LEAF AND EVERY PAGE SINCE 1.0.23, which is what it derives
+  // from `hasPages`; an index is the only surface that is not document-like,
+  // and it never was.
   documentLike: boolean;
   // The tracker a grade on this note writes. On an index, the type's own —
   // the first rating any of its kinds declares — because an index's charts
@@ -1744,6 +1759,28 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     parts: (ctx, opts) => childrenParts(ctx, opts),
   },
 
+  // ── 📄 Pages: OFFERED ON EVERY KIND, AS OF 1.0.23 ───────────────────────
+  //
+  // `applies` and `default` are the lines they have always been; `hasPages` is
+  // what changed under them, from "this kind was ticked as paged in Settings"
+  // to "this is a leaf note". The consequences are worth stating where a reader
+  // of this entry will look for them:
+  //
+  //   • EVERY KIND'S DEFAULT TEMPLATE NOW OPENS WITH THIS SECTION, Practice and
+  //     every custom journal's kinds included. That is a change to what the
+  //     plugin COMPOSES, and the first one this catalogue has made to a shipped
+  //     template since 1.0.22 said shipped pages were unchanged byte for byte.
+  //     It is deliberate: the New page button lives inside this fence, so a
+  //     template without the section is a note with no way to split itself
+  //     except the command palette.
+  //   • NOTHING ALREADY WRITTEN IS REWRITTEN. A note is composed once, and
+  //     `applySections` only ever acts on the list a reader ticks; existing
+  //     Practice notes gain nothing until somebody asks. **Refresh journal
+  //     templates** rewrites TEMPLATES, so that is where the new section
+  //     appears first.
+  //   • UNTICKING IT IS THE WHOLE OF THE OPT-OUT, and it is per template and per
+  //     note rather than per kind. The settings tick that used to answer this
+  //     for every note of a kind at once is gone — see `JournalPages`.
   {
     id: "pages",
     icon: "📄",
@@ -1752,6 +1789,8 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     blurb: "The index of pages this note has been split across.",
     surface: "leaf",
     locked: false,
+    // A page holds no pages: `{ page }` contexts answer false, which is the one
+    // refusal left in this predicate and the only one that was ever structural.
     applies: (ctx) => ctx.hasPages,
     default: (ctx) => ctx.hasPages,
     // WELDED FOR THE SAME REASON AND ON THE SAME TERMS as `children` above,
@@ -2586,7 +2625,11 @@ export function sectionContext(
   const isPage = "page" in target;
   const kind = isPage ? target.page : target.kind;
   const variantId = isPage ? undefined : target.variantId;
-  const hasPages = !isPage && kind.pages != null;
+  // A LEAF, AND NOT A PAGE. This read `!isPage && kind.pages != null`, where
+  // the second half was the per-kind tick; `kind.pages` is now every kind's, so
+  // the first half is the whole test — and it is the half that was always
+  // structural. See `SectionContext.hasPages`.
+  const hasPages = !isPage;
   return {
     type,
     noteKind: isPage ? "page" : "leaf",
@@ -2596,8 +2639,8 @@ export function sectionContext(
     // A page has no variant: every paged kind shares one page template (see
     // buildJournalType), so there is nothing for a variant to distinguish.
     ...(variantId ? { variantId } : {}),
-    typeValue: isPage ? (kind.pages?.id ?? "page") : kind.id,
-    ownNoun: isPage ? (kind.pages?.label ?? "Page") : kind.label,
+    typeValue: isPage ? kind.pages.id : kind.id,
+    ownNoun: isPage ? kind.pages.label : kind.label,
     hasSubContainers: false,
     hasPages,
     documentLike: hasPages || isPage,
@@ -2778,10 +2821,20 @@ const journalWidgets = (
   const bound: FlatSection[] = catalogue.map((s) =>
     bindSection(s, ctx, { defaults: sectionOverrides(ctx, s.id) })
   );
-  // SUPPLIES NOTHING. A journal note carries `type:` and its own dates, never
-  // `week-start` — so the two widgets that need a dashboard period are withheld
-  // here exactly as they are on a diary entry. See `WidgetSpec.needs`.
-  return pageWidgetKeywords(bound).flatMap((keyword) => {
+  // WHAT THIS SURFACE CAN ANSWER. A journal note carries `type:` and its own
+  // dates, never `week-start` — so the two widgets that need a dashboard period
+  // are withheld here exactly as they are on a diary entry.
+  //
+  // AND `pages` IS THE SECOND NEED (1.0.23). `pages-table` reads the HOST's kind
+  // to learn what a page of it is called and which `type:` value counts as one;
+  // on a surface that holds no pages it answers with the bare defaults and lists
+  // whatever sits beside the note — on a page, that is the page's own siblings,
+  // drawn as if they were its children. A leaf supplies the need, so the door
+  // offers the widget there and nowhere else; on a leaf the catalogue's own
+  // 📄 Pages section already claims the keyword, so what this actually does is
+  // withhold it from every index, every page and every flat note in the tree.
+  // See `WidgetSpec.needs`.
+  return pageWidgetKeywords(bound, ctx.hasPages ? ["pages"] : []).flatMap((keyword) => {
     const flat = instanceSectionFor(instanceId(keyword, 1));
     return flat ? [asJournal(flat, keyword)] : [];
   });
@@ -2899,20 +2952,18 @@ export function targetIdFor(ctx: SectionContext): string {
 // KINDS FIRST because they are the common case and the origin in all but two
 // of them, and a reader scanning for the note type they are on should find it
 // before the two general ones.
-// AND `Page` IS NOT OFFERED WHERE THERE ARE NO PAGES. `templateTargets` emits a
-// `page` target only when some kind declares `pages`, so on a journal without
-// one the checkbox would tick a surface the journal does not have and produce a
-// layout nothing could ever reload. Every index has a front page, so that one
-// is unconditional.
+// AND ALL THREE ARE UNCONDITIONAL AS OF 1.0.23. `Page` was offered only where
+// some kind declared `pages` — *"on a journal without one the checkbox would
+// tick a surface the journal does not have and produce a layout nothing could
+// ever reload"* — and every journal has that surface now, the way every one has
+// always had a front page. See `JournalPages`.
 export function layoutTargetsFor(
   type: JournalType
 ): { id: string; label: string }[] {
   return [
     ...type.kinds.map((k) => ({ id: k.id, label: k.label })),
     { id: LAYOUT_SURFACE_INDEX, label: "Front page" },
-    ...(type.kinds.some((k) => k.pages)
-      ? [{ id: LAYOUT_SURFACE_PAGE, label: "Page" }]
-      : []),
+    { id: LAYOUT_SURFACE_PAGE, label: "Page" },
   ];
 }
 
@@ -3002,17 +3053,24 @@ export function templateTargets(type: JournalType): TemplateTarget[] {
       });
     }
   }
-  // One page template for the whole type, from the first kind that has pages.
-  // Every paged kind shares it (see journal.ts::buildJournalType), so emitting
-  // one per kind would write the same file two or three times and give the
-  // wizard a rail of identical rows.
-  const paged = type.kinds.find((k) => k.pages);
-  if (paged?.pages) {
-    const ctx = sectionContext(type, { page: paged });
+  // One page template for the whole type, written against its first kind.
+  //
+  // EVERY KIND SHARES IT (see journal.ts::buildJournalType), so emitting one per
+  // kind would write the same file two or three times and give the wizard a
+  // rail of identical rows. Which kind builds the context is therefore
+  // arbitrary, and `[0]` says so; what it supplies is the journal's page id and
+  // label, which are the same three values on every kind of the type.
+  //
+  // UNCONDITIONAL SINCE 1.0.23, where it used to be `kinds.find(k => k.pages)`.
+  // A journal with no kinds at all still has none of this, which is why the
+  // read is guarded rather than indexed.
+  const first = type.kinds[0];
+  if (first) {
+    const ctx = sectionContext(type, { page: first });
     out.push({
       key: templateKeyFor(ctx),
-      file: paged.pages.template,
-      label: paged.pages.label,
+      file: first.pages.template,
+      label: first.pages.label,
       ctx,
     });
   }

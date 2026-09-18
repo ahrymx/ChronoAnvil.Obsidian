@@ -290,9 +290,9 @@ describe("the editor opens on it, as that journal's page", () => {
     // null, and null was read as "there is no menu here". The cog opened on
     // *Banner art & settings…* alone on every journal's front page.
     //
-    // The refusal itself is CORRECT and stays: there is no Template…, no
-    // tracker and no Convert to a dashboard to offer on a page that is not a
-    // note of any kind. What was wrong is what the caller did with it.
+    // The refusal itself is CORRECT and stays: there is no Template… and no
+    // tracker to offer on a page that is not a note of any kind. What was wrong
+    // is what the caller did with it.
     const refs: JournalHostRef[] = TYPES.map((type) => ({
       type,
       root: type.root,

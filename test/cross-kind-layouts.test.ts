@@ -278,15 +278,18 @@ describe("the door a reader actually uses", () => {
   });
 
   // ── the two surfaces (4.33) ──────────────────────────────────────────
-  it("offers a front page, and a page only where the journal has any", () => {
-    // Study's Lesson declares `pages`, so both surfaces are on offer.
+  it("offers a front page and a page, in every journal there is", () => {
     const study = layoutTargetsFor(STUDY_JOURNAL).map((t) => t.id);
     expect(study).toContain("surface:index");
     expect(study).toContain("surface:page");
 
-    // A journal with no paged kind is not offered `Page`: `templateTargets`
-    // emits no page template for it, so the checkbox would tick a surface the
-    // journal does not have and produce a layout nothing could ever reload.
+    // THE SECOND HALF OF THIS USED TO BE A REFUSAL. A journal whose kinds had
+    // all left the pages tick unticked was not offered `Page`, because
+    // `templateTargets` emitted no page template for it and the checkbox would
+    // have ticked a surface the journal did not have. Every journal has one as
+    // of 1.0.23 — the capability is not a setting any more — so the surface is
+    // offered on a one-kind journal that declares nothing, and the layout it
+    // saves has a template to reload from.
     const flat = buildJournalType({
       ...structuredClone(STUDY_CONFIG),
       id: "flat",
@@ -294,7 +297,7 @@ describe("the door a reader actually uses", () => {
     });
     const ids = layoutTargetsFor(flat).map((t) => t.id);
     expect(ids).toContain("surface:index");
-    expect(ids).not.toContain("surface:page");
+    expect(ids).toContain("surface:page");
   });
 
   it("prefixes the surfaces so a kind cannot collide with one", () => {

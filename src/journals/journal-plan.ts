@@ -454,14 +454,51 @@ function ownerOf(seg: Segment, sigs: Signature[]): JournalSection | null {
   //
   // Non-empty because an empty fence is not evidence of anything.
   if (!kw.length) return null;
-  return (
-    sigs.find(
-      (c) =>
-        c.extensible &&
-        !OPAQUE_FENCE_KINDS.has(c.fenceKind) &&
-        isSubMultiset(kw, c.keywords)
-    )?.section ?? null
+  const short = sigs.find(
+    (c) =>
+      c.extensible &&
+      !OPAQUE_FENCE_KINDS.has(c.fenceKind) &&
+      isSubMultiset(kw, c.keywords)
   );
+  if (short) return short.section;
+
+  // ── AND A LONG FENCE DOES TOO, AS OF 1.0.23 ─────────────────────────────
+  //
+  // The same failure from the other direction, which is the shape the tracker
+  // region's paragraph above already names. A Study journal IMPORTED from a
+  // vault whose `Cheatsheets` template had been deleted keeps the group its
+  // index was composed with — `header:2:📝 Cheatsheets`, a `new-cheatsheets`
+  // button, a `kind-table:cheatsheets` — for a kind the rebuilt type does not
+  // have. The catalogue would compose two groups; the file carries three;
+  // exact equality says no and the sub-multiset fallback only forgives a fence
+  // that is SHORTER. So the whole *What's below* block read as the reader's
+  // own, the table went on rendering *"Unknown Study note type: cheatsheets"*,
+  // and there was nothing any door could offer to do about it — a repair that
+  // cannot SEE the block cannot mend it.
+  //
+  // THE EXTRA KEYWORDS MUST BE THE SECTION'S OWN KINDS, which is what keeps
+  // this from being a resemblance. `children`'s signature is buttons and
+  // kind-tables; a fence of buttons and kind-tables with one group too many is
+  // still an exact reconstruction from that section's declared pieces, and a
+  // fence carrying a `tasks-table:` the reader typed is not a superset of
+  // anything — it is theirs, and it stays foreign. Headers are already out of
+  // both sides of the comparison (`fenceKeywords`), so a renamed heading is not
+  // a stray and never was.
+  //
+  // NARROWER THAN IT LOOKS. `extensible` means the section declares `parts`,
+  // and `children` is the only one that does — the rule cannot reach a banner,
+  // a grid or a page index. What it buys is `prune`: the block is attributable,
+  // so `strayParts` can name the group that is no longer a note type and
+  // `applySections` can take out exactly those lines.
+  const kinds = new Set<string>();
+  const long = sigs.find((c) => {
+    if (!c.extensible || OPAQUE_FENCE_KINDS.has(c.fenceKind)) return false;
+    if (!isSubMultiset(c.keywords, kw)) return false;
+    kinds.clear();
+    for (const k of c.keywords) kinds.add(k);
+    return kw.every((k) => kinds.has(k));
+  });
+  return long?.section ?? null;
 }
 
 // EVERY SECTION IN ONE FENCE, WHICH IS MORE THAN ONE WHEN THE FENCE IS A ROW.
@@ -527,9 +564,35 @@ function ownersBySignature(seg: Segment, sigs: Signature[]): JournalSection[] {
           !out.includes(c.section) &&
           isSubMultiset(rest, c.keywords)
       );
-      if (!short || !out.length) return [];
-      out.push(short.section);
-      break;
+      if (short && out.length) {
+        out.push(short.section);
+        break;
+      }
+
+      // ── AND IT MAY BE LONG, BY THE SAME ARGUMENT (1.0.23) ───────────
+      //
+      // The reader's imported Study again — `ownerOf`'s long-fence paragraph
+      // holds the account — arriving here instead because the shipped Topic
+      // index welds banner, trackers and *What's below* into ONE fence. The
+      // deal consumes banner, then trackers, then the two groups the catalogue
+      // composes, and stops on a third group it has no signature for: a kind
+      // the journal lost. The tail rule above cannot help, because the section
+      // the extra keywords belong to is the one already in `out`.
+      //
+      // THE LAST MEMBER, AND ONLY ITS OWN KINDS. Same two limits as the short
+      // tail and as `ownerOf`: welded sections are appended, so the long one is
+      // the last one, and every leftover keyword has to be a kind that member
+      // already composes — `button` and `kind-table` here. A `tasks-table:` the
+      // reader typed at the end of the banner's fence is not one of `children`'s
+      // kinds, so the fence stays theirs and stays foreign, which is the case
+      // 5.28 narrowed the multi-section gate for in the first place.
+      const last = out.length
+        ? usable.find((c) => c.section === out[out.length - 1])
+        : undefined;
+      if (last?.extensible && rest.every((k) => last.keywords.includes(k))) {
+        break;
+      }
+      return [];
     }
     out.push(hit.section);
     at += hit.keywords.length;
@@ -893,6 +956,88 @@ export function missingParts(
   if (!parts.length) return [];
   const present = new Set(lines.map((l) => l.trim()));
   return parts.filter((p) => !present.has(p.probe.trim()));
+}
+
+// The parts a run contains that the section no longer has. 1.0.23.
+//
+// `missingParts` READ BACKWARDS, and the same section is the only case: a
+// journal index's `children` fence carries one header, button and table per note
+// kind, so a kind that LEAVES the journal leaves its group behind on every
+// dashboard and index template that was written while it existed.
+//
+// ── THE REPORT THAT PROMPTED IT ──────────────────────────────────────────
+//
+// An imported Study whose topic index still drew a `📝 Cheatsheets` group: its
+// create button read `new-cheatsheets` because no kind answered to it, and under
+// it sat a red *"Unknown Study note type: cheatsheets"*. The import that lost the
+// kind is fixed in `journal-infer.ts`; this is the other half, for every vault
+// already in that state and for every kind a reader deletes on purpose.
+//
+// THE READER COULD ALREADY DO IT BY HAND — untick the section, save, tick it
+// back, save — which is the "remove then re-add" dance `dashboard-catchup.ts`
+// exists to end. Same write, discovered.
+//
+// ── WHY THE SPAN IS EXACT RATHER THAN GUESSED ────────────────────────────
+//
+// A part's own `lines` say what a group is made of, and every line in one either
+// CARRIES THE ID (the button, the table) or carries a label (the header). So the
+// walk back matches the id-bearing lines literally, with the stray id
+// substituted, and the label-bearing ones by directive key alone — and stops at
+// the first line that is neither. It cannot eat the section's own bar: the bar is
+// a `header:`, and a header is only taken after the button below it has already
+// matched. It cannot eat the neighbouring group either, for the same reason.
+//
+// GATED ON THE SURFACE, exactly as `missingParts` is, and for its reason.
+export interface StrayPart {
+  id: string;
+  from: number;
+  to: number;
+}
+
+export function strayParts(
+  lines: string[],
+  section: JournalSection,
+  ctx: SectionContext
+): StrayPart[] {
+  if (ctx.noteKind === "leaf" || ctx.noteKind === "page") return [];
+  const parts = section.parts?.(ctx, sectionOverrides(ctx, section.id)) ?? [];
+  if (!parts.length) return [];
+
+  const keyOf = (line: string): string => {
+    const at = line.indexOf(":");
+    return at === -1 ? line : line.slice(0, at);
+  };
+  const probeKeys = new Set(parts.map((p) => keyOf(p.probe.trim())));
+  const known = new Set(parts.map((p) => p.probe.trim()));
+  // Any real part answers for the SHAPE — they are composed by one `map`, so
+  // they differ only in the id and the label.
+  const shape = parts[0];
+  const siblings = shape.lines.slice(0, -1).map((l) => l.trim());
+
+  const out: StrayPart[] = [];
+  const taken = new Set<number>();
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const key = keyOf(line);
+    if (!probeKeys.has(key) || known.has(line) || taken.has(i)) continue;
+    const id = line.slice(key.length + 1);
+    if (!id) continue;
+
+    let from = i;
+    for (let k = siblings.length - 1; k >= 0; k--) {
+      if (from - 1 < 0 || taken.has(from - 1)) break;
+      const prev = lines[from - 1].trim();
+      const want = siblings[k];
+      const matches = want.includes(shape.id)
+        ? prev === want.split(shape.id).join(id)
+        : keyOf(prev) === keyOf(want);
+      if (!matches) break;
+      from--;
+    }
+    for (let j = from; j <= i; j++) taken.add(j);
+    out.push({ id, from, to: i });
+  }
+  return out;
 }
 
 // ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ───────────────────
@@ -1373,11 +1518,24 @@ export function planSections(
       // want both at once. `reconfigure` wins the label because it is the one
       // that rewrites a line the reader may have edited; the extension is
       // reported in the same detail rather than swallowed.
+      // A GROUP NAMING A KIND THE JOURNAL NO LONGER HAS — see `strayParts`.
+      const strays = strayParts(runLines, section, ctx);
+      // `prune` OUTRANKS `extend` AND LOSES TO `reconfigure`, which is the same
+      // ordering rule the pair already followed: the op is named after the
+      // boldest write in it, and every other write is reported in the detail
+      // rather than swallowed. A fence can want all three at once — a journal
+      // that gained one kind and lost another is exactly that.
       const kindOfOp = rewriting.has(section.id)
         ? "reconfigure"
-        : gaps.length || noBar || saysStack
-          ? "extend"
-          : "keep";
+        : strays.length
+          ? "prune"
+          : gaps.length || noBar || saysStack
+            ? "extend"
+            : "keep";
+      const strayDetail =
+        strays.length === 1
+          ? `${strays[0].id} is no longer one of ${ctx.type.name}'s note types — its table will be removed`
+          : `${strays.map((x) => x.id).join(", ")} are no longer ${ctx.type.name} note types — their tables will be removed`;
       const partDetail =
         gaps.length === 1
           ? `${gaps[0].label} has no table here — it will be added`
@@ -1391,11 +1549,16 @@ export function planSections(
         ? "this block is a stack and does not say so — the `stack` line will be added" +
           (undivided ? ", one above each section in it" : "")
         : "this block is a stack and does not say where its sections start — a `stack` line will be added above each of them";
-      const gapDetail = gaps.length
+      const addedDetail = gaps.length
         ? partDetail + (noBar ? `; ${barDetail}` : "") + (saysStack ? `; ${stackDetail}` : "")
         : noBar
           ? barDetail + (saysStack ? `; ${stackDetail}` : "")
           : stackDetail;
+      // THE REMOVAL LEADS, because it is the sentence a reader has to agree to.
+      const gapDetail = strays.length
+        ? strayDetail +
+          (gaps.length || noBar || saysStack ? `; ${addedDetail}` : "")
+        : addedDetail;
       // A HEADING THE READER DID NOT LIST, BUT HAS WRITTEN UNDER, SURVIVES THE
       // rewrite — so the plan says so before the write rather than leaving them
       // to notice afterwards that the list they typed is not the list they got.
@@ -1424,8 +1587,10 @@ export function planSections(
               journalHostLabel(ctx)
             ) +
             (orphans.length ? ` — ${describeKept(orphans)}` : "") +
-            (gaps.length || noBar || noStack ? `; ${gapDetail}` : "")
-          : gaps.length || noBar || noStack
+            (strays.length || gaps.length || noBar || noStack
+              ? `; ${gapDetail}`
+              : "")
+          : strays.length || gaps.length || noBar || noStack
             ? gapDetail
             : "unchanged",
       });
@@ -1602,6 +1767,21 @@ export function planSections(
 // "After the probe" is correct only because a probe is the LAST line of its
 // part — the rule SectionPart states. Inserting after a probe is inserting
 // after the whole group.
+// Cut the groups `strayParts` found, bottom-up so the indices stay true.
+function withoutStrayParts(
+  lines: string[],
+  section: JournalSection,
+  ctx: SectionContext
+): string[] {
+  const strays = strayParts(lines, section, ctx);
+  if (!strays.length) return lines;
+  const out = [...lines];
+  for (const stray of [...strays].sort((a, b) => b.from - a.from)) {
+    out.splice(stray.from, stray.to - stray.from + 1);
+  }
+  return out;
+}
+
 function withMissingParts(
   lines: string[],
   section: JournalSection,
@@ -1672,7 +1852,7 @@ export function applySections(
 ): string | null {
   const want = idsOf(requested);
   const ops = planSections(text, ctx, requested);
-  const { removing, adding, moving, rewriting, extending: short, any } =
+  const { removing, adding, moving, rewriting, extending: short, pruning, any } =
     plannedWrites(ops);
   if (!any) return null;
   // A reconfigure may ALSO be short of a part (see `planSections`), so what the
@@ -1680,7 +1860,7 @@ export function applySections(
   // Only this surface has parts, which is why the widening is here and not in
   // `plannedWrites` — where it would tell the other three that every rewrite is
   // also an extension.
-  const extending = new Set([...short, ...rewriting]);
+  const extending = new Set([...short, ...rewriting, ...pruning]);
 
   const segs = splitRawSegments(segment(text.split("\n")));
   const runs = parseSections(text, ctx);
@@ -1747,6 +1927,12 @@ export function applySections(
         }
         const section = byId.get(id);
         if (section && extending.has(section.id)) {
+          // THE STRAYS FIRST, THEN THE GAPS, and the order is arithmetic rather
+          // than taste: `withMissingParts` places a new group relative to the
+          // probes the file has, and a dead group is not a landmark to place
+          // anything against. Cutting first also keeps the two passes honest —
+          // neither can see what the other left behind.
+          out = withoutStrayParts(out, section, ctx);
           out = withMissingParts(out, section, ctx);
           // AND THE TITLE, IF THE PLAN SAID SO. Asked of the same function the
           // plan asked rather than of a second derivation of it, which is this
@@ -2468,12 +2654,12 @@ export type { JournalType, SectionOverrides };
 // frontmatter. Nothing on disk is rewritten. A kinds change decides what gets
 // written from here on, and the confirmation says exactly that in those words.
 
-export type KindChangeKind =
-  | "added"
-  | "removed"
-  | "relabelled"
-  | "rated"
-  | "paged";
+// A `"paged"` STOOD HERE UNTIL 1.0.23, reported when a kind's pages tick
+// changed: *"can be split into pages."* one way, *"can no longer be split into
+// pages. Notes already split keep their pages and go on working."* the other. It
+// is gone with the tick — every kind can be split — and with it the only change
+// this window ever reported that was not about `type:` values.
+export type KindChangeKind = "added" | "removed" | "relabelled" | "rated";
 
 // WHAT THE CHANGE IS ABOUT, and the reason one window covers two things.
 //
@@ -2503,7 +2689,6 @@ export interface KindLike {
   id: string;
   label: string;
   rating?: string;
-  pages?: unknown;
 }
 
 // What changed between two kind lists, by id.
@@ -2552,17 +2737,6 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
         detail: k.rating
           ? `new notes are scored on ${k.rating}. Notes already written keep what they have.`
           : "new notes are no longer scored. Notes already written keep their score.",
-      });
-    }
-    if (Boolean(was.pages) !== Boolean(k.pages)) {
-      out.push({
-        kind: "paged",
-        subject: "kind",
-        id: k.id,
-        label: k.label,
-        detail: k.pages
-          ? "can be split into pages."
-          : "can no longer be split into pages. Notes already split keep their pages and go on working.",
       });
     }
   }

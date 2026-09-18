@@ -2813,6 +2813,13 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
 .ca-tpl-op-extend .ca-tpl-op-mark {
   color: var(--color-green);
 }
+/* And a prune takes lines out of a section that is staying, so it reads with
+   remove's colour for the mirror of that reason: what the mark says is which
+   way the write goes, and the row's words say which section it happens inside.
+   (1.0.23) */
+.ca-tpl-op-prune .ca-tpl-op-mark {
+  color: var(--color-red);
+}
 .ca-tpl-empty {
   color: var(--text-muted);
   font-size: var(--ca-text-sm);

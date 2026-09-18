@@ -128,6 +128,35 @@ describe("what the footer counts", () => {
   });
 });
 
+describe("the ninth op reaches the window (1.0.23)", () => {
+  // `prune` is a write, and a write the footer does not count is Save sitting
+  // disabled over a plan with something to do. Read off the source for the same
+  // reason the `regroup` pair next door is: the real `changeCount` is a private
+  // method on a Modal, and the helper above is a replica of it — a replica
+  // cannot answer whether the original was updated.
+  const editor = readSrc("section-editor");
+
+  it("is counted, so Save is offered for one", () => {
+    const at = editor.indexOf("private changeCount()");
+    expect(at).toBeGreaterThan(-1);
+    expect(editor.slice(at, at + 500)).toContain('o.kind === "prune"');
+  });
+
+  it("has a mark of its own on the change list", () => {
+    // Every other op kind draws one, and a row with a blank where the mark goes
+    // reads as a keep — which is the row this op exists not to be.
+    expect(editor).toContain('op.kind === "prune"');
+    expect(editor).toContain('"⊖"');
+  });
+
+  it("and the mark is coloured like a removal, because it removes", () => {
+    // `extend` borrows add's green; this borrows remove's red. The stylesheet
+    // is where that is said, and a class with no rule behind it is a mark that
+    // renders in the body colour and says nothing.
+    expect(readCss()).toContain(".ca-tpl-op-prune .ca-tpl-op-mark");
+  });
+});
+
 // ── the rows ──────────────────────────────────────────────────────────
 
 describe("what a row offers", () => {

@@ -33,9 +33,11 @@ import {
   moveTargets,
   moveValue,
   prunedSelection,
+  removableKinds,
   selectionLabel,
   targetOf,
 } from "../src/ui/widgets/below-edit";
+import { kindRemovalRefusal } from "../src/journals/kind-create";
 import type { JournalFolders } from "../src/ui/widgets/below-edit";
 import { containerFoldersOf } from "../src/journals/journal";
 import type { JournalType } from "../src/journals/journal";
@@ -437,7 +439,11 @@ describe("how the mode reaches the rows", () => {
     // — so one listener on the block would never fire once, and a selection would
     // silently evaporate on the first repaint with no error anywhere.
     const text = src();
-    expect(text).toContain("for (const host of this.hosts) {");
+    // DESTRUCTURED SINCE 1.0.24, where a host became a record of three facts —
+    // the element, its note type and the head of its group — so the loop takes
+    // the element out of it by name. The claim is unchanged: one listener per
+    // host, on the host.
+    expect(text).toContain("for (const { host } of this.hosts) {");
     expect(text).toContain("host.addEventListener(LIVE_REDRAW_EVENT, redraw)");
     expect(text).toContain(
       "this.register(() => host.removeEventListener(LIVE_REDRAW_EVENT, redraw))"
@@ -835,8 +841,14 @@ describe("the foot the Edit button sits in", () => {
     // table along with the tables it wants. `named` is collected here for the
     // same reason one line up.
     const src = readSrc("widgets");
-    expect(src).toContain("const kindHosts: HTMLElement[] = [];");
-    expect(src).toContain('if (kind === "kind-table") kindHosts.push(widget);');
+    // A RECORD SINCE 1.0.24, and for the same reason the collection is here at
+    // all: the removal on an empty group's head needs the note type and the
+    // head as well as the element, and this is the only place all three are in
+    // hand. `head` is `headerGroup`, which the next non-inline directive nulls.
+    expect(src).toContain("const kindHosts: KindHost[] = [];");
+    expect(src).toContain('if (kind === "kind-table") {');
+    expect(src).toContain("host: widget,");
+    expect(src).toContain("head: headerGroup,");
   });
 
   it("wears a glyph none of the other vocabularies had claimed", () => {
@@ -844,7 +856,12 @@ describe("the foot the Edit button sits in", () => {
     // is page actions, `pencil` is rename. Selecting rows is none of those.
     const foot = readCode("ui/widgets/below-edit");
     expect(foot).toContain('"list-checks"');
-    expect(foot).toContain('const hint = "Select notes to move or delete";');
+    // AND THE SENTENCE NAMES BOTH ACTS SINCE 1.0.24. The removal on an empty
+    // group's head exists only inside this mode, so a door describing only the
+    // ticks would leave it undiscoverable.
+    expect(foot).toContain(
+      'const hint = "Select notes to move or delete, or remove an empty note type";'
+    );
     // BOTH, per `addHeadButton`'s rule: `title` is the hover and `aria-label` is
     // the only name a screen reader has for an icon.
     expect(foot).toContain('edit.setAttr("aria-label", hint)');
@@ -967,6 +984,232 @@ describe("how the foot is drawn", () => {
 });
 
 // ── and nothing composed changed ─────────────────────────────────────────
+
+// ── removing an empty note type from the card (1.0.24) ───────────────────
+//
+// *"allow kinds (the titled sections for pages) to be removed in edit-mode of
+// 'what's below', but only if it has no entries."*
+//
+// TWO QUESTIONS, AND THE SUITE KEEPS THEM APART because the code does. Whether
+// a group may be OFFERED a removal is about this card and is answered on every
+// render — `removableKinds`. Whether the removal may HAPPEN is about the whole
+// journal and is answered once, at the press — `kindRemovalRefusal`. A card
+// showing no Lessons is not a journal with no Lessons, and a suite that tested
+// only the first would be pinning a door that declassifies notes.
+
+describe("which groups are offered a removal", () => {
+  it("offers an empty titled group", () => {
+    expect(
+      removableKinds([{ kindId: "decision", rows: 0, titled: true }])
+    ).toEqual(["decision"]);
+  });
+
+  it("withholds one with entries in it, which is the reader's own condition", () => {
+    expect(
+      removableKinds([
+        { kindId: "update", rows: 4, titled: true },
+        { kindId: "decision", rows: 0, titled: true },
+      ])
+    ).toEqual(["decision"]);
+  });
+
+  it("withholds a group with no head to hang it on", () => {
+    // A fence composed without `header:2:` lines draws a table under the
+    // section's own bar and nothing names the type — so there is nowhere to put
+    // the control and no way to say which type it would take.
+    expect(
+      removableKinds([{ kindId: "decision", rows: 0, titled: false }])
+    ).toEqual([]);
+  });
+
+  it("withholds a bare `kind-table:` naming no type at all", () => {
+    expect(removableKinds([{ kindId: "", rows: 0, titled: true }])).toEqual([]);
+  });
+
+  it("is a rule about the card, and says nothing about the vault", () => {
+    // THE LINE THIS SUITE IS DRAWN AT. `removableKinds` cannot see a note, so
+    // it cannot be the thing that decides a removal is safe — it decides only
+    // that a control is worth drawing. The refusal below is the other half, and
+    // the pair is asserted together so neither can quietly grow into the other.
+    const src = readCode("ui/widgets/below-edit");
+    expect(src).not.toContain("getMarkdownFiles");
+    expect(src).toContain("promptRemoveKind(");
+  });
+});
+
+describe("whether the removal may actually happen", () => {
+  it("allows one nothing on disk carries", () => {
+    expect(kindRemovalRefusal("Projects", "Decision", 2, 0)).toBeNull();
+  });
+
+  it("refuses one with notes, and says how many and where to do it", () => {
+    // NOT A BARE NO. A refusal that only says no sends a reader looking for a
+    // setting that does not exist — so it names what is in the way, how much of
+    // it, the way out, and the door that CAN do it behind the window with the
+    // count in it.
+    const why = kindRemovalRefusal("Projects", "Decision", 2, 14)!;
+    expect(why).toContain("14 notes");
+    expect(why).toContain("Decision");
+    expect(why).toContain("Settings");
+  });
+
+  it("reads for a single note as well as for fourteen", () => {
+    // 1.0.4's defect, one surface over: five plural verbs under a lead that had
+    // been given a singular subject.
+    const why = kindRemovalRefusal("Projects", "Decision", 2, 1)!;
+    expect(why).toContain("1 note in Projects is still Decision");
+    expect(why).not.toContain("notes");
+  });
+
+  it("refuses the last note type, whatever its count", () => {
+    // A journal with no kinds draws a *What's below* card with nothing in it
+    // and no way to add the next one except the settings step this door exists
+    // to save — the control would have deleted itself.
+    const why = kindRemovalRefusal("Projects", "Decision", 1, 0)!;
+    expect(why).toContain("at least one note type");
+  });
+
+  it("weighs the last-type rule before the count", () => {
+    // Both are true of a one-kind journal with notes in it, and the one that
+    // survives the removal is the one worth saying: moving the notes elsewhere
+    // would not make the type removable.
+    expect(kindRemovalRefusal("Projects", "Decision", 1, 9)).toContain(
+      "at least one note type"
+    );
+  });
+});
+
+describe("what the removal does once it is agreed", () => {
+  const src = () => readCode("journals/kind-create");
+
+  it("counts the journal's notes through the one walk that counts them", () => {
+    // The journal editor's declassification sentence weighs the same question,
+    // and a second walk is how two doors come to disagree about whether a type
+    // is empty — with one of them then taking a classification off notes the
+    // other could see.
+    expect(src()).toContain("countNotesOfKind(");
+    expect(readCode("core/settings-editors")).toContain("countNotesOfKind(");
+    expect(readSrc("journal")).toContain("export function countNotesOfKind(");
+  });
+
+  it("asks before it writes, and the sentence says nothing is lost", () => {
+    const text = src();
+    expect(text).toContain("confirmAction(");
+    expect(text).toContain("nothing you have written changes");
+    // AND WHAT STAYS. No path in this plugin deletes a kind's template, the
+    // editor's removal included, so a reader who did this by mistake gets the
+    // group back by adding the name again.
+    expect(text).toContain("Its template file stays");
+  });
+
+  it("walks the same tail the addition walks, in the same order", () => {
+    // A kind that arrives from a note and a kind that arrives from Settings
+    // reach the vault the same way, and so do the two that leave.
+    const text = src();
+    const at = text.indexOf("export async function removeKindFromJournal");
+    expect(at).toBeGreaterThan(-1);
+    const body = text.slice(at);
+    for (const call of [
+      "plugin.saveSettings()",
+      "plugin.journalImport.writeManifest(next)",
+      "offerDashboardCatchup(app, buildJournalType(next))",
+      "plugin.journals.rebuildJournalHome()",
+      "plugin.notifyJournalTypesChanged()",
+      "repaintOpenNotes(app)",
+    ]) {
+      expect(body, call).toContain(call);
+    }
+  });
+
+  it("does not re-derive the surviving ids", () => {
+    // `normaliseKinds` exists to derive and unique an id, and every id left
+    // after a removal is already the `type:` value on notes — `preserveIds` is
+    // the flag that stops it touching those, so the honest thing is not to ask
+    // the question at all.
+    const at = src().indexOf("export async function removeKindFromJournal");
+    expect(src().slice(at)).not.toContain("normaliseKinds(");
+    expect(src().slice(at)).toContain(
+      "cfg.kinds.filter((k) => k.id !== kindId)"
+    );
+  });
+
+  it("leaves the catch-up to mend the tables it strands", () => {
+    // 1.0.23's `prune`, which is what makes this offerable at all: every index
+    // in the journal is carrying a `kind-table:` for the type that just left,
+    // and until that release nothing could even SEE the block.
+    expect(readCode("journals/dashboard-catchup")).toContain(
+      'o.kind === "extend" || o.kind === "prune"'
+    );
+  });
+});
+
+describe("where the removal control lives", () => {
+  const src = () => readCode("ui/widgets/below-edit");
+
+  it("appears only inside the mode, and is taken back off with it", () => {
+    // A permanent `×` beside every empty group would put a journal-altering act
+    // one slip from a reader browsing their notes. `Edit` is the door.
+    const text = src();
+    expect(text).toContain("this.syncRemovals();");
+    expect(text).toContain("this.clearRemovals();");
+    const apply = text.indexOf("private apply()");
+    const release = text.indexOf("private release()");
+    expect(text.slice(apply, release)).toContain("this.syncRemovals();");
+    expect(text.slice(release)).toContain("this.clearRemovals();");
+  });
+
+  it("is re-decided on every redraw, not written once", () => {
+    // These tables are live-scoped: the first note filed under a type arrives
+    // without a repaint of the block, and a button written once would stay
+    // offering to remove a type that now has a note in it. `liftEmptyHead` is a
+    // sync on the same heads for the same reason.
+    const text = src();
+    const at = text.indexOf("private syncRemovals()");
+    const body = text.slice(at, text.indexOf("private clearRemovals()"));
+    // Both directions: put one on a group that may have one, take one off a
+    // group that may not.
+    expect(body).toContain("existing?.remove();");
+    expect(body).toContain("head.appendChild(this.buildRemove(kindId));");
+  });
+
+  it("hangs on the group's head, beside the title it is about", () => {
+    // `attachKindRowMenu`'s argument one scope down: the object being
+    // configured and the control that configures it are the same object. The
+    // picking bar's two buttons act on what is TICKED, and a note type is not a
+    // note.
+    const text = src();
+    expect(text).toContain("head.querySelector");
+    const at = text.indexOf("private buildBar()");
+    expect(text.slice(at)).not.toContain("buildRemove");
+  });
+
+  it("wears the other hosted button's shape rather than a third one", () => {
+    // `buildAddCategoryButton` is the other control hung in a `header:` bar on
+    // this surface. Same wrapper, same button classes, same icon slot — so it
+    // sits at the create button's height and needs no rule of its own.
+    const text = src();
+    expect(text).toContain('cls: "ca-journal-btn ca-journal-btn-subtle"');
+    expect(text).toContain("ca-journal-widget ca-journal-button");
+    expect(readCode("ui/widgets/attachment-widgets")).toContain(
+      'cls: "ca-journal-btn ca-journal-btn-subtle"'
+    );
+  });
+
+  it("closes the mode once a type has gone", () => {
+    // Removing a type repaints every open note, which rebuilds this card from
+    // its fence — so ticks, the bar and these buttons are all about to be
+    // replaced, and a mode left on would be marks on elements nothing listens
+    // to.
+    expect(src()).toContain("if (ok) this.setPicking(false);");
+  });
+
+  it("stops the click reaching the head, which folds the group", () => {
+    const text = src();
+    const at = text.indexOf("private buildRemove(");
+    const body = text.slice(at, text.indexOf("private kindLabel("));
+    expect(body).toContain("evt.stopPropagation();");
+  });
+});
 
 describe("no note needs migrating to gain any of this", () => {
   it("is renderer-drawn, so the catalogue says nothing about it", () => {

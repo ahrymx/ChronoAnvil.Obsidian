@@ -5,26 +5,33 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The `pages` tick, after it stopped being a Structure checkbox. 5.20.
+// The `pages` tick, after it stopped being a tick at all. 5.20 → 1.0.23.
 //
-// ── WHAT MOVED, AND WHAT MUST NOT ────────────────────────────────────────
+// ── WHAT THIS FILE USED TO ASSERT ────────────────────────────────────────
 //
-// `kind.pages` used to have a checkbox of its own on the journal wizard's
-// Structure step, beside the kind's emoji, name and rating. Every other field
-// on that row is IDENTITY; this one is a decision about what the kind's
-// template CONTAINS — so it was asked one step before the step that asks
-// exactly that, in a different vocabulary, with nothing on screen connecting
-// the two. The documentation had to explain the coupling backwards.
+// `kind.pages` had a checkbox of its own on the journal wizard's Structure
+// step, beside the kind's emoji, name and rating. 5.20 moved the question onto
+// the Sections checklist — the 📄 Pages row — and the move had to carry a seam
+// with it, because the section's own gate (`applies: (ctx) => ctx.hasPages`)
+// read the config the tick was writing: the row could not come from
+// `sectionsFor` while the config still said no, so the SURFACE offered it, a
+// second model composed the preview, and `StructuralSink` persisted the config
+// before the file was written.
 //
-// The `pages` SECTION is the control now. What that could not be allowed to
-// cost is the gate: `applies: (ctx) => ctx.hasPages` is what stops a layout
-// copied out of a paged journal from composing a pages table over a kind that
-// has none — `layout-transfer.ts` names this section as its example — and
-// composition reads the same predicate. So the gate is untouched, and the row
-// is offered BY THE SURFACE while the config still says no.
+// ── AND WHY NONE OF THAT IS LEFT ─────────────────────────────────────────
 //
-// These are the two halves of that: the gate still bites, and the ctx the
-// editor asks about a tick with is the one `sectionContext` would have built.
+// The reader's account of the bug that ended it: *"only lessons can hold
+// pages"*, on a note that was not a Lesson, with the 📄 Pages section missing
+// from the catalogue and a pages table already sitting in the note. Every one
+// of those is the capability gate talking. A Practice note that grows too long
+// to read is the same note a Lesson becomes, and the fact that one kind had
+// been ticked in Settings and the other had not is not a fact about either.
+//
+// So the capability is universal, the gate became a question about the SURFACE
+// — a leaf, not an index and not a page — and the row is an ordinary row on an
+// ordinary checklist. What this file asserts now is that one fact and the
+// absence of the seam: a deleted mechanism that half-survives is worse than
+// either state, because the half that remains is the half nothing tests.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -43,28 +50,20 @@ import {
   normaliseKinds,
 } from "../src/core/settings-editors";
 import type { TemplateTarget } from "../src/journals/journal-sections";
-import type { JournalKindConfig } from "../src/journals/custom-journal";
 import type ChronoAnvilPlugin from "../src/main";
 
-const CONFIG = (paged: boolean): JournalConfig => ({
+const CONFIG = (): JournalConfig => ({
   id: "notes",
   name: "Notes",
   emoji: "📓",
   root: "03 - Journals/Notes",
   templatesFolder: "03 - Journals/Notes/Templates",
   levels: [{ id: "area", noun: "Area", emoji: "📁" }],
-  kinds: [
-    {
-      id: "lesson",
-      emoji: "📘",
-      label: "Lesson",
-      ...(paged ? { pages: true as const } : {}),
-    },
-  ],
+  kinds: [{ id: "lesson", emoji: "📘", label: "Lesson" }],
 });
 
-const leafCtx = (paged: boolean): SectionContext => {
-  const type = buildJournalType(CONFIG(paged));
+const leafCtx = (): SectionContext => {
+  const type = buildJournalType(CONFIG());
   const ctx = templateTargets(type).find(
     (t) => t.ctx.noteKind === "leaf"
   )?.ctx;
@@ -72,81 +71,28 @@ const leafCtx = (paged: boolean): SectionContext => {
   return ctx;
 };
 
-describe("the `pages` gate, which the 5.20 move had to leave alone", () => {
-  it("refuses the section on a kind whose config says it has no pages", () => {
-    const ids = sectionsFor(leafCtx(false)).map((s) => s.id);
-    expect(ids).not.toContain("pages");
-  });
-
-  it("offers it, and defaults it on, the moment the config says otherwise", () => {
-    const ctx = leafCtx(true);
+describe("the `pages` gate, which is a fact about the surface now", () => {
+  it("offers it, and defaults it on, for a kind that declares nothing", () => {
+    // THE CONFIG ABOVE SAYS NOTHING ABOUT PAGES — there is no field left to say
+    // it with. A journal a reader makes in the wizard can split any of its notes
+    // the day it exists.
+    const ctx = leafCtx();
     expect(sectionsFor(ctx).map((s) => s.id)).toContain("pages");
-    // ONE OF THE FOUR a page starts with, where the kind has pages at all —
-    // it is the "what is below" of a long note. See the catalogue's doctrine
-    // comment.
+    // ONE OF THE SECTIONS A LEAF STARTS WITH — it is the "what is below" of a
+    // long note. See the catalogue's doctrine comment.
     expect(defaultSectionIds(ctx)).toContain("pages");
   });
 
   it("never offers it on a page, which is what a page is a page OF", () => {
-    const type = buildJournalType(CONFIG(true));
+    const type = buildJournalType(CONFIG());
     const page = templateTargets(type).find((t) => t.ctx.noteKind === "page");
     expect(page).toBeDefined();
+    expect(page!.ctx.hasPages).toBe(false);
     expect(sectionsFor(page!.ctx).map((s) => s.id)).not.toContain("pages");
   });
-});
 
-describe("the context the editor asks a tick about", () => {
-  // `openTemplateEditor`'s `modelWith`, spelled here so the claim is about
-  // behaviour rather than about the source line. A model built for a list
-  // holding `pages` must be indistinguishable from one built for a kind whose
-  // config already said so — otherwise the preview shows one thing and Save
-  // writes another.
-  const modelWith = (ctx: SectionContext, ids: string[]) => {
-    const paged = ids.includes("pages") || ctx.hasPages;
-    return journalSectionModel({
-      ...ctx,
-      hasPages: paged,
-      documentLike: paged || ctx.noteKind === "page",
-    });
-  };
-
-  it("composes the same template a stored `pages: true` would", () => {
-    const unpaged = leafCtx(false);
-    const paged = leafCtx(true);
-    const want = defaultSectionIds(paged);
-
-    const fromTick = modelWith(unpaged, [...want]).apply("", want);
-    const fromConfig = journalSectionModel(paged).apply("", want);
-
-    expect(fromTick).toBe(fromConfig);
-    expect(fromTick).toContain("pages-table");
-  });
-
-  it("takes the table back out when the row is unticked", () => {
-    // THE HALF THAT FORCED THE UNION. `applySections` removes a section by
-    // knowing it exists and finding it absent from `want` — so a model narrowed
-    // to the tick list has no `pages` in its catalogue, walks past the table and
-    // reports nothing to change. The untick would then clear `kind.pages` and
-    // leave the table in the file, which is the one state this whole seam is
-    // supposed to make unreachable.
-    const paged = leafCtx(true);
-    const withTable = journalSectionModel(paged).apply(
-      "",
-      defaultSectionIds(paged)
-    )!;
-    expect(withTable).toContain("pages-table");
-
-    const without = defaultSectionIds(paged).filter((id) => id !== "pages");
-    const next = modelWith(paged, without).apply(withTable, without);
-    expect(next).not.toBeNull();
-    expect(next).not.toContain("pages-table");
-  });
-
-  it("leaves a ctx that never had the question alone", () => {
-    // An index has no `hasPages` to turn on and no kind to write it to. The
-    // editor is not given the sink there at all — see `structuralHere` — and
-    // the derivation would be a no-op if it were.
-    const type = buildJournalType(CONFIG(true));
+  it("never offers it on an index, which holds notes rather than pages", () => {
+    const type = buildJournalType(CONFIG());
     const index = templateTargets(type).find(
       (t) => t.ctx.noteKind === "index"
     )!;
@@ -155,29 +101,50 @@ describe("the context the editor asks a tick about", () => {
   });
 
   it("derives `documentLike` exactly as sectionContext does", () => {
-    // Two spellings of one rule is how they come to disagree. This asserts the
-    // derivation rather than trusting that the copy in template-editor.ts is
-    // still the same shape as the original.
-    const type = buildJournalType(CONFIG(true));
+    // Two spellings of one rule is how they come to disagree. The second
+    // spelling lived in template-editor.ts and is gone with the seam; this
+    // asserts the derivation the one remaining copy makes.
+    const type = buildJournalType(CONFIG());
     const ctx = sectionContext(type, { kind: type.kinds[0] });
     expect(ctx.documentLike).toBe(ctx.hasPages || ctx.noteKind === "page");
+    const page = sectionContext(type, { page: type.kinds[0] });
+    expect(page.documentLike).toBe(true);
   });
 });
 
-describe("the wizard's Sections checklist, which took the question over", () => {
-  // The two private members the claim is about: the row list a target draws,
-  // and the draft row a tick on it writes to.
+describe("the table it composes, and takes back out", () => {
+  it("writes the index, the button and the bar as one section", () => {
+    const ctx = leafCtx();
+    const want = defaultSectionIds(ctx);
+    const text = journalSectionModel(ctx).apply("", want)!;
+    expect(text).toContain("pages-table");
+    expect(text).toContain("button:notes:new-page");
+  });
+
+  it("takes the table back out when the row is unticked", () => {
+    // `applySections` removes a section by knowing it exists and finding it
+    // absent from `want`. This was the half that forced 5.20's union model —
+    // a catalogue narrowed to the tick list walked past the table and reported
+    // nothing to change. One catalogue now, and the removal is expressible in
+    // it because `pages` is in it either way.
+    const ctx = leafCtx();
+    const withTable = journalSectionModel(ctx).apply("", defaultSectionIds(ctx))!;
+    expect(withTable).toContain("pages-table");
+
+    const without = defaultSectionIds(ctx).filter((id) => id !== "pages");
+    const next = journalSectionModel(ctx).apply(withTable, without);
+    expect(next).not.toBeNull();
+    expect(next).not.toContain("pages-table");
+  });
+});
+
+describe("the wizard's Sections checklist, which draws an ordinary row", () => {
+  // The private member the claim is about: the row list a target draws.
   class Probe extends JournalEditModal {
     rows(target: TemplateTarget): string[] {
       return (
         this["displayOrder"](target) as { id: string }[]
       ).map((s) => s.id);
-    }
-    kindOf(target: TemplateTarget): JournalKindConfig | null {
-      return this["draftKindOf"](target) as JournalKindConfig | null;
-    }
-    offersHere(target: TemplateTarget): boolean {
-      return this["pagesRowOn"](target) as boolean;
     }
   }
 
@@ -197,8 +164,7 @@ describe("the wizard's Sections checklist, which took the question over", () => 
   };
 
   // BOTH LISTS NORMALISED, exactly as `renderSections` builds them — the rail
-  // must name the files that will actually be written, and `draftKindOf` pairs
-  // against the same normalisation.
+  // must name the files that will actually be written.
   const targetsOf = (draft: JournalConfig): TemplateTarget[] =>
     templateTargets(
       buildJournalType({
@@ -207,57 +173,50 @@ describe("the wizard's Sections checklist, which took the question over", () => 
       })
     );
 
-  it("offers the row on an unpaged kind, at its catalogue rank", () => {
-    const draft = CONFIG(false);
+  it("draws it once, from the catalogue, at its catalogue rank", () => {
+    const draft = CONFIG();
     const leaf = targetsOf(draft).find((t) => t.ctx.noteKind === "leaf")!;
     const rows = wizard(draft).rows(leaf);
 
-    // Offered, even though `sectionsFor` refuses it — that is the whole seam.
-    expect(rows).toContain("pages");
-    expect(sectionsFor(leaf.ctx).map((s) => s.id)).not.toContain("pages");
-    // And placed where it would go if ticked, which is what `displayOrder`
-    // promises every unticked row: after the tracker card, before the writing.
+    // ONCE. It was drawn by `withPagesRow` while the catalogue refused it and by
+    // `sectionsFor` once the config agreed, and the two had to be kept from
+    // overlapping; there is one producer now, so there is nothing to overlap.
+    expect(rows.filter((id) => id === "pages")).toHaveLength(1);
+    expect(sectionsFor(leaf.ctx).map((s) => s.id)).toContain("pages");
+    // After the tracker card, before the writing — where `displayOrder` promises
+    // every row will be.
     expect(rows.indexOf("pages")).toBeGreaterThan(rows.indexOf("trackers"));
     expect(rows.indexOf("pages")).toBeLessThan(rows.indexOf("headings"));
   });
 
-  it("draws it once, not twice, once the kind is paged", () => {
-    const draft = CONFIG(true);
-    const leaf = targetsOf(draft).find((t) => t.ctx.noteKind === "leaf")!;
-    const rows = wizard(draft).rows(leaf);
-    expect(rows.filter((id) => id === "pages")).toHaveLength(1);
-  });
-
-  it("keeps it off every target that is not a kind's own default", () => {
-    const draft = CONFIG(true);
+  it("draws it on the leaf targets and nowhere else", () => {
+    const draft = CONFIG();
     const p = wizard(draft);
     for (const t of targetsOf(draft)) {
-      const own = t.ctx.noteKind === "leaf";
-      expect(p.offersHere(t)).toBe(own);
-      if (!own) expect(p.rows(t)).not.toContain("pages");
+      const leaf = t.ctx.noteKind === "leaf";
+      expect(p.rows(t).includes("pages"), t.key).toBe(leaf);
     }
   });
 
-  it("finds the draft row even while another kind's label is still blank", () => {
-    // `normaliseKinds` DROPS an unlabelled row, so the built type's kinds and
-    // `draft.kinds` are the same length only while the form is complete — and
-    // this is read from a checkbox handler, which is exactly when it might not
-    // be. Indexing straight into `draft.kinds` writes `pages` onto the wrong
-    // kind here.
-    const draft = CONFIG(false);
-    draft.kinds = [
-      { id: "", emoji: "📝", label: "" },
-      ...draft.kinds,
-      { id: "practice", emoji: "✏️", label: "Practice" },
-    ];
-    const p = wizard(draft);
-    for (const t of targetsOf(draft).filter((x) => x.ctx.noteKind === "leaf")) {
-      expect(p.kindOf(t)?.id).toBe(t.ctx.kind?.id);
-    }
+  it("draws it on a kind's saved layout too, where 5.20 could not", () => {
+    // A LAYOUT IS A TEMPLATE OF THE SAME KIND, and the tick on it used to be
+    // refused for a real reason: *"a per-variant control over a per-kind fact —
+    // ticking it on one layout would silently change every other, including the
+    // default nobody was looking at."* The tick changes nothing but the file it
+    // is on now, so a reader may keep the Pages index on their plain Lesson and
+    // leave it off the compact one.
+    const draft: JournalConfig = {
+      ...CONFIG(),
+      variants: [{ id: "compact", label: "Compact", kinds: ["lesson"] }],
+    };
+    const variant = targetsOf(draft).find(
+      (t) => t.ctx.variantId === "compact"
+    )!;
+    expect(wizard(draft).rows(variant)).toContain("pages");
   });
 });
 
-describe("the Structure checkbox, which is gone", () => {
+describe("the seam that is gone, and stays gone", () => {
   const editors = readSrc("settings-editors");
 
   it("no longer draws a Pages field on a kind row", () => {
@@ -268,23 +227,46 @@ describe("the Structure checkbox, which is gone", () => {
     expect(editors).toContain("A `Pages` CHECKBOX SAT HERE AND IS GONE (5.20)");
   });
 
-  it("writes the tick back from the section list instead", () => {
-    expect(editors).toContain("draftKind.pages = box.checked || undefined");
-    expect(editors).toContain("private async setKindPaged(");
-    // Through the same confirmation every other kind change goes through —
-    // unsetting it is a change `diffKinds` already has the sentence for.
-    expect(editors).toContain("kindChangeNeedsConfirming(changes)");
+  it("writes no config from a section tick", () => {
+    // The members that made a checkbox a settings change, BY CALL SITE rather
+    // than by name — each of them is named in an obituary three lines from
+    // where it used to run, and a sweep for the bare word would be reading the
+    // gravestone.
+    expect(editors).not.toContain("setKindPaged");
+    expect(editors).not.toContain("this.draftKindOf(");
+    expect(editors).not.toContain("this.pagesRowOn(");
+    expect(editors).not.toContain("withPagesRow(");
+    expect(editors).not.toContain("draftKind.pages");
+    // And the obituary itself, which is the half a grep for the name finds.
+    expect(editors).toContain("A `withPagesRow` STOOD HERE UNTIL 1.0.23");
   });
 
-  it("offers the row on a kind's default template only", () => {
-    // A saved layout is one arrangement of a kind among several; a per-variant
-    // control over a per-kind fact would change every other layout of that kind
-    // from a window nobody had the others open in.
-    expect(editors).toContain(
-      '(target.ctx.variantId ?? "default") === "default"'
+  it("leaves the section editor with one model and one save", () => {
+    const editor = readSrc("section-editor");
+    expect(editor).not.toContain("structural?:");
+    expect(editor).not.toContain("this.spec.structural");
+    expect(editor).not.toContain("private structuralModel");
+    expect(editor).toContain("A `StructuralSink` stood here");
+    // The window writes the file and nothing else.
+    expect(editor).toContain("Nothing writes config from this window");
+    // And the template editor asks for neither.
+    const template = readSrc("template-editor");
+    expect(template).not.toContain("onSetPaged");
+    expect(template).not.toContain("modelWith(");
+    expect(template).toContain(
+      "A `modelWith` AND A `structuralHere` STOOD HERE UNTIL 1.0.23"
     );
-    expect(readSrc("template-editor")).toContain(
-      '(ctx.variantId ?? "default") === "default"'
-    );
+  });
+
+  it("keeps no `pages` field on a stored kind", () => {
+    // `normaliseKinds` rebuilds every row from the fields the editor knows
+    // about, so a stored `pages: true` is dropped on the next save rather than
+    // migrated — the treatment `trackers` got in 3.18 §7, for the same reason:
+    // nothing reads it.
+    const row = normaliseKinds(
+      [{ id: "lesson", emoji: "📘", label: "Lesson", pages: true } as never],
+      { preserveIds: true }
+    )[0];
+    expect(row).not.toHaveProperty("pages");
   });
 });

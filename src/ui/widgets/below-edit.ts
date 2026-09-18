@@ -103,6 +103,20 @@ import {
 } from "../../journals/journal";
 import type { JournalKind, JournalType } from "../../journals/journal";
 import { kindPlural } from "../../journals/journal-sections";
+import { promptRemoveKind } from "../../journals/kind-create";
+
+// One `kind-table:` on the card: the element it drew, the note type it drew it
+// for, and the head of the group it sits under.
+//
+// RECORDED BY THE DISPATCHER, because that is the only place all three are in
+// hand — the file's own rule for `named`, stated one screen up from where this
+// is filled in. `head` is null where the fence composes no `header:2:` line
+// over the table, which is a card with no title to hang a removal off.
+export interface KindHost {
+  host: HTMLElement;
+  kindId: string;
+  head: HTMLElement | null;
+}
 
 /** One journal, and the folders of it that may hold a note. */
 export interface JournalFolders {
@@ -142,7 +156,7 @@ export type MoveTarget =
 export function buildBelowFoot(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
-  hosts: readonly HTMLElement[]
+  hosts: readonly KindHost[]
 ): HTMLElement | null {
   const add = buildAddKindRow(plugin, ctx);
   if (!add) return null;
@@ -167,7 +181,11 @@ export function buildBelowFoot(
   // BOTH STRINGS, THE SAME SENTENCE, which is `addHeadButton`'s rule: the label
   // is the gesture and the tooltip is the consequence, and a reader on a screen
   // reader gets only one of the two.
-  const hint = "Select notes to move or delete";
+  // AND IT NAMES THE SECOND THING THE MODE DOES, AS OF 1.0.24. The removal on
+  // an empty group's head appears only inside this mode, so a door that still
+  // described only the ticks would leave the one act a reader cannot discover
+  // by pressing rows undescribed.
+  const hint = "Select notes to move or delete, or remove an empty note type";
   edit.setAttr("aria-label", hint);
   edit.setAttr("title", hint);
   edit.setAttr("aria-pressed", "false");
@@ -193,6 +211,30 @@ export function buildBelowFoot(
 export function selectionLabel(n: number): string {
   if (n === 0) return "Nothing selected";
   return `${n} note${n === 1 ? "" : "s"} selected`;
+}
+
+// Which of a card's groups may be offered a removal, by id.
+//
+// EMPTY ON THIS CARD IS THE QUESTION THIS ONE ANSWERS, and it is the only one
+// asked on a render. A group with rows in it is a group whose note type plainly
+// has notes, and drawing a dead control over every one of them would be four
+// disabled buttons on a Study topic for a mode about selecting notes. Whether
+// the type is empty in the whole JOURNAL is a walk of the vault — asked once, at
+// the press, by `promptRemoveKind`, which is also where the refusal is worded.
+//
+// A GROUP WITH NO HEAD IS NOT OFFERED, because the control hangs on the title
+// and a card composed without `header:2:` lines has none. A group whose id is
+// empty is not offered either: a bare `kind-table:` names no type, so there is
+// nothing to remove and nothing to call it.
+//
+// PURE, AND OVER THE COUNT RATHER THAN THE DOM, so the rule is testable without
+// a browser — the file's own standard for `moveTargets` and `prunedSelection`.
+export function removableKinds(
+  groups: readonly { kindId: string; rows: number; titled: boolean }[]
+): string[] {
+  return groups
+    .filter((g) => g.titled && g.kindId !== "" && g.rows === 0)
+    .map((g) => g.kindId);
 }
 
 // The destinations a set of notes can be sent to, in the order they are offered.
@@ -364,6 +406,11 @@ export function moveReport(
   return `Moved ${done} of ${done + skipped.length} to ${where} — these did not: ${skipped.join(", ")}`;
 }
 
+// The removal's own class, named once. It is read by `syncRemovals` to find a
+// button it has already drawn, which is what makes that a sync rather than a
+// one-shot, and a second spelling of it would draw a second button per repaint.
+const REMOVE_CLS = "ca-journal-kind-remove";
+
 // A CLASS, NOT THE `hidden` PROPERTY, AND THIS SHIPPED WRONG IN 1.0.14. Both
 // halves of the foot set `el.hidden` and neither of them disappeared: the reader
 // saw the dashed `+ Add note type` slot sitting beside a live *Delete…*, which is
@@ -406,7 +453,7 @@ export class BelowEdit extends MarkdownRenderChild {
     private foot: HTMLElement,
     private addRow: HTMLElement,
     private toggle: HTMLElement,
-    private hosts: readonly HTMLElement[],
+    private hosts: readonly KindHost[],
     private deps: BelowEditDeps
   ) {
     // ANCHORED ON THE FOOT, so Obsidian's own unload drives the teardown — the
@@ -430,7 +477,7 @@ export class BelowEdit extends MarkdownRenderChild {
     // so a single listener on the block would never fire — this is the mistake
     // the next person makes, which is why it is written down. `liftEmptyHead` is
     // wired the same way one screen up in the dispatcher, for the same reason.
-    for (const host of this.hosts) {
+    for (const { host } of this.hosts) {
       // `addEventListener` PLUS `register`, NOT `registerDomEvent`. The latter is
       // typed against `HTMLElementEventMap` and `ca-live-redraw` is not in it —
       // the dispatcher wires `liftEmptyHead` the same plain way one screen up. The
@@ -502,7 +549,7 @@ export class BelowEdit extends MarkdownRenderChild {
   // Put the ticks in, take the stale ones out, and re-read the count.
   private apply(): void {
     this.chosen = prunedSelection(this.chosen, this.pathsOnScreen());
-    for (const host of this.hosts) {
+    for (const { host } of this.hosts) {
       for (const list of Array.from(host.querySelectorAll(".ca-list"))) {
         // A STATE CLASS, NOT A BUILD-TIME FLAG, and that is the one place this
         // differs from `hasActions`. The `⋯` is on every row on every paint, so
@@ -517,6 +564,7 @@ export class BelowEdit extends MarkdownRenderChild {
         this.tickIn(row);
       }
     }
+    this.syncRemovals();
     this.refresh();
   }
 
@@ -567,7 +615,7 @@ export class BelowEdit extends MarkdownRenderChild {
   private pick(path: string, on: boolean): void {
     if (on) this.chosen.add(path);
     else this.chosen.delete(path);
-    for (const host of this.hosts) {
+    for (const { host } of this.hosts) {
       const row = host.querySelector<HTMLElement>(
         `[${ROW_NOTE_ATTR}="${CSS.escape(path)}"]`
       );
@@ -580,7 +628,8 @@ export class BelowEdit extends MarkdownRenderChild {
 
   // Take every mark back off.
   private release(): void {
-    for (const host of this.hosts) {
+    this.clearRemovals();
+    for (const { host } of this.hosts) {
       for (const list of Array.from(host.querySelectorAll(".ca-list"))) {
         list.classList.remove("is-editing");
       }
@@ -596,6 +645,123 @@ export class BelowEdit extends MarkdownRenderChild {
     this.count = null;
     this.moveBtn = null;
     this.deleteBtn = null;
+  }
+
+  // ── the removal on an empty group's head (1.0.24) ─────────────────────
+  //
+  // THE READER'S ASK, in their words: *"allow kinds (the titled sections for
+  // pages) to be removed in edit-mode of 'what's below', but only if it has no
+  // entries."* A note type could be ADDED from this card since 1.1 and only
+  // taken off it four steps away in Settings, and the group it leaves behind —
+  // a head, a create button and an empty table — is the most visible thing on
+  // the page.
+  //
+  // IN THE MODE, NOT ON THE CARD. The head carries no control at rest, and that
+  // is the same call the tick made: a permanent `×` beside every empty group
+  // would put a journal-altering act one slip from a reader browsing their
+  // notes. `Edit` is the door, and it already says what it opens — the tooltip
+  // grew the second clause with this.
+  //
+  // ON THE HEAD RATHER THAN IN THE PICKING BAR. The bar's two buttons act on
+  // what is TICKED, and a note type is not a note — a third button beside them
+  // would read as a third thing to do to a selection. `attachKindRowMenu` made
+  // this call one scope down: the object being configured and the control that
+  // configures it are the same object, and the group's title is what a reader
+  // points at when they mean "this type".
+
+  // Put a removal on every group that may have one, and take back the ones that
+  // may not.
+  //
+  // A SYNC RATHER THAN A ONE-SHOT, for `liftEmptyHead`'s reason on the same
+  // heads: these tables are live-scoped, so the first note filed under a type
+  // arrives without a repaint of the block, and a button written once would
+  // stay offering to remove a type that now has a note in it. It is re-run from
+  // `apply`, which every redraw calls.
+  private syncRemovals(): void {
+    const offered = new Set(
+      removableKinds(
+        this.hosts.map((h) => ({
+          kindId: h.kindId,
+          rows: h.host.querySelectorAll(`[${ROW_NOTE_ATTR}]`).length,
+          titled: h.head !== null,
+        }))
+      )
+    );
+    for (const { kindId, head } of this.hosts) {
+      if (!head) continue;
+      const existing = head.querySelector<HTMLElement>(`.${REMOVE_CLS}`);
+      if (!offered.has(kindId)) {
+        existing?.remove();
+        continue;
+      }
+      if (existing) continue;
+      head.appendChild(this.buildRemove(kindId));
+    }
+  }
+
+  private clearRemovals(): void {
+    for (const { head } of this.hosts) {
+      head?.querySelector(`.${REMOVE_CLS}`)?.remove();
+    }
+  }
+
+  // `buildAddCategoryButton`'s SHAPE EXACTLY, and that is the whole of the
+  // styling. That control is the other hosted button in a `header:` bar on this
+  // surface — a `span.ca-journal-widget.ca-journal-button` holding a
+  // `.ca-journal-btn.ca-journal-btn-subtle` with an icon and a label — so this
+  // needs no rule of its own, sits at the same height as the create button
+  // beside it, and cannot drift into being a third size of control. The one
+  // added class is the handle `syncRemovals` finds it by.
+  private buildRemove(kindId: string): HTMLElement {
+    const label = this.kindLabel(kindId);
+    const wrap = createSpan({
+      cls: `ca-journal-widget ca-journal-button ${REMOVE_CLS}`,
+    });
+    const btn = wrap.createEl("button", {
+      cls: "ca-journal-btn ca-journal-btn-subtle",
+      attr: { type: "button" },
+    });
+    // `x` — `actions-menu.ts` fixes the glyph vocabulary and `x` is its word
+    // for a removal, which is what the tracker cell's own remove already wears.
+    setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), "x");
+    btn.createSpan({ cls: "ca-journal-btn-label", text: "Remove" });
+    // BOTH STRINGS, THE SAME SENTENCE — the foot's own rule, and here the
+    // tooltip is the half that names the type, because the label cannot: four
+    // groups would otherwise carry four buttons reading "Remove".
+    const hint = `Remove the ${label} note type from ${this.deps.type.name}`;
+    btn.setAttr("aria-label", hint);
+    btn.setAttr("title", hint);
+    this.registerDomEvent(btn, "click", (evt) => {
+      evt.preventDefault();
+      // The head folds the group on click. It must not, because a reader asked
+      // to remove the type — the separation every hosted control in a section
+      // makes.
+      evt.stopPropagation();
+      void this.removeKind(kindId);
+    });
+    return wrap;
+  }
+
+  // What to call the type in the tooltip and in the notice.
+  //
+  // THE JOURNAL'S OWN LABEL, falling back to the id. A `kind-table:` naming a
+  // type the journal no longer has still draws a group — that is the state
+  // 1.0.23's `prune` exists to mend — and it has no label to read, so the id is
+  // what the reader is shown rather than the word "undefined".
+  private kindLabel(kindId: string): string {
+    return (
+      this.deps.type.kinds.find((k) => k.id === kindId)?.label ?? kindId
+    );
+  }
+
+  private async removeKind(kindId: string): Promise<void> {
+    const { plugin, type } = this.deps;
+    // THE MODE CLOSES FIRST. Removing a type repaints every open note, which
+    // rebuilds this card from its fence — so ticks, the bar and these buttons
+    // are all about to be replaced, and a mode left on would be a set of marks
+    // on elements nothing is listening to. `onunload`'s own argument.
+    const ok = await promptRemoveKind(plugin.app, plugin, type.id, kindId);
+    if (ok) this.setPicking(false);
   }
 
   // ── the bar ───────────────────────────────────────────────────────────
@@ -665,7 +831,7 @@ export class BelowEdit extends MarkdownRenderChild {
 
   private pathsOnScreen(): string[] {
     const out: string[] = [];
-    for (const host of this.hosts) {
+    for (const { host } of this.hosts) {
       for (const row of Array.from(
         host.querySelectorAll<HTMLElement>(`[${ROW_NOTE_ATTR}]`)
       )) {

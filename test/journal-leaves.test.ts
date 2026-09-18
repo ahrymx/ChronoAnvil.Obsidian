@@ -25,7 +25,7 @@ import { describe, expect, it } from "vitest";
 import { STUDY_JOURNAL, journalNounOf } from "../src/journals/journal";
 import { sectionContext } from "../src/journals/journal-sections";
 import { nextPageOrder, pageOrderOf } from "../src/journals/page-default";
-import { readCode, readSrc } from "./sources";
+import { readCode, readSrc, srcFiles } from "./sources";
 
 const lesson = STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!;
 const practice = STUDY_JOURNAL.kinds.find((k) => k.id === "practice")!;
@@ -104,7 +104,12 @@ describe("what a journal calls a note carrying a given type", () => {
     for (const value of ["lesson", "practice", "subject", "topic", "page"]) {
       expect(journalNounOf(STUDY_JOURNAL, value), value).not.toBeNull();
     }
-    expect(practice.pages).toBeUndefined();
+    // AND `practice` ANSWERS `page` TOO. Its pages carry the same `type:` as a
+    // Lesson's, because the page kind is one record shared by every kind of the
+    // journal — see `buildJournalType`, which builds one page record and gives
+    // every kind a copy of it.
+    expect(practice.pages.id).toBe("page");
+    expect(practice.pages).toEqual(lesson.pages);
   });
 
   it("normalises the property the way every other reader does", () => {
@@ -157,12 +162,71 @@ describe("where a new page sits in its note", () => {
   });
 });
 
+// ── ONE DOOR ONTO PROMOTION, AND PAGES DO NOT NEST (1.0.23) ──────────────
+
+describe("what can be turned into a dashboard, and by what", () => {
+  // THE READER'S INSTRUCTION, IN THEIR WORDS: take it out completely, *"even
+  // for nested pages (pages below kind dashboard)"*. So this is two claims —
+  // there is one caller of `promoteToDashboard`, and a page is not something it
+  // can be asked about.
+
+  it("has exactly one caller, which is `newPage`", () => {
+    // `convertToDashboard` was the second, and a second door onto an operation
+    // with no inverse is what 1.0.23 closed. Counted rather than named, because
+    // a third would arrive by being written, not by being renamed.
+    const calls = srcFiles().flatMap(({ path, code }) =>
+      code
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("//"))
+        .filter((l) => /\bpromoteToDashboard\(/.test(l))
+        .map((l) => `${path}: ${l.trim()}`)
+    );
+    expect(calls).toHaveLength(2);
+    // Its declaration, and the one call — both in journal.ts, and the call is
+    // inside `newPage`.
+    expect(calls.every((c) => c.startsWith("src/journals/journal.ts"))).toBe(
+      true
+    );
+    expect(calls.filter((c) => c.includes("await this.promoteToDashboard("))).toHaveLength(1);
+  });
+
+  it("offers no command and no menu row of its own", () => {
+    const everywhere = srcFiles()
+      .map(({ code }) =>
+        code
+          .split("\n")
+          .filter((l) => !l.trim().startsWith("//"))
+          .join("\n")
+      )
+      .join("\n");
+    expect(everywhere).not.toContain("convertToDashboard(");
+    expect(everywhere).not.toContain("convertHere(");
+    expect(everywhere).not.toContain("note-convert-to-dashboard");
+  });
+
+  it("refuses a page, which is what keeps pages from nesting", () => {
+    // `pageKindOf` resolves a KIND from `type:`, and a page's `type:` is
+    // deliberately not a kind id — so the one caller cannot be reached from a
+    // page, and the refusal says which note to open instead rather than naming
+    // a capability the reader was never offered.
+    const t = readCode("journal.ts");
+    expect(t).toContain('const isPage = type.kinds.some((k) => k.pages.id === value);');
+    expect(t).toContain("A page holds no pages of its own.");
+    expect(t).toContain("open \"${owner}\" to add another.");
+  });
+});
+
 describe("creating a page asks before it moves anything", () => {
   const src = () => readCode("journal.ts");
   const body = (): string => {
     const at = src().indexOf("async newPage(");
     expect(at).toBeGreaterThan(0);
-    return src().slice(at, src().indexOf("async convertToDashboard("));
+    // TO THE NEXT DECLARATION, which was `async convertToDashboard(` until
+    // 1.0.23 deleted it. A boundary that no longer matches returns -1 and slices
+    // the whole rest of the file, which is a test that stops testing an ordering.
+    const end = src().indexOf("private async pickContainerFolder(");
+    expect(end).toBeGreaterThan(at);
+    return src().slice(at, end);
   };
 
   it("opens the dialogue before promoting the note", () => {
@@ -229,12 +293,16 @@ describe("a note's type is read, never compared raw", () => {
 });
 
 describe("the leaf keeps the surfaces this pass did not touch", () => {
-  it("still offers Pages on a kind that can hold them, and only there", () => {
+  it("still offers Pages on a leaf, which is now every kind", () => {
     const src = readSrc("journal-sections");
     expect(src).toContain('id: "pages"');
+    // THE GATE IS UNCHANGED AND ITS ANSWER IS NOT. `ctx.hasPages` used to read
+    // the kind's config; it reads the SURFACE now — a leaf, not an index and
+    // not a page — so Practice answers yes where it used to answer no, and the
+    // *"only a Lesson can hold pages"* refusal has nothing left to say.
     expect(src).toContain("applies: (ctx) => ctx.hasPages");
     expect(sectionContext(STUDY_JOURNAL, { kind: lesson }).hasPages).toBe(true);
-    expect(sectionContext(STUDY_JOURNAL, { kind: practice }).hasPages).toBe(false);
+    expect(sectionContext(STUDY_JOURNAL, { kind: practice }).hasPages).toBe(true);
     // A page holds no pages, which is what stops a page offering to contain
     // itself — see `surfaceOf`'s `{ page }` branch.
     expect(sectionContext(STUDY_JOURNAL, { page: lesson }).hasPages).toBe(false);

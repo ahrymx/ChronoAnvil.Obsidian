@@ -130,12 +130,17 @@ describe("what crosses", () => {
 
 describe("what does not, and is said so", () => {
   it("drops a section the target cannot compose, and names it", () => {
-    // `pages` applies only where the kind is paged. Cooking's are not.
+    // `pages` USED TO BE THE PER-KIND EXAMPLE — Cooking's kinds had not been
+    // ticked as paged, so a Study Lesson's layout lost it on arrival. Every
+    // kind holds pages as of 1.0.23, so the section is a fact about the
+    // SURFACE instead, and the loss it still demonstrates is the one that
+    // remains: a leaf's layout dropped onto the journal's front page, which
+    // holds notes rather than pages.
     const type = cooking();
     const { layout, dropped } = resolveLayoutFor(
       { sections: ["banner", "pages"] },
       type,
-      ctxFor(type)
+      indexCtxFor(type)
     );
     expect(layout.sections).toEqual(["banner"]);
     expect(dropped).toHaveLength(1);
@@ -216,7 +221,7 @@ describe("what does not, and is said so", () => {
     const { dropped } = resolveLayoutFor(
       { sections: ["pages"], options: { pages: { label: "Pages" } } },
       type,
-      ctxFor(type)
+      indexCtxFor(type)
     );
     expect(dropped).toHaveLength(1);
     expect(dropped[0].sectionId).toBe("pages");

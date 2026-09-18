@@ -255,9 +255,12 @@ function kindIsDated(
   // refused for — which is why it is listed rather than omitted. Omitting it
   // would refuse with "no note type called page", naming a typo the reader did
   // not make instead of the reason.
-  const pages = registeredJournalTypes(plugin).some((t) =>
-    t.kinds.some((k) => k.pages)
-  )
+  //
+  // OFFERED WHEREVER A JOURNAL IS, SINCE 1.0.23. This was conditional on some
+  // registered journal having a paged kind; every kind of every journal holds
+  // pages now, so the condition was "is there a journal at all", which the empty
+  // `kinds` list beside it already answers.
+  const pages = registeredJournalTypes(plugin).length
     ? [{ id: "page", label: PAGE, dated: false }]
     : [];
 

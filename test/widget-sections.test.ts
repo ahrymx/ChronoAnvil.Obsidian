@@ -91,12 +91,12 @@ describe("what the generator makes", () => {
     // this call supplies nothing — which is every flat note in the tree. So the
     // count is the registry minus the widgets that declare a need, and the
     // second assertion is what says the subtraction is the FIELD rather than an
-    // off-by-two: hand the same empty catalogue a period and all thirty-two
-    // come back.
+    // off-by-two: hand the same empty catalogue every need there is and all
+    // thirty-two come back.
     const needy = Object.values(WIDGETS).filter((w) => w.needs).length;
     expect(needy).toBeGreaterThan(0);
     expect(tail).toHaveLength(Object.keys(WIDGETS).length - needy);
-    expect(pageWidgetSections([], "", ["period"])).toHaveLength(
+    expect(pageWidgetSections([], "", ["period", "pages"])).toHaveLength(
       Object.keys(WIDGETS).length
     );
     expect(tail.every((s) => isPageWidgetId(s.id))).toBe(true);
@@ -912,44 +912,45 @@ describe("one door, six surfaces (5.26)", () => {
       .map((s) => s.id)
       .filter(isPageWidgetId).length;
 
-  // WHAT EVERY ROW BELOW STARTS FROM: the registry, less the two widgets that
-  // need a period property, which only a dashboard supplies. `needs` is the
-  // one subtraction that is about the WIDGET rather than about the catalogue.
+  // WHAT EVERY ROW BELOW STARTS FROM: the registry, less the three widgets that
+  // need something of their host — a period property, which only a dashboard
+  // supplies, and pages, which only a journal leaf does. `needs` is the one
+  // subtraction that is about the WIDGET rather than about the catalogue.
   const FREE = Object.keys(WIDGETS).length -
     Object.values(WIDGETS).filter((w) => w.needs).length;
 
   it("offers the registry, less what each catalogue already claims", () => {
     expect(Object.keys(WIDGETS).length).toBe(32);
-    expect(FREE).toBe(30);
+    expect(FREE).toBe(29);
 
     const rows: [string, SectionModel, number][] = [
       // The homepage claims nine keywords of its own — the most of any
       // catalogue, and the reason its list looked short beside the others.
-      ["home", homeSectionModel(DEFAULT_PATHS.diary), 21],
-      ["search", searchSectionModel(), 27],
+      ["home", homeSectionModel(DEFAULT_PATHS.diary), 20],
+      ["search", searchSectionModel(), 26],
       // Both logbook surfaces claim exactly `logbook`.
       [
         "logbook",
         logbookSectionModel(DEFAULT_LOGBOOKS[0]),
-        29,
+        28,
       ],
-      ["logbooks", logbooksFolderSectionModel(DEFAULT_LOGBOOKS), 29],
+      ["logbooks", logbooksFolderSectionModel(DEFAULT_LOGBOOKS), 28],
       // A period dashboard SUPPLIES `period`, so the two needy widgets are
       // offered here — and are claimed by its own catalogue, which is why the
       // number is not simply higher.
-      ["weekly dashboard", diarySectionModel({ grain: "weekly" }), 24],
-      ["yearly dashboard", diarySectionModel({ grain: "yearly" }), 26],
+      ["weekly dashboard", diarySectionModel({ grain: "weekly" }), 23],
+      ["yearly dashboard", diarySectionModel({ grain: "yearly" }), 25],
       // A DIARY ENTRY CLAIMS NO PAGE-WIDGET KEYWORD AT ALL — its catalogue is
       // `note:`, `list:`, `tasks:` and `attach:` directives, none of which is a
       // widget — so it is offered every free one. It was offered none before
       // this release.
-      ["daily entry", entrySectionModel({ grain: "daily" }), 30],
+      ["daily entry", entrySectionModel({ grain: "daily" }), 29],
       // A journal INDEX claims the most of the three journal surfaces: its
       // dashboard sections are built from widgets a leaf note has no use for.
       [
         "journal index",
         journalSectionModel(sectionContext(STUDY_JOURNAL, { depth: 1 })),
-        23,
+        22,
       ],
       [
         "journal leaf",
@@ -968,13 +969,20 @@ describe("one door, six surfaces (5.26)", () => {
   });
 
   it("and no surface offers a widget that needs what it cannot supply", () => {
-    // The two are `entry-rollup`, which refuses outright, and `period-nav`,
-    // which WRITES `week-start` onto its host — so on a note with no period the
-    // second is worse than the first. A dashboard is the only surface that
-    // declares `supplies: ["period"]`, and its own catalogue claims both, so
-    // nothing anywhere lists them as free.
+    // `entry-rollup` refuses outright, and `period-nav` WRITES `week-start`
+    // onto its host — so on a note with no period the second is worse than the
+    // first. A dashboard is the only surface that declares
+    // `supplies: ["period"]`, and its own catalogue claims both, so nothing
+    // anywhere lists them as free.
+    //
+    // `pages-table` IS THE THIRD, AND 1.0.23 IS WHY. Free everywhere, it drew a
+    // table of the host's own siblings on a page and an empty one pointing at a
+    // "New Page" button that was not in reach anywhere else — and it could not
+    // be welded into a banner either, because the weld list names the SECTION
+    // `pages`. A journal leaf supplies `pages` and claims the keyword with that
+    // section; no other surface does either.
     const needy = Object.keys(WIDGETS).filter((k) => WIDGETS[k].needs);
-    expect(needy).toEqual(["entry-rollup", "period-nav"]);
+    expect(needy).toEqual(["entry-rollup", "period-nav", "pages-table"]);
     const models: SectionModel[] = [
       homeSectionModel(DEFAULT_PATHS.diary),
       searchSectionModel(),

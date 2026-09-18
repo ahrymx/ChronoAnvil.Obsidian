@@ -174,21 +174,32 @@ export type VaultLists = {
 // shapes: an exclusion there is a widget no reader can add anywhere, and a
 // need here is a widget most surfaces can offer and some cannot.
 //
-// ── AND WHY IT IS ONE VALUE RATHER THAN A VOCABULARY ────────────────────
+// ── AND WHY THE VOCABULARY IS TWO WORDS RATHER THAN THIRTY ──────────────
 //
-// Because two widgets want it and thirty do not, and every candidate for a
-// second value turned out to be soft on inspection. `week-summary` and its
-// three siblings read the host's period property and fall back to the current
-// one — which `home-sections.ts` argues "is the intent rather than a miss" on
-// the page about now. `stats-band` and `pages-table` scope to the host note's
-// own folder, which every note has. `level-index` refuses without a folder OR a
-// journal, and its argument supplies the second.
+// Because three widgets want one of them and twenty-nine want none, and most
+// candidates turn out to be soft on inspection. `week-summary` and its three
+// siblings read the host's period property and fall back to the current one —
+// which `home-sections.ts` argues "is the intent rather than a miss" on the page
+// about now. `stats-band` scopes to the host note's own folder, which every note
+// has. `level-index` refuses without a folder OR a journal, and its argument
+// supplies the second.
 //
-// So the honest membership is the widgets that already REFUSE, plus the one
-// that is worse than a refusal because it writes what it wanted to find. A
-// third value invented ahead of a third widget would be a vocabulary with one
-// producer, which is what `widget-registry.ts` warns against one table down.
-export type WidgetNeed = "period";
+// So the honest membership is the widgets that already REFUSE, plus the ones
+// that are worse than a refusal because they answer with something plausible and
+// unrelated. `period-nav` writes the property it wanted to find; `pages-table`
+// LISTS what it wanted to find, which on a page is that page's own siblings
+// drawn as if they were its children.
+//
+// `pages` WAS LISTED HERE AS ONE OF THE SOFT ONES — *"scopes to the host note's
+// own folder, which every note has"* — and that sentence was true of the FOLDER
+// and false of the answer. `buildPagesTable` reads the host kind's `pages.id` to
+// know which `type:` value is a page of it and its `pages.label` to name the
+// empty state, and where the host is not a note that holds pages it falls back
+// to the bare `page`/`Page` defaults and lists the neighbours. The reader who
+// found it had one on a note that cannot hold pages, drawing an index nothing
+// could add to and refusing the weld, because a widget instance is not the
+// catalogue's `pages` section and `WELDS_INTO_BANNER` names the section.
+export type WidgetNeed = "period" | "pages";
 
 // One widget, as a list of widgets needs it.
 export interface WidgetSpec {
@@ -851,6 +862,14 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     bar: "📄 Pages",
     blurb: "The pages beneath this folder, one row each.",
     category: "journals",
+    // IT ANSWERS WITH THE NEIGHBOURS, which is the second reason a widget is in
+    // this field at all — see `WidgetNeed`. Only a journal LEAF supplies this;
+    // an index holds notes rather than pages, a page holds neither, and a flat
+    // note has no kind to ask. On the one surface that does supply it, the
+    // catalogue's own 📄 Pages section has already claimed the keyword, so the
+    // net effect is that this row leaves the add list everywhere it could only
+    // ever have drawn somebody else's pages.
+    needs: "pages",
   },
   "review-queue": {
     label: "Review queue",

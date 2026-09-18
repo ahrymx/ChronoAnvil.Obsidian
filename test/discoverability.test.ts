@@ -52,7 +52,7 @@ describe("where the control appears", () => {
     );
     const banner = readSrc("vault-banner");
     expect(banner).toContain(
-      "const build = this.menuFor(file, surface, isIndex, view);"
+      "const build = this.menuFor(file, surface, view);"
     );
     expect(banner).toMatch(/if \(build\) \{\n\s+const cog = trail\.createDiv/);
   });
@@ -130,11 +130,26 @@ describe("what each surface offers", () => {
     expect(t.slice(branch, trackers)).toContain("return;");
   });
 
-  it("offers converting to a dashboard only where it can happen", () => {
-    // Three conditions, and each removes a menu item whose only outcome would
-    // be an error notice: not already a dashboard, not itself a page, and a kind
-    // that actually declares pages.
-    expect(header()).toContain('!isIndex && ctx.noteKind !== "page" && ctx.hasPages');
+  it("offers no converting to a dashboard, which is 1.0.23", () => {
+    // THE ROW THIS USED TO PIN had three conditions, each removing a menu item
+    // whose only outcome would be an error notice:
+    // `!isIndex && ctx.noteKind !== "page" && ctx.hasPages`. It is gone, and so
+    // is the promotion it was the only menu door onto — see `core/actions.ts`
+    // for the long form.
+    //
+    // ASSERTED AS AN ABSENCE ON PURPOSE. The row was cheap to restore by
+    // symmetry with the tracker rows above it, and the thing that makes it wrong
+    // is not visible from this file.
+    expect(header()).not.toContain('setTitle("Convert to a dashboard")');
+    expect(header()).not.toContain("convertHere");
+    expect(header()).toContain(
+      "A `Convert to a dashboard` ROW STOOD HERE UNTIL 1.0.23"
+    );
+    // AND `isIndex` CAME OFF THE BUILDER WITH IT — that row was its only reader,
+    // and both callers were deriving it.
+    expect(header()).toContain(
+      "export function journalBannerMenu(\n  plugin: ChronoAnvilPlugin,\n  notePath: string\n)"
+    );
   });
 });
 
@@ -437,6 +452,40 @@ describe("the other doors", () => {
     }
   });
 
+  it("offers `New page` only where a note holds pages", () => {
+    // ── THE DEFECT THIS CLOSES (1.0.23) ──────────────────────────────────
+    //
+    // The gate was `inJournal` — a prefix match on the root, which every note of
+    // the journal passes, index notes and pages included. So the palette offered
+    // `New page` on all of them and `newPage` refused per kind: *"Only a Lesson
+    // can hold pages."* — the reader's own report. Half the fix was making the
+    // refusal untrue (every kind holds pages), and this is the other half: a
+    // page and an index still hold none, and a command that cannot work should
+    // not be in the list.
+    //
+    // IT WAS A PAIR. `note-convert-to-dashboard` carried the same gate and is
+    // deleted — the promotion it did alone is what `newPage` does on the way to
+    // making the page.
+    //
+    // ASSERTED AS THE SOURCE, NOT AS A CALL, because the predicate needs a
+    // plugin with settings and an active file and the question here is which
+    // gate the action carries — `test/page-default.test.ts` owns the arithmetic
+    // itself.
+    const t = readSrc("actions");
+    expect(t).toContain("function canHoldPages(");
+    expect(t).toContain("return !!type && pathHoldsPages(type, path);");
+    expect(ACTIONS.find((a) => a.id === "note-new-page")?.when?.name).toBe(
+      "canHoldPages"
+    );
+    expect(ACTIONS.find((a) => a.id === "note-convert-to-dashboard")).toBeUndefined();
+    // AND `inJournal` IS GONE, with its obituary left where it stood — it was
+    // the only caller of the bare prefix match, and a second gate that answers
+    // "somewhere in this journal" is how such a pair drifts apart again.
+    expect(t).not.toContain("function inJournal(");
+    expect(t).toContain("An `inJournal` LIVED HERE AND IS GONE (1.0.23)");
+    expect(t).toContain("A `note-convert-to-dashboard` STOOD HERE UNTIL 1.0.23");
+  });
+
   it("labels the ribbon's groups and warns on the destructive one", () => {
     // §8.2. `setIsLabel` and `setSection` are both declared in obsidian.d.ts;
     // `setSubmenu` is not, and is deliberately unused — a `setSubmenu` that
@@ -529,10 +578,11 @@ describe("the diary entry offers its own commands", () => {
 
   it("does not pretend the two menus are one", () => {
     // §2.3 of the plan assumed `bannerMenu` generalised to two callers. Its two
-    // callers share two items out of six — a journal note offers section
-    // editing, a template preview and "Convert to a dashboard", none of which a
-    // diary entry can do. A builder taking a flag that selects between two
-    // disjoint lists is the shape §4.3 declined for the chart models.
+    // callers share two items out of six — a journal note offers section editing
+    // and a template preview, neither of which a diary entry can do. (It offered
+    // "Convert to a dashboard" too, until 1.0.23; the argument is unchanged with
+    // one fewer item on the list.) A builder taking a flag that selects between
+    // two disjoint lists is the shape §4.3 declined for the chart models.
     // Code only. Both files explain what they deliberately do NOT share, and
     // an explanation naming the other side's API is the record of the decision
     // rather than a use of it — the distinction vocabulary.test.ts draws.
@@ -542,7 +592,7 @@ describe("the diary entry offers its own commands", () => {
         .filter((l) => !l.trim().startsWith("//"))
         .join("\n");
     expect(codeOf("entryheader")).not.toContain("contextFor(");
-    expect(codeOf("entryheader")).not.toContain("Convert to a dashboard");
+    expect(codeOf("entryheader")).not.toContain("Preview template changes");
     expect(codeOf("study-header")).not.toContain("openThisMonth");
   });
 });

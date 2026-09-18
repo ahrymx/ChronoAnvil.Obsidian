@@ -69,7 +69,6 @@ export function attachKindRowMenu(
   actions: HTMLElement,
   file: TFile
 ): void {
-  const { kind } = table;
   // THE ROW IS IDENTIFIED BY A PATH, NEVER BY THE `TFile` (4.50.2).
   //
   // Obsidian MUTATES a `TFile` in place on rename, so a menu holding the object
@@ -98,7 +97,7 @@ export function attachKindRowMenu(
       );
       return;
     }
-    if (kind.pages) addPageLayoutRows(menu, table, live, path);
+    addPageLayoutRows(menu, table, live, path);
     addDeleteRows(menu, table, path);
   });
   // NAMED AFTER THE ROW IT ACTS ON, which is 4.48's rule for the same reason:
@@ -115,7 +114,7 @@ function addPageLayoutRows(
   file: TFile,
   path: string
 ): void {
-  const label = kind.pages?.label ?? "Page";
+  const label = kind.pages.label;
   const cfg = plugin.journals.configOf(type);
   const fm = frontmatterOf(plugin.app, file);
   // TICKED ON WHAT WOULD BE USED, NOT ON WHAT IS STORED. A note naming a layout
@@ -217,7 +216,7 @@ async function remove(table: KindRowContext, path: string): Promise<void> {
 
   const siblings = childFiles(file.parent).map((f) => f.path);
   const pages = pagePathsOf(file.path, siblings);
-  const pageLabel = kind.pages?.label ?? "Page";
+  const pageLabel = kind.pages.label;
   const many = plural(pageLabel).toLowerCase();
   const promoted = isPromotedPath(file.path);
 

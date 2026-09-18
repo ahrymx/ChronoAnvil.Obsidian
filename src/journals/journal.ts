@@ -166,7 +166,7 @@ export interface JournalTemplateVariant {
   options?: Record<string, SectionOverrides>;
 }
 
-// A kind's optional sub-notes: the pages a long note can be split across.
+// A kind's sub-notes: the pages a long note can be split across.
 //
 // A note of a kind that has this can be *promoted* — `Algebra/Quadratics.md`
 // becomes `Algebra/Quadratics/Quadratics.md` with pages beside it — turning it
@@ -180,6 +180,36 @@ export interface JournalTemplateVariant {
 // it is the wrong answer: levels are fixed for the whole type, so every lesson
 // would have to be a folder, and most lessons are one file and should stay one
 // file.
+//
+// ── EVERY KIND HAS THIS, AS OF 1.0.23 ──────────────────────────────────
+//
+// It was opt-in per kind — `pages?: boolean` on the config, a tick in the
+// settings rail, and `applies: (ctx) => ctx.hasPages` gating the 📄 Pages
+// section on the answer. What that gate actually decided was whether a note
+// could EVER be split, which is not a fact about a kind: a Practice note that
+// grows too long to read is the same note a Lesson becomes, and the reader who
+// wanted it split had to open Settings, find the journal, find the kind, and
+// tick a box whose consequence is a section they could otherwise have ticked on
+// the note in front of them.
+//
+// SO THE CAPABILITY IS UNIVERSAL AND THE SECTION IS THE CHOICE. Every kind of
+// every journal can hold pages; whether a given note or template CARRIES the
+// 📄 Pages index is an ordinary section tick, on the same list as every other
+// section. What is gone with the gate: `JournalKindConfig.pages`, the settings
+// tick that wrote it, `diffKinds`' `paged` row, and `StructuralSink` — the seam
+// in the section editor that existed so one row could write config before it
+// wrote the file. A stored `pages: true` is dropped on the next save, the way
+// `trackers` was in 3.18: nothing reads it, so it does not survive.
+//
+// WHAT STAYS PER-TYPE is this object — one page id, one label, one shared
+// template per journal — because that is what a page IS here, and the fields
+// were never per-kind in practice: `buildJournalType` has written the same
+// three values for every paged kind since the constructor existed.
+//
+// AND A PAGE STILL HOLDS NO PAGES. `sectionContext`'s `{ page }` branch answers
+// `hasPages: false`, which is the one refusal left and the only one that was
+// ever structural: a page's pages would be a second level of splitting with no
+// folder to put them in and no note to promote.
 //
 // `id` is the `type` value a page's frontmatter carries, and it is
 // DELIBERATELY NOT one of the type's `kinds`. Everything that asks "is this
@@ -215,10 +245,12 @@ export interface JournalKind {
   // Template variants offered when creating a note of this kind. Never
   // empty — newNote() falls back to the first entry if a stale id is passed.
   templates: JournalTemplateVariant[];
-  // Set when notes of this kind can be split across pages. Study's lesson has
-  // it; practice doesn't, because a practice note is a set of exercises rather
-  // than a document that grows.
-  pages?: JournalPages;
+  // The pages notes of this kind can be split across. REQUIRED, and that is the
+  // whole of 1.0.23 on this line: `kind.pages` was read as "may this kind be
+  // split" in nine places, and making it non-optional is what turned every one
+  // of those into a compile error to be answered rather than a check that
+  // quietly always says yes. See JournalPages.
+  pages: JournalPages;
 
   // ── What notes of this kind measure (2.36) ──────────────────────────────
   //
@@ -470,7 +502,10 @@ export const STUDY_CONFIG: JournalConfig = {
       id: "lesson",
       emoji: "📖",
       label: "Lesson",
-      pages: true,
+      // `pages: true` stood here until 1.0.23 and is gone with the field: every
+      // kind of every journal can be split across pages now, so Practice can be
+      // too. See JournalPages.
+      //
       // A preset is allowed opinions, and these two are the whole point of the
       // split: grading a Lesson deck asks "did I remember this", grading a
       // Practice deck asks "did I get these right". Two questions, two
@@ -705,7 +740,10 @@ export function buildJournalType(cfg: JournalConfig): JournalType {
     };
   });
 
-  const kinds: JournalKind[] = cfg.kinds.map((k) => ({
+  // `pages` is added below rather than here, because the template it names is
+  // claimed after every kind has taken its own filename — so what this map
+  // produces is a kind less its pages, and the list below is the kind.
+  const stems: Omit<JournalKind, "pages">[] = cfg.kinds.map((k) => ({
     id: k.id,
     emoji: k.emoji,
     label: k.label,
@@ -739,18 +777,23 @@ export function buildJournalType(cfg: JournalConfig): JournalType {
   }));
 
   // One page template for the whole type, claimed once and shared by every
-  // paged kind — so it takes one name from the allocator rather than one per
-  // kind, and a kind called "Page" cannot quietly take it.
-  const pageTemplate = cfg.kinds.some((k) => k.pages)
-    ? claim(PAGE_TEMPLATE.replace(/\.md$/, ""))
-    : null;
-  if (pageTemplate) {
-    cfg.kinds.forEach((k, i) => {
-      if (k.pages) {
-        kinds[i].pages = { id: "page", label: "Page", template: pageTemplate };
-      }
-    });
-  }
+  // kind — so it takes one name from the allocator rather than one per kind,
+  // and a kind called "Page" cannot quietly take it.
+  //
+  // UNCONDITIONAL SINCE 1.0.23. It was claimed only when some kind said
+  // `pages: true`, and the three values below were written onto those kinds
+  // alone; every kind can hold pages now, so every journal has the template and
+  // every kind names it. The allocator still runs LAST, after levels and kinds,
+  // so the filenames a given config produces are the ones it always produced.
+  const pageTemplate = claim(PAGE_TEMPLATE.replace(/\.md$/, ""));
+  // ONE OBJECT PER KIND RATHER THAN ONE SHARED BETWEEN THEM, on the same
+  // reasoning `layout` is spread rather than referenced below: a type handed
+  // out of this constructor is somebody else's to hold, and two kinds sharing
+  // one `pages` would make a relabel of either a relabel of both.
+  const kinds: JournalKind[] = stems.map((k) => ({
+    ...k,
+    pages: { id: "page", label: "Page", template: pageTemplate },
+  }));
 
   return {
     id: cfg.id,
@@ -997,14 +1040,15 @@ export const MEDIA_CONFIG: JournalConfig = {
     // source-literal scan cannot see, because the string is composed at
     // runtime rather than written down.
     //
-    // `pages: true` is the shape no other preset has — a long read splits into
-    // chapters, a season into episodes — and the shared page template and the
-    // 📄 Pages section already do it.
+    // A long read splits into chapters, a season into episodes, and the shared
+    // page template and the 📄 Pages section do it. This was `pages: true` — the
+    // shape no other preset had — until 1.0.23 made the capability universal;
+    // what Media keeps is the arrangement, which is every kind's now. See
+    // JournalPages.
     {
       id: "title",
       emoji: "🎬",
       label: "Title",
-      pages: true,
       rating: "stars",
     },
   ],
@@ -1148,7 +1192,9 @@ export function recognisedTypeValues(type: JournalType): Set<string> {
   const out = new Set<string>();
   for (const kind of type.kinds) {
     out.add(kind.id);
-    if (kind.pages) out.add(kind.pages.id);
+    // Every kind has pages since 1.0.23, and every kind of one journal names the
+    // same page id — so this adds one value however many kinds there are.
+    out.add(kind.pages.id);
   }
   for (const level of type.levels) out.add(level.id);
   return out;
@@ -1183,7 +1229,7 @@ export function journalNounOf(type: JournalType, value: string): string | null {
   return (
     type.kinds.find((k) => k.id === id)?.label ??
     type.levels.find((l) => l.id === id)?.noun ??
-    type.kinds.find((k) => k.pages?.id === id)?.pages?.label ??
+    type.kinds.find((k) => k.pages.id === id)?.pages.label ??
     null
   );
 }
@@ -1455,6 +1501,35 @@ export function kindsCarrying(type: JournalType, trackerId: string): string[] {
     .map((k) => k.id);
 }
 
+// How many notes in a journal's tree carry one kind's id.
+//
+// THE COUNT A REMOVAL IS WEIGHED AGAINST, and there is one of it. It was a
+// private method on the journal editor, where it fed the declassification
+// sentence in `confirmKindChange`; 1.0.24 gives the *What's below* card a
+// removal of its own, and a second walk deciding the same question is how two
+// doors come to disagree about whether a note type is empty — with one of them
+// then deleting a classification off notes the other could see.
+//
+// `noteTypeOf` RATHER THAN A RAW FRONTMATTER READ, which is the trim and the
+// lowercase: a note written `type: Lesson` by hand is a Lesson, and a counter
+// that missed it would report a kind empty that is not. 5.2 made this repair in
+// `isContainerFolder` and 5.20 made it in `buildPagesTable`, for this reason.
+//
+// A WHOLE-VAULT WALK, so it is asked at the moment of ACTING and never on a
+// render. Both callers are behind a confirmation.
+export function countNotesOfKind(
+  app: App,
+  root: string,
+  kindId: string
+): number {
+  let n = 0;
+  for (const file of app.vault.getMarkdownFiles()) {
+    if (!file.path.startsWith(`${root}/`)) continue;
+    if (noteTypeOf(app, file) === kindId) n++;
+  }
+  return n;
+}
+
 // Which tracker a Recall sitting on a note of this kind grades into, or null
 // to fall back to the confidence built-in — which is what every note written
 // before the declaration existed does, so an undeclared kind is unchanged.
@@ -1469,9 +1544,7 @@ export function ratingTrackerFor(
 export function pageTypeIds(plugin: ChronoAnvilPlugin): Set<string> {
   const out = new Set<string>();
   for (const type of registeredJournalTypes(plugin)) {
-    for (const kind of type.kinds) {
-      if (kind.pages) out.add(kind.pages.id);
-    }
+    for (const kind of type.kinds) out.add(kind.pages.id);
   }
   return out;
 }
@@ -1552,15 +1625,18 @@ export function journalAncestors(
   // The last segment is the file itself; a folder note repeats its folder's
   // name, so dropping the filename leaves the containers either way.
   //
-  // The cap is the type's own depth, plus one when any of its kinds can hold
-  // pages. A promoted note is a container the type's `levels` doesn't describe
-  // — Study has two levels but a page sits three folders deep — so capping at
-  // levels.length alone would drop the lesson from its own page's trail,
-  // leaving a crumb trail that skips the note the page belongs to. The extra
-  // is conditional rather than unconditional so a stray note filed far too
-  // deep in a type that has no pages still can't invent crumbs for folders the
-  // type has no noun for.
-  const depth = type.levels.length + (type.kinds.some((k) => k.pages) ? 1 : 0);
+  // The cap is the type's own depth, plus one for the promotion any note may
+  // make. A promoted note is a container the type's `levels` doesn't describe —
+  // Study has two levels but a page sits three folders deep — so capping at
+  // levels.length alone would drop the lesson from its own page's trail, leaving
+  // a crumb trail that skips the note the page belongs to.
+  //
+  // THE +1 WAS CONDITIONAL ON A PAGED KIND UNTIL 1.0.23, *"so a stray note filed
+  // far too deep in a type that has no pages still can't invent crumbs for
+  // folders the type has no noun for"*. There is no such type now: every journal
+  // can promote a note, so every journal's trail has the extra level to describe
+  // and the condition could only ever answer yes.
+  const depth = type.levels.length + 1;
   const folders = parts.slice(0, -1).slice(0, depth);
   return folders.map((name, i) => ({
     name,
@@ -1842,24 +1918,21 @@ export class JournalManager {
     // BOTH FIELDS, ALWAYS (4.50 §1). `kind.templates` always holds at least the
     // default variant, and `pageLayoutChoices` always holds at least the page
     // default — so neither list is ever empty and neither field is ever hidden.
-    // The pages half is absent, not empty, for a kind that cannot hold pages.
-    const pageRows = kind.pages
-      ? pageLayoutChoices(this.configOf(type), kind.pages.label)
-      : null;
+    //
+    // AND THE PAGES HALF IS NO LONGER CONDITIONAL. It was absent, not empty, for
+    // a kind that could not hold pages; every kind can (1.0.23), so every kind's
+    // create dialogue asks which layout its pages open with.
+    const pageRows = pageLayoutChoices(this.configOf(type), kind.pages.label);
     const details = await promptNewNote(this.app, {
       heading: `${kind.emoji} New ${kind.label.toLowerCase()}`,
       titlePlaceholder: `${kind.label} title`,
       layoutLabel: "Layout",
       templates: kind.templates.map((t) => ({ id: t.id, label: t.label })),
-      ...(pageRows && kind.pages
-        ? {
-            pages: {
-              label: `${kind.pages.label} layout`,
-              templates: pageRows,
-              templateId: PAGE_LAYOUT_DEFAULT,
-            },
-          }
-        : {}),
+      pages: {
+        label: `${kind.pages.label} layout`,
+        templates: pageRows,
+        templateId: PAGE_LAYOUT_DEFAULT,
+      },
     });
     if (!details?.title.trim()) return;
     const safeTitle = details.title.trim().replace(/[\\/:"*?<>|]/g, "-");
@@ -1989,13 +2062,19 @@ export class JournalManager {
   // for a metadata cache a moment behind a save; leaving it to cover a case
   // analysis this could answer directly meant a file read on every New Page for
   // anyone who had ever capitalised a `type:` by hand.
+  //
+  // WHAT IT REFUSES, SINCE 1.0.23. It ended `return kind?.pages ? kind : null`,
+  // where the second half was the per-kind capability tick; every kind has pages
+  // now, so what is left is the only question there ever was for this function —
+  // is this note one of THIS journal's leaf notes. A page answers no (its `type`
+  // is the page id, which is deliberately not a kind), and so does an index
+  // note, a note of another journal, and a note with no `type` at all.
   private pageKindOf(
     type: JournalType,
     fm: Record<string, unknown>
   ): JournalKind | null {
     const t = normaliseTypeValue(fm["type"]);
-    const kind = t == null ? undefined : type.kinds.find((k) => k.id === t);
-    return kind?.pages ? kind : null;
+    return (t == null ? undefined : type.kinds.find((k) => k.id === t)) ?? null;
   }
 
   // Whether a note has already been promoted: a folder note is one whose
@@ -2043,7 +2122,7 @@ export class JournalManager {
     const moved = getFile(this.app, target);
     if (!moved) return null;
 
-    const label = kind.pages?.label ?? "Page";
+    const label = kind.pages.label;
     const original = await this.app.vault.read(moved);
     const lines = original.split("\n");
     // Only the half (or halves) the note doesn't already have. A lesson written
@@ -2079,7 +2158,7 @@ export class JournalManager {
 
     let fm = frontmatterOf(this.app, file);
     let kind = this.pageKindOf(type, fm);
-    if (!kind?.pages) {
+    if (!kind) {
       // Fallback: if metadataCache is momentarily behind after a save, parse type from text
       try {
         const text = await this.app.vault.read(file);
@@ -2089,7 +2168,7 @@ export class JournalManager {
           const fallbackKind = type.kinds.find(
             (k) => k.id.toLowerCase() === directType.toLowerCase()
           );
-          if (fallbackKind?.pages) {
+          if (fallbackKind) {
             kind = fallbackKind;
             fm = { ...fm, type: directType };
           }
@@ -2099,15 +2178,35 @@ export class JournalManager {
       }
     }
 
-    if (!kind?.pages) {
-      const which = type.kinds
-        .filter((k) => k.pages)
-        .map((k) => k.label)
-        .join(" or ");
-      new Notice(
-        which
-          ? `❌ Only a ${which} can hold pages.`
-          : `❌ ${type.name} notes can't hold pages.`
+    // ── THE REFUSAL THAT IS LEFT, AND WHAT IT USED TO BE (1.0.23) ────────
+    //
+    // *"❌ Only a Lesson can hold pages."* — composed from the kinds that had
+    // been ticked as paged, and shown on a Practice note, on a Topic index, and
+    // on a page of a lesson alike. Two of those three were the capability tick
+    // talking, and the tick is gone: every kind of this journal holds pages.
+    //
+    // WHAT REACHES HERE NOW IS A NOTE THAT IS NOT A LEAF OF THIS JOURNAL, and
+    // the two ways in want different sentences, because the reader's next move
+    // differs. A PAGE is the interesting one: the reader is standing inside the
+    // very note whose pages they want another of, so the message names it rather
+    // than saying no twice. Anything else — an index, a note with no `type`, a
+    // stray file under the root — is not one of this journal's notes at all.
+    //
+    // BOTH ARE BACKSTOPS RATHER THAN THE PATH. `newPageHere` is gated on
+    // `canHoldPages` (`core/actions.ts`), so the palette does not offer the
+    // command on either surface, and the button only exists inside a 📄 Pages
+    // section, which only a leaf composes. This is what a hand-typed
+    // `button:<type>:new-page` on the wrong note gets.
+    if (!kind) {
+      const value = normaliseTypeValue(fm["type"]);
+      const isPage = type.kinds.some((k) => k.pages.id === value);
+      const owner = file.parent?.name;
+      notify.fail(
+        isPage
+          ? owner
+            ? `A page holds no pages — open "${owner}" to add another.`
+            : "A page holds no pages of its own."
+          : `This isn't one of ${type.name}'s notes.`
       );
       return;
     }
@@ -2224,60 +2323,31 @@ export class JournalManager {
     notify.ok(`${pages.label} created!`);
   }
 
-  // The explicit command: convert without creating a page. Useful when the
-  // reason to promote is "this is getting long" rather than "I want to write
-  // the next bit now".
-  async convertToDashboard(type: JournalType, notePath?: string): Promise<void> {
-    const path = notePath ?? activeMarkdownFile(this.app)?.path;
-    let file = path ? getFile(this.app, path) : null;
-    if (!file && path) {
-      const base = path.replace(/\.md$/, "");
-      const leafName = path.split("/").pop();
-      if (leafName) {
-        file = getFile(this.app, `${base}/${leafName}`);
-      }
-    }
-    if (!file) {
-      file = activeMarkdownFile(this.app);
-    }
-    if (!file) {
-      notify.fail("Open a note first.");
-      return;
-    }
-    let fm = frontmatterOf(this.app, file);
-    let kind = this.pageKindOf(type, fm);
-    if (!kind) {
-      try {
-        const text = await this.app.vault.read(file);
-        const match = /^type:\s*["']?([^"'\n\r]+)["']?/m.exec(text);
-        if (match && match[1]) {
-          const directType = match[1].trim();
-          const fallbackKind = type.kinds.find(
-            (k) => k.id.toLowerCase() === directType.toLowerCase()
-          );
-          if (fallbackKind?.pages) {
-            kind = fallbackKind;
-            fm = { ...fm, type: directType };
-          }
-        }
-      } catch {
-        // Fall back to empty frontmatter if unreadable
-      }
-    }
-    if (!kind) {
-      notify.fail("This note isn't a kind that can hold pages.");
-      return;
-    }
-    if (this.isPromoted(file)) {
-      new Notice("This note is already a dashboard.");
-      return;
-    }
-    const moved = await this.promoteToDashboard(type, file, kind);
-    if (moved) {
-      await openFile(this.app, moved);
-      notify.ok(`"${moved.basename}" can now hold pages.`);
-    }
-  }
+  // ── A `convertToDashboard` STOOD HERE UNTIL 1.0.23 ──────────────────────
+  //
+  // *"Convert to a dashboard"* — a command and a banner-menu row that called
+  // `promoteToDashboard` and stopped there, described in its own comment as
+  // *"useful when the reason to promote is 'this is getting long' rather than
+  // 'I want to write the next bit now'"*.
+  //
+  // THAT DISTINCTION DIED WITH THE PAGES TICK. Promotion used to be how a note
+  // GOT its Pages section — `promoteToDashboard` splices one in below the banner
+  // when it finds none — so there was a real state to reach before writing a
+  // page. Every leaf template ships the section now, so the splice finds nothing
+  // missing and the command reduced to moving a note into a folder named after
+  // itself: step one of `newPage`, and a drag in Obsidian's own file explorer.
+  //
+  // IT IS NOT REPLACED, AND PAGES DO NOT NEST. `newPage` promotes on the way
+  // past, `pageKindOf` answers null for a page, and there is no other caller of
+  // `promoteToDashboard` left — so a page cannot be turned into a dashboard to
+  // hold pages of its own, from any surface. That is the reader's call, in those
+  // words.
+  //
+  // WHAT WENT WITH IT: a second `when` gate, a second refusal sentence, the
+  // `isIndex` argument on `journalBannerMenu` (its only reader), and a fallback
+  // this path alone carried — a raw read of the file plus a regex over `type:`
+  // for when the metadata cache had not caught up, which `newPage` never needed
+  // and which was the tell that this was the road less walked.
 
   private async pickContainerFolder(
     type: JournalType
@@ -2360,10 +2430,6 @@ export class JournalManager {
     if (hit) await this.newPage(hit.type, hit.path);
   }
 
-  async convertHere(): Promise<void> {
-    const hit = this.typeOfActive();
-    if (hit) await this.convertToDashboard(hit.type, hit.path);
-  }
 
   // Store an arrangement as one of a kind's saved layouts. 3.18 §6.
   //

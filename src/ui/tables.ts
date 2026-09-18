@@ -2701,7 +2701,7 @@ function isContainerFolder(
   const leaves = new Set<string>();
   for (const kind of type.kinds) {
     leaves.add(kind.id);
-    if (kind.pages) leaves.add(kind.pages.id);
+    leaves.add(kind.pages.id);
   }
   return !leaves.has(value);
 }

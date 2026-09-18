@@ -1137,6 +1137,230 @@ describe("parts and the extend op", () => {
   });
 });
 
+// ── a kind the journal no longer has, and the prune op (1.0.23) ───────────
+//
+// THE READER'S BUG. A Study journal imported from a vault whose `Cheatsheets`
+// template had not survived came back with two kinds, while its Topic indexes
+// still drew three groups — the third rendering *"Unknown Study note type:
+// cheatsheets"*. `journal-import.test.ts` holds the half that stops the kind
+// being lost; this is the half that mends a vault already in that state.
+//
+// IT IS `extend` READ BACKWARDS, and deliberately built as its mirror: the
+// section stays, the bar over it stays, the groups around it stay, and the
+// write is the three lines of one group. Every claim `extend` makes below is
+// asserted here in the other direction, because the failure mode is the same
+// one — a reconciler that cannot attribute a block offers to ADD a second copy
+// of it.
+
+describe("strays and the prune op", () => {
+  const topic = richTopic;
+  const want = (ctx: SectionContext): string[] =>
+    sectionsPresent(topic().text, ctx);
+
+  // A group for a kind the type does not have, built by copying the shape of
+  // one it does rather than by typing three lines out — the same discipline
+  // `dropPractice` follows above, and for the same reason.
+  const addCheatsheets = (text: string): string => {
+    const lines = text.split("\n");
+    const at = lines.findIndex((l) => l.trim() === "kind-table:practice");
+    expect(at).toBeGreaterThan(-1);
+    return [
+      ...lines.slice(0, at + 1),
+      "header:2:📝 Cheatsheets",
+      "button:study:new-cheatsheets",
+      "kind-table:cheatsheets",
+      ...lines.slice(at + 1),
+    ].join("\n");
+  };
+
+  it("attributes a fence LONGER than the catalogue composes", () => {
+    // WHERE THIS USED TO STOP. Exact keyword equality said no, and the
+    // sub-multiset fallback only ever forgave a fence that was SHORTER — so
+    // the whole block read as the reader's own, and a repair that cannot see a
+    // block cannot mend it. Both halves of the attribution are asserted: the
+    // section is present, and nothing in the file is reported foreign.
+    const { ctx, text } = topic();
+    const over = addCheatsheets(text);
+    expect(sectionsPresent(over, ctx)).toContain("children");
+    expect(
+      parseSections(over, ctx).filter((r) => r.sectionId === null && !r.filler)
+    ).toEqual([]);
+  });
+
+  it("calls it a prune, not an add and not a remove", () => {
+    const { ctx, text } = topic();
+    const ops = planSections(addCheatsheets(text), ctx, want(ctx));
+    const children = ops.find((o) => o.sectionId === "children")!;
+    expect(children.kind).toBe("prune");
+    // The failure this replaces, and the one it must not become: a second copy
+    // of the whole section, or the section leaving with the group.
+    expect(ops.filter((o) => o.kind === "add")).toEqual([]);
+    expect(ops.filter((o) => o.kind === "remove")).toEqual([]);
+  });
+
+  it("names the kind and says what will happen to it", () => {
+    // The dialog is the plan rather than a summary of it, so this string is the
+    // sentence a reader agrees to before anything is written.
+    const { ctx, text } = topic();
+    const op = planSections(addCheatsheets(text), ctx, want(ctx)).find(
+      (o) => o.sectionId === "children"
+    )!;
+    expect(op.detail).toContain("cheatsheets");
+    expect(op.detail).toContain("Study");
+    expect(op.detail).toContain("will be removed");
+    expect(op.detail).not.toBe("unchanged");
+  });
+
+  it("writes exactly the file the catalogue would have composed", () => {
+    const { ctx, text } = topic();
+    expect(applySections(addCheatsheets(text), ctx, want(ctx))).toBe(text);
+  });
+
+  it("is idempotent, and a pristine file is not a write at all", () => {
+    const { ctx, text } = topic();
+    expect(applySections(text, ctx, want(ctx))).toBeNull();
+    const once = applySections(addCheatsheets(text), ctx, want(ctx))!;
+    expect(applySections(once, ctx, want(ctx))).toBeNull();
+  });
+
+  it("reports no stray on anything it just composed", () => {
+    // The mirror of "reports no missing parts on anything it just composed",
+    // and the property that stops this becoming a formatter that rewrites a
+    // file every time it runs. A section that cannot say this about its own
+    // fresh output has the bug already.
+    for (const t of allTemplates()) {
+      const ops = planSections(t.text, t.ctx, sectionsPresent(t.text, t.ctx));
+      expect(
+        ops.filter((o) => o.kind === "prune"),
+        `${t.file} reports a stray in what it was just composed with`
+      ).toEqual([]);
+    }
+  });
+
+  it("takes the group and nothing around it", () => {
+    // SPAN EXACTNESS, stated as the lines that survive rather than as indices.
+    // The section's own bar sits directly above the first group and the fence
+    // close directly below the last, so a span off by one in either direction
+    // cuts a line this plugin cannot put back.
+    const { ctx, text } = topic();
+    const out = applySections(addCheatsheets(text), ctx, want(ctx))!;
+    for (const line of [
+      childrenBar(ctx)[0],
+      "header:2:📖 Lessons",
+      "button:study:new-lesson",
+      "kind-table:lesson",
+      "header:2:🛠️ Practice",
+      "button:study:new-practice",
+      "kind-table:practice",
+    ]) {
+      expect(out).toContain(line);
+    }
+    for (const line of [
+      "header:2:📝 Cheatsheets",
+      "button:study:new-cheatsheets",
+      "kind-table:cheatsheets",
+    ]) {
+      expect(out).not.toContain(line);
+    }
+  });
+
+  it("takes a stray from the middle as readily as from the end", () => {
+    // The group is spliced ABOVE Practice rather than below it, so the walk
+    // back over the group's siblings has a real group on both sides of it.
+    // `withoutStrayParts` splices bottom-up for exactly this case.
+    const { ctx, text } = topic();
+    const lines = text.split("\n");
+    const at = lines.findIndex((l) => l.trim() === "header:2:🛠️ Practice");
+    expect(at).toBeGreaterThan(-1);
+    const middle = [
+      ...lines.slice(0, at),
+      "header:2:📝 Cheatsheets",
+      "button:study:new-cheatsheets",
+      "kind-table:cheatsheets",
+      ...lines.slice(at),
+    ].join("\n");
+    expect(applySections(middle, ctx, want(ctx))).toBe(text);
+  });
+
+  it("takes two of them in one write", () => {
+    // Two lost kinds is one sentence and one write, and the detail pluralises
+    // rather than repeating itself.
+    const { ctx, text } = topic();
+    const two = addCheatsheets(addCheatsheets(text)).replace(
+      "header:2:📝 Cheatsheets\nbutton:study:new-cheatsheets\nkind-table:cheatsheets\nheader:2:📝 Cheatsheets",
+      "header:2:📝 Flashcards\nbutton:study:new-flashcards\nkind-table:flashcards\nheader:2:📝 Cheatsheets"
+    );
+    const op = planSections(two, ctx, want(ctx)).find(
+      (o) => o.sectionId === "children"
+    )!;
+    expect(op.kind).toBe("prune");
+    expect(op.detail).toContain("flashcards");
+    expect(op.detail).toContain("cheatsheets");
+    expect(applySections(two, ctx, want(ctx))).toBe(text);
+  });
+
+  it("reports the gap too when a journal gained a kind and lost one", () => {
+    // `prune` OUTRANKS `extend` and the extension is reported in the same
+    // detail rather than swallowed — the ordering rule the pair already
+    // followed with `reconfigure`. A journal that gained one kind and lost
+    // another is exactly this file.
+    const { ctx, text } = topic();
+    const both = addCheatsheets(text)
+      .split("\n")
+      .filter(
+        (l) =>
+          !/^(header:2:🛠️|button:study:new-practice|kind-table:practice)/.test(
+            l.trim()
+          )
+      )
+      .join("\n");
+    const op = planSections(both, ctx, want(ctx)).find(
+      (o) => o.sectionId === "children"
+    )!;
+    expect(op.kind).toBe("prune");
+    // The removal LEADS, because it is the sentence a reader has to agree to.
+    expect(op.detail.indexOf("cheatsheets")).toBeLessThan(
+      op.detail.indexOf("Practice")
+    );
+    expect(applySections(both, ctx, want(ctx))).toBe(text);
+  });
+
+  it("leaves a line the reader typed foreign rather than pruning it", () => {
+    // THE LIMIT ON THE LONG-FENCE RULE, and the case 5.28 narrowed the
+    // multi-section gate for. A `tasks-table:` in the middle of the index is
+    // not one of `children`'s own kinds, so the fence is not a long `children`
+    // — it is the reader's, it is reported foreign, and nothing offers to cut
+    // it.
+    const { ctx, text } = topic();
+    const typed = text.replace(
+      "kind-table:practice",
+      "kind-table:practice\ntasks-table:mine"
+    );
+    expect(
+      parseSections(typed, ctx).some((r) => r.sectionId === null && !r.filler)
+    ).toBe(true);
+    const ops = planSections(typed, ctx, sectionsPresent(typed, ctx));
+    expect(ops.filter((o) => o.kind === "prune")).toEqual([]);
+    const out = applySections(typed, ctx, sectionsPresent(typed, ctx));
+    expect(out == null || out.includes("tasks-table:mine")).toBe(true);
+  });
+
+  it("never prunes a leaf note or a page, whatever the catalogue says", () => {
+    // §1.4's gate, in the other direction. `strayParts` refuses on the SURFACE
+    // rather than on the catalogue, for the reason `extend` does: a dashboard's
+    // content is a rollup and can be wrong about a fact, a leaf note's content
+    // is the reader's writing.
+    for (const t of allTemplates()) {
+      if (t.ctx.noteKind === "index") continue;
+      const ops = planSections(t.text, t.ctx, sectionsPresent(t.text, t.ctx));
+      expect(
+        ops.some((o) => o.kind === "prune"),
+        `${t.file} is a ${t.ctx.noteKind} and must never be pruned`
+      ).toBe(false);
+    }
+  });
+});
+
 // ── a section's title is a question with an answer in the file (3.18 §3) ───
 
 describe("renameable section titles", () => {

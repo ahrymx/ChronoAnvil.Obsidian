@@ -17,6 +17,10 @@ stack
 tracker:accuracy
 tracker:status
 # chronoanvil:trackers:end
+stack
+header:📄 Pages
+button:study:new-page
+pages-table
 ```
 
 <!--chronoanvil-skeleton-->

@@ -16,9 +16,15 @@
 // other side:
 //
 //   SECTIONS ARE NAMED BY ID, and which sections exist is a function of the
-//   surface. `sectionApplies` filters by `surface`, by `applies(ctx)`, and by
-//   the type's own shape — so a layout naming `pages` applied to a journal
-//   whose kinds are not paged names a section that cannot be composed.
+//   surface. `sectionApplies` filters by `surface` and by `applies(ctx)`, so a
+//   layout naming a section the target's surface does not offer names something
+//   that cannot be composed.
+//
+//   `pages` WAS THE EXAMPLE THIS PARAGRAPH USED — *"a layout naming `pages`
+//   applied to a journal whose kinds are not paged"* — and it stopped being one
+//   in 1.0.23: every kind of every journal holds pages, so that id composes
+//   wherever it lands. The paragraph stands on `nav`, `children` and every
+//   index-only section; what changed is which ids can be carried, not the rule.
 //
 //   OPTIONS ARE WORSE THAN SECTIONS. A `resources` override naming shelves is
 //   arguably portable — the shelves are the reader's own words. A `bridge`

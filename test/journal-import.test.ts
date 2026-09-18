@@ -22,6 +22,7 @@ import type { JournalScan } from "../src/journals/journal-infer";
 import { buildJournalType, journalTemplateFiles } from "../src/journals/custom-journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import type { TrackerDef } from "../src/trackers/trackers";
+import { readSrc } from "./sources";
 
 // The Cooking journal from the dev vault, stated as the config that made it.
 // Two levels, two kinds, one of them paged, both rated on a tracker the vault
@@ -205,10 +206,99 @@ describe("inferring a journal from its folder", () => {
     expect(out?.config.kinds.map((k) => k.emoji)).toEqual(["📋", "🔥"]);
   });
 
-  it("recovers which kind is paged", () => {
+  it("recovers a kind named by a create button and nothing else", () => {
+    // ── THE READER'S IMPORT BUG (1.0.23) ─────────────────────────────────
+    //
+    // A kind has three possible traces in a folder — a `<kind>.md` template, a
+    // note carrying `type: <kind>`, and the `new-<kind>` button its index draws
+    // — and inference read the first two. The third was parsed already, and used
+    // only to SORT what the other two had found.
+    //
+    // So a kind nobody had written a note of yet, in a vault whose templates
+    // folder had moved, was dropped from the config while every trace of it
+    // stayed on disk. From the note that is: a `📝 Cheatsheets` group still
+    // drawn on the topic index, its button reading `new-cheatsheets` because no
+    // kind answered to it, and a red *"Unknown Study note type: cheatsheets"*
+    // under it. Reported from a real vault, with that screenshot.
+    const withButtonOnly = scan({
+      templates: [],
+      notes: [
+        ...scan().notes,
+        scanFile(
+          ["Italian", "Pasta", "Pasta.md"],
+          "---\ntype: dish\ncuisine: Italian\n---\n" +
+            "```chronoanvil\nheader:🗂️ What's below\n" +
+            "header:2:📋 Recipes\nbutton:cooking:new-recipe\nkind-table:recipe\n" +
+            "header:2:🔥 Attempts\nbutton:cooking:new-attempt\nkind-table:attempt\n" +
+            "header:2:📝 Cheatsheets\nbutton:cooking:new-cheatsheet\nkind-table:cheatsheet\n```\n"
+        ),
+      ],
+    });
+    const kinds = inferJournalFromScan(withButtonOnly, NO_TRACKERS)!.config.kinds;
+    const found = kinds.find((k) => k.id === "cheatsheet");
+    expect(found).toBeDefined();
+    // AND IT ARRIVES DRESSED, from the same fence: the `header:2:` beside the
+    // button carries the emoji and the plural, which is what `kindLabelsFromFences`
+    // was already reading for the kinds it did recover.
+    expect(found!.emoji).toBe("📝");
+    // In DECLARED position — third, where the index draws it — rather than
+    // appended because it was found last.
+    expect(kinds.map((k) => k.id)).toEqual(["recipe", "attempt", "cheatsheet"]);
+  });
+
+  it("believes a button only from this journal, and only about a kind", () => {
+    // THE COST OF LETTING A BUTTON DECLARE ONE. While this sweep only sorted, an
+    // action naming no kind matched nothing and fell through harmlessly; now it
+    // would be believed. Two refusals keep that from happening, and both bit in
+    // the writing: Cooking imported a kind called `container` from the
+    // `New Cuisine` button its own top-level index composes.
+    const out = inferJournalFromScan(
+      scan({
+        notes: [
+          ...scan().notes,
+          scanFile(
+            ["Italian", "Italian.md"],
+            "---\ntype: cuisine\n---\n```chronoanvil\n" +
+              // This journal's own level controls, which are not kinds.
+              "button:cooking:new-container\nbutton:cooking:new-top\n" +
+              "button:cooking:new-journal\nbutton:cooking:new-topic\n" +
+              "button:cooking:new-page\n" +
+              // And another journal's kind, linked from a Cooking page.
+              "button:study:new-lesson\n```\n"
+          ),
+        ],
+      }),
+      NO_TRACKERS
+    );
+    expect(out?.config.kinds.map((k) => k.id)).toEqual(["recipe", "attempt"]);
+  });
+
+  it("keeps its reserved list in step with the one that draws the buttons", () => {
+    // TWO LISTS, ONE FACT, and this file reads backwards what `button-widgets.ts`
+    // writes forwards. A sixth reserved action added there and not here would be
+    // imported as a kind named after a control — silently, and only into vaults
+    // that happen to have that button.
+    const infer = readSrc("journal-infer");
+    const drawn = readSrc("button-widgets");
+    for (const action of ["journal", "top", "topic", "container"]) {
+      expect(infer, action).toContain(`"${action}"`);
+      expect(drawn, action).toContain(`sub === "new-${action}"`);
+    }
+    // `page` is refused a step earlier, by the same rule that refuses a level id.
+    expect(infer).toContain('if (k === "page" || levelSet.has(k)) return;');
+    expect(drawn).toContain('if (sub === "new-page")');
+  });
+
+  it("recovers no paged flag, because there is no longer one to recover", () => {
+    // THIS TEST USED TO READ THE PAGES TABLE BACK OFF THE TEMPLATE and set
+    // `pages: true` on the kind that had one. The field is gone from
+    // `JournalKindConfig` as of 1.0.23 — every kind holds pages — so the table
+    // is read back as what it always was: a SECTION in that template's text,
+    // which the import keeps by keeping the template.
     const out = inferJournalFromScan(scan(), NO_TRACKERS);
-    expect(out?.config.kinds.find((k) => k.id === "recipe")?.pages).toBe(true);
-    expect(out?.config.kinds.find((k) => k.id === "attempt")?.pages).toBeUndefined();
+    for (const kind of out!.config.kinds) {
+      expect(kind, kind.id).not.toHaveProperty("pages");
+    }
   });
 
   it("recovers what each kind is rated on", () => {

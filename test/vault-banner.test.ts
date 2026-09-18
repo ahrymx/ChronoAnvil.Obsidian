@@ -541,7 +541,7 @@ describe("the banner's hook", () => {
     // dashboard half — which silently dropped **Wide page**, the one setting on
     // that menu with no other door (4.51.1).
     const t = banner();
-    expect(t).toContain("journalBannerMenu(this.plugin, file.path, isIndex)");
+    expect(t).toContain("journalBannerMenu(this.plugin, file.path)");
     expect(t).toContain("sectionsMenuFor(this.plugin, file.path,");
     // And neither list is re-spelled here.
     expect(t).not.toContain('.setTitle("Edit sections…")');
@@ -562,7 +562,7 @@ describe("the banner's hook", () => {
     // list would then offer it *Wide page* and drop *Template…*.
     const t = banner();
     expect(t).toMatch(
-      /\(surface === "journal"\s*\?\s*journalBannerMenu\(this\.plugin, file\.path, isIndex\)\s*:\s*null\)\s*\?\?/
+      /\(surface === "journal"\s*\?\s*journalBannerMenu\(this\.plugin, file\.path\)\s*:\s*null\)\s*\?\?/
     );
   });
 
@@ -1073,7 +1073,7 @@ describe("what the Banner section became", () => {
     //
     // This read `page-head.ts` and passed against two inline `find`s — kinds,
     // then levels. THE LIST HAS FOUR ENTRIES: `recognisedTypeValues` walks
-    // kinds, each paged kind's `pages`, and levels, and a page's `type:` is
+    // kinds, each kind's `pages`, and levels, and a page's `type:` is
     // `kind.pages.id`. So every page in the vault fell through to the
     // name-the-journal fallback the test above this one pins, and wore `STUDY`
     // where its lesson wore `STUDY · LESSON`.
@@ -1085,7 +1085,7 @@ describe("what the Banner section became", () => {
     const t = readSrc("journal.ts");
     expect(t).toContain("type.kinds.find((k) => k.id === id)?.label");
     expect(t).toContain("type.levels.find((l) => l.id === id)?.noun");
-    expect(t).toContain("type.kinds.find((k) => k.pages?.id === id)?.pages?.label");
+    expect(t).toContain("type.kinds.find((k) => k.pages.id === id)?.pages.label");
   });
 
   it("does not print the date twice on an untitled entry", () => {

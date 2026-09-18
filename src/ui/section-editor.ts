@@ -166,43 +166,21 @@ export interface ArrangementSink {
   save: (name: string, sections: string[], targets: string[]) => Promise<void>;
 }
 
-// ── A SECTION WHOSE GATE IS CONFIG RATHER THAN TEXT (5.20) ───────────────
+// ── A SECTION WHOSE GATE WAS CONFIG RATHER THAN TEXT (5.20–1.0.23) ───────
 //
-// `ArrangementSink`'s shape once more, for the same reason and with the same
-// discipline: a surface fact arrives as data or does not arrive, and nothing in
-// this window asks which surface it is on.
+// A `StructuralSink` stood here: `ArrangementSink`'s shape once more, for one
+// case — the journal catalogue's `pages` section, gated on `applies: (ctx) =>
+// ctx.hasPages`, which was a fact about the KIND and stored in settings rather
+// than a fact about the note. The sink let this window offer a row its model did
+// not have, ask for the model that WOULD compose the note once that row was
+// ticked, and give the caller one chance to persist and one to refuse before
+// anything was written.
 //
-// THE CASE IT EXISTS FOR is the journal catalogue's `pages` section, which is
-// gated on `applies: (ctx) => ctx.hasPages` — a fact about the KIND, stored in
-// settings, not a fact about the note. `layout-transfer.ts` names that gate as
-// the thing that stops a layout copied out of a paged journal from composing a
-// pages table over a kind that has none, so it cannot be loosened; and a reader
-// looking at `lesson.md` still has to be able to say "this kind has pages".
-// So the surface offers the row, and ticking it changes the config that makes
-// the catalogue offer it for real.
-//
-// OPAQUE, LIKE EVERY OTHER SEAM HERE. This window never learns what a kind is,
-// what `pages` means, or that a config exists. It draws an extra row, asks for
-// the model that composes the note once that row is ticked, and gives the
-// caller one chance to persist and one chance to refuse before anything is
-// written.
-export interface StructuralSink {
-  // Rows this surface offers that its model does not, because whether they
-  // apply is not a question about the note.
-  //
-  // EMPTY IS THE NORMAL STATE: once the config says yes, the model offers the
-  // section itself and this list has nothing left to add.
-  offer: SectionView[];
-  // The model that composes this note once these are the ticked rows.
-  //
-  // ASKED ON EVERY READ of `model`, because the preview, the schematic, the
-  // plan and the Save all go through that one getter — which is what makes a
-  // tick show its own consequence before anything is persisted.
-  modelWith: (ids: readonly string[]) => SectionModel;
-  // Persist what the ticks imply, before the file is written. False means the
-  // reader was asked something and declined, and nothing at all is written.
-  save: (ids: readonly string[]) => Promise<boolean>;
-}
+// EVERY KIND CAN HOLD PAGES NOW, so the gate answers yes on every leaf, the
+// model offers the row itself, and the seam had no producer left. It is deleted
+// rather than kept for the next case: this file's own rule is that a field with
+// no producer is invisible state, and the shape is three dozen lines that can be
+// written again from `ArrangementSink` the day a second one turns up.
 
 export interface SectionEditorSpec {
   file: TFile;
@@ -220,7 +198,6 @@ export interface SectionEditorSpec {
   handEdited?: boolean;
   onSaved?: () => void;
   arrangement?: ArrangementSink;
-  structural?: StructuralSink;
 }
 
 export class SectionEditorModal extends EditorModal {
@@ -403,36 +380,18 @@ export class SectionEditorModal extends EditorModal {
     this.modalEl.addClass("ca-section-editor");
   }
 
-  // The model built for the ticked rows, kept until they change. See `model`.
-  private structuralModel: { key: string; model: SectionModel } | null = null;
-
+  // ONE MODEL, AS OF 1.0.23. This was a getter over a memoised second model —
+  // the catalogue as it would be once the structural row was ticked — and a
+  // `structuralModel` cache keyed on the ticked list. Both went with
+  // `StructuralSink`; the spec's model is the only one there has ever been for
+  // every other surface, and now for this one.
   private get model(): SectionModel {
-    const sink = this.spec.structural;
-    if (!sink) return this.spec.model;
-    // THE TICKED ROWS, NOT `want`. `want` filters on `unanswered`, which asks
-    // `view`, which asks `model` — so reading it here is a stack overflow. It
-    // is also the wrong list: a row whose question is still blank is a row the
-    // reader has said yes to, and whether this kind has pages is not waiting on
-    // an answer to anything.
-    const ids = this.rows.filter((id) => !this.removed.has(id));
-    // MEMOISED ON THE LIST, because `view()` reads this getter once per row and
-    // every read would otherwise rebuild a catalogue. The key is the list, so a
-    // tick invalidates it and nothing else does.
-    const key = ids.join("\u0000");
-    if (this.structuralModel?.key !== key) {
-      this.structuralModel = { key, model: sink.modelWith(ids) };
-    }
-    return this.structuralModel.model;
+    return this.spec.model;
   }
 
-  // What may still be added: the model's answer, plus whatever the surface
-  // offers that the model cannot. See `StructuralSink`.
+  // What may still be added.
   private offered(): SectionView[] {
-    const base = this.model.addable(this.spec.text);
-    const extra = (this.spec.structural?.offer ?? []).filter(
-      (s) => !base.some((b) => b.id === s.id)
-    );
-    return [...base, ...extra];
+    return this.model.addable(this.spec.text);
   }
 
   // The rows still ticked, in row order, each with whatever the reader answered
@@ -791,6 +750,10 @@ export class SectionEditorModal extends EditorModal {
         o.kind === "move" ||
         o.kind === "reconfigure" ||
         o.kind === "extend" ||
+        // 1.0.23: a group naming a note type the journal no longer has is a
+        // write like any other, and the reader whose only change is that cut
+        // would otherwise get a disabled Save over a plan naming it.
+        o.kind === "prune" ||
         // 4.8: two blocks becoming one is a write like any other, and a reader
         // whose only change is a row would otherwise be shown "No changes" over
         // a plan that names three.
@@ -2543,11 +2506,13 @@ export class SectionEditorModal extends EditorModal {
               ? "↕"
               : op.kind === "extend"
                 ? "⊕"
-                : op.kind === "regroup"
-                  ? "▥"
-                  : op.kind === "foreign"
-                    ? "⚠"
-                    : "";
+                : op.kind === "prune"
+                  ? "⊖"
+                  : op.kind === "regroup"
+                    ? "▥"
+                    : op.kind === "foreign"
+                      ? "⚠"
+                      : "";
       row.createSpan({ cls: "ca-tpl-op-mark", text: mark });
       row.createSpan({ cls: "ca-tpl-op-label", text: op.label });
       row.createSpan({ cls: "ca-tpl-op-detail", text: op.detail });
@@ -2677,18 +2642,10 @@ export class SectionEditorModal extends EditorModal {
       return;
     }
 
-    // THE CONFIG FIRST, THEN THE FILE (5.20). A structural row is a settings
-    // change with a template change behind it, and the settings change is the
-    // one a reader can be asked to confirm — so it goes first, and `false`
-    // means they said no and NEITHER happens. Writing the file first would
-    // leave a `lesson.md` with a pages table over a kind that still says it has
-    // none, which is the state the whole seam exists to make unreachable.
-    if (
-      this.spec.structural &&
-      !(await this.spec.structural.save(this.rows.filter((id) => !this.removed.has(id))))
-    ) {
-      return;
-    }
+    // A "THE CONFIG FIRST, THEN THE FILE" STEP SAT HERE (5.20–1.0.23), giving
+    // `StructuralSink.save` the chance to persist a settings change — and to
+    // refuse, leaving neither written. Nothing writes config from this window
+    // any more: every row on it is a section of this file and this file alone.
 
     const next = this.model.apply(current, this.want);
     // THE SECTIONS FIRST, THEN THE BLOCKS THEY SIT IN. 4.8 §2.3.

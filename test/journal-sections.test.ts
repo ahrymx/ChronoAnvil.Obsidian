@@ -301,14 +301,17 @@ describe("the section catalogue", () => {
       }
     });
 
-    it("does not offer pages to a kind that cannot hold them", () => {
-      // `applies` rather than `default`: a Practice note has no pages, so the
-      // section is absent from the picker rather than sitting in it unticked
-      // offering something that would render an empty table forever.
+    it("offers pages to every kind, because every kind can hold them", () => {
+      // THIS USED TO BE A REFUSAL: a Practice note had no pages, so the section
+      // was absent from the picker rather than sitting in it unticked. What
+      // made that wrong is that "has pages" was a SETTING — the reader ticked
+      // Lesson and not Practice months earlier — and a Practice note that grows
+      // too long to read is the same note a Lesson becomes. The capability is
+      // universal as of 1.0.23 and the tick is the section's own.
       expect(sectionApplies(findSection("pages")!, lesson)).toBe(true);
       expect(
         sectionApplies(findSection("pages")!, kindCtx(STUDY_JOURNAL, "practice"))
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it("always includes the required section in what it offers", () => {
@@ -578,24 +581,33 @@ describe("the section catalogue", () => {
       ...freshCustomJournal(new Set()),
       id: "field",
       kinds: [
-        { id: "report", emoji: "📓", label: "Report", rating: "confidence", pages: true },
+        { id: "report", emoji: "📓", label: "Report", rating: "confidence" },
         { id: "note", emoji: "📝", label: "Note" },
       ],
     });
 
-    it("gives a paged kind a page template, and an unpaged type none", () => {
+    it("gives every type a page template, including one that says nothing", () => {
+      // THE SECOND HALF WAS `not.toContain`. A journal none of whose kinds had
+      // been ticked got no `page.md` at all, so the surface did not exist to
+      // lay out, the `New page` command had nowhere to write, and turning the
+      // capability on later meant a template appearing from nowhere. Every
+      // journal has the file now, and a reader who never splits a note simply
+      // never opens it.
       const files = templateTargets(paged).map((t) => t.file);
       expect(files).toContain("page.md");
       const plain = buildJournalType(freshCustomJournal(new Set()));
-      expect(templateTargets(plain).map((t) => t.file)).not.toContain("page.md");
+      expect(templateTargets(plain).map((t) => t.file)).toContain("page.md");
     });
 
-    it("writes one page template for the type, not one per paged kind", () => {
+    it("writes one page template for the type, not one per kind", () => {
+      // The page record is shared, and so is the file it names — a page of a
+      // Report and a page of a Note are the same surface, and two templates
+      // would be two answers to one question.
       const two = buildJournalType({
         ...freshCustomJournal(new Set()),
         kinds: [
-          { id: "a", emoji: "📓", label: "A", pages: true },
-          { id: "b", emoji: "📓", label: "B", pages: true },
+          { id: "a", emoji: "📓", label: "A" },
+          { id: "b", emoji: "📓", label: "B" },
         ],
       });
       expect(templateTargets(two).filter((t) => t.file === "page.md")).toHaveLength(1);
@@ -633,14 +645,26 @@ describe("the section catalogue", () => {
       expect(out).not.toMatch(/^status:/m);
     });
 
-    it("gives an unpaged kind of a paged type an ordinary leaf template", () => {
+    it("gives every kind of the type the same leaf template", () => {
+      // THE PAIR THIS USED TO DRAW was offered-and-off (`checklist`) against
+      // not-offered-at-all (`pages`), and `pages` has changed sides: it is
+      // offered on every leaf and ticked by default, which is the 1.0.23 call —
+      // a reader meets the Pages index on the note itself rather than having to
+      // find a setting first, and unticking the row is the opt-out.
       const note = sectionContext(paged, { kind: paged.kinds[1] });
-      expect(defaultSectionIds(note)).toEqual(["banner", "trackers", "headings"]);
-      // `pages` is not offered — the kind has none. `checklist` is offered and
-      // off, which is the 5.20 distinction this pair now draws.
+      expect(defaultSectionIds(note)).toEqual([
+        "banner",
+        "trackers",
+        "pages",
+        "headings",
+      ]);
       const offered = sectionsFor(note).map((s) => s.id);
-      expect(offered).not.toContain("pages");
+      expect(offered).toContain("pages");
       expect(offered).toContain("checklist");
+      // And it composes identically on the other kind, which is the whole of
+      // what "universal" means here.
+      const other = sectionContext(paged, { kind: paged.kinds[0] });
+      expect(sectionsFor(other).map((s) => s.id)).toContain("pages");
     });
   });
 

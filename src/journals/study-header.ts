@@ -338,10 +338,9 @@ export function renderCrumb(
 function attachBannerMenu(
   plugin: ChronoAnvilPlugin,
   host: HTMLElement,
-  notePath: string,
-  isIndex: boolean
+  notePath: string
 ): void {
-  const build = journalBannerMenu(plugin, notePath, isIndex);
+  const build = journalBannerMenu(plugin, notePath);
   if (build) settingsButton(host, "ca-jsh-more", build);
 }
 
@@ -357,10 +356,14 @@ function attachBannerMenu(
 // NULL WHERE THERE IS NOTHING TO OFFER, which is `sectionsMenuFor`'s rule and
 // `discoverability.test.ts`'s: *a menu that opens and then explains it cannot
 // help is worse than no menu.*
+// AN `isIndex` PARAMETER CAME OFF THIS IN 1.0.23. Both callers computed it —
+// basename against folder name — and it gated one row: the `Convert to a
+// dashboard` that is gone. Everything else this menu offers is the same on an
+// index as on a leaf, and a parameter kept "in case" is a parameter two callers
+// have to keep deriving correctly for nothing.
 export function journalBannerMenu(
   plugin: ChronoAnvilPlugin,
-  notePath: string,
-  isIndex: boolean
+  notePath: string
 ): ((menu: Menu) => void) | null {
   const ctx = plugin.sections.contextFor(notePath);
   if (!ctx) return null;
@@ -419,19 +422,17 @@ export function journalBannerMenu(
         .onClick(() => void plugin.entryTrackers.removeTracker(notePath))
     );
 
-    // Only where it can happen: a kind that declares pages, on a note that is
-    // not already a dashboard. Offering it on an index would be offering to
-    // promote something already promoted, and offering it on a kind without
-    // pages would be a menu item whose only outcome is an error notice.
-    if (!isIndex && ctx.noteKind !== "page" && ctx.hasPages) {
-      menu.addSeparator();
-      menu.addItem((i: MenuItem) =>
-        i
-          .setTitle("Convert to a dashboard")
-          .setIcon("layout-dashboard")
-          .onClick(() => void plugin.journals.convertHere())
-      );
-    }
+    // A `Convert to a dashboard` ROW STOOD HERE UNTIL 1.0.23, drawn under its
+    // own separator on any leaf that was not already promoted. It called
+    // `promoteToDashboard` without making a page, and `core/actions.ts` carries
+    // the long form of why it went: after 1.0.23 the section it used to splice
+    // is already in the template, so the row moved a note into a folder of its
+    // own and nothing else — which is what pressing **New page** does first, and
+    // what a drag in the file explorer does at all.
+    //
+    // NOTHING REPLACES IT ON THIS MENU. The note already carries the Pages index
+    // and its button; a second door onto the same promotion, named after the
+    // mechanism rather than the outcome, is what this menu had too much of.
 
   };
 }
@@ -488,7 +489,7 @@ export function buildStudyHeader(
   // slip the argument predicted — the two are a hand's width apart at the
   // band's opposite ends, and the rename needs a click ON the name. Three
   // banners placing one control three ways was the larger cost.
-  attachBannerMenu(plugin, titleRow, ctx.sourcePath, isIndex);
+  attachBannerMenu(plugin, titleRow, ctx.sourcePath);
 
   // ── Band 2: the trail + this note's date or activity ─────────────────
   const nav = wrap.createDiv({ cls: "ca-jsh-nav ca-journal-banner-nav" });

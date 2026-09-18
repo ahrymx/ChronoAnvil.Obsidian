@@ -90,7 +90,6 @@ export class JournalTemplates {
     kind: JournalKind,
     layoutId: string
   ): string | null {
-    if (!kind.pages) return null;
     const layout = pageLayoutById(this.configForType(type), layoutId);
     if (!layout) return null;
     return this.composedFrom(sectionContext(type, { page: kind }), layout).text;

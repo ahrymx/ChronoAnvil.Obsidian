@@ -5,6 +5,115 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.24] - 2026-09-18
+
+### Added
+
+- **A note type nothing uses can be removed from the card that lists it.** Since
+  1.1, **+ Add note type** at the foot of *What's below* has added one without
+  going to Settings. Taking one back off was still four steps away, and the group
+  it leaves behind — a heading, a **New …** button and an empty table — is the
+  most visible thing on the page.
+
+  Press **Edit**, and any group with **no notes in it** grows a **Remove** button
+  beside its title. The control is only in that mode, and only on an empty group:
+  a type with notes under it is not offered one, because removing it is the
+  change that costs every one of those notes its breadcrumbs, its place in the
+  review queue and its row in its parent's tables. That change still belongs in
+  Settings → ChronoAnvil → Journals, behind the window that counts the notes and
+  says what it costs — and if a type is empty on the card you are looking at but
+  has notes elsewhere in the journal, the button says so and sends you there
+  rather than acting.
+
+  A journal's last note type is never removable. Nothing you have written is
+  touched, the type's template file stays in your templates folder, and adding
+  the name back restores the group. Your other index notes are offered the
+  tidy-up in the same window that offers them a new type's table — see 1.0.23 —
+  so the tables the removed type leaves behind go with it, or stay, as you
+  choose.
+
+## [1.0.23] - 2026-09-18
+
+### Changed
+
+- **Every note type can hold pages now, and the Pages index is an ordinary
+  section you tick.** Whether a note type could be split across pages used to be
+  a checkbox in Settings, ticked per note type when the journal was made. If you
+  had not ticked it, **New page** was in the command palette anyway and answered
+  *"Only a Lesson can hold pages."* — a refusal about a decision you made months
+  earlier, on the note in front of you, which is the wrong place to learn it.
+
+  The checkbox is gone. Any note of any type can be split, in every journal,
+  including the ones already in your vault. A note that grows too long to read is
+  the same note whatever it is called.
+
+- **📄 Pages is in the section catalogue, on every note type's template.** It was
+  missing from the list on any type that had not been ticked, which is what made
+  the pages table sitting in a note impossible to move, rename or group — it was
+  a bare widget rather than a section, so **Add to group** and the banner weld
+  had nothing to hold on to. It is a section like any other now: it welds into
+  the banner stack, it carries a title bar, and unticking it takes the table back
+  out.
+
+  **Every note type's default template now ships with it** — the Pages index and
+  the **New page** button, welded into the banner — so the capability is met on
+  the note rather than in a settings step. Untick **📄 Pages** on *Templates and
+  sections* for a type that should not have one. **Nothing already written is
+  rewritten**: this changes what a fresh template composes, and existing notes
+  and templates are left exactly as they are.
+
+### Removed
+
+- **`Convert to a dashboard` is gone — the command and the banner menu row.** It
+  promoted a note without making a page: a folder named after the note, the note
+  moved into it, and a Pages section spliced into the body if it had none. That
+  last part is what made it worth having, and it is dead as of this release —
+  every note type's template already ships the Pages section, so the row had been
+  reduced to moving a note into a folder of its own. **New page** does that on
+  its way to making the page, and Obsidian's file explorer does it by drag.
+
+  Promotion is the widest-reaching thing this plugin does — it rewrites every
+  wikilink in the vault that pointed at the note — and it has no undo. There is
+  one door onto it now, and you reach it having already said what the page is
+  called.
+
+  **Pages do not nest.** A page cannot be turned into a dashboard to hold pages
+  of its own, from any surface.
+
+### Fixed
+
+- **`New page` is no longer offered where it cannot work.** It was gated on
+  nothing more than "this note is somewhere in a journal", so the palette listed
+  it on front pages and on pages themselves — surfaces that hold no pages — and
+  the command then did nothing. It is now offered on the notes that hold pages
+  and nowhere else, and a page asked for one of its own says so in its own words.
+
+- **The `pages-table` widget is withheld from surfaces that have no pages.** It
+  was free to add from *Edit this note's sections…* on any page in the vault,
+  where it drew either the host's own siblings or an empty table pointing at a
+  **New page** button that was not in reach. It is offered on a journal note and
+  nowhere else.
+
+- **Importing a journal no longer loses a note type, and a vault that already
+  lost one can be repaired.** A note type left three traces in a vault — its
+  template file, the notes carrying its name in their frontmatter, and the
+  **New …** button its dashboards draw. Import read the first two and used the
+  third only to work out what order to list them in, so a type whose template
+  had been deleted and whose notes had all been filed elsewhere came back as a
+  journal that did not have it — while its dashboards went on drawing the table,
+  which then rendered *"Unknown Study note type: cheatsheets"*.
+
+  A button now declares its type like the other two. What it cannot declare is a
+  level or a page — those draw **New …** buttons of their own and are not note
+  types — and a button belonging to a different journal is ignored.
+
+  For a vault already in that state, **Repair vault** offers to take the stale
+  table out. It is the catch-up that offers to ADD a table for a type your
+  journal gained, asked in the other direction: the section stays, its title
+  stays, every other table under it stays, and the write is the heading, the
+  button and the table of the type that is gone. Nothing is written until you
+  accept it, and the list you accept names each type by name.
+
 ## [1.0.22] - 2026-09-14
 
 ### Changed

@@ -189,6 +189,42 @@ export function isPromotedPath(path: string): boolean {
   return parts[parts.length - 1] === base;
 }
 
+// ── WHICH NOTES HOLD PAGES, FROM THE PATH ALONE (1.0.23) ────────────────
+//
+// Every kind of every journal can hold pages now (see `JournalPages`), so the
+// question stopped being "was this kind ticked" and became "is this note a LEAF
+// of this journal" — and the two surfaces that are not, an index note and a page
+// itself, are exactly what this excludes.
+//
+// PATH ARITHMETIC RATHER THAN FRONTMATTER, and the reason is the caller.
+// `core/actions.ts`'s `when` predicates run on every palette keystroke for every
+// action, under a rule written down in that file: *settings and the active
+// file's PATH, nothing else — no vault reads, no metadata-cache walks, no
+// await.* `resolveSectionHost` answers this question properly, by reading the
+// note's `type:`; it cannot be asked here, and a command that offered itself on
+// every note in a journal and then apologised is what this replaces.
+//
+// THE ARITHMETIC, for a journal with L levels: a leaf sits L folders below the
+// root, and a PROMOTED leaf — a folder note — sits one deeper, because promotion
+// gives it a folder of its own. So an index note fails it (a folder note above
+// L + 1), a page fails it (L + 1 folders deep and NOT a folder note), and both
+// shapes of leaf pass.
+//
+// WRONG ONLY ABOUT A NOTE FILED SOMEWHERE THE JOURNAL DOES NOT PUT ONE, where it
+// answers no and the command is not offered. `newPage` still resolves the kind
+// from `type:` and still refuses in its own words, so nothing here decides
+// whether the page is MADE — only whether the palette offers to.
+export function pathHoldsPages(
+  type: { root: string; levels: readonly unknown[] },
+  notePath: string
+): boolean {
+  const root = type.root;
+  if (root === "" || !notePath.startsWith(`${root}/`)) return false;
+  const rel = notePath.slice(root.length).replace(/^\//, "");
+  const folders = rel.split("/").length - 1;
+  return folders === type.levels.length + (isPromotedPath(notePath) ? 1 : 0);
+}
+
 // The pages of a title: every markdown file beside it in its own folder.
 //
 // EMPTY FOR A TITLE THAT WAS NEVER PROMOTED, and that is not a detail. An

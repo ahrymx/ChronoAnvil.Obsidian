@@ -255,6 +255,30 @@ describe("repairNote — what it must not do", () => {
     expect(next ?? "").toContain(mine);
   });
 
+  it("throws rather than performing a forbidden op", () => {
+    // NOT FILTERED, THROWN — the module's own rule, asserted through a stub
+    // model rather than by reaching for a real one, because the whole point is
+    // that no real model here can produce these. A repair is additive; an op
+    // that is not says `want` was built wrong, and dropping it silently would
+    // leave the write doing something the plan never named.
+    //
+    // `prune` IS ON THE LIST AS OF 1.0.23. It is produced by a section that
+    // declares `parts`, and no page this module repairs has one — parts are
+    // `children`'s, on a journal index, which is the other reconciler. So it
+    // belongs with `remove` and `move` rather than with `extend`.
+    for (const kind of ["remove", "move", "prune", "regroup"] as const) {
+      const model: SectionModel = {
+        ...homeModel(),
+        plan: () => [
+          { kind, sectionId: "tasks", label: "Tasks", detail: "" },
+        ],
+      };
+      expect(() => repairNote(model, home(), home()), kind).toThrow(
+        new RegExp(`repair produced a ${kind} op`)
+      );
+    }
+  });
+
   it("never reorders what is already there", () => {
     // A reader who moved a block keeps it moved: the want lists present
     // sections in FILE order, so `moveOps` has nothing to diff.

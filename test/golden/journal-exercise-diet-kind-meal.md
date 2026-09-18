@@ -16,6 +16,10 @@ tracker:status
 tracker:calories
 tracker:protein
 # chronoanvil:trackers:end
+stack
+header:📄 Pages
+button:exercise-diet:new-page
+pages-table
 ```
 
 <!--chronoanvil-skeleton-->

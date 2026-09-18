@@ -41,11 +41,7 @@ import type { KindChange } from "../journals/journal-plan";
 import { confirmAction, confirmPlan, promptText } from "../ui/modals";
 import { openTemplateEditor } from "../ui/template-editor";
 import type { JournalSection } from "../journals/journal-sections";
-import {
-  JOURNAL_SECTIONS,
-  findSection,
-  sectionContext,
-} from "../journals/journal-sections";
+import { sectionContext } from "../journals/journal-sections";
 import { resolveLayoutFor } from "../journals/layout-transfer";
 import type { SectionOverrides } from "../journals/journal-sections";
 import { getFile, noteTypeOf, plural } from "./util";
@@ -71,7 +67,11 @@ import {
   surfaceKey,
   uniquePropertyName,
 } from "../trackers/trackers";
-import { registeredJournalTypes, variantKinds } from "../journals/journal";
+import {
+  countNotesOfKind,
+  registeredJournalTypes,
+  variantKinds,
+} from "../journals/journal";
 import {
   JournalConfig,
   JournalKindConfig,
@@ -1151,7 +1151,6 @@ export function normaliseKinds(
       emoji: row.emoji.trim() || "📝",
       label,
       ...(row.rating ? { rating: row.rating } : {}),
-      ...(row.pages ? { pages: true } : {}),
       // CARRIED, NOT REBUILT (3.20.1). This routine rebuilds every kind row
       // from the fields the editor knows about, and `plural` was not one of
       // them — so opening a journal in Settings and pressing Save silently
@@ -1551,66 +1550,10 @@ export class JournalEditModal extends SteppedEditorModal {
                 split.surfaces
               );
             },
-            // THE `pages` TICK, WRITTEN BACK (5.20). Only the default target
-            // of a kind reaches this — `openTemplateEditor` decides that, and
-            // says why — so `ctx.kind` is a kind of this journal and the row
-            // it names is this draft's.
-            (paged) => this.setKindPaged(target.ctx.kind?.id ?? "", paged)
           );
         });
       })();
     }
-  }
-
-  // Store whether a kind's notes can be split across pages, asking first where
-  // the answer takes something away.
-  //
-  // SAVED IMMEDIATELY rather than held until this form's own Save, and
-  // `addVariant` above already argues the case: the change has a template file
-  // behind it, and config without the file — or the file without the config —
-  // is the state `ensureJournalTemplates` exists to prevent rather than to
-  // create. The section editor has just written the kind's own template on the
-  // strength of this returning true, so the two land together or not at all.
-  private async setKindPaged(kindId: string, paged: boolean): Promise<boolean> {
-    const row = this.draft.kinds.find((k) => k.id === kindId);
-    if (!row) return false;
-    const before = this.draft.kinds.map((k) => ({ ...k }));
-    row.pages = paged || undefined;
-
-    // `diffKinds` ALREADY HAS THE SENTENCE. It reports this change as `paged`
-    // and, for the direction that takes something away, says *"can no longer be
-    // split into pages. Notes already split keep their pages and go on
-    // working."* — which is the reassurance a reader needs and not one this
-    // call site should be writing a second copy of.
-    const changes = diffKinds(before, this.draft.kinds);
-    if (kindChangeNeedsConfirming(changes)) {
-      const ok = await confirmKindChange(
-        this.app,
-        this.plugin,
-        this.draft.name,
-        changes,
-        // Nothing is being removed, so nothing needs counting: `counts` is read
-        // for the "N notes carry this type" line on a `removed` change only.
-        {}
-      );
-      if (!ok) {
-        this.draft.kinds = before;
-        return false;
-      }
-    }
-
-    await this.onSave(this.draft);
-    // The shared Page template, where turning this on has just created a target
-    // for one. Never a delete on the way back: `refreshJournalTemplates` leaves
-    // files it no longer composes alone, and a reader may have edited this one.
-    const written = await this.plugin.scaffold.ensureJournalTemplates(
-      this.draft
-    );
-    if (written.length) {
-      new Notice(`ChronoAnvil: wrote ${written.join(", ")} ✅`);
-    }
-    this.refreshBody();
-    return true;
   }
 
   // Store an arrangement as one of a kind's saved layouts.
@@ -2319,29 +2262,14 @@ export class JournalEditModal extends SteppedEditorModal {
           .createDiv({ cls: "ca-wizard-check-blurb" })
           .setText("Always included — it carries the title and tracker grid.");
       }
-      // The sentence the deleted Structure checkbox used to carry, on the row
-      // that replaced it. Only while the kind is unpaged: once it is, the table
-      // is the section and its own blurb says what it is.
-      if (section.id === "pages" && !active.ctx.hasPages) {
-        text
-          .createDiv({ cls: "ca-wizard-check-blurb" })
-          .setText(
-            "Long notes of this kind can be split into pages, each with its own Recall deck. Ticking this gives the journal a shared Page template."
-          );
-      }
+      // A SECOND BLURB SAT HERE UNTIL 1.0.23, on this row alone: *"Long notes of
+      // this kind can be split into pages… Ticking this gives the journal a
+      // shared Page template."* It was the sentence the deleted Structure
+      // checkbox used to carry, and it explained a tick that wrote CONFIG. The
+      // tick writes nothing but the template now — every kind can hold pages —
+      // so the row is an ordinary row and the section's own blurb is the whole
+      // of what there is to say about it.
       box.addEventListener("change", () => {
-        // THE `pages` ROW WRITES CONFIG, NOT JUST THE TICK LIST (5.20). It is
-        // the one row on this list whose answer is a fact about the KIND rather
-        // than about the template — `sectionContext` derives `hasPages` from
-        // `kind.pages`, and that same field is what makes `templateTargets`
-        // emit the shared Page template. Writing it here is what lets the
-        // checkbox be the only place the question is asked; the repaint below
-        // is what makes the rail, the schematic and this very row agree with it
-        // a moment later.
-        if (section.id === "pages" && this.pagesRowOn(active)) {
-          const draftKind = this.draftKindOf(active);
-          if (draftKind) draftKind.pages = box.checked || undefined;
-        }
         // INSERT AND DELETE IN PLACE (3.18 §2.1). This used to rebuild the list
         // as `sectionsFor(ctx).filter(...).map(id)`, which re-sorted it into
         // catalogue order on every click of any box — so an order the reader
@@ -2354,15 +2282,14 @@ export class JournalEditModal extends SteppedEditorModal {
         // it goes, and the catalogue's answer is the one every other surface
         // gives.
         const now = [...(this.chosen.get(active.key) ?? [])];
-        // RANKED AGAINST THE CONTEXT THE TICK CREATES, not the one it was drawn
-        // in (5.20). `pages` is gated on `hasPages` and the row that turns
-        // `hasPages` on is drawn while it is still off — so asking the current
-        // ctx where `pages` goes gets `indexOf` = -1, which sorts it above the
-        // banner. One line, and only the structural row can reach it.
-        const rankCtx =
-          section.id === "pages" && box.checked && !active.ctx.hasPages
-            ? { ...active.ctx, hasPages: true, documentLike: true }
-            : active.ctx;
+        // THE CONTEXT THE ROW WAS DRAWN IN, which is now the only one there is.
+        // 5.20 ranked `pages` against a context the tick CREATED — `{...ctx,
+        // hasPages: true}` — because the row that turned `hasPages` on was
+        // drawn while it was still off, and asking the current ctx where `pages`
+        // went got `indexOf` = -1, which sorted it above the banner. No tick
+        // changes `hasPages` any more (1.0.23), so there is one context and
+        // every row is ranked in it.
+        const rankCtx = active.ctx;
         // ORDER CANNOT MATTER HERE: this Map is only read for `.required`.
         const byId = new Map(sectionsFor(rankCtx).map((sc) => [sc.id, sc]));
         const at = now.indexOf(section.id);
@@ -2421,74 +2348,15 @@ export class JournalEditModal extends SteppedEditorModal {
       out.push(byId.get(id)!);
     }
     while (ri < rest.length) out.push(rest[ri++]);
-    return this.withPagesRow(target, out);
-  }
-
-  // ── the `pages` row, which the catalogue cannot offer (5.20) ───────────
-  //
-  // `pages` is gated on `applies: (ctx) => ctx.hasPages`, and that gate STAYS.
-  // `layout-transfer.ts` names this section as the example of what a
-  // cross-journal layout copy has to drop loudly — a layout saved from a paged
-  // journal, pasted into an unpaged one, must not quietly compose a pages table
-  // over a kind that has none — and composition reads the same predicate. So
-  // the row cannot come from `sectionsFor` while the kind is unpaged.
-  //
-  // IT COMES FROM THE SURFACE INSTEAD, and ticking it changes the config that
-  // makes the catalogue offer it for real. The gate is untouched; what changed
-  // is that there is now somewhere to answer it from.
-  private withPagesRow(
-    target: TemplateTarget,
-    rows: JournalSection[]
-  ): JournalSection[] {
-    if (!this.pagesRowOn(target) || target.ctx.hasPages) return rows;
-    const pages = findSection("pages");
-    if (!pages) return rows;
-    // AT ITS CATALOGUE RANK AMONG THE ROWS ALREADY DRAWN, which is the promise
-    // `displayOrder` makes for every unticked row: *"placed where it WOULD go
-    // if ticked"*. A layout can move it afterwards; it cannot have an opinion
-    // about it yet, having never seen it.
-    const rank = (id: string): number =>
-      JOURNAL_SECTIONS.findIndex((s) => s.id === id);
-    const mine = rank("pages");
-    const before = rows.findIndex((s) => rank(s.id) > mine);
-    const out = [...rows];
-    out.splice(before === -1 ? out.length : before, 0, pages);
+    // A `withPagesRow` STOOD HERE UNTIL 1.0.23, and its own comment is its
+    // obituary: *"`pages` is gated on `applies: (ctx) => ctx.hasPages`, and that
+    // gate STAYS… so the row cannot come from `sectionsFor` while the kind is
+    // unpaged. IT COMES FROM THE SURFACE INSTEAD, and ticking it changes the
+    // config that makes the catalogue offer it for real."* The gate now answers
+    // yes on every leaf, so `sectionsFor` offers the row itself and there is
+    // nothing for this list to splice in. `pagesRowOn` and `draftKindOf` went
+    // with it — both existed to find the config row that tick wrote.
     return out;
-  }
-
-  // Whether this template is where a kind's `pages` tick lives.
-  //
-  // A KIND'S DEFAULT TARGET ONLY. `kind.pages` is a property of the kind and a
-  // saved layout is one arrangement of it among several, so a Pages box on
-  // `kind:lesson:compact` would be a per-variant control over a per-kind fact —
-  // ticking it on one layout would silently change every other, including the
-  // default nobody was looking at. The page target is excluded for the reason
-  // `sectionContext` gives in its own words: a page has no variant, and it is
-  // also not the note the tick is about.
-  private pagesRowOn(target: TemplateTarget): boolean {
-    return (
-      target.ctx.noteKind === "leaf" &&
-      (target.ctx.variantId ?? "default") === "default"
-    );
-  }
-
-  // The draft row a template target's kind was built from.
-  //
-  // PAIRED THROUGH THE NORMALISED LIST rather than indexed into
-  // `this.draft.kinds`: `normaliseKinds` DROPS a row whose label is still
-  // blank, so the two arrays are the same length only while the form is
-  // complete — and this is read from a checkbox handler, which is exactly when
-  // it might not be. Zipping the kept rows against their normalised selves is
-  // the pairing that holds mid-typing.
-  private draftKindOf(target: TemplateTarget): JournalKindConfig | null {
-    const id = target.ctx.kind?.id;
-    if (!id) return null;
-    const kept = this.draft.kinds.filter((k) => k.label.trim());
-    const norm = normaliseKinds(this.draft.kinds, {
-      preserveIds: this.isEstablished,
-    });
-    const at = norm.findIndex((k) => k.id === id);
-    return at === -1 ? null : (kept[at] ?? null);
   }
 
   // Up/down, on a chosen row only.
@@ -2947,13 +2815,12 @@ export class JournalEditModal extends SteppedEditorModal {
     return n;
   }
 
+  // MOVED TO `journal.ts` IN 1.0.24 AND CALLED FROM THERE. The *What's below*
+  // card can remove an empty note type now, and it has to weigh the same
+  // question this does — so the walk is shared rather than written twice. See
+  // `countNotesOfKind`.
   private countNotesOfKind(root: string, kindId: string): number {
-    let n = 0;
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      if (!file.path.startsWith(`${root}/`)) continue;
-      if (noteTypeOf(this.app, file) === kindId) n++;
-    }
-    return n;
+    return countNotesOfKind(this.app, root, kindId);
   }
 
   // The offer the kind-change window has been promising. 3.18 follow-ups §4.

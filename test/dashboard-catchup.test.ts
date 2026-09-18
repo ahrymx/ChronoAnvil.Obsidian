@@ -47,6 +47,29 @@ function staleTopicIndex(): string {
   return [...lines.slice(0, from), ...lines.slice(from + 3)].join("\n");
 }
 
+// And the same file from the other direction: a Topic index that carries a
+// group for a kind the journal does NOT have. This is the reader's imported
+// Study — a `Cheatsheets` note type whose template did not survive the import,
+// so the rebuilt type has two kinds and the dashboard draws three tables, the
+// third rendering *"Unknown Study note type: cheatsheets"*.
+//
+// BUILT BY COPYING THE SHIPPED GROUP rather than by typing one, for the same
+// reason `staleTopicIndex` deletes from it: a fixture hand-written to look like
+// the composer's output is a fixture that stops matching the composer.
+function overgrownTopicIndex(): string {
+  const lines = studyTemplate("topic-index.md").split("\n");
+  const at = lines.findIndex((l) => l.trim() === "kind-table:practice");
+  expect(at).toBeGreaterThan(-1);
+  const indent = lines[at].slice(0, lines[at].indexOf("kind-table"));
+  return [
+    ...lines.slice(0, at + 1),
+    `${indent}header:2:📝 Cheatsheets`,
+    `${indent}button:study:new-cheatsheets`,
+    `${indent}kind-table:cheatsheets`,
+    ...lines.slice(at + 1),
+  ].join("\n");
+}
+
 describe("what the scan finds", () => {
   it("plans an extend on a dashboard missing a kind's table", () => {
     const text = staleTopicIndex();
@@ -141,6 +164,58 @@ describe("what applying it writes", () => {
     const current = studyTemplate("topic-index.md");
     const c = ctx();
     expect(applySections(current, c, detectSections(current, c))).toBeNull();
+  });
+});
+
+describe("the group a kind LOST, which is the same question (1.0.23)", () => {
+  // THE READER'S BUG, and the half of it a repair has to answer. The import
+  // fix in `journal-infer` stops the kind being dropped in the first place; a
+  // vault already carrying the stale table needs a door, and this is it —
+  // *Repair vault* and the kinds-change offer both run `findDashboardCatchups`.
+  const before = overgrownTopicIndex();
+  const c = ctx();
+
+  it("sees the block at all, which is where this used to stop", () => {
+    // A fence LONGER than the catalogue composes matched no signature, so the
+    // whole *What's below* block read as the reader's own and no door could
+    // offer to touch it. `ownerOf`'s long-fence rule is what changed.
+    const ops = planSections(before, c, detectSections(before, c));
+    expect(ops.map((o) => o.sectionId)).toContain("children");
+  });
+
+  it("plans a prune, not an extend and not a remove", () => {
+    const ops = planSections(before, c, detectSections(before, c));
+    const prune = ops.filter((o) => o.kind === "prune");
+    expect(prune.length).toBe(1);
+    expect(prune[0].sectionId).toBe("children");
+    // The section is STAYING. Only the group inside it goes.
+    for (const op of ops) expect(["keep", "prune", "foreign"]).toContain(op.kind);
+  });
+
+  it("names the kind, which is what the offer renders", () => {
+    const op = planSections(before, c, detectSections(before, c)).find(
+      (o) => o.kind === "prune"
+    );
+    expect(op?.detail).toContain("cheatsheets");
+    expect(op?.detail).toContain("no longer");
+    expect(op?.detail).not.toBe("unchanged");
+  });
+
+  it("takes out exactly the three lines and lands on the shipped file", () => {
+    // The strongest statement available, and the mirror of `extend`'s: pruning
+    // the stale group restores the Topic index the catalogue composes, byte for
+    // byte. Nothing else in the fence is rewritten, and the bar over it stays.
+    expect(applySections(before, c, detectSections(before, c))).toBe(
+      studyTemplate("topic-index.md")
+    );
+  });
+
+  it("is what `findDashboardCatchups` filters for, alongside extend", () => {
+    // The scan is the offer's only producer, and a catch-up that could only add
+    // was telling half the truth about what a kinds change does to a vault.
+    expect(readCode("dashboard-catchup")).toContain(
+      'o.kind === "extend" || o.kind === "prune"'
+    );
   });
 });
 

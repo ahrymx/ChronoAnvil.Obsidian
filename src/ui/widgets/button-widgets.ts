@@ -176,9 +176,10 @@ export function journalSubActionSpec(
   // consolidation removed. runJournalAction still routes it.
   if (sub === "refresh") return { label: "Refresh all", icon: "refresh-cw" };
   if (sub === "new-page") {
-    // Labelled from whichever kind of this type carries pages, so a journal
-    // that calls them Sections says so.
-    const label = type.kinds.find((k) => k.pages)?.pages?.label ?? "Page";
+    // Labelled from this type's own page noun, so a journal that calls them
+    // Sections says so. Every kind of one journal names the same one, so the
+    // first kind answers for all of them — see `buildJournalType`.
+    const label = type.kinds[0]?.pages.label ?? "Page";
     return { label: `New ${label}`, icon: "file-plus", primary: true };
   }
   if (sub.startsWith("new-")) {

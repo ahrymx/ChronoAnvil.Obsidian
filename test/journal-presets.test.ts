@@ -465,26 +465,40 @@ describe("the arrangement the presets ship (5.20)", () => {
   // EVERY TEMPLATE ALL FOUR PRESETS WRITE, not just the indexes. The six index
   // cases were the whole table until 5.20, because the leaves had nothing
   // preset-specific to say; now neither do the indexes, and the reason to list
-  // all fifteen is that "the same three answers everywhere" is only worth
+  // all seventeen is that "the same three answers everywhere" is only worth
   // asserting if everywhere is where it is asserted.
+  //
+  // ── WHAT 1.0.23 DID TO THIS TABLE ─────────────────────────────────────
+  //
+  // Every leaf opens with `header:📄 Pages` now, where four of them opened with
+  // the banner alone. Those four — Practice, Update, Decision, Workout, Meal —
+  // were the kinds nobody had ticked, and the tick is gone: every kind holds
+  // pages, and every kind's DEFAULT template ships the index and the New page
+  // button so the capability is met on the note rather than in Settings. That
+  // is the reader's call, made in those words, and it rewrites what a fresh
+  // vault composes — nothing already written is touched.
+  //
+  // Two page templates joined for the same reason: `projects` and
+  // `exercise-diet` had no paged kind and so had no page surface at all.
   const CASES: [string, string, string[]][] = [
     ["study", "subject-index", ["journal-header", "header:🗂️ Topics"]],
     ["study", "topic-index", ["journal-header", "header:🗂️ What's below"]],
     ["study", "lesson", ["journal-header", "header:📄 Pages"]],
-    // A kind with no pages under it has nothing below to table, so its leaf is
-    // the banner, the grid and the prose.
-    ["study", "practice", ["journal-header"]],
+    ["study", "practice", ["journal-header", "header:📄 Pages"]],
     // AND A PAGE IS THE BANNER AND THE PROSE. It is not graded — a per-page
     // rating would count a note's own parts as its peers — so even `trackers`
-    // is absent here, and this is the shortest template the plugin writes.
+    // is absent here, and this is the shortest template the plugin writes. It
+    // is also the one surface that gets no Pages index: a page holds none.
     ["study", "page", ["journal-header"]],
     ["projects", "area-index", ["journal-header", "header:🗂️ Projects"]],
     ["projects", "project-index", ["journal-header", "header:🗂️ What's below"]],
-    ["projects", "update", ["journal-header"]],
-    ["projects", "decision", ["journal-header"]],
+    ["projects", "update", ["journal-header", "header:📄 Pages"]],
+    ["projects", "decision", ["journal-header", "header:📄 Pages"]],
+    ["projects", "page", ["journal-header"]],
     ["exercise-diet", "block-index", ["journal-header", "header:🗂️ What's below"]],
-    ["exercise-diet", "workout", ["journal-header"]],
-    ["exercise-diet", "meal", ["journal-header"]],
+    ["exercise-diet", "workout", ["journal-header", "header:📄 Pages"]],
+    ["exercise-diet", "meal", ["journal-header", "header:📄 Pages"]],
+    ["exercise-diet", "page", ["journal-header"]],
     ["media", "medium-index", ["journal-header", "header:🎬 Titles"]],
     ["media", "title", ["journal-header", "header:📄 Pages"]],
     ["media", "page", ["journal-header"]],
@@ -495,6 +509,21 @@ describe("the arrangement the presets ship (5.20)", () => {
       expect(blocks(templateFor(presetId, stem))).toEqual(expected);
     });
   }
+
+  it("names every template every preset writes, and no other", () => {
+    // WITHOUT THIS THE TABLE IS A SAMPLE. A preset growing a surface — which is
+    // exactly what `page.md` did in two of them this release — would leave the
+    // table passing and silent about the file nobody had looked at.
+    const listed = new Set(CASES.map(([id, stem]) => `${id}/${stem}.md`));
+    const written = new Set(
+      JOURNAL_PRESETS.flatMap((preset) =>
+        journalTemplateFiles(buildJournalType(preset.config)).map(
+          (f) => `${preset.id}/${f.name}`
+        )
+      )
+    );
+    expect([...written].sort()).toEqual([...listed].sort());
+  });
 
   it("ends every leaf on the reader's own prose", () => {
     // THE FOURTH DEFAULT, AND THE ONE `blocks` CANNOT SEE — a skeleton is `##`

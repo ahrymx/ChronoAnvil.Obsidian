@@ -18,6 +18,10 @@ tracker:status
 tracker:duration
 tracker:distance
 # chronoanvil:trackers:end
+stack
+header:📄 Pages
+button:exercise-diet:new-page
+pages-table
 ```
 
 <!--chronoanvil-skeleton-->

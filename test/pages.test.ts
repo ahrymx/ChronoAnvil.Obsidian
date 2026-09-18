@@ -18,13 +18,21 @@ import { buildJournalType } from "../src/journals/custom-journal";
 const asset = studyFile;
 
 describe("the pages model", () => {
-  it("puts pages on the lesson kind and not on practice", () => {
-    // Per kind, not per type: levels are fixed for a whole type, so making
-    // this a level would force every lesson to be a folder.
+  it("puts pages on every kind, and Practice is the one that proves it", () => {
+    // PER NOTE, NOT PER KIND AND NOT PER TYPE (1.0.23). It was per kind — Lesson
+    // had pages and Practice did not — and the tick that said so is gone: a
+    // Practice note that grows too long to read is the same note a Lesson
+    // becomes. Levels are still fixed for a whole type, which is why promotion
+    // is not a third level; that half of the old argument is untouched.
     const lesson = STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!;
     const practice = STUDY_JOURNAL.kinds.find((k) => k.id === "practice")!;
     expect(lesson.pages).toBeDefined();
-    expect(practice.pages).toBeUndefined();
+    expect(practice.pages).toBeDefined();
+    // ONE TEMPLATE FILE FOR THE JOURNAL, named by both. Two `page.md`s would be
+    // the allocator's collision repair firing on a file nothing asked to be
+    // distinct.
+    expect(practice.pages.template).toBe(lesson.pages.template);
+    expect(practice.pages.id).toBe(lesson.pages.id);
   });
 
   it("keeps the page type out of the journal's kinds", () => {
@@ -38,7 +46,10 @@ describe("the pages model", () => {
     expect(STUDY_JOURNAL.kinds.map((k) => k.id)).not.toContain("page");
   });
 
-  it("gives a custom type no pages unless it asks for them", () => {
+  it("gives a custom type pages without being asked", () => {
+    // WAS "no pages unless it asks for them", and the asking is what 1.0.23
+    // removed: a journal a reader makes in the wizard can split any of its notes
+    // the day it exists, without finding a tick in Settings first.
     const cooking = buildJournalType({
       id: "cooking",
       name: "Cooking",
@@ -48,7 +59,8 @@ describe("the pages model", () => {
       levels: [{ noun: "Section", fallbackEmoji: "📂" }],
       kinds: [{ id: "recipe", emoji: "🍲", label: "Recipe" }],
     });
-    expect(cooking.kinds.every((k) => !k.pages)).toBe(true);
+    expect(cooking.kinds.every((k) => k.pages.id === "page")).toBe(true);
+    expect(cooking.kinds[0].pages.template).toBe("page.md");
   });
 });
 
@@ -73,9 +85,15 @@ describe("crumbs through a promoted note", () => {
     ).toEqual(["Maths", "Algebra", "Quadratics"]);
   });
 
-  it("does not extend the cap for a type with no pages", () => {
-    // A stray note filed too deep in a type that can't hold pages still
-    // shouldn't invent crumbs for folders the type has no noun for.
+  it("extends the cap by exactly one, in every journal", () => {
+    // WAS "does not extend the cap for a type with no pages" — a stray note
+    // filed too deep in an unpaged type must not invent crumbs for folders the
+    // type has no noun for. There is no unpaged type now, so the +1 is every
+    // journal's, and what it describes is the folder a promotion makes.
+    //
+    // THE CAP STILL BITES, which is the half worth keeping: one level deeper
+    // than a page can be is still refused, so a note filed four folders into a
+    // one-level journal gets two crumbs and not three.
     const cooking = buildJournalType({
       id: "cooking",
       name: "Cooking",
@@ -87,9 +105,14 @@ describe("crumbs through a promoted note", () => {
     });
     expect(
       journalAncestors(cooking,
-        "03 - Journals/Cooking/Sauces/Warm/Hollandaise.md"
+        "03 - Journals/Cooking/Sauces/Hollandaise/Step one.md"
       ).map((a) => a.name)
-    ).toEqual(["Sauces"]);
+    ).toEqual(["Sauces", "Hollandaise"]);
+    expect(
+      journalAncestors(cooking,
+        "03 - Journals/Cooking/Sauces/Warm/Hollandaise/Step one.md"
+      ).map((a) => a.name)
+    ).toEqual(["Sauces", "Warm"]);
   });
 });
 
@@ -150,8 +173,14 @@ describe("the shipped templates", () => {
     expect(t).toContain("button:study:new-page");
   });
 
-  it("keeps the Pages section off Practice", () => {
-    expect(asset("template-practice.md")).not.toContain("pages-table");
+  it("gives Practice one too, which is 1.0.23 on a shipped file", () => {
+    // THE ONE TEMPLATE THIS RELEASE CHANGES, and it is the change: Practice was
+    // the kind whose config said it could not hold pages, so it had no index and
+    // no New page button. `test/golden/journal-study-kind-practice.md` is the
+    // byte-for-byte version of this claim.
+    const t = asset("template-practice.md");
+    expect(t).toContain("pages-table");
+    expect(t).toContain("button:study:new-page");
   });
 });
 

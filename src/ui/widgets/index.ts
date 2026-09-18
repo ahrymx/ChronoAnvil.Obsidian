@@ -111,6 +111,7 @@ import {
 // directive — so routing it through `directive-regions.ts` would be a
 // pass-through added only to keep an import in a tidier place.
 import { buildBelowFoot } from "./below-edit";
+import type { KindHost } from "./below-edit";
 import {
   liveScopedWidget,
   liveFrontmatterWidget,
@@ -1242,7 +1243,27 @@ export class Widgets implements
       // empties its `containerEl` and appends a new subtree; it never replaces the
       // host. So holding these and re-walking their descendants is sound, which is
       // what lets a selection survive a repaint.
-      const kindHosts: HTMLElement[] = [];
+      // ── AND WHICH KIND, AND WHICH HEAD (1.0.24) ─────────────────────
+      //
+      // The foot's edit mode can now take an EMPTY note type off the journal,
+      // and the control for that sits on the group's own head — beside the
+      // title it is about, which is `attachKindRowMenu`'s argument one scope
+      // up: *"the object being configured and the control that configures it
+      // can be the same object."*
+      //
+      // All three facts are in hand here and nowhere else. The element is this
+      // loop's; the kind id is the directive's argument, which a `querySelector`
+      // pass would have to read a class to guess at; and the head is
+      // `headerGroup`, which is the bar of the `header:2:` line above and is
+      // nulled by the next non-inline directive — so it is the right one only
+      // at this moment. `button:` is in `INLINE_KINDS`, which is why the create
+      // button between the head and the table does not clear it.
+      //
+      // A GROUP WITH NO HEAD GETS NO CONTROL, and that is honest rather than a
+      // gap: `head` is null on a fence composed without `header:2:` lines, where
+      // there is no title to hang a removal off and no way to tell the reader
+      // which type it would remove.
+      const kindHosts: KindHost[] = [];
 
       // AND A TRACKER GRID IS ONE OF THEM (5.15). Three paths build the grid —
       // a habit chip, an ordinary `tracker:`/`sleep` cell, and an empty marked
@@ -1520,7 +1541,19 @@ export class Widgets implements
         // `div.ca-journal-live-widget` a `liveScopedWidget` rebuilds into, and
         // that host is stable for the life of the block, so the controller can
         // hold it and re-walk its rows after every repaint.
-        if (kind === "kind-table") kindHosts.push(widget);
+        if (kind === "kind-table") {
+          // THE ARGUMENT, READ THE WAY `buildFromSpec` READS IT — the label
+          // comes off at the `|` first, then the id is what follows the colon.
+          // Two spellings of one split is how a `kind-table:lesson|Reading`
+          // ends up recorded as the kind `lesson|Reading`.
+          const body = line.split("|")[0];
+          const colon = body.indexOf(":");
+          kindHosts.push({
+            host: widget,
+            kindId: colon === -1 ? "" : body.slice(colon + 1).trim(),
+            head: headerGroup,
+          });
+        }
 
         // ── AN EMPTY INDEX HANDS ITS SENTENCE TO THE HEAD (5.28) ────────
         //

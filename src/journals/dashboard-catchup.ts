@@ -5,8 +5,8 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// The dashboards a new note kind has not reached yet, offered at the moment the
-// kind is added.
+// The dashboards a note kind has not reached yet — or has not left yet —
+// offered at the moment the kind is added or removed.
 //
 // WHY THIS EXISTS (3.18 follow-ups §4)
 //
@@ -121,10 +121,17 @@ function indexSurfaces(
 // `want` IS WHAT THE FILE ALREADY HAS, which is the whole reason this is an
 // offer rather than a redesign. It asks the planner the same question the
 // section editor asks when a reader opens it and presses Save without touching
-// a row: keep every section that is there, and nothing else. So the only op it
-// can ever produce is `extend` — nothing is added, nothing removed, nothing
-// moved — and the filter below is an assertion of that rather than a narrowing
-// of a wider result.
+// a row: keep every section that is there, and nothing else. So no SECTION is
+// added, removed or moved, and the filter below is an assertion of that rather
+// than a narrowing of a wider result.
+//
+// TWO OPS PASS IT AS OF 1.0.23, and they are one question asked in both
+// directions. `extend` is a dashboard short of a table for a kind the journal
+// GAINED; `prune` is one still carrying a table for a kind it LOST — the state
+// the reader reported, where an imported Study drew a `📝 Cheatsheets` group
+// over *"Unknown Study note type: cheatsheets"*. Both act inside a section that
+// is staying, on lines this plugin composed, and a catch-up that could only ever
+// add was telling half the truth about what a kinds change does to a vault.
 export async function findDashboardCatchups(
   app: App,
   type: JournalType
@@ -133,7 +140,9 @@ export async function findDashboardCatchups(
   for (const { file, ctx } of indexSurfaces(app, type)) {
     const text = await app.vault.read(file);
     const want = detectSections(text, ctx);
-    const ops = planSections(text, ctx, want).filter((o) => o.kind === "extend");
+    const ops = planSections(text, ctx, want).filter(
+      (o) => o.kind === "extend" || o.kind === "prune"
+    );
     if (ops.length) out.push({ file, label: file.path, ops });
   }
   return out;

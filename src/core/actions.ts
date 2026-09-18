@@ -90,6 +90,7 @@ import { ensureEventsNote } from "../events/eventstore";
 import { syncTrackerConfig } from "../charts/charts";
 import { registeredJournalTypes } from "../journals/journal";
 import { journalTypeOfPath } from "../trackers/trackers";
+import { pathHoldsPages } from "../journals/page-default";
 import { hasTabbedGroup, stepFocusedGroup } from "../ui/widgets/group-tabs";
 import { notify } from "./notify";
 import { activeMarkdownFile as resolveActiveMarkdownFile, openFile } from "./util";
@@ -196,16 +197,35 @@ function activeNotePath(p: ChronoAnvilPlugin): string | null {
   return activeMarkdownFile(p)?.path ?? null;
 }
 
-// Is the active note inside a journal? Prefix matching over configured roots —
-// no vault read. See the cheapness rule above.
-function inJournal(p: ChronoAnvilPlugin): boolean {
+// An `inJournal` LIVED HERE AND IS GONE (1.0.23) — prefix matching over the
+// configured roots, and the gate on both page commands. It was too weak for
+// either: see `canHoldPages`, which is the same prefix match plus the question
+// the commands actually ask.
+//
+// Is the active note one that can be split across pages?
+//
+// A STRICTER GATE THAN `inJournal`, AND THE DEFECT IT CLOSES (1.0.23). Both page
+// commands were gated on being inside a journal at all, so the palette offered
+// them on a Topic index and on a page — where `newPage` answered *"❌ Only a
+// Lesson can hold pages"*, which was §6's run-and-then-apologise in the one
+// group of the table written to end it. Half of that message was the per-kind
+// capability tick, which is gone; the rest is a question about the NOTE, and
+// this is it.
+//
+// `pathHoldsPages` OWNS THE ARITHMETIC, in `page-default.ts`, where it is pure
+// and checkable without a vault. This stays what every other predicate here is:
+// settings, the active path, and a call.
+function canHoldPages(p: ChronoAnvilPlugin): boolean {
   const path = activeNotePath(p);
   if (path == null) return false;
-  const refs = registeredJournalTypes(p).map((t) => ({
-    typeId: t.id,
-    root: t.root,
-  }));
-  return journalTypeOfPath(refs, path) != null;
+  // WHICH JOURNAL FIRST, on longest-root-wins, because a custom journal's root
+  // can sit inside the one Study claims — `journalTypeOfPath` owns that rule and
+  // asking every type in registration order would answer for the wrong one.
+  const types = registeredJournalTypes(p);
+  const refs = types.map((t) => ({ typeId: t.id, root: t.root }));
+  const id = journalTypeOfPath(refs, path);
+  const type = types.find((t) => t.id === id);
+  return !!type && pathHoldsPages(type, path);
 }
 
 const hasNote = (p: ChronoAnvilPlugin): boolean => activeNotePath(p) != null;
@@ -341,14 +361,34 @@ export const ACTIONS: Action[] = [
   //
   // Every action here is note-scoped, and every one of them now says so with a
   // `when` rather than by running and then apologising. Four used to end in
-  // "Open a note first."; `new-page` and `convert-to-dashboard` did nothing at
-  // all — no note, no notice, no error (§6).
+  // "Open a note first."; `new-page` and the `convert-to-dashboard` that stood
+  // beside it did nothing at all — no note, no notice, no error (§6).
+  //
+  // ── AND A `note-convert-to-dashboard` STOOD HERE UNTIL 1.0.23 ──────
+  //
+  // *"Note: convert to a dashboard"* — `promoteToDashboard` without the page:
+  // make a folder named after the note, `renameFile` the note into it, and
+  // splice in a Pages section if it had none. Its defence was the distinction
+  // between *"this is getting long"* and *"I want to write the next bit now"*.
+  //
+  // 1.0.23 took both halves of it away. The splice is dead — every leaf template
+  // ships the Pages section, so `pagesSectionBlock` finds nothing missing — which
+  // leaves a command that moves a note into a folder of its own, which is step
+  // one of `newPage` and a drag in the file explorer. And the distinction it
+  // named is gone with the tick: the Pages index and its **New page** button are
+  // on the note from birth, so there is no state to reach BEFORE writing a page.
+  //
+  // AND IT WAS NOT FREE TO KEEP. Promotion is the widest-blast-radius operation
+  // this plugin has — a folder, a vault-wide link rewrite and a body edit — it
+  // has no inverse, and this was the one door onto it whose name said none of
+  // that. It is reached now only through `newPage`, where the reader has already
+  // said what the page is called.
   {
     id: "note-new-page",
     name: "Note: new page",
     icon: "file-plus",
     group: "notes",
-    when: inJournal,
+    when: canHoldPages,
     run: (p) => void p.journals.newPageHere(),
   },
   // ── the pages of a widget group (4.34 §5) ───────────────────────────
@@ -380,14 +420,6 @@ export const ACTIONS: Action[] = [
     group: "notes",
     when: hasTabbedGroup,
     run: (p) => void stepFocusedGroup(p, -1),
-  },
-  {
-    id: "note-convert-to-dashboard",
-    name: "Note: convert to a dashboard",
-    icon: "layout-dashboard",
-    group: "notes",
-    when: inJournal,
-    run: (p) => void p.journals.convertHere(),
   },
   {
     // ONE DOOR, AS OF §9.1. `add-section-to-note` used to sit beside this, and

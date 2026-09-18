@@ -151,7 +151,7 @@ function surfaceOf(type: JournalType, value: string): SectionContext | null {
   //
   // sectionContext has had a `{ page }` branch since the catalogue existed and
   // templateTargets uses it correctly; this was the one caller that didn't.
-  const owner = type.kinds.find((k) => k.pages?.id.toLowerCase() === value);
+  const owner = type.kinds.find((k) => k.pages.id.toLowerCase() === value);
   if (owner) return sectionContext(type, { page: owner });
 
   return null;

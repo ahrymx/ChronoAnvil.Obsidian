@@ -374,7 +374,10 @@ function ctxTargetOf(
 ): Parameters<typeof sectionContext>[1] {
   if (ctx.noteKind === "index") return { depth: ctx.depth ?? 0 };
   if (ctx.noteKind === "page") {
-    return { page: type.kinds.find((k) => k.pages)!.pages! };
+    // ONE PAGE TEMPLATE PER JOURNAL, composed from its first kind — which is
+    // what `templateTargets` does, and is now unambiguous because every kind
+    // carries the same page record.
+    return { page: type.kinds[0]! };
   }
   return { kind: type.kinds.find((k) => k.id === ctx.kind!.id)! };
 }
