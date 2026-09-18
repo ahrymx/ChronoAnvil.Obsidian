@@ -507,10 +507,10 @@ describe("the file it all comes out as", () => {
   // them: the group of four, then `time-grid` as a block of its own, then the
   // two lone rows.
   const PAGE = [
-    "banner", "diary", "launcher", "tasks", "logbook",
+    "banner", "diary", "launcher", "tasks", "events", "logbook",
     "time-grid", "journals", "charts",
   ];
-  const PAGE_GROUP = ["diary", "launcher", "tasks", "logbook"];
+  const PAGE_GROUP = ["diary", "launcher", "tasks", "events", "logbook"];
   const at = (): Arrangement => ({
     rows: PAGE,
     joined: new Set(PAGE_GROUP.slice(1)),
@@ -578,7 +578,7 @@ describe("the file it all comes out as", () => {
     const out = moveRow(at(), BAND, "journals", -1);
     const next = written(out);
     expect(next).not.toBe(home());
-    // The group's own fence is untouched: the same four cells in the same two
+    // The group's own fence is untouched: the same five cells in the same two
     // columns, which is what "moved over it" has to mean in the file.
     expect(fenceOf(next)).toEqual(fenceOf(home()));
     expect(model.blocks?.(next)?.map((b) => b.ids)).toEqual([

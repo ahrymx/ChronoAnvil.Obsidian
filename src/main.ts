@@ -365,19 +365,34 @@ export default class ChronoAnvilPlugin extends Plugin {
     const folds = this.settings.collapsedNoteSections;
     const tabs = this.settings.openGroupTabs;
     const gridFilters = this.settings.timeGridFilters;
-    // AND THE REVEALS, WHICH ARE THE FOURTH OF THESE (5.28). Same key format,
-    // same reason to prune, opposite default — see `revealedNoteSections`.
-    const reveals = this.settings.revealedNoteSections;
+    // ── AND THE RECORD THE REVEALS USED TO KEEP (1.0.25) ─────────────────
+    //
+    // `revealedNoteSections` WAS THE FOURTH OF THESE (5.28) and is a field no
+    // longer. A reveal defaults to OPEN now and files its answer as a fold,
+    // namespaced `::reveal:` inside `collapsedNoteSections` — so it is pruned by
+    // the walk over that record below, and `ui/reveal.ts` argues why the second
+    // record was only ever the opposite default in disguise.
+    //
+    // DELETED RATHER THAN MIGRATED, because there is nothing in it to carry:
+    // every key it held said *the reader opened this*, which is what the new
+    // default says for free. It is swept here rather than left in data.json for
+    // the reason `::journal:list` is swept below — a record that only ever grows
+    // is what this method exists to stop, and a retired one never shrinks on its
+    // own.
+    const stale = this.settings as { revealedNoteSections?: unknown };
+    const retired = stale.revealedNoteSections === undefined ? 0 : 1;
+    if (retired) delete stale.revealedNoteSections;
     const any =
       Object.keys(folds ?? {}).length > 0 ||
       Object.keys(tabs ?? {}).length > 0 ||
-      Object.keys(reveals ?? {}).length > 0 ||
       Object.keys(gridFilters ?? {}).length > 0;
-    if (!any) return;
+    if (!any) {
+      if (retired > 0) await this.saveSettings();
+      return;
+    }
     const live = new Set(this.app.vault.getMarkdownFiles().map((f) => f.path));
-    let dropped = tabs ? pruneCollapsedSections(tabs, live) : 0;
+    let dropped = retired + (tabs ? pruneCollapsedSections(tabs, live) : 0);
     dropped += gridFilters ? pruneCollapsedSections(gridFilters, live) : 0;
-    dropped += reveals ? pruneCollapsedSections(reveals, live) : 0;
     if (!folds || Object.keys(folds).length === 0) {
       if (dropped > 0) await this.saveSettings();
       return;

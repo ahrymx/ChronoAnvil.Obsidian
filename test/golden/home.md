@@ -10,6 +10,7 @@ diary:3
 cell
 launcher
 tasks-table
+events
 tab
 logbook
 ```

@@ -34,13 +34,37 @@ import {
 // (`foldableSection`). A reveal has somewhere to get back from — the button in
 // the banner is the thing that is left — so it can take the whole card.
 //
-// AND THE DEFAULT IS CLOSED, which is the other half a fold cannot do. Every
-// other collapse in this plugin starts open and remembers what the reader shut;
-// a reveal starts shut and remembers what they opened. That is why the state is
-// its own record rather than a namespace inside `collapsedNoteSections`: the two
-// records answer opposite questions, and one map whose absent keys mean
-// "expanded" for some prefixes and "collapsed" for others is a map nobody can
-// iterate correctly.
+// ── AND THE DEFAULT IS OPEN, AS OF 1.0.25 ───────────────────────────────
+//
+// IT SHIPPED CLOSED, and the paragraph that stood here made the case: every
+// other collapse in this plugin starts open and remembers what the reader shut,
+// a reveal started shut and remembered what they opened, and that opposite
+// default was the entire reason the answer lived in a record of its own.
+//
+// THE REPORT: *"Make stack groups auto expand its children (the added widgets),
+// and remember their states across app/Obsidian reloads."* Closed-by-default is
+// right exactly once — the first time a reader meets chrome they never asked
+// for — and wrong every time after, in the way that costs most. A reader welds a
+// section into the banner ON PURPOSE, from the section editor or the widget
+// door, and the thing they just added is not drawn: the gesture and its result
+// disagree, and the only evidence the section arrived at all is a word in a
+// strip of chevrons. A stack that opens what is in it is a stack that can be
+// built by looking at it.
+//
+// SO A REVEAL KEEPS ITS ANSWER WHERE A FOLD DOES, and the case for a second
+// record goes with the default it was made of. The heading above still holds —
+// a fold keeps its bar and a reveal draws nothing at all, which is the whole of
+// what a reveal is for — but that is a difference in what the two DRAW, and it
+// was never a reason for two records. The answer is a namespace inside
+// `collapsedNoteSections` — `"<notePath>::reveal:<id>"`, which is the `::frame:`
+// rule applied a second time — so an absent key means open here exactly as it
+// does everywhere else, and the load-time prune, the rename retarget and any
+// future *unfold everything* have one map with one meaning to walk.
+//
+// WHAT A READER HAD OPENED IS DELETED RATHER THAN MIGRATED, and nothing is lost
+// by that: an open reveal is the default now, so every answer the old record
+// held is an answer the new default gives for free. `pruneNoteState` drops the
+// field the first time the plugin loads.
 //
 // ── HOW A BUTTON REACHES A CARD IN ANOTHER BLOCK ────────────────────────
 //
@@ -57,11 +81,13 @@ import {
 // Blocks may render in any order, arrive late, or be torn down and rebuilt by a
 // live widget, and none of it needs a timer.
 //
-// A TARGET IS VISIBLE UNTIL A CONTROLLER CLAIMS IT, and that rule is what makes
-// the feature safe to ship closed-by-default. If a note has no banner — the
-// section removed, a template preview, a fence pasted into somebody else's note
-// — nothing hides, because nothing is drawn that could show it again. The
-// hiding is the controller's act, never the target's.
+// A TARGET IS VISIBLE UNTIL A CONTROLLER CLAIMS IT, which is what made the
+// feature safe to ship closed-by-default and is no less the rule now that it
+// ships open. If a note has no banner — the section removed, a template preview,
+// a fence pasted into somebody else's note — nothing hides, because nothing is
+// drawn that could show it again. The hiding is the controller's act, never the
+// target's, and under the 1.0.25 default it is the controller acting on
+// something the reader closed by hand.
 //
 // IT IS ALSO WHAT MAKES BREAKING A STACK UP FREE (5.29). Only a section welded
 // into the banner's fence registers, so a section that leaves it stops being a
@@ -219,15 +245,26 @@ export interface RevealTarget {
 // AN INTERFACE RATHER THAN THE PLUGIN, for `FoldStore`'s reason — this module is
 // imported by the widget dispatcher, which imports half the plugin, and taking
 // `ChronoAnvilPlugin` here would be the cycle.
+//
+// `isOpen` IS TRUE FOR A KEY NOBODY HAS ANSWERED, as of 1.0.25. The store the
+// dispatcher hands in is `foldStore` read the other way round, so the default
+// is not a decision this file makes twice — see the head of this file.
 export interface RevealStore {
   isOpen(key: string): boolean;
   setOpen(key: string, open: boolean): void;
 }
 
+// Where a reveal's answer is filed — and it is a fold's record since 1.0.25.
+//
 // The separator is `SECTION_KEY_SEP`'s, so `pathwatch.ts` retargets these keys
 // on a rename with the same three lines it uses for every other per-note record.
+//
+// `reveal:` NAMESPACES IT, which is the rule `frame:` already follows in the
+// dispatcher. These keys now share `collapsedNoteSections` with the header bars,
+// whose own keys are `"<notePath>::<title>"`, and a reader who titled a section
+// `tracker` would otherwise have one control folding the other's card.
 export function revealKey(path: string, id: string): string {
-  return `${path}::${id}`;
+  return `${path}::reveal:${id}`;
 }
 
 // ── THE PURE HALF ───────────────────────────────────────────────────────

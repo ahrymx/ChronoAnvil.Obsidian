@@ -719,23 +719,27 @@ export class Widgets implements
     };
   }
 
-  // Where a banner's reveals remember what the reader opened.
+  // Where a banner's reveals remember what the reader closed.
   //
-  // ITS OWN RECORD, AND THE DEFAULT IS THE REASON — `settings.revealedNoteSections`
-  // says why. Fire-and-forget on the write for `foldStore`'s reason: a failed
-  // save costs a remembered chevron, not correctness.
+  // ── THE FOLD STORE, READ THE OTHER WAY ROUND (1.0.25) ─────────────────
+  //
+  // IT HAD A RECORD OF ITS OWN — `settings.revealedNoteSections`, holding what
+  // the reader had OPENED — and the only thing that record was ever made of was
+  // the opposite default. A reveal shipped closed; every fold in the plugin
+  // ships open; one map whose absent keys meant "expanded" for some prefixes and
+  // "collapsed" for others is a map nobody can iterate correctly, so there were
+  // two. `ui/reveal.ts` carries the reader's ask and the reversal in full.
+  //
+  // With the default flipped the two records answer the same question, so there
+  // is one — and this is not a second copy of the eight lines above it, because
+  // a second copy is how two records that share a key format come to disagree.
+  // It is those lines with the sign changed, which is the whole of the
+  // difference between a chevron in the banner and a chevron on a section bar.
   private revealStore(): RevealStore {
+    const fold = this.foldStore();
     return {
-      isOpen: (key) => this.plugin.settings.revealedNoteSections?.[key] === true,
-      setOpen: (key, open) => {
-        if (!this.plugin.settings.revealedNoteSections) {
-          this.plugin.settings.revealedNoteSections = {};
-        }
-        const map = this.plugin.settings.revealedNoteSections;
-        if (open) map[key] = true;
-        else delete map[key];
-        void this.plugin.saveSettings();
-      },
+      isOpen: (key) => !fold.isCollapsed(key),
+      setOpen: (key, open) => fold.setCollapsed(key, !open),
     };
   }
 

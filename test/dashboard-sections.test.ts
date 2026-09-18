@@ -807,6 +807,7 @@ describe("the homepage becomes a place to start", () => {
       "diary",
       "launcher",
       "tasks",
+      "events",
       "logbook",
       "time-grid",
       "journals",

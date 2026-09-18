@@ -5,6 +5,120 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.28] - 2026-09-18
+
+### Changed
+
+- **The diary card's "Coming up" list folds away.** The agenda at the bottom of
+  the calendar was always open and always the tallest thing on the card. It now
+  ships collapsed, behind an **Upcoming events** toggle sitting at the far end of
+  the card's footer, opposite **Jump to a date…** — the two controls of that
+  shape now read as a pair. The toggle is in the footer rather than in the
+  panel's own head on purpose: a control inside the thing it hides is only
+  findable while that thing is showing, and this one ships hiding it.
+
+  Opening it is remembered for as long as the pane is open, which is the same
+  guarantee the month cursor has had and for the same reason — adding an event
+  redraws the card, and without it the list you opened to check your work would
+  fold itself away again.
+
+### Added
+
+- **The events manager is on the homepage, under Open tasks.** With the diary
+  card's agenda folded away by default, the **Manage** link that opened the
+  events note went with it — and a control that has to be revealed before it can
+  be pressed is not a way into anything. The 🎉 **Events** widget now composes as
+  the third cell of the homepage's right-hand stack, below the task list.
+
+  It arrives on an existing homepage at the next repair, stacked into that cell,
+  because reconciliation is additive and reorders nothing. Untick it in **Edit
+  this note's sections…** if you would rather not have it; nothing else on the
+  page moves.
+
+  One trade, stated: a page whose catalogue writes a keyword stops offering that
+  widget in the add list, so the homepage will no longer offer a *second* events
+  manager. A second copy of the one list of every event in the vault is not
+  something anybody has asked for — unlike a second logbook, which is why the
+  logbook is still not composed here.
+
+## [1.0.27] - 2026-09-18
+
+### Changed
+
+- **The compact week got its air back, and its cards got their names.** Three
+  things about 1.0.26 on a wide screen, all reported together as *"somewhat too
+  cramped"*:
+
+  - **The all-day row has stopped saying "all day".** The two words had been
+    losing to a 30px gutter since they were written — they wrapped onto two
+    lines, and the second one sat against the `12a` mark. The row paints its own
+    tint across the whole week and nothing else on the grid looks like it, which
+    is context enough. The words are still there for a pointer and for a screen
+    reader; they just no longer take up any of the grid.
+  - **The section is about fifty pixels taller, in both modes.** Compact rows
+    went 22px → 24px, so midnight to midnight is 576px rather than 528 — and
+    since nothing scrolls there, the day's height *is* the section's. The full
+    grid's scroller cap went 620px → 670px, which is about one more hour of the
+    evening before you have to scroll for it.
+  - **A card carries its name again where there is room for one.** A compact box
+    that stands for a single thing now shows its title, at container widths of
+    560px and up — roughly a 75px column, which is where a name stops being an
+    abbreviation. Below that the grid is exactly what 1.0.19 shipped: counted
+    boxes and nothing else, because seven columns divide a phone into 45px each
+    and a name in 45px was the complaint that produced the boxes.
+
+  A box standing for several things still shows only its count, at every width.
+  They are grouped by colour, so naming one after the earliest of four names it
+  after the wrong thing three times in four.
+
+## [1.0.26] - 2026-09-18
+
+### Changed
+
+- **The week grid is compact everywhere, and a pencil opens it for editing.**
+  The small form — all seven columns and the whole day at once, everything in it
+  a coloured box with a count, nothing scrolling inside the note — was a phone
+  form, reached only in a pane narrower than 400px. It is now what the grid
+  looks like at every width.
+
+  It was never really about the phone. A week you are *reading* is seven columns
+  and some colour; a week you are *editing* is the only one that needs fifty
+  pixels an hour and a drag handle on every block. A wide screen was never a
+  statement that you wanted the second one — and the full grid was costing about
+  a thousand pixels of note to say what the compact one says in five hundred.
+
+  The **✏️** beside the source names is the way in: press it and the rows grow,
+  every block wears its own title and times, and the three gestures come back —
+  drag a column for a new event, drag a block to move it, press one to open it.
+  Press it again to go back. Each grid remembers which you left it in, per note,
+  across restarts, exactly as the phone control already did.
+
+  Nothing about a compact grid is new: the boxes, the counts, the press that
+  opens, and the reason nothing drags there (a quarter-hour block is five pixels
+  tall) are all 1.0.18 and 1.0.19, unchanged. If you had expanded a grid on your
+  phone, it is still expanded.
+
+## [1.0.25] - 2026-09-18
+
+### Changed
+
+- **A stack opens what is in it.** The chevrons in a banner — one per section
+  welded into the card, added in 5.28 — started **closed**, and stayed closed
+  until you pressed them. That was written for a note arriving with chrome
+  nobody asked for. It was exactly wrong for the note you had just built:
+  welding a section into the banner, from **Edit sections…** or from the widget
+  door, put it there and did not draw it, so the only sign the section existed
+  was a word in a strip of chevrons.
+
+  Every welded section now starts **open**, including one you add to a stack
+  that is already on the page. A section you close stays closed — on that note,
+  under that chevron, across restarts — which is how every other fold in
+  ChronoAnvil has always worked.
+
+  What you had opened before this release is not carried over, and there is
+  nothing to carry: open is the default now. The record that held it is removed
+  from `data.json` the first time this version loads.
+
 ## [1.0.24] - 2026-09-18
 
 ### Added

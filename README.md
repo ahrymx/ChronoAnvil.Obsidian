@@ -56,22 +56,31 @@ queries, no Templater scripts, no external chart plugins.
 
 ![The hourly week grid, with its three gestures numbered](docs/screenshots/time-grid.png)
 
+The grid rests **compact**, on a phone and on a widescreen alike: the whole week
+and the whole day at once — all seven columns, midnight to midnight, nothing
+scrolling inside it. Everything on it is a box in its own colour, never shorter
+than three quarters of an hour so it can be seen, and where several things of
+one colour would land on top of each other they become one box carrying the
+count: two work logs read **2**, four meetings read **4**. A press opens what is
+in a box, or offers the list when it holds several.
+
+Where the columns are wide enough to hold a name — a laptop, a full-width pane —
+a box standing for a single thing shows its title. On a phone, where seven
+columns are 45px each, it stays a box: a name in 45px is three letters and an
+ellipsis, which is what the boxes were invented to replace.
+
+Nothing moves in that state, and that is not a second decision: a quarter-hour
+block is five pixels tall there, and a drag handle on five pixels is a handle
+that moves the wrong meeting. Press the **✏️** beside the source names and the
+week opens for editing — full rows, every block wearing its own title and times,
+and these three gestures wired. Press it again to go back. Each note remembers
+which you left it in.
+
 | | Gesture | What it does |
 | :---: | --- | --- |
 | **1** | Drag down an empty column | Blocks out a new slot at the hours you swept |
 | **2** | Click a block | Opens it to edit the title, times and colour *(coming soon)* |
 | **3** | Drag a block | Moves it to another day or hour — the dashed outline is where it lands |
-
-On a phone, or in any pane too narrow for those three, the grid draws the whole
-week and the whole day at once — all seven columns, midnight to midnight,
-nothing scrolling inside it. Everything on it becomes a box in its own colour,
-never shorter than three quarters of an hour so it can be seen, and where
-several things of one colour would land on top of each other they become one
-box carrying the count: two work logs read **2**, four meetings read **4**. A
-press opens what is in a box, or offers the list when it holds several. It is
-read-only there — nothing moves — and the **⤢** button beside the source names
-hands back the full grid, gestures and all, with that note remembering which
-you chose.
 
 ### Every dated thing, on one page
 
@@ -83,7 +92,11 @@ finger as with a mouse. An event turned off keeps its place in the list and
 leaves every calendar, which is what a holiday you observe some years wants.
 
 The page itself is customisable like any other: a banner, a section editor, and
-the manager above the week ahead beside the week's events.
+the manager above the week ahead beside the week's events. The same manager sits
+on the homepage, under the open-task list, so adding a birthday is one press from
+where you start. The diary card's own **Coming up** list is folded away until you
+ask for it — press **Upcoming events** in the card's footer, opposite **Jump to a
+date…**.
 
 ## Install
 

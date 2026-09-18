@@ -225,19 +225,16 @@ export interface ChronoAnvilSettings {
   // A header bar collapses everything after it up to the next header bar; this
   // remembers which sections the user has folded so they stay folded across
   // reloads. Absent key = expanded (the default).
-  collapsedNoteSections: Record<string, boolean>;
-  // Which of a journal note's revealable sections the reader has OPENED, keyed
-  // "<notePath>::<revealId>" (5.28). The banner draws a chevron per revealable
-  // section and a closed one is not drawn at all — see `ui/reveal.ts`.
   //
-  // ITS OWN RECORD BECAUSE ITS DEFAULT IS THE OTHER ONE. `collapsedNoteSections`
-  // above means "absent key = expanded", which is right for every fold in the
-  // plugin and exactly wrong here: a reveal ships CLOSED and what is worth
-  // remembering is what the reader opened. Sharing one map under two key
-  // prefixes would leave it unreadable to anything that iterates it — the
-  // load-time prune, a future "unfold everything" — for the sake of not
-  // declaring a field.
-  revealedNoteSections: Record<string, boolean>;
+  // THREE KINDS OF KEY, ONE MEANING. `"<notePath>::<title>"` is a header bar's,
+  // `"<notePath>::frame:<kind>"` a `frame: section`'s, and
+  // `"<notePath>::reveal:<id>"` a banner chevron's since 1.0.25 — each
+  // namespaced so it cannot collide with a title a reader wrote, and every one
+  // of them absent-means-open. That last one had a record of its own
+  // (`revealedNoteSections`) for as long as a reveal shipped CLOSED and the
+  // answer worth keeping was the opposite one; `ui/reveal.ts` holds the reversal
+  // and `pruneNoteState` deletes the retired field.
+  collapsedNoteSections: Record<string, boolean>;
   // Which page of a tabbed widget group the reader last had open, keyed
   // "<notePath>::<blockIndex>". Absent key = the first page. 4.34 §4.
   //
@@ -402,7 +399,6 @@ export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
   logbooks: DEFAULT_LOGBOOKS.map((book) => ({ ...book })),
   dismissedJournalFolders: [],
   collapsedNoteSections: {},
-  revealedNoteSections: {},
   openGroupTabs: {},
   timeGridFilters: {},
   captureDraft: "",

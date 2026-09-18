@@ -431,6 +431,24 @@ function renderWeekdayHeader(parent: HTMLElement, weeks = false): void {
 // month — so adding an event while browsing next March would throw you home.
 export interface CalendarState {
   monthKey?: string;
+  // Whether the reader has opened the agenda — 1.0.28, and it is here for the
+  // paragraph above rather than for a reason of its own. The agenda ships
+  // COLLAPSED now, so "open" is a thing the reader did, and a rebuild triggered
+  // by the events note changing is precisely the moment they did it: add an
+  // event from the manager, the calendar redraws, and the list you opened to
+  // check your work folds itself away again. Same failure as the month, same
+  // place to keep the answer.
+  //
+  // NOT IN SETTINGS, WHICH IS WHERE THE OTHER FOLDS LIVE. `collapsedNoteSections`
+  // keeps a record per note and per section because those folds are about a
+  // SECTION of a page. This is a control inside one widget's card, on a card that
+  // may appear more than once in a vault, and the state is worth exactly as much
+  // as the month cursor beside it: until the pane closes. Persisting it would
+  // mean naming this panel in a per-note key, which is the machinery a fold uses
+  // because a fold IS a section — see `revealKey` in ui/reveal.ts for the three
+  // kinds of key that record already holds, and note that none of them is
+  // "a control inside a widget".
+  agendaOpen?: boolean;
 }
 
 export interface CalendarOptions {
@@ -984,6 +1002,52 @@ export function buildCalendar(
   if (opts.agenda && opts.agenda > 0) {
     root.addClass("ca-jc-has-agenda");
     renderAgenda(root, plugin, opts.agenda, openDay);
+
+    // ── AND IT IS FOLDED AWAY UNTIL ASKED FOR (1.0.28) ──────────────────
+    //
+    // The reader's ask: *"make the Diary calendar's coming up events
+    // collapsible via 'Upcoming Events' opposite to 'Jump to a Date…';
+    // automatically collapsed."*
+    //
+    // WHY THE FOOTER AND NOT THE PANEL'S OWN HEAD. The panel has a head — the
+    // label and the Manage link — and putting the control there would have cost
+    // nothing to build. It is the wrong place because a control inside the thing
+    // it hides is only findable while the thing is showing, and this one ships
+    // hiding it: a reader who never opens the agenda would meet the word
+    // "Upcoming events" for the first time by expanding a panel they did not
+    // know was there. The footer is the card's row of controls, it is on screen
+    // whatever the agenda is doing, and it already holds the other control of
+    // exactly this shape.
+    //
+    // OPPOSITE THE JUMP TOGGLE, WHICH IS WHAT `space-between` MAKES OF A THIRD
+    // CHILD: the two toggles take the ends and the status text sits between
+    // them. The status is the only one of the three that is sometimes empty, so
+    // it is the one that can afford the middle — the ends stay put whether or
+    // not it is saying anything.
+    //
+    // THE STATE CLASS GOES ON THE ROOT, NOT ON THE PANEL, because two rules
+    // depend on the answer and only one of them is the panel's: the card drops
+    // its bottom padding for an agenda that runs to its edge
+    // (`.ca-jc-has-agenda`), and with the panel gone that padding has to come
+    // back or the footer sits flush against the card's rim. One class on the
+    // card answers both.
+    const agendaToggle = footer.createSpan({
+      cls: "ca-jc-agenda-toggle",
+      text: "Upcoming events",
+      attr: { title: "Show or hide what is coming up" },
+    });
+    const showAgenda = (open: boolean) => {
+      root.toggleClass("is-agenda-open", open);
+      agendaToggle.toggleClass("is-open", open);
+      if (state) state.agendaOpen = open;
+    };
+    // COLLAPSED IS THE ABSENT ANSWER, which is what "automatically collapsed"
+    // means for a record that starts empty: `=== true` rather than a falsy test,
+    // so a state object from an older build opens closed rather than undefined.
+    showAgenda(state?.agendaOpen === true);
+    agendaToggle.addEventListener("click", () =>
+      showAgenda(!root.hasClass("is-agenda-open"))
+    );
   }
 
   return root;

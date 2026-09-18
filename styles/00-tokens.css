@@ -574,19 +574,15 @@
   --ca-tg-row: 50px;
   --ca-tg-now: #e0484d;
 
-  /* ── IS THE GRID COMPACT? THE STYLESHEET ANSWERS AND THE VIEW READS IT ──
-     `time-grid` is the one widget whose narrow form is not only a different
-     shape but a different set of GESTURES: a fifteen-minute stand-up is five
-     pixels tall at the compact row height, and a drag handle on five pixels
-     is a handle that moves the wrong meeting. So the view has to know, and
-     the width it would have to measure is already a number in this file.
-
-     Declared here as 0 and raised to 1 by the container query in
-     `99-time-grid.css`, then read back through `getComputedStyle`. Two files
-     holding one breakpoint is how a grid comes to be drawn compact and wired
-     for dragging at the same time — the failure `--ca-tg-hours` exists to
-     prevent, one row down the same widget. */
-  --ca-tg-compact: 0;
+  /* `--ca-tg-compact` STOOD HERE, AND 1.0.26 RETIRED IT.
+     It was declared 0 and raised to 1 by `99-time-grid.css`'s container query,
+     then read back through `getComputedStyle` in a `ResizeObserver` — the
+     channel that told the view a grid was too narrow to be written on, so that
+     a fifteen-minute block five pixels tall never grew a drag handle. The
+     property is gone because the QUESTION is: a grid is compact unless the
+     reader has opened it for editing, at every width, and the view holds that
+     answer itself. The stylesheet keys off `.ca-tg:not(.is-expanded)` and the
+     breakpoint decides nothing but whether the bar wraps. */
 
   /* ── The spacing scale (3.9 §4) ────────────────────────────────────────
      DEFINED HERE AND READ BY NOTHING IN THE PATCH THAT ADDS IT. That is the

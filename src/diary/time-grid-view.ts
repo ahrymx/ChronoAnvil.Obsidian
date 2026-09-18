@@ -208,34 +208,46 @@ export function buildTimeGrid(
     ? loadTimeGridFilters(plugin, filterKey, sources)
     : new Set<GridSource>();
 
-  // WHETHER THIS GRID IS TOO NARROW TO BE WRITTEN ON, ASKED OF THE STYLESHEET.
+  // ── WHETHER THIS GRID IS BEING READ OR BEING WRITTEN ON (1.0.26) ──────
   //
-  // `99-time-grid.css` holds the breakpoint — it is a `@container` query, and
-  // the container is this element — and raises `--ca-tg-compact` to 1 inside
-  // it. Nothing here knows the number. A width measured in TypeScript and a
+  // `readCompact` STOOD HERE and asked the stylesheet — named without its
+  // parentheses, as every obituary in this tree is, so that a sweep for the CALL
+  // form still reports a live one: `99-time-grid.css`
+  // held the breakpoint as a `@container` query over this element and raised
+  // `--ca-tg-compact` to 1 inside it, and a `ResizeObserver` — `CompactWatcher`,
+  // retired with it — re-read the property whenever the box changed. Nothing
+  // here knew the number, deliberately: a width measured in TypeScript and a
   // width written in CSS is two files holding one breakpoint, which is how a
   // grid comes to be drawn at fifteen pixels an hour and wired for dragging at
   // the same time.
   //
-  // AN EMPTY STRING MEANS "NOT LAID OUT YET" and reads as false, which is the
-  // safe way round: a full-size grid drawn into a narrow pane is corrected by
-  // the observer below on the first frame it has a box.
-  const readCompact = (): boolean =>
-    getComputedStyle(root).getPropertyValue("--ca-tg-compact").trim() === "1";
+  // THE READER TOOK THE BREAKPOINT OUT OF THE QUESTION: *"Time-grid should have
+  // a smaller mode on big displays just the same as on mobile, with a toggle to
+  // go in and make edits and create events."* A grid is compact unless the
+  // reader has opened it for editing — at 360px and at 1600px alike — so the
+  // answer is the stored flag and nothing else, the stylesheet keys off
+  // `.is-expanded` rather than a width, and the two files cannot disagree
+  // because there is only one of them holding an opinion.
+  //
+  // THE HAZARD THE OLD ARRANGEMENT GUARDED IS UNCHANGED AND STILL GUARDED. A
+  // quarter-hour block is five pixels tall at the compact row height and
+  // `.ca-tg-grip` is a twelve-pixel handle; `compact` is what stops that handle
+  // being wired, and it is now the same flag that sets the row height, one step
+  // earlier in the same decision.
 
   let drawn: Collected = { items: [], allDay: [] };
   let ready = false;
   let showing: DayCount = asked;
   let opened = false;
-  let compact = false;
   const ticker: TickerSlot = { current: null };
   let expanded = filterKey ? loadTimeGridExpanded(plugin, filterKey) : false;
+  let compact = !expanded;
   root.toggleClass("is-expanded", expanded);
 
   const render = (): void => {
     if (!ready) return;
     showing = asked;
-    compact = readCompact();
+    compact = !expanded;
     const cols = visibleDays(dates, showing, moment().format("YYYY-MM-DD"));
     span.setText(
       cols.length === 1
@@ -292,56 +304,39 @@ export function buildTimeGrid(
     render();
   });
 
-  expandControl(bar, expanded, (want) => {
+  editControl(bar, expanded, (want) => {
     expanded = want;
     root.toggleClass("is-expanded", expanded);
     if (filterKey) saveTimeGridExpanded(plugin, filterKey, expanded);
     render();
   });
 
-  // The one thing that can change the answer without anything being pressed.
-  ctx.addChild(
-    new CompactWatcher(root, () => {
-      if (ready && readCompact() !== compact) render();
-    })
-  );
+  // `CompactWatcher` STOOD HERE (1.0.18–1.0.25), a `ResizeObserver` on the root
+  // that re-asked the stylesheet for `--ca-tg-compact` on every box change and
+  // repainted when the answer had crossed the breakpoint. Nothing measures this
+  // widget any more — see the block above `drawn` — so a resize changes what the
+  // grid LOOKS like and never what it is, which is CSS's own job and needs no
+  // observer at all.
 
   reload();
 
   return root;
 }
 
-// Re-asks the stylesheet whether the grid is compact, whenever the grid's box
-// changes.
+// `CompactWatcher` STOOD HERE AND IS RETIRED (1.0.26).
 //
-// A RENDER CHILD BECAUSE AN OBSERVER OUTLIVES ITS ELEMENT OTHERWISE, which is
-// `NowTicker`'s reason one class down: a homepage is opened and closed all day,
-// and an observer registered on the plugin would go on measuring a node that is
-// no longer in a document. `ctx.addChild` ties it to the block.
+// It was a `MarkdownRenderChild` holding a `ResizeObserver` over the grid's
+// root, so that a pane dragged past 400px re-read `--ca-tg-compact` and
+// repainted. Both halves of its reason for existing are gone: the stylesheet no
+// longer decides whether the grid is compact — the reader does, at every width
+// — and with no measurement there is nothing to observe. A resize now changes
+// how the columns divide the width and nothing else, which is a question CSS
+// answers on its own.
 //
-// IT DOES NOT DECIDE ANYTHING. It re-reads one custom property and calls back;
-// the stylesheet still owns the breakpoint, and a resize that does not cross it
-// repaints nothing.
-class CompactWatcher extends MarkdownRenderChild {
-  private observer: ResizeObserver | null = null;
-
-  constructor(
-    private readonly root: HTMLElement,
-    private readonly onChange: () => void
-  ) {
-    super(root);
-  }
-
-  onload(): void {
-    this.observer = new ResizeObserver(() => this.onChange());
-    this.observer.observe(this.root);
-  }
-
-  onunload(): void {
-    this.observer?.disconnect();
-    this.observer = null;
-  }
-}
+// The render-child shape it argued for is still right and still in use one class
+// up: `NowTicker` owns a timer for the same reason this owned an observer — a
+// homepage is opened and closed all day, and anything registered on the plugin
+// goes on running against a node that has left the document.
 
 export function loadTimeGridFilters(
   plugin: ChronoAnvilPlugin,
@@ -378,10 +373,16 @@ export function saveTimeGridFilters(
 // big. Two key shapes for one widget would be two things to migrate the day a
 // note is renamed.
 //
-// A RECORD THAT ONLY EVER HOLDS `true`. The default is compact-below-400px, so
-// "not expanded" is the absence of a row rather than a stored `false` — the
-// shape `saveTimeGridFilters` already uses for "nothing is turned off", and it
-// keeps a vault that has never pressed the control out of the settings file.
+// A RECORD THAT ONLY EVER HOLDS `true`. The default is compact — at every
+// width, as of 1.0.26 — so "not expanded" is the absence of a row rather than a
+// stored `false`: the shape `saveTimeGridFilters` already uses for "nothing is
+// turned off", and it keeps a vault that has never pressed the control out of
+// the settings file.
+//
+// AND THE DEFAULT GOT WIDER WITHOUT THE RECORD CHANGING SHAPE, which is why
+// there is no migration here. It used to mean "expanded out of the phone's
+// compact form"; it means "opened for editing" now, and a reader who had pressed
+// the control on a phone had asked for exactly that.
 export function loadTimeGridExpanded(
   plugin: ChronoAnvilPlugin,
   key: string
@@ -407,17 +408,30 @@ export function saveTimeGridExpanded(
   void plugin.saveSettings();
 }
 
-// The way back to the desk grid.
+// The door into the week, and back out of it.
 //
-// DRAWN ALWAYS AND SHOWN BY CSS, which is the only order that works: the bar is
-// built before this element has been laid out, so nothing here can know how
-// wide the grid ended up. `.ca-tg-expand` is `display: none` until the
-// container query says otherwise, so on every pane wide enough to draw the full
-// grid the control is not merely useless, it is absent.
+// ── IT WAS `expandControl`, AND THE RENAME IS THE ASK (1.0.26) ───────────
 //
-// AN ICON AND NOT A WORD. Three source names are already in this corner and a
-// fourth word would read as a fourth source.
-function expandControl(
+// It was drawn always and shown by CSS — `display: none` until the container
+// query said otherwise — because a pane wide enough to draw the full grid had
+// nothing to expand TO, and the bar is built before anything has been laid out
+// so nothing here could know the width. The resting shape changed, not the
+// order: a grid is compact at every width now, so the control exists at every
+// width and CSS decides nothing about it.
+//
+// WHAT IT SAYS IS THE PART THAT HAD TO CHANGE. *"A toggle to go in and make
+// edits and create events"* is what the reader calls this, and `Show the full
+// grid` described the half of it a reader can see rather than the half they
+// came for. The pixels and the gestures are one switch — a drag handle on a
+// five-pixel block is a handle that moves the wrong meeting — so the label says
+// the consequence and the icon is a pencil.
+//
+// AN ICON AND NOT A WORD, unchanged. Three source names are already in this
+// corner and a fourth word would read as a fourth source.
+const EDIT_ON = "Done — back to the compact week";
+const EDIT_OFF = "Edit the week — full rows, drag to move, drag a column for a new event";
+
+function editControl(
   bar: HTMLElement,
   expanded: boolean,
   onChange: (want: boolean) => void
@@ -427,20 +441,20 @@ function expandControl(
     attr: {
       type: "button",
       "aria-pressed": expanded ? "true" : "false",
-      "aria-label": expanded ? "Show the compact grid" : "Show the full grid",
-      title: expanded ? "Show the compact grid" : "Show the full grid",
+      "aria-label": expanded ? EDIT_ON : EDIT_OFF,
+      title: expanded ? EDIT_ON : EDIT_OFF,
     },
   });
-  setIcon(btn, expanded ? "minimize-2" : "maximize-2");
+  setIcon(btn, expanded ? "minimize-2" : "pencil");
   btn.addEventListener("click", () => {
     const want = !btn.hasClass("is-on");
     btn.toggleClass("is-on", want);
     btn.setAttribute("aria-pressed", want ? "true" : "false");
-    const label = want ? "Show the compact grid" : "Show the full grid";
+    const label = want ? EDIT_ON : EDIT_OFF;
     btn.setAttribute("aria-label", label);
     btn.setAttribute("title", label);
     btn.empty();
-    setIcon(btn, want ? "minimize-2" : "maximize-2");
+    setIcon(btn, want ? "minimize-2" : "pencil");
     onChange(want);
   });
 }
@@ -793,7 +807,26 @@ function paint(
   // The all-day lane. DRAWN EVEN WHEN EMPTY, so a task acquiring a due date
   // does not shift the whole grid down by a row the moment it arrives.
   const lane = grid.createDiv({ cls: "ca-tg-lane" });
-  lane.createDiv({ cls: "ca-tg-lane-label", text: "all day" });
+  // ── THE GUTTER CELL IS A SPACER NOW, NOT A LABEL (1.0.27) ───────────
+  //
+  // It read "all day". The reader took the words off it — *"'all day' text can
+  // be removed, as the row's colour is enough context for what it is."* — and
+  // the two words had been losing to the gutter since they were written: they
+  // wrapped at 24px, were given a second line for it in 1.0.19, and at 30px
+  // still put `day` against the `12a` mark.
+  //
+  // THE ELEMENT STAYS BECAUSE IT IS THE LANE'S FIRST COLUMN. `grid-template-
+  // columns` starts with the gutter, and a lane missing that cell slides every
+  // day one column left.
+  //
+  // AND THE WORDS GO WHERE THEY COST NOTHING. A tint is enough context for a
+  // reader looking at it and is no context at all for a reader who cannot see
+  // it, so the row keeps its name in the two places that are free: a tooltip
+  // for a pointer, and `aria-label` for anything reading the tree.
+  lane.createDiv({
+    cls: "ca-tg-lane-label",
+    attr: { title: "All day", "aria-label": "All day" },
+  });
   cols.forEach((day) => {
     const cell = lane.createDiv({ cls: "ca-tg-lane-cell" });
     const mine = shownAllDay.filter((a) => a.day === day);
@@ -809,6 +842,10 @@ function paint(
         });
         if (tally.items.length === 1) {
           const only = tally.items[0];
+          // ITS OWN SPAN FOR `drawBox`'s REASON ONE SCREEN DOWN: the name is
+          // drawn and the stylesheet decides whether the column is wide enough
+          // to hold it. A chip is the same 45px on a phone as a block is.
+          chip.createSpan({ cls: "ca-tg-chip-title", text: only.title });
           chip.setAttribute("title", laneTitle(only));
           wire(plugin, chip, only.key);
           continue;
@@ -1733,12 +1770,32 @@ function drawBox(
   el.style.left = `calc(${box.col * width}% + 2px)`;
   el.style.width = `calc(${width}% - 4px)`;
 
-  // THE COUNT IS THE ONLY TEXT A COMPACT GRID CARRIES, and a box holding one
+  // THE COUNT IS THE ONLY NUMBER A COMPACT GRID CARRIES, and a box holding one
   // thing carries none: `1` on every bar on the week is noise a reader has to
   // look past, and a box that stands for one thing already says so by being
-  // one. The name is on the element as a `title` and one press away in the note
-  // it came from — which is what a 45px column has always had to do.
+  // one.
+  //
+  // ── AND A BOX OF ONE SAYS WHAT IT IS (1.0.27) ─────────────────────
+  //
+  // THE REPORT: *"The cards are missing text in read mode."* It carried none at
+  // all — the name was on the element as a `title` and one press away in the
+  // note it came from, which is what a 45px phone column has always had to do,
+  // and which 1.0.19 chose deliberately after the opposite report (*"entries
+  // are too small"*) from that width.
+  //
+  // WHICH IS WHY THE SPAN IS DRAWN AND THE STYLESHEET DECIDES. Seven columns
+  // divide 360px into 45 each and a name in 45px is three letters and an
+  // ellipsis; at 560px and up a column is 75px and a name is a name. That is a
+  // question about how wide this widget ended up, so it is answered where the
+  // width is known — `@container (min-width: 560px)` in `99-time-grid.css` —
+  // rather than by a second measurement here. The `title` stays either way.
+  //
+  // A BOX OF SEVERAL STILL SAYS ONLY ITS COUNT. They are grouped by colour, so
+  // naming one after the earliest of four names it after the wrong thing three
+  // times in four — the same argument `wireStack` makes about which note a
+  // press should open.
   if (alone) {
+    el.createSpan({ cls: "ca-tg-blk-title", text: lead.title });
     el.setAttribute("title", `${lead.title} — ${describeWhen(lead)}`);
     wire(plugin, el, lead.key);
     return;

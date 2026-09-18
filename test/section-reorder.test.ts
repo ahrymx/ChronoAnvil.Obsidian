@@ -42,8 +42,9 @@ const ROOT = DEFAULT_PATHS.diaryRoot;
 const model = homeSectionModel(ROOT, "");
 const home = (): string => composeHomeNote(ROOT);
 
-// The homepage's own top row: Diary + launcher + tasks on page 1, logbook on page 2.
-const GROUP = ["diary", "launcher", "tasks", "logbook"];
+// The homepage's own top row: Diary + launcher + tasks + events on page 1,
+// logbook on page 2.
+const GROUP = ["diary", "launcher", "tasks", "events", "logbook"];
 
 // The second row / section.
 const WEEK = ["time-grid"];
@@ -129,6 +130,7 @@ describe("the write reorders the cells and changes nothing else", () => {
       "cell",
       "tasks-table",
       "launcher",
+      "events",
       "tab",
       "logbook",
     ]);
@@ -160,6 +162,7 @@ describe("the write reorders the cells and changes nothing else", () => {
       "cell",
       "diary:3",
       "tasks-table",
+      "events",
       "tab",
       "logbook",
     ]);
@@ -196,7 +199,12 @@ describe("what the dry run reports", () => {
     const ops = cellMoveOps(ids(home()), ids(out), label);
     expect(ops).toHaveLength(1);
     expect(ops[0].kind).toBe("move");
-    expect(ops[0].detail).toBe("moves above Logbook");
+    // ABOVE EVENTS, NOT ABOVE LOGBOOK, SINCE 1.0.28 — the aside gained a
+    // fourth cell between the two that swapped and the page break, and the op
+    // names the member the moved one now sits above. The property under test is
+    // that ONE op is emitted and that it names a neighbour, not which neighbour
+    // the stack happens to put there.
+    expect(ops[0].detail).toBe("moves above Events");
   });
 
   it("finds a block whose FIRST cell moved, which is why it matches on members", () => {
@@ -233,6 +241,7 @@ describe("starting a page inside a group", () => {
       "launcher",
       "tab",
       "tasks-table",
+      "events",
       "tab",
       "logbook",
     ]);
@@ -284,6 +293,7 @@ describe("starting a page inside a group", () => {
       "cell",
       "launcher",
       "tasks-table",
+      "events",
       "tab",
       "logbook",
     ]);
@@ -318,7 +328,7 @@ describe("the one bit a reorder could not survive", () => {
     expect(groups(rows, bits)[0]).toEqual(["banner", "launcher"]);
     expect(groups(rows, keptBlocks(groups(ROWS, bits), rows, bits))).toEqual([
       ["banner"],
-      ["launcher", "diary", "tasks", "logbook"],
+      ["launcher", "diary", "tasks", "events", "logbook"],
       ["journals"],
       ["charts"],
     ]);

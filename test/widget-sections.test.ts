@@ -319,7 +319,10 @@ describe("locating a widget, which must be the directive and not a word inside o
   });
 
   it("finds nothing in a note that does not hold it", () => {
-    expect(locateKeyword("events")(home())).toBe(-1);
+    // `timeline` RATHER THAN `events` SINCE 1.0.28. The homepage composes the
+    // events manager in its aside now, so `events` is a keyword this page DOES
+    // hold — which is the opposite of what this case is about.
+    expect(locateKeyword("timeline")(home())).toBe(-1);
   });
 });
 
@@ -370,9 +373,14 @@ describe("the de-dup probe, which runs both ways", () => {
     // THE POINT OF THE DOOR, stated as a case: the value is the keywords no
     // catalogue has an opinion about.
     const ids = pageWidgetSections(CATALOGUE, "").map((s) => s.id);
-    expect(ids).toContain("w:events#1");
     expect(ids).toContain("w:timeline#1");
     expect(ids).toContain("w:activity-chart#1");
+    // AND `events` STOPPED BEING ONE OF THEM IN 1.0.28, which is this rule seen
+    // from the other side: the homepage composes the manager in its aside, so
+    // the door no longer offers what the catalogue writes. Same trade
+    // `time-grid` has been subject to since 4.70, and the catalogue entry says
+    // why it costs this page nothing.
+    expect(ids).not.toContain("w:events#1");
   });
 
   it("answers the same for any diary root, because it reads locate and not render", () => {
@@ -387,27 +395,33 @@ describe("the de-dup probe, which runs both ways", () => {
 });
 
 describe("a widget added from the window behaves like any other section", () => {
-  const withEvents = model.apply(home(), [
+  // ── THE EXEMPLAR IS `timeline`, AND WAS `events` UNTIL 1.0.28 ────────
+  //
+  // Nothing here is about which widget it is: what these cases need is a
+  // keyword the homepage catalogue does NOT write, so that adding one is a
+  // reader's act rather than a section the page already had. `events` was that
+  // widget until the aside gained the manager, and `timeline` is one now.
+  const withTimeline = model.apply(home(), [
     ...composedIds,
-    "w:events#1",
+    "w:timeline#1",
   ]) as string;
 
   it("lands in one fence at the end, after everything the page has an opinion about", () => {
-    expect(withEvents).not.toBeNull();
-    expect(withEvents.trimEnd().endsWith("```")).toBe(true);
-    const fences = withEvents.split("\n").filter((l) => l.startsWith("```chronoanvil"));
+    expect(withTimeline).not.toBeNull();
+    expect(withTimeline.trimEnd().endsWith("```")).toBe(true);
+    const fences = withTimeline.split("\n").filter((l) => l.startsWith("```chronoanvil"));
     expect(fences).toHaveLength(
       home().split("\n").filter((l) => l.startsWith("```chronoanvil")).length + 1
     );
     // `insertionPoint` ranks by catalogue position and the tail is last, so this
     // costs no rule of its own.
-    expect(withEvents.split("\n").filter((l) => l === "events")).toHaveLength(1);
+    expect(withTimeline.split("\n").filter((l) => l === "timeline")).toHaveLength(1);
   });
 
   it("is reported as present, and reported last", () => {
-    const present = model.present(withEvents);
-    expect(present).toContain("w:events#1");
-    expect(present[present.length - 1]).toBe("w:events#1");
+    const present = model.present(withTimeline);
+    expect(present).toContain("w:timeline#1");
+    expect(present[present.length - 1]).toBe("w:timeline#1");
   });
 
   it("is still offered once it is there, because a page may hold another (4.56)", () => {
@@ -415,10 +429,10 @@ describe("a widget added from the window behaves like any other section", () => 
     // present, and what is present is the OCCURRENCE — so the copy on the page
     // goes and the next one takes its place. One row per widget, always, however
     // many the page already holds.
-    const ids = model.addable(withEvents).map((s) => s.id);
-    expect(ids).not.toContain("w:events#1");
-    expect(ids).toContain("w:events#2");
-    expect(ids.filter((id) => id.startsWith("w:events"))).toHaveLength(1);
+    const ids = model.addable(withTimeline).map((s) => s.id);
+    expect(ids).not.toContain("w:timeline#1");
+    expect(ids).toContain("w:timeline#2");
+    expect(ids.filter((id) => id.startsWith("w:timeline"))).toHaveLength(1);
   });
 
   it("and a SECTION is withheld once the page has it, which is the other half", () => {
@@ -426,8 +440,8 @@ describe("a widget added from the window behaves like any other section", () => 
     // content into a `<!--chronoanvil:key-->` region keyed by name, so a second copy
     // would claim the first one's region and overwrite it on Save. A widget
     // renders and remembers nothing, so a second copy is a second view.
-    const offered = model.addable(withEvents).map((s) => s.id);
-    for (const id of model.present(withEvents)) {
+    const offered = model.addable(withTimeline).map((s) => s.id);
+    for (const id of model.present(withTimeline)) {
       if (isPageWidgetId(id)) continue;
       expect(offered, id).not.toContain(id);
     }
@@ -437,7 +451,7 @@ describe("a widget added from the window behaves like any other section", () => 
     // THE PROPERTY `insertionPoint` PROMISES, asked of a section the catalogue
     // never wrote. The fence goes with the blank line that follows it and
     // nothing else moves.
-    const back = model.apply(withEvents, composedIds);
+    const back = model.apply(withTimeline, composedIds);
     expect(back).toBe(home());
   });
 
@@ -457,14 +471,14 @@ describe("a widget added from the window behaves like any other section", () => 
     // up with it. `loose` is unaffected either way: a section alone in its fence
     // owns the whole fence, whatever is in it.
     const blockOf = (text: string) =>
-      flatBlocks(text, WITH_WIDGETS).find((b) => b.ids.includes("w:events#1"));
-    expect(blockOf(withEvents)?.loose).toContain("w:events#1");
-    expect(blockOf(withEvents)?.column).toEqual([]);
+      flatBlocks(text, WITH_WIDGETS).find((b) => b.ids.includes("w:timeline#1"));
+    expect(blockOf(withTimeline)?.loose).toContain("w:timeline#1");
+    expect(blockOf(withTimeline)?.column).toEqual([]);
 
-    const bare = withEvents.replace(/^header:.*\n(?=events$)/m, "");
-    expect(bare).not.toBe(withEvents);
-    expect(blockOf(bare)?.loose).toContain("w:events#1");
-    expect(blockOf(bare)?.column).toContain("w:events#1");
+    const bare = withTimeline.replace(/^header:.*\n(?=timeline$)/m, "");
+    expect(bare).not.toBe(withTimeline);
+    expect(blockOf(bare)?.loose).toContain("w:timeline#1");
+    expect(blockOf(bare)?.column).toContain("w:timeline#1");
   });
 
   it("re-points its argument in place, without touching anything else", () => {
@@ -496,7 +510,10 @@ describe("a widget added from the window behaves like any other section", () => 
 });
 
 describe("a widget fence somebody wrote by hand", () => {
-  const byHand = home() + "\n```chronoanvil\nevents\n```\n";
+  // THE SAME SUBSTITUTION AS THE DESCRIBE ABOVE, for the same reason: this is
+  // a fence the catalogue did not write, and since 1.0.28 an `events` fence on
+  // the homepage is one it did.
+  const byHand = home() + "\n```chronoanvil\ntimeline\n```\n";
 
   it("stops being reported as a block nobody owns", () => {
     // THE COMPLAINT ANSWERED FROM THE OTHER SIDE. Before 4.12 this fence was a
@@ -504,33 +521,33 @@ describe("a widget fence somebody wrote by hand", () => {
     // it, and would not touch it.
     const ops = model.plan(byHand, model.present(byHand));
     expect(ops.filter((o) => o.kind === "foreign")).toEqual([]);
-    expect(model.present(byHand)).toContain("w:events#1");
+    expect(model.present(byHand)).toContain("w:timeline#1");
   });
 
   it("and a titled one is listed, removable, and not offered a group", () => {
-    const titled = home() + "\n```chronoanvil\nheader:🎉 Events\nevents\n```\n";
-    expect(model.present(titled)).toContain("w:events#1");
+    const titled = home() + "\n```chronoanvil\nheader:📜 All entries\ntimeline\n```\n";
+    expect(model.present(titled)).toContain("w:timeline#1");
     const block = flatBlocks(titled, WITH_WIDGETS).find((b) =>
-      b.ids.includes("w:events#1")
+      b.ids.includes("w:timeline#1")
     );
-    expect(block?.loose).toContain("w:events#1");
+    expect(block?.loose).toContain("w:timeline#1");
     expect(block?.column).toEqual([]);
   });
 
   it("gives a second copy an id of its own rather than leaving it nobody's", () => {
     // WHAT 4.56 CHANGED, AND THE OLD BEHAVIOUR IS WORTH STATING TO SEE IT. Two
-    // `events` fences used to be one section and one foreign block: the id went
-    // to the first run, and the second was reported, untouchable and impossible
-    // to remove from the window — because `events` did not carry `repeats` and
-    // three widgets out of thirty did.
+    // two fences of one keyword used to be one section and one foreign block:
+    // the id went to the first run, and the second was reported, untouchable and
+    // impossible to remove from the window — because only three widgets out of
+    // thirty carried `repeats`.
     //
     // Every occurrence has an id now, so the reader's second copy is a row like
     // any other. The one-anchor rule is untouched: two ids, two runs.
-    const twice = byHand + "\n```chronoanvil\nevents:upcoming:9\n```\n";
+    const twice = byHand + "\n```chronoanvil\ntimeline:9\n```\n";
     const present = model.present(twice);
-    expect(present.filter((id) => id.startsWith("w:events"))).toEqual([
-      "w:events#1",
-      "w:events#2",
+    expect(present.filter((id) => id.startsWith("w:timeline"))).toEqual([
+      "w:timeline#1",
+      "w:timeline#2",
     ]);
     const ops = model.plan(twice, present);
     expect(ops.filter((o) => o.kind === "foreign")).toEqual([]);
@@ -538,10 +555,10 @@ describe("a widget fence somebody wrote by hand", () => {
     // as it was, which is the property the old arrangement could not offer.
     const left = model.apply(
       twice,
-      present.filter((id) => id !== "w:events#2")
+      present.filter((id) => id !== "w:timeline#2")
     ) as string;
-    expect(left).toContain("events\n");
-    expect(left).not.toContain("events:upcoming:9");
+    expect(left).toContain("timeline\n");
+    expect(left).not.toContain("timeline:9");
   });
 });
 
@@ -924,9 +941,10 @@ describe("one door, six surfaces (5.26)", () => {
     expect(FREE).toBe(29);
 
     const rows: [string, SectionModel, number][] = [
-      // The homepage claims nine keywords of its own — the most of any
-      // catalogue, and the reason its list looked short beside the others.
-      ["home", homeSectionModel(DEFAULT_PATHS.diary), 20],
+      // The homepage claims ten keywords of its own — the most of any
+      // catalogue, and the reason its list looked short beside the others. It
+      // was nine until 1.0.28 put the events manager in its aside.
+      ["home", homeSectionModel(DEFAULT_PATHS.diary), 19],
       ["search", searchSectionModel(), 26],
       // Both logbook surfaces claim exactly `logbook`.
       [

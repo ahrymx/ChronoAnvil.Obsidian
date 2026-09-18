@@ -28,7 +28,7 @@
 // file's.
 
 import { describe, expect, it } from "vitest";
-import { readCss, readSrc } from "./sources";
+import { readCss, readSrc, styleSheets } from "./sources";
 import {
   DEFAULT_SOURCES,
   EMPTY_WINDOW,
@@ -609,13 +609,20 @@ describe("mobile controls and horizontal scrolling", () => {
   });
 });
 
-// ── the compact week (1.0.18) ────────────────────────────────────────
+// ── the compact week (1.0.18, and every width in 1.0.26) ─────────────
 //
-// THE BREAKPOINT LIVES IN THE STYLESHEET AND THE VIEW READS IT BACK, so these
-// are two halves of one assertion: the container query must raise
-// `--ca-tg-compact`, and `time-grid-view` must ask for it rather than measure a
-// width of its own. A grid drawn at fifteen pixels an hour and wired for
-// dragging is the failure both halves exist to prevent.
+// IT WAS A BREAKPOINT AND IT IS A MODE. Until 1.0.26 these were two halves of
+// one assertion: the container query had to raise `--ca-tg-compact`, and
+// `time-grid-view` had to ask for it rather than measure a width of its own,
+// because a grid drawn at fifteen pixels an hour and wired for dragging is the
+// failure both halves existed to prevent.
+//
+// THE READER TOOK THE WIDTH OUT OF IT: *"Time-grid should have a smaller mode
+// on big displays just the same as on mobile, with a toggle to go in and make
+// edits and create events."* Compact is the resting shape at every width, the
+// stored flag is the whole answer, and the stylesheet keys off
+// `.ca-tg:not(.is-expanded)`. The hazard is unchanged and the guard is the same
+// `compact` flag — it is simply decided one step earlier, by the reader.
 
 describe("the rail, when there is no room for it", () => {
   it("marks every hour and both ends of the window at step 1", () => {
@@ -661,10 +668,10 @@ describe("the rail, when there is no room for it", () => {
   });
 });
 
-// The tail of the stylesheet, from the container query to the end of the file.
+// The tail of the stylesheet: every rule that applies to a grid nobody has
+// opened for editing, from the first of them to the end of the file.
 function compactRules(): string {
-  const css = readCss();
-  // ── THE GRID'S OWN CONTAINER QUERY, NOT THE FIRST ONE IN THE SHEET ──────
+  // ── THE ANCHOR MOVED WITH THE MECHANISM (1.0.26) ───────────────────────
   //
   // This took `indexOf("@container (max-width: 400px)")`, which held for
   // exactly as long as the time grid was the only widget with a compact form.
@@ -676,11 +683,19 @@ function compactRules(): string {
   // width. It failed on `overflow: hidden`, which is the honest outcome: the
   // assertion had stopped being about the compact block.
   //
-  // Anchored on the declaration that IS this block — the flag the view reads
-  // back — so a fourth widget at the same breakpoint cannot move it again.
-  const at = css.indexOf("--ca-tg-compact: 1");
-  expect(at).toBeGreaterThan(-1);
-  const open = css.lastIndexOf("@container (max-width: 400px)", at);
+  // It was then anchored on `--ca-tg-compact: 1`, the flag the view read back,
+  // and that property is retired. TWO THINGS CHANGED HERE RATHER THAN ONE. The
+  // anchor is the selector that IS the mode — no other widget can spell it — and
+  // the haystack is THIS STYLESHEET rather than the concatenation, which is what
+  // `styleSheets()` exists for. `readCss` joins every source with its prose
+  // intact, so a retirement note in `00-tokens.css` naming the selector it
+  // replaced was enough to move the slice to the top of the sheet: the same
+  // failure the 1.0.21 note above describes, arriving from the one direction a
+  // better anchor could not help with.
+  const sheet = styleSheets().find((s) => s.name === "99-time-grid.css");
+  expect(sheet).toBeDefined();
+  const css = sheet?.css ?? "";
+  const open = css.indexOf(".ca-tg:not(.is-expanded)");
   expect(open).toBeGreaterThan(-1);
   return css.slice(open);
 }
@@ -688,14 +703,49 @@ function compactRules(): string {
 describe("the compact week", () => {
   const compactBlock = compactRules;
 
-  it("raises the flag the view reads, and defines it unconditionally", () => {
-    expect(readCss()).toContain("--ca-tg-compact: 0");
-    expect(compactBlock()).toContain("--ca-tg-compact: 1");
+  it("is a mode the reader holds, not a width the stylesheet measures", () => {
+    const css = readCss();
+    // THE RETIRED CHANNEL, ASSERTED GONE FROM BOTH ENDS. A property still
+    // declared in `00-tokens.css` and read by nothing is the shape this widget
+    // already carries two of (`gridWindow`, `MIN_WINDOW_HOURS`); one still READ
+    // by the view after the stylesheet stopped raising it would be worse — a
+    // grid permanently editable, handles and all, at 360px.
+    // THE READ AND THE DECLARATION, not the word: the property is named in two
+    // obituaries, which is the house's way of keeping a retirement findable.
+    // What must not exist is anything that still USES it.
+    expect(css).not.toContain("--ca-tg-compact:");
+    expect(readSrc("time-grid-view")).not.toContain("readCompact()");
+    expect(readSrc("time-grid-view")).not.toContain(
+      'getPropertyValue("--ca-tg-compact")'
+    );
+    // And the mode is one class, spelled the one way.
+    expect(compactBlock()).toContain(".ca-tg:not(.is-expanded) {");
+  });
+
+  it("leaves the narrow query only what is genuinely about width", () => {
+    // The bar wrapping onto two rows is about a phone and always was — it is
+    // the one rule this block never undid when the grid was expanded, which is
+    // the sentence that decided what stayed behind.
+    const block = compactBlock();
+    const query = block.slice(block.indexOf("@container (max-width: 400px)"));
+    expect(query).toContain(".ca-tg-bar");
+    expect(query).toContain("flex-wrap: wrap");
+    // A WIDTH NO LONGER DECIDES THE MODE. It still decides what fits, which is
+    // what an ordinary responsive rule is for — see the name reveal below. What
+    // must not come back is the grid's own SHAPE being read off the box.
+    expect(query).not.toContain("--ca-tg-row");
+    expect(query).not.toContain(".ca-tg-blk {");
+    expect(query).not.toContain(".ca-tg-scroll");
   });
 
   it("fits the whole day and the whole week with nothing scrolling", () => {
     const block = compactBlock();
-    expect(block).toContain("--ca-tg-row: 22px");
+    // 24px SINCE 1.0.27, WHICH IS THE SECTION'S OWN FIFTY PIXELS: the reader
+    // called both modes *"somewhat too cramped"*, and with nothing scrolling
+    // here the day's height IS the section's — 24 hours at 24px is 576 against
+    // 528. The expanded half takes the same fifty on the scroller's cap.
+    expect(block).toContain("--ca-tg-row: 24px");
+    expect(readCss()).toContain("max-height: min(70vh, 670px)");
     // Thirty rather than twenty-four: the corner's "W38" and the rail's "12a"
     // are a flex cell with no overflow and an absolutely positioned label, so
     // at 24px neither clipped — both drew past the left edge of the grid.
@@ -710,11 +760,69 @@ describe("the compact week", () => {
   it("draws a box rather than a block, and no handle on it", () => {
     const block = compactBlock();
     // Sixteen pixels is what a digit needs. The arithmetic reaches it first —
-    // forty-five minutes at 22px an hour — and this is the floor under that.
+    // forty-five minutes, 18px at the 24px row — and this is the floor under
+    // that. The two numbers moved apart in the direction that agrees more.
     expect(block).toContain("min-height: 16px");
-    expect(block).toContain(".ca-tg-blk-title");
     expect(block).toContain(".ca-tg-grip");
     expect(block).toContain("cursor: default");
+  });
+
+  it("names a box of one where a column is wide enough to hold a name", () => {
+    // THE REPORT: *"The cards are missing text in read mode."* And the report
+    // it has to be answered WITHOUT reopening is 1.0.19's, from the other
+    // width: *"entries are too small"*, which is why the text came out in the
+    // first place. Seven columns divide 360px into 45 each.
+    const block = compactBlock();
+    // Hidden by default, revealed by a width — and it is the stylesheet that
+    // holds the width, not a second measurement in the view.
+    const hide = block.indexOf(".ca-tg:not(.is-expanded) .ca-tg-blk-title,");
+    expect(hide).toBeGreaterThan(-1);
+    expect(block.slice(hide, block.indexOf("}", hide))).toContain("display: none");
+    const reveal = block.indexOf("@container (min-width: 560px)");
+    expect(reveal).toBeGreaterThan(hide);
+    const shown = block.slice(reveal, block.indexOf("\n}", reveal));
+    expect(shown).toContain(".ca-tg-blk-title");
+    expect(shown).toContain(".ca-tg-chip-title");
+    expect(shown).toContain("text-overflow: ellipsis");
+
+    // And the view draws the span for a box of ONE only — a box groups by
+    // colour, so naming it after the earliest of four names it after the wrong
+    // thing three times in four.
+    const src = readSrc("time-grid-view");
+    const at = src.indexOf("  if (alone) {");
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf("}", at));
+    expect(body).toContain('cls: "ca-tg-blk-title", text: lead.title');
+    expect(src).toContain('cls: "ca-tg-chip-title", text: only.title');
+    // The count is still the whole of what a box of several says.
+    expect(src).toContain('el.createSpan({ cls: "ca-tg-count", text: String(box.items.length) });');
+  });
+
+  it("takes the words off the all-day gutter and keeps the row's name", () => {
+    // *"'all day' text can be removed, as the row's colour is enough context
+    // for what it is."* Enough context for a reader looking at it, and none at
+    // all for one who cannot see it — so the words go to the two places that
+    // cost no pixels rather than nowhere.
+    const src = readSrc("time-grid-view");
+    expect(src).not.toContain('cls: "ca-tg-lane-label", text: "all day"');
+    expect(src).toContain('attr: { title: "All day", "aria-label": "All day" }');
+    // The cell itself stays: it is the lane's first COLUMN as well as its
+    // label, and a lane without it slides every day one column left.
+    expect(src).toContain('cls: "ca-tg-lane-label"');
+    // What it keeps in the stylesheet is the half that was never about words.
+    const css = readCss();
+    const at = css.indexOf(".ca-tg-lane-label {");
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toContain("position: sticky");
+    expect(rule).toContain("var(--ca-tg-lane-bg)");
+    expect(rule).not.toContain("text-overflow");
+    expect(rule).not.toContain("letter-spacing");
+    // And the compact override that gave two words a second line is gone with
+    // the words. Matched as the SELECTOR — the obituary left behind names the
+    // rule, which is what an obituary is for.
+    expect(compactBlock()).not.toContain(
+      ".ca-tg:not(.is-expanded) .ca-tg-lane-label"
+    );
   });
 
   it("gives the week a row and the controls a row", () => {
@@ -742,31 +850,53 @@ describe("the compact week", () => {
     expect(block.slice(hour, block.indexOf("}", hour))).toContain("right: 3px");
   });
 
-  it("hides the way out everywhere there is nothing to leave", () => {
+  it("draws the way out at every width, because there is always something to leave", () => {
     const css = readCss();
     const at = css.indexOf(".ca-tg-expand {");
     expect(at).toBeGreaterThan(-1);
-    expect(css.slice(at, css.indexOf("}", at))).toContain("display: none");
-    expect(compactBlock()).toContain("display: inline-flex");
-  });
-
-  it("puts every override back when the reader expands it", () => {
+    expect(css.slice(at, css.indexOf("}", at))).toContain("display: inline-flex");
+    // And it is the LAST thing in the bar on a wrapped one, which is the only
+    // rule about it a width still decides.
     const block = compactBlock();
-    expect(block).toContain(".ca-tg.is-expanded");
-    expect(block).toContain("--ca-tg-compact: 0");
-    expect(block).toContain("--ca-tg-row: 50px");
-    expect(block).toContain("minmax(74px, 1fr)");
-    expect(block).toContain("min-height: 17px");
-    expect(block).toContain("cursor: crosshair");
+    const query = block.slice(block.indexOf("@container (max-width: 400px)"));
+    expect(query).toContain(".ca-tg-expand");
+    expect(query).toContain("margin-left: auto");
   });
 
-  it("asks the stylesheet rather than measuring a width of its own", () => {
+  it("needs no second copy of every rule to put the desk grid back", () => {
+    // THIS IS WHAT THE REVERSAL BOUGHT. Every compact rule used to be undone by
+    // a `.ca-tg.is-expanded` twin nested in the same query — two declarations
+    // per property, in two places, kept in step by hand. The base rules ARE the
+    // expanded grid now, so the twins are gone and the numbers live once.
+    const css = readCss();
+    expect(css).not.toContain(".ca-tg.is-expanded .ca-tg-blk");
+    expect(css).not.toContain(".ca-tg.is-expanded .ca-tg-scroll");
+    expect(css).toContain("--ca-tg-row: 50px");
+    expect(css).toContain("minmax(74px, 1fr)");
+    expect(css).toContain("cursor: crosshair");
+  });
+
+  it("holds the mode itself rather than measuring the box it is in", () => {
     const src = readSrc("time-grid-view");
-    expect(src).toContain("--ca-tg-compact");
-    expect(src).toContain("getComputedStyle");
-    expect(src).toContain("ResizeObserver");
-    // And puts the observer down with the block it belongs to.
-    expect(src).toContain("this.observer?.disconnect()");
+    // ONE FLAG, AND THE SAME ONE THAT SETS THE ROW HEIGHT. A drag handle wired
+    // against a row height decided somewhere else is the failure the old
+    // `getComputedStyle` round trip existed to prevent; a flag that decides both
+    // cannot have the disagreement at all.
+    expect(src).toContain("let compact = !expanded;");
+    expect(src).toContain("compact = !expanded;");
+    expect(src).not.toContain("getComputedStyle");
+    expect(src).not.toContain("new ResizeObserver");
+    // The render child the observer lived in is retired; the one beside it,
+    // which owns a timer for the same reason, is not.
+    expect(src).not.toContain("new CompactWatcher(");
+    expect(src).toContain("class NowTicker extends MarkdownRenderChild");
+  });
+
+  it("says what the toggle is for, which is editing", () => {
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("Edit the week");
+    expect(src).toContain("back to the compact week");
+    expect(src).toContain('setIcon(btn, expanded ? "minimize-2" : "pencil");');
   });
 
   it("wires no gesture on a grid with no room for one", () => {

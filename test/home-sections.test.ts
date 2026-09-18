@@ -198,6 +198,7 @@ describe("what the homepage composes to", () => {
       "cell",
       "launcher",
       "tasks-table",
+      "events",
       "tab",
       "logbook",
     ]);
@@ -468,7 +469,7 @@ describe("what the homepage composes to", () => {
 // yourself" stopped being the safety net and the behaviour has to be right.
 // THE TOP ROW AS COMPOSED: Diary + launcher + tasks on Page 1, logbook on Page 2.
 const TOP_ROW =
-  "```chronoanvil\nrow\ndiary:3\ncell\nlauncher\ntasks-table\ntab\nlogbook\n```";
+  "```chronoanvil\nrow\ndiary:3\ncell\nlauncher\ntasks-table\nevents\ntab\nlogbook\n```";
 
 // The time grid, composed as of 4.70 and NOT in a row — the catalogue entry
 // argues both halves of that, and the block above the catalogue says why there
@@ -561,7 +562,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
     // deletes a line the reader wrote. `applyFlatSections` is a reconciler.
     const note = MULTILINE_ROW();
     const keepAll = [
-      "banner", "diary", "launcher", "tasks", "logbook",
+      "banner", "diary", "launcher", "tasks", "events", "logbook",
       "time-grid", "journals", "charts",
     ];
     const ops = model.plan(note, keepAll);
@@ -629,6 +630,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
       "diary",
       "launcher",
       "tasks",
+      "events",
       "logbook",
       "time-grid",
       "journals",
@@ -647,6 +649,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
         "diary",
         "launcher",
         "tasks",
+        "events",
         "logbook",
         "time-grid",
         "journals",
@@ -665,6 +668,7 @@ describe("a block holding two sections is the unit (4.2 §2)", () => {
       "diary",
       "launcher",
       "tasks",
+      "events",
       "logbook",
       "time-grid",
       "journals",
@@ -779,6 +783,7 @@ describe("the home model", () => {
       "banner",
       "launcher",
       "tasks",
+      "events",
       "logbook",
       "upcoming",
       "on-this-day",
@@ -1016,7 +1021,7 @@ describe("the home model", () => {
   it("applies only what the plan named", () => {
     // The property the whole preview rests on.
     const want = [
-      "banner", "diary", "launcher", "tasks", "logbook",
+      "banner", "diary", "launcher", "tasks", "events", "logbook",
       "time-grid", "charts",
     ];
     const ops = model.plan(home(), want);

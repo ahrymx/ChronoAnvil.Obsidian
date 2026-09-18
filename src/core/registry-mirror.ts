@@ -70,8 +70,16 @@ export const REGISTRY_VERSION = 1;
 // vault would be restoring somebody's scroll position.
 export const NOT_MIRRORED = [
   "collapsedNoteSections",
-  // The same kind of fact as the fold above it, and excluded for the same
-  // sentence: which sections a note had open is somebody's scroll position.
+  // ── A RETIRED FIELD, KEPT ON THE LIST (1.0.25) ────────────────────────
+  //
+  // It was the same kind of fact as the fold above it, excluded for the same
+  // sentence: which sections a note had open is somebody's scroll position. The
+  // field is gone — a reveal is a fold now and its answer lives in
+  // `collapsedNoteSections`, which is the first name here — and the exclusion
+  // stays because `mirroredPart` walks the settings OBJECT, not the type. A
+  // reader's data.json still carries the dead record until `pruneNoteState` runs,
+  // and a mirror written in that window would carry it to the next vault. One
+  // string is a cheap way to be sure it never travels.
   "revealedNoteSections",
   "captureDraft",
   "collapsedSettingsGroups",

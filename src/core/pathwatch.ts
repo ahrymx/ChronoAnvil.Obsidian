@@ -130,8 +130,11 @@ export function remapConfiguredPaths(
     // Keyed `<notePath>::<section title>`. Not a configured path, but it holds
     // note paths, so a rename invalidates it exactly as it invalidates the rest
     // of this record.
+    // Since 1.0.25 this also holds the banner's reveals, under a `::reveal:`
+    // namespace — `revealedNoteSections` was the record beside it and is a field
+    // no longer. One entry fewer in the loop below, and the keys it used to hold
+    // retarget with the rest of the folds because they ARE folds now.
     collapsedNoteSections?: Record<string, boolean>;
-    revealedNoteSections?: Record<string, boolean>;
     openGroupTabs?: Record<string, number>;
     timeGridFilters?: Record<string, string[]>;
     timeGridExpanded?: Record<string, boolean>;
@@ -184,16 +187,17 @@ export function remapConfiguredPaths(
   // function has retargeted on rename since it was written; these records were
   // added later and never joined in.
   //
-  // ONE LOOP, FIVE RECORDS (5.28, and a fifth in 1.0.18). This was three copies
-  // of the same eight lines, and the fourth — the banner's reveals — is why they
-  // became one: the copies had already drifted, since the fold one wrote `true`
-  // back where the other two preserved the value they moved. `remapNoteKeys`
-  // preserves it, which is strictly more correct for a record whose values are
-  // booleans and was already required of the two that hold numbers and lists.
-  // The fifth cost one line, which is the whole argument for the loop.
+  // ONE LOOP, FOUR RECORDS (5.28, a fifth in 1.0.18, and back to four in
+  // 1.0.25). This was three copies of the same eight lines, and the fourth — the
+  // banner's reveals — is why they became one: the copies had already drifted,
+  // since the fold one wrote `true` back where the other two preserved the value
+  // they moved. `remapNoteKeys` preserves it, which is strictly more correct for
+  // a record whose values are booleans and was already required of the two that
+  // hold numbers and lists. Each one after cost a line, which is the whole
+  // argument for the loop — and the reveals leaving cost a line back, because
+  // their keys are folds now and the first row already moves them.
   const perNote: [Record<string, unknown> | undefined, string][] = [
     [settings.collapsedNoteSections, "collapsed sections"],
-    [settings.revealedNoteSections, "revealed sections"],
     [settings.openGroupTabs, "open group tabs"],
     [settings.timeGridFilters, "time-grid filters"],
     [settings.timeGridExpanded, "time-grid expansion"],

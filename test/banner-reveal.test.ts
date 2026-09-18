@@ -32,6 +32,16 @@
 // off the code and onto the fence — `stackParts` says where each section
 // begins, and each of them past the host is one button.
 //
+// AND THE SECOND OF THOSE IS REVERSED IN 1.0.25, by the reader again: *"Make
+// stack groups auto expand its children (the added widgets), and remember their
+// states across app/Obsidian reloads."* Closed-by-default is right exactly once
+// — the first time anyone meets chrome they did not ask for — and wrong every
+// time after, because welding a section into the banner is a thing a reader does
+// ON PURPOSE and the result was a section that did not draw. A reveal starts
+// open and remembers what was closed, which is what a fold is, so the record of
+// its own goes with the default that justified it. `where the answer is kept`
+// below is the whole of that change.
+//
 // The DOM half is asserted structurally: this suite runs in node, there is no
 // jsdom, and the interesting half of a reveal is a rule over a list anyway.
 
@@ -51,7 +61,7 @@ import {
   watchRevealTargets,
 } from "../src/ui/reveal";
 import type { RevealTarget } from "../src/ui/reveal";
-import { remapConfiguredPaths } from "../src/core/pathwatch";
+import { pruneCollapsedSections, remapConfiguredPaths } from "../src/core/pathwatch";
 import { NOT_MIRRORED } from "../src/core/registry-mirror";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import { STUDY_JOURNAL } from "../src/journals/journal";
@@ -477,30 +487,69 @@ describe("the registry a banner subscribes to", () => {
   });
 });
 
+// ── WHERE THE ANSWER IS KEPT, AND WHICH WAY IT POINTS (1.0.25) ───────────
+//
+// THE READER'S ASK: *"Make stack groups auto expand its children (the added
+// widgets), and remember their states across app/Obsidian reloads."* Both halves
+// are one change. A reveal shipped CLOSED and remembered what was opened; it
+// ships OPEN and remembers what was closed, which is what every fold in the
+// plugin does — so the second record, which existed only because the defaults
+// were opposite, is a namespace inside `collapsedNoteSections` instead.
+//
+// THESE ASSERTIONS ARE THE REVERSAL ITSELF, and they are deliberately pinned at
+// the source: the whole decision is one `!` and one key prefix, and neither has
+// anywhere to hide.
 describe("where the answer is kept", () => {
-  it("defaults to closed, which is the opposite of every fold", () => {
-    // Asserted at the source of the store rather than through it: the whole
-    // decision is the `=== true`, and the record it reads is the reason there
-    // is a second record at all.
+  it("defaults to open, which is what every other fold does", () => {
+    // ONE STORE, READ TWO WAYS. What matters is not that `isOpen` returns true
+    // for an unanswered key — it is that it cannot answer differently from the
+    // fold store, because it IS the fold store with the sign changed. A second
+    // copy of those lines is how two records that share a key format come to
+    // disagree, which is the defect `remapNoteKeys` was written to end.
     const widgets = readCode("widgets");
+    expect(widgets).toContain("const fold = this.foldStore();");
+    expect(widgets).toContain("isOpen: (key) => !fold.isCollapsed(key),");
     expect(widgets).toContain(
-      "isOpen: (key) => this.plugin.settings.revealedNoteSections?.[key] === true"
+      "setOpen: (key, open) => fold.setCollapsed(key, !open),"
     );
-    expect(DEFAULT_SETTINGS.revealedNoteSections).toEqual({});
-    // And the fold's own store is untouched by it — one record per default.
+    // And the fold store itself is unchanged: absent means expanded, which is
+    // now the sentence both controls are made of.
     expect(widgets).toContain(
       "isCollapsed: (key) =>\n        this.plugin.settings.collapsedNoteSections?.[key] === true"
     );
   });
 
-  it("is keyed so a rename retargets it", () => {
+  it("no longer declares a record of its own", () => {
+    // The field is gone rather than migrated, and nothing is lost by that: every
+    // key it held said *the reader opened this*, which is what the new default
+    // says for free.
+    expect(DEFAULT_SETTINGS).not.toHaveProperty("revealedNoteSections");
+    expect(DEFAULT_SETTINGS.collapsedNoteSections).toEqual({});
+  });
+
+  it("namespaces its keys so a title cannot claim them", () => {
+    // `reveal:` IS THE POINT OF THIS TEST. The keys now share a map with the
+    // header bars, whose own keys are `"<notePath>::<title>"` — so without the
+    // prefix a reader who titled a section `trackers` would have one control
+    // folding the other's card. `frame:` already solved this once.
     expect(revealKey("Study/Maths/lesson1.md", "trackers")).toBe(
-      "Study/Maths/lesson1.md::trackers"
+      "Study/Maths/lesson1.md::reveal:trackers"
     );
+    // The separator is still the first `::`, which is what every split in
+    // `pathwatch.ts` takes and why an id holding a colon is safe here.
+    expect(revealKey("a.md", "kind-table").indexOf("::")).toBe(4);
+  });
+
+  it("is retargeted by a rename through the fold record's own walk", () => {
+    // ONE WALK, ONE ROW. `revealedNoteSections` used to be the second entry in
+    // `remapConfiguredPaths`' per-note loop; a reveal key is a fold key now, so
+    // the first entry moves it and the loop is one line shorter.
     const settings = {
       paths: {},
-      revealedNoteSections: { "Study/Maths/lesson1.md::trackers": true },
-      collapsedNoteSections: { "Study/Maths/lesson1.md::📄 Pages": true },
+      collapsedNoteSections: {
+        "Study/Maths/lesson1.md::reveal:trackers": true,
+        "Study/Maths/lesson1.md::📄 Pages": true,
+      },
     };
     const changed = remapConfiguredPaths(
       settings as never,
@@ -508,26 +557,44 @@ describe("where the answer is kept", () => {
       "Study/Algebra",
       true
     );
-    expect(changed).toContain("revealed sections");
-    expect(settings.revealedNoteSections).toEqual({
-      "Study/Algebra/lesson1.md::trackers": true,
-    });
-    // The record beside it moved too, through the same walk — which is the
-    // point of there being one walk.
     expect(changed).toContain("collapsed sections");
+    expect(changed).not.toContain("revealed sections");
     expect(settings.collapsedNoteSections).toEqual({
+      "Study/Algebra/lesson1.md::reveal:trackers": true,
       "Study/Algebra/lesson1.md::📄 Pages": true,
     });
   });
 
-  it("is pruned with the note and never mirrored", () => {
-    // The same two chores every per-note record has. A record that only grows
-    // is what the prune exists to stop, and restoring somebody's open sections
-    // onto another vault is restoring their scroll position.
-    expect(readCode("main")).toContain(
-      "pruneCollapsedSections(reveals, live)"
-    );
+  it("is pruned with the note, and the retired record is deleted outright", () => {
+    // The same two chores every per-note record has — except that the record
+    // this used to be is not pruned key by key any more, it is dropped whole the
+    // first time the plugin loads.
+    const main = readCode("main");
+    expect(main).toContain("delete stale.revealedNoteSections;");
+    expect(main).toContain("pruneCollapsedSections(folds, live)");
+    // AND THE EXCLUSION OUTLIVES THE FIELD, on purpose: `mirroredPart` walks the
+    // settings OBJECT, so a data.json still carrying the dead record could
+    // otherwise mirror it into the next vault before the prune ever ran.
     expect([...NOT_MIRRORED]).toContain("revealedNoteSections");
+  });
+
+  it("lets the fold record's own prune reach a reveal key", () => {
+    // THE NAMESPACE HAS TO SURVIVE THE SPLIT, and this is the one place that
+    // could have gone wrong quietly: `pruneCollapsedSections` takes the FIRST
+    // `::`, and a reveal key now carries a second colon after it. A note that is
+    // gone takes its chevrons with it; one that is still there keeps them.
+    const folds: Record<string, boolean> = {
+      [revealKey("Study/lesson1.md", "kind-table")]: true,
+      [revealKey("Study/gone.md", "tracker")]: true,
+      "Study/lesson1.md::📄 Pages": true,
+    };
+    expect(
+      pruneCollapsedSections(folds, new Set(["Study/lesson1.md"]))
+    ).toBe(1);
+    expect(Object.keys(folds).sort()).toEqual([
+      revealKey("Study/lesson1.md", "kind-table"),
+      "Study/lesson1.md::📄 Pages",
+    ]);
   });
 });
 

@@ -378,6 +378,67 @@ const HOME_SECTION_DEFS: FlatSection[] = [
     }),
     locate: (text) => probe(text, /^tasks-table\b/m),
   },
+  // ── THE EVENTS MANAGER, UNDER THE TASKS LIST (1.0.28) ────────────────
+  //
+  // The reader's ask, in the same breath as folding the diary card's agenda
+  // away: *"once that is done, add 'Events' widget to the homepage's group
+  // under 'Open Tasks'."* The group is this cell, and "under" is the position:
+  // consecutive members carrying one `cell` id stack in the order the catalogue
+  // writes them, so the entry goes here and nowhere else.
+  //
+  // WHY THE ASK CAME WHEN IT DID, AND WHY THIS IS THE MANAGER RATHER THAN THE
+  // LIST. The catalogue's own header names `events:upcoming` among three
+  // widgets *"proposed and declined"*, on the grounds that *"the `diary` card
+  // already ends with it"* — and this release is the one that stops it ending
+  // with it by default. So the obvious reading of "Events" is the list coming
+  // back on its own, and it is the wrong one: the list is still THERE, one word
+  // in the card's footer away, and re-composing it as a second block would put
+  // the same five rows on the page twice for a reader who opens the toggle.
+  //
+  // What the fold actually takes off the page is the MANAGER — the agenda's
+  // head carries the `Manage` link, and a control that has to be revealed
+  // before it can be pressed is not a way into anything. `events` is the door
+  // it opened, drawn where it can be seen. The two entries stay what they were:
+  // `upcoming` is still offered here and declines to ship, for the reason its
+  // own comment gives.
+  //
+  // IT COSTS NO SPARE, WHICH IS THE `time-grid` TRADE AND NOT THE `logbook`
+  // ONE. `pageWidgetKeywords` withholds a widget from the add list on a page
+  // whose catalogue writes its keyword, so composing this means a reader cannot
+  // add a SECOND events manager here from the widget door. A second logbook on
+  // one page is a thing readers asked for by name; a second copy of the one
+  // list of every event in the vault is not.
+  sectionOf({
+    id: "events",
+    // THE REGISTRY'S OWN WORDS, all three. The same widget through a second
+    // door — see `time-grid` below for the rule and why it is one.
+    label: WIDGETS.events.label,
+    blurb: WIDGETS.events.blurb,
+    icon: WIDGETS.events.glyph,
+    category: "tasks",
+    // Nothing of the reader's is stored in the block: the events live in the
+    // events note, and this is the manager onto them.
+    locked: false,
+    row: HOME_TOP_ROW,
+    cell: HOME_ASIDE,
+    // `bar` RATHER THAN `title`, WHICH IS WHAT A CELL MEMBER HAS. A row carries
+    // one title, composed by the cell that opens it; this composes none while
+    // the row stands and takes this one back if it is ever left alone there.
+    // `launcher` two entries up carries the argument.
+    bar: `${HEADER_PREFIX}${WIDGETS.events.bar}`,
+    // The section/widget answer, for 1.0.22's reason: nothing is anchored into
+    // this bar, so the toggle is the one way the block has to say what it is.
+    asks: true,
+    widget: "events",
+    // THE BARE KEYWORD AND NOT THE ALIAS. `events:upcoming` is a different
+    // widget wearing this keyword — the list, dispatched through the same
+    // builder since 2.13.1 — and `\b` would match it, so a homepage carrying one
+    // by hand would have it attributed to the manager and reordered as if it
+    // were. `events` takes no argument of its own, so "the keyword, with no
+    // colon after it" is the whole of the grammar to match. Same shape of fix
+    // as `diary` / `diary-search` one catalogue entry up.
+    anchor: /^events\b(?!:)/m,
+  }),
   sectionOf({
     id: "logbook",
     label: WIDGETS.logbook.label,

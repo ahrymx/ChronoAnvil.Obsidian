@@ -1943,13 +1943,24 @@
   padding-top: 6px;
   border-top: 1px solid var(--background-modifier-border);
 }
-.ca-jc-jump-toggle {
+/* The two toggles are one control in two places — the card's footer is a row of
+   words you press — so they are one rule rather than a copy each. `.is-open` is
+   the agenda toggle's alone: the jump row's word ends in an ellipsis, which says
+   "something follows" whether or not it is following yet, and the agenda's does
+   not, so it needs the other channel to say which state you are in. */
+.ca-jc-jump-toggle,
+.ca-jc-agenda-toggle {
   font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   cursor: pointer;
 }
-.ca-jc-jump-toggle:hover {
+.ca-jc-jump-toggle:hover,
+.ca-jc-agenda-toggle:hover {
   color: var(--interactive-accent);
+}
+.ca-jc-agenda-toggle.is-open {
+  color: var(--text-normal);
+  font-weight: 600;
 }
 .ca-jc-status {
   font-size: var(--ca-text-2xs);
@@ -2006,7 +2017,24 @@
    Rows reuse .ca-ev-chip / .ca-ev-text / .ca-ev-title / .ca-ev-meta from the
    standalone widget (section 9) — only the date gutter and the relative-time
    cell are new here. */
-.ca-journal-calendar.ca-jc-has-agenda {
+/* ── COLLAPSED UNTIL ASKED FOR (1.0.28) ──────────────────────────────────
+   The panel is drawn and then hidden, rather than rendered on demand: it costs
+   a few rows of DOM a reader may never look at, and it buys the footer's toggle
+   being a class flip with nothing to rebuild — which is what lets the open
+   state survive in `CalendarState` instead of being recomputed.
+
+   `:not(.is-agenda-open)` rather than `display: none` in the panel's own rule,
+   so the rule that describes what the agenda LOOKS like stays a description of
+   that and nothing else.
+
+   THE PADDING FOLLOWS THE PANEL. The card gives up its bottom padding for an
+   agenda, which is full-bleed and supplies its own; with the agenda folded away
+   there is nothing down there but the footer, and a footer against the card's
+   rim reads as a card that has been cut off. */
+.ca-journal-calendar:not(.is-agenda-open) .ca-jc-agenda {
+  display: none;
+}
+.ca-journal-calendar.ca-jc-has-agenda.is-agenda-open {
   padding-bottom: 0;
 }
 /* RETIRED WITH THE BAND (4.13.1 §3). `.ca-journal-calendar.jc-has-header .ca-jc-header
