@@ -198,6 +198,40 @@
   justify-content: flex-end;
   gap: 4px 8px;
 }
+/* ── THE `⋯` A KIND GROUP'S HEAD WEARS IN EDIT MODE (1.0.33) ────────
+ *
+ * `.ca-list-menu`'S RULE, MINUS THE HOVER REVEAL. That control is one of ten on
+ * a table and rests invisible so a list of rows is a list of rows; this one is
+ * one per group and exists only while the reader is IN the mode they opened to
+ * use it, so hiding it until the pointer finds it would be hiding the thing they
+ * just asked for. `@media (hover: none)` therefore has nothing to correct here
+ * either — the touch rule over there exists because there is no hover to reveal
+ * with, and there is nothing to reveal.
+ *
+ * SIZED IN PIXELS, NOT OFF `--ca-row-action-w`. That token is the RESERVE a record
+ * row spends so its columns do not shift under the pointer; a header bar reserves
+ * nothing, and borrowing a width whose whole job is elsewhere is how a tuning
+ * there becomes a surprise here. 22 × 20 is `.ca-list-menu`'s own box.
+ */
+.ca-journal-kind-options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.ca-journal-kind-options svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+.ca-journal-kind-options:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
 /* ONE AUTO MARGIN PER ROW, AND AT LEVEL 2 IT IS THE ACTIONS' (4.13 §1b).
  *
  * Two `margin-left: auto` in one flex line is one too many, and the failure is

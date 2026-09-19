@@ -2174,6 +2174,40 @@ input.ca-kind-label {
   font-size: var(--ca-text-2xs);
   line-height: 1.4;
 }
+/* ── A kind's column headings (1.0.32) ───────────────────────────────────
+   Up to four boxes on the `Rated on` row's shape, each holding one column's
+   word. They SHARE the line and wrap onto the next when the modal is narrow,
+   which is the only arrangement that fits four of them beside a label at every
+   width the settings window has — a grid of four fixed tracks puts `Date` in a
+   box wide enough for `Confidence` and leaves the narrow modal overflowing.
+
+   NO LABELS OVER THEM. Each box carries its column's derived word as its
+   placeholder, which is both the label and the current answer; a caption row
+   would be four more words saying the same four words one line higher. */
+.ca-kind-cols-boxes {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+}
+input.ca-kind-col {
+  /* Enough for "Confidence" and no more: these are column headings, and a box
+     that invites a sentence is a box that will get one. */
+  flex: 1 1 7em;
+  min-width: 0;
+  max-width: 12em;
+  font-size: var(--ca-text-sm);
+  padding: 3px 7px;
+  height: auto;
+}
+/* The word it would show if the box were emptied — quieter than a typed one,
+   because it is the table's answer rather than the reader's. */
+input.ca-kind-col::placeholder {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
 .ca-kind-add {
   align-self: flex-start;
   display: inline-flex;

@@ -268,7 +268,8 @@ export async function captureDestinations(
       label: `${grain === "daily" ? "Today" : `This ${CLASS_DEFS[grain].periodNoun}`} · ${labelForGrain(grain, key)}`,
       regionKey: CAPTURE_NOTE_KEY,
       dated: false,
-      resolve: () => resolveGrainEntry(plugin, grain, key),
+      resolve: () =>
+        plugin.diary.openOrCreateEntry(grain, key, { reveal: false }),
     };
   });
 
@@ -349,22 +350,12 @@ export function offersHostEntry(facts: {
   return true;
 }
 
-// A grain's current entry, created from its template if it isn't there yet and
-// never revealed — capture exists so you don't leave what you were doing.
-//
-// Three openers rather than one because the diary has three, split by how a
-// grain names its period; this is the only place that needs all of them at once.
-async function resolveGrainEntry(
-  plugin: ChronoAnvilPlugin,
-  grain: TrackerClass,
-  key: string
-): Promise<TFile | null> {
-  const d = plugin.diary;
-  if (grain === "daily") return d.openOrCreateDay(key, { reveal: false });
-  if (grain === "monthly") return d.openOrCreateMonth(key, { reveal: false });
-  const unit = grain === "weekly" ? "week" : grain === "quarterly" ? "quarter" : "year";
-  return d.openOrCreatePeriodEntry(unit, key, { reveal: false });
-}
+// `resolveGrainEntry` IS `Diary.openOrCreateEntry` AS OF 1.0.29. It was written
+// here because capture was the only caller that needed all three of the diary's
+// openers at once; "Link to diary" is the second, and the switch belongs to the
+// class that owns the three rather than to whichever caller wanted them first.
+// `reveal: false` is still passed at the call site — that is capture's own
+// posture, not a property of the door.
 
 // Options that turn the generic capture box into a specific one. Defaults
 // reproduce the quick-capture behaviour exactly, so `new CaptureModal(app,

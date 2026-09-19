@@ -67,6 +67,7 @@ import { frontmatterOf, openFile } from "../core/util";
 import { ART_PRESETS } from "../core/constants";
 import { BRAND_ICON_ID } from "./brand-icon";
 import { resolveTarget, reviewScopes } from "../core/links";
+import { attachFileGestures } from "./file-gestures";
 import {
   Crumb,
   journalBannerMenu,
@@ -401,6 +402,13 @@ export class VaultBanner {
         else if (dest) void openFile(this.app, dest);
       };
       btn.addEventListener("click", go);
+      // AND THE TWO GESTURES A LINK HAS (1.0.30) — but only where the
+      // destination is a FILE. `today` and `capture` are the two rows whose
+      // destination is a window, and there is no note to open in a tab and no
+      // note for a file menu to be about; a button that answered a middle-click
+      // by opening the capture window in a new tab would be answering it with
+      // the same thing a plain click does, in the wrong place.
+      if (dest) attachFileGestures(this.app, btn, dest);
       btn.addEventListener("keydown", (evt) => {
         if (evt.key === "Enter" || evt.key === " ") {
           evt.preventDefault();
@@ -500,9 +508,18 @@ export class VaultBanner {
     // in a page's face with the pencil on it. Two editors for one name is the
     // doubling this release has spent five patches removing; the breadcrumb is
     // the copy that gives it up, because a trail is a place and not a control.
-    trail
-      .createDiv({ cls: "ca-avb-here" })
-      .createSpan({ cls: "ca-avb-here-text", text: this.hereText(file, surface) });
+    const here = trail.createDiv({ cls: "ca-avb-here" });
+    here.createSpan({
+      cls: "ca-avb-here-text",
+      text: this.hereText(file, surface),
+    });
+    // THE TAIL IS A NOTE TOO (1.0.30). It is the one crumb that is not a link —
+    // you are already on it, and 4.51.6 took its editor away — which left it the
+    // only part of the trail a right-click said nothing about. It is also the
+    // most obvious thing on the bar to right-click: *this* note is what a reader
+    // wants to rename, move or reveal in the explorer, and the menu that does
+    // all three is one trigger away.
+    attachFileGestures(this.app, here, file);
 
     const meta = this.metaText(file, surface, isIndex);
     if (meta) trail.createDiv({ cls: "ca-avb-meta", text: meta });

@@ -888,6 +888,137 @@ body.is-mobile .ca-list.is-editing {
 .ca-list.is-editing .ca-list-row.is-picked {
   background: var(--background-modifier-hover);
 }
+
+/* ── ONE GRID, SO THE DATA LINES UP WITH THE HEADER (1.0.31) ─────────────
+ *
+ * The reader's ask: *"the only thing wrong is that the data does not always
+ * line up with the header."*
+ *
+ * AND IT NEVER COULD, because there was never one table. The strip and every
+ * row carried the SAME TRACK LIST and were SEPARATE GRID CONTAINERS, and an
+ * `auto` track is sized by the content of its own grid and nothing else. So the
+ * strip sized `Status` to the word while the row under it sized that column to
+ * `In Progress`; `Confidence` went the other way, a heading wider than any gauge
+ * beneath it. Every column was off by its own amount, in its own direction — the
+ * failure nobody can name from looking at it.
+ *
+ * AND A SECOND, CONSTANT ONE UNDER IT. The row is a flex box of lead, token,
+ * main and actions with an 8px gap; the strip is one box with padding. So even
+ * where the tracks happened to agree, the whole value block sat 8px left of its
+ * headings, and `has-row-actions` and `is-editing` each had a padding rule
+ * compensating for a slot's width on one side. Two compensations for one cause.
+ *
+ * ── THE FIX IS THE STRUCTURE, NOT A THIRD COMPENSATION ──────────────────
+ *
+ * The list becomes the grid. It owns every track — the lead, the token, the
+ * name, the values, the actions — and the strip and each row are SUBGRIDS
+ * spanning all of them. A subgrid does not size tracks; it uses its parent's.
+ * So the widest date in the table and the word `Date` are measured against each
+ * other exactly once, by the one grid that holds them both, and the strip cannot
+ * drift from the rows because there is nothing left for it to drift from.
+ *
+ * The two compensation rules above are dead under this and are overridden back
+ * to nothing: a lead and an actions TRACK reserve their own width by existing.
+ *
+ * ── WHY THE OLD LAYOUT IS STILL HERE ────────────────────────────────────
+ *
+ * `@supports`, which this stylesheet had none of until now. Subgrid is
+ * Chromium 117 and Safari 16; the desktop app is far past both and a phone
+ * never reaches this code — the collapse at 460px above is what a phone gets,
+ * and the reader's word on it is that it *"looks good as it is"*. What is left
+ * in between is a tablet on an old webview, and there the rules below simply do
+ * not apply and the table is exactly what it was yesterday. A layout that
+ * degrades to the previous release is worth four lines of guard.
+ *
+ * ── AND THE GAP BECOMES PADDING, WHICH IS NOT A DETAIL ──────────────────
+ *
+ * A grid gap falls between TRACKS, including empty ones, and two of these
+ * tracks are empty on every row of every table — the token, which a record row
+ * never fills, and the lead, which only edit mode fills. With `column-gap`, each
+ * would have charged the row 12px of indent for holding nothing. So the column
+ * gap is zero and the 12px lives on the cells, where it is paid only by a cell
+ * that exists.
+ *
+ * ── RIGHT-ALIGNED, WHICH IS WHAT IT ALREADY LOOKED LIKE ─────────────────
+ *
+ * Nothing here declared an alignment before, and nothing needed to: every value
+ * track was sized to its own content, so left-aligned text filled its column and
+ * READ as right-aligned. Sharing the tracks ends that — a two-character count in
+ * a track sized by the word `Activity` would now sit at the left of it — so the
+ * alignment the reader has been looking at all along gets written down. */
+@supports (grid-template-columns: subgrid) {
+  @container (width > 460px) {
+    .ca-list.is-record {
+      display: grid;
+      /* lead | token | name + values | actions */
+      grid-template-columns: auto auto var(--ca-row-cols) auto;
+      column-gap: 0;
+      row-gap: 6px;
+      /* The 6px each row and the strip used to pay on their own sides. It has
+         to leave them: a subgrid's own horizontal padding shifts its tracks off
+         the parent's, which is this bug again, one level down. */
+      padding: 0 6px;
+    }
+    .ca-list.is-record > .ca-list-heads,
+    .ca-list.is-record > .ca-list-row {
+      display: grid;
+      grid-template-columns: subgrid;
+      grid-column: 1 / -1;
+      align-items: baseline;
+      gap: 0;
+    }
+    .ca-list.is-record > .ca-list-row {
+      padding: 6px 0;
+    }
+    /* Spans every track, so the rule under the headings still crosses the whole
+       table rather than stopping where the values do. */
+    .ca-list.is-record > .ca-list-heads {
+      padding: 0 0 4px;
+    }
+    .ca-list.is-record > .ca-list-heads > .ca-list-heads-cell:first-child {
+      grid-column: 3;
+      text-align: left;
+    }
+    .ca-list.is-record > .ca-list-row > .ca-list-lead {
+      grid-column: 1;
+    }
+    .ca-list.is-record > .ca-list-row > .ca-list-token {
+      grid-column: 2;
+    }
+    .ca-list.is-record > .ca-list-row > .ca-list-main.is-columned {
+      display: grid;
+      grid-template-columns: subgrid;
+      grid-column: 3 / -2;
+      column-gap: 0;
+      row-gap: 4px;
+      align-items: baseline;
+      min-width: 0;
+    }
+    .ca-list.is-record > .ca-list-row > .ca-list-actions {
+      grid-column: -2 / -1;
+      padding-left: 8px;
+    }
+    .ca-list.is-record .ca-list-cell,
+    .ca-list.is-record .ca-list-heads-cell {
+      padding-left: 12px;
+      text-align: right;
+    }
+    /* A slot that IS filled keeps the space it used to get from the row's flex
+       gap; an empty one is `display: none` already and pays nothing. */
+    .ca-list.is-record > .ca-list-row > .ca-list-lead,
+    .ca-list.is-record > .ca-list-row > .ca-list-token {
+      margin-right: 8px;
+    }
+    /* Dead under one grid: a track reserves its own width. Kept above for the
+       fallback, undone here rather than made conditional in two places. */
+    .ca-list.is-record.has-row-actions > .ca-list-heads {
+      padding-right: 0;
+    }
+    .ca-list.is-record.is-editing > .ca-list-heads {
+      padding-left: 0;
+    }
+  }
+}
 .ca-list-menu {
   display: flex;
   align-items: center;

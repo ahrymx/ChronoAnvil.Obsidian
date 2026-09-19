@@ -220,12 +220,36 @@ interface MomentShim {
 }
 
 function makeMoment(d: Date, valid: boolean): MomentShim {
+  // SINGULAR AND PLURAL, AND A THROW ON ANYTHING ELSE (1.0.29). moment
+  // normalises `month` and `months` to one unit; this understood only the
+  // plural and answered everything else by returning the date UNCHANGED, which
+  // is the failure `startOf` was changed to throw about in 2.57 and is worse
+  // here — a caller stepping by `month` got a loop of identical dates and a
+  // suite that agreed with it. `quarters` is here for the same reason: it is a
+  // unit the diary steps in, and silently not stepping is not an answer.
   const shift = (n: number, unit: string): Date => {
     const c = new Date(d.getTime());
-    if (unit === "days") c.setUTCDate(c.getUTCDate() + n);
-    else if (unit === "weeks") c.setUTCDate(c.getUTCDate() + n * 7);
-    else if (unit === "months") c.setUTCMonth(c.getUTCMonth() + n);
-    else if (unit === "years") c.setUTCFullYear(c.getUTCFullYear() + n);
+    const u = unit.endsWith("s") ? unit : `${unit}s`;
+    // CLAMPED TO THE LANDING MONTH, as moment clamps. `setUTCMonth` overflows —
+    // 31 March minus one month is 3 March — so a month-length step off a long
+    // month skipped a month and named its neighbour twice. moment answers 28
+    // February, and a stub that answers otherwise is a test that agrees with a
+    // bug nobody has.
+    const byMonths = (months: number): void => {
+      const day = c.getUTCDate();
+      c.setUTCDate(1);
+      c.setUTCMonth(c.getUTCMonth() + months);
+      const last = new Date(
+        Date.UTC(c.getUTCFullYear(), c.getUTCMonth() + 1, 0)
+      ).getUTCDate();
+      c.setUTCDate(Math.min(day, last));
+    };
+    if (u === "days") c.setUTCDate(c.getUTCDate() + n);
+    else if (u === "weeks") c.setUTCDate(c.getUTCDate() + n * 7);
+    else if (u === "months") byMonths(n);
+    else if (u === "quarters") byMonths(n * 3);
+    else if (u === "years") byMonths(n * 12);
+    else throw new Error(`obsidian-stub: add/subtract("${unit}") not implemented`);
     return c;
   };
   return {

@@ -184,15 +184,60 @@ describe("adding a kind from the card", () => {
     );
   });
 
-  it("offers the dashboards their new table, through the shared window", async () => {
-    // The one consent in the flow, and it is the editor's own. Not re-stated
-    // here: `dashboard-catchup.ts` owns the plan, the sentence and the notice,
-    // so both doors show the same thing.
+  it("lists the type on the card it was pressed from, and nowhere else", async () => {
+    // ── THE READER'S ASK (1.0.33) ────────────────────────────────────────
+    //
+    // *"adding a new note-type to a table should not add this type to all index
+    // pages. The only place the defaults should be configured like this is from
+    // chronanvil's journal settings."*
+    //
+    // It used to finish by opening the vault-wide offer — *"List the new note
+    // type on 7 dashboards?"* — so a group wanted on one Topic arrived on every
+    // Topic in the subject, from a list of paths a reader accepts in one press.
     const src = fnBody("addKindToJournal", "journals/kind-create");
-    expect(src).toContain("offerDashboardCatchup(app, buildJournalType(next))");
+    expect(src).toContain("await catchUpIndexNote(app, type, host, listing);");
+    // AND THE PAGE SAYS SO BEFORE THE PLANNER IS ASKED (1.0.33). The kind is
+    // `local`, so `childrenParts` composes its group only where `notetypes`
+    // names it — reconcile first and the planner is asked about a kind this
+    // page has not claimed, composes nothing, and the button does nothing.
+    expect(src).toContain(
+      "const listing = await plugin.journals.listKindOnPage(host, added.id);"
+    );
+    expect(src.indexOf("listKindOnPage")).toBeLessThan(
+      src.indexOf("catchUpIndexNote")
+    );
+    // AND THE WIDE DOOR IS STILL THERE, because the Settings editor means every
+    // dashboard: a kinds change made in the journal's own settings IS a change
+    // to the journal's defaults. One call site, two scopes, chosen by the caller.
+    expect(src).toContain("else await offerDashboardCatchup(app, type);");
     expect(readSrc("settings-editors")).toContain(
       "offerDashboardCatchup(this.app, buildJournalType(this.draft))"
     );
+  });
+
+  it("is handed the note by the control that drew itself on it", async () => {
+    // `buildAddKindRow` already resolved the host to decide whether to draw the
+    // control at all, so the scope is the same answer used twice rather than a
+    // second lookup that could disagree with the first.
+    expect(readSrc("tables")).toContain(
+      "void promptAddKind(plugin.app, plugin, type.id, file);"
+    );
+  });
+
+  it("asks nothing before writing that one note, and says why", async () => {
+    // The window exists because the wide path writes files the reader is not
+    // looking at. This writes the card under their hand — which is what the
+    // prompt they just answered said it would do.
+    const src = readSrc("dashboard-catchup");
+    expect(src).toContain("export async function catchUpIndexNote(");
+    // The BODY, because `offerDashboardCatchup` sits below it in the same file
+    // and is the function that is supposed to ask.
+    expect(fnBody("catchUpIndexNote", "journals/dashboard-catchup")).not.toContain(
+      "confirmPlan("
+    );
+    // Through `indexSurfaces`, so the write plans against the same context the
+    // offer would have — a second derivation is how the two come to disagree.
+    expect(src).toContain("indexSurfaces(app, type).find((s) => s.file.path === file.path)");
   });
 
   it("does not open the kind-change confirmation", async () => {

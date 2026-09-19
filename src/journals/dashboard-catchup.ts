@@ -55,6 +55,7 @@ import { applySections, planSections } from "./journal-plan";
 import type { JournalType } from "./journal";
 import type { SectionOp } from "../core/section-model";
 import { noteTypeOf } from "../core/util";
+import { pageTypesOf } from "./kind-tables";
 
 // One note or template that would gain something, and what.
 export interface DashboardCatchup {
@@ -110,6 +111,18 @@ function indexSurfaces(
       ctx: {
         ...sectionContext(type, { depth }),
         hostFolder: file.parent?.path ?? "",
+        // AND WHICH PAGE-ADDED TYPES THIS ONE LISTS (1.0.33), which is the
+        // note's own answer and is why it is added HERE and not in the template
+        // pass above. A template is composed once for every index note of its
+        // level, so a page's list written into one would be every page's list.
+        //
+        // This is what makes the pair work in both directions: `missingParts`
+        // offers the group to the page that claims the kind, and `strayParts`
+        // treats that same group as known rather than as a table for a kind
+        // the journal lost. Every other index note in the journal sees the
+        // kind in neither list and is left exactly as it was — *"adding a new
+        // note-type to a table should not add this type to all index pages."*
+        localKinds: pageTypesOf(app, file),
       },
     });
   }
@@ -178,6 +191,73 @@ export async function applyDashboardCatchups(
     written++;
   }
   return written;
+}
+
+// ── One note, because the reader is standing on it (1.0.33) ──────────────
+//
+// THE READER'S ASK: *"adding a new note-type to a table should not add this type
+// to all index pages. The only place the defaults should be configured like this
+// is from chronanvil's journal settings."*
+//
+// `+ Add note type` on a *What's below* card used to finish by opening the
+// vault-wide offer below — *"List the new note type on 7 dashboards?"* — so a
+// group wanted on one Topic arrived on every Topic in the subject. Which is what
+// that offer is FOR when it is the Settings editor asking: a kinds change made in
+// the journal's own settings is a change to the journal's defaults, and the
+// dashboards catching up with it is the honest consequence. Pressed from one
+// card it is the wrong scope, and it was the wrong scope silently — the reader
+// reads a list of paths and accepts, and the mistake is seven files old.
+//
+// SO THE SCOPE FOLLOWS THE DOOR. This writes the note the control was pressed
+// from and nothing else; `offerDashboardCatchup` stays exactly as it is for the
+// door that means every dashboard.
+//
+// AND IT ASKS NOTHING, which is not a weakening of the consent. The window below
+// exists because it writes to files the reader is not looking at; this writes the
+// card under their hand, and `promptAddKind`'s own description already promises
+// precisely that — *"It gets its own template, its own create button and its own
+// group on this card."* The old behaviour was the one that exceeded what the
+// prompt said it would do.
+//
+// THROUGH `indexSurfaces`, NOT BY BUILDING A CONTEXT HERE. That function is the
+// one place that knows a note's depth comes from its `type:` and its host folder
+// from its parent, and a second derivation of a `SectionContext` is how the offer
+// and the write come to plan against different questions. A note it does not
+// return is not an index surface of this journal, and nothing is written.
+// ── AND THE CALLER MAY HAVE TO SAY WHAT THE PAGE LISTS ───────────────────
+//
+// The reader's report: *"adding a new-note type no longer automatically updates
+// the table (the user has to repair vault for it to show)"*.
+//
+// `indexSurfaces` reads a page's claimed note types out of its frontmatter, and
+// `frontmatterOf` reads OBSIDIAN'S METADATA CACHE — which is filled from a file
+// event, after the write that caused it returns. So the sequence that adds a
+// page-local note type (claim the kind, then reconcile) asked the planner about
+// a page that had already claimed the kind and was told, by a cache one event
+// behind, that it had not. Nothing was composed; the reader's next Repair vault
+// found the claim and did it then, which is exactly what they saw.
+//
+// `listing` IS THE WRITE'S OWN ANSWER, handed straight over — `listKindOnPage`
+// and `unlistKindOnPage` both resolve to the list they just put in the file. Not
+// a delta and not a hint: where it is given it IS this page's list, so the same
+// argument serves both directions, and a caller with nothing to say omits it and
+// gets the cache's answer as before.
+export async function catchUpIndexNote(
+  app: App,
+  type: JournalType,
+  file: TFile,
+  listing?: readonly string[]
+): Promise<boolean> {
+  const found = indexSurfaces(app, type).find((s) => s.file.path === file.path);
+  if (!found) return false;
+  const ctx: SectionContext = listing
+    ? { ...found.ctx, localKinds: [...listing] }
+    : found.ctx;
+  const text = await app.vault.read(file);
+  const next = applySections(text, ctx, detectSections(text, ctx));
+  if (next == null || next === text) return false;
+  await app.vault.modify(file, next);
+  return true;
 }
 
 // ── The offer itself ──────────────────────────────────────────────────────

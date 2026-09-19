@@ -93,6 +93,7 @@ import { getFile } from "../../core/util";
 import { notify } from "../../core/notify";
 import { trashClause, trashDestination, trashSeveral } from "../../core/trash";
 import { confirmAction, promptDetailedSuggester } from "../modals";
+import { buildKindOptions } from "./kind-options-menu";
 import type { DetailedChoice } from "../modals";
 import { isPromotedPath } from "../../journals/page-default";
 import {
@@ -198,7 +199,14 @@ export function buildBelowFoot(
   const at = ctx.sourcePath.lastIndexOf("/");
   const here = at < 0 ? "" : ctx.sourcePath.slice(0, at);
 
-  ctx.addChild(new BelowEdit(foot, add, edit, hosts, { plugin, type, here }));
+  ctx.addChild(
+    new BelowEdit(foot, add, edit, hosts, {
+      plugin,
+      type,
+      here,
+      path: ctx.sourcePath,
+    })
+  );
   return foot;
 }
 
@@ -411,6 +419,10 @@ export function moveReport(
 // one-shot, and a second spelling of it would draw a second button per repaint.
 const REMOVE_CLS = "ca-journal-kind-remove";
 
+// And the options `⋯`'s, for the reason directly above: `syncOptions` finds the
+// one it has already drawn by this name, which is what makes it a sync.
+const OPTIONS_CLS = "ca-journal-kind-options";
+
 // A CLASS, NOT THE `hidden` PROPERTY, AND THIS SHIPPED WRONG IN 1.0.14. Both
 // halves of the foot set `el.hidden` and neither of them disappeared: the reader
 // saw the dashed `+ Add note type` slot sitting beside a live *Delete…*, which is
@@ -439,6 +451,8 @@ interface BelowEditDeps {
   type: JournalType;
   /** The folder the host index note lives in — where its notes already are. */
   here: string;
+  /** The index note itself — what carries this page's own table answers. */
+  path: string;
 }
 
 export class BelowEdit extends MarkdownRenderChild {
@@ -564,6 +578,10 @@ export class BelowEdit extends MarkdownRenderChild {
         this.tickIn(row);
       }
     }
+    // BEFORE THE REMOVAL, so a group offered both reads options-then-remove: the
+    // destructive one is last, which is `promptAction`'s ordering rule applied to
+    // a strip rather than to a dialogue.
+    this.syncOptions();
     this.syncRemovals();
     this.refresh();
   }
@@ -629,6 +647,7 @@ export class BelowEdit extends MarkdownRenderChild {
   // Take every mark back off.
   private release(): void {
     this.clearRemovals();
+    this.clearOptions();
     for (const { host } of this.hosts) {
       for (const list of Array.from(host.querySelectorAll(".ca-list"))) {
         list.classList.remove("is-editing");
@@ -705,6 +724,44 @@ export class BelowEdit extends MarkdownRenderChild {
     }
   }
 
+  // ── the options on every group's head (1.0.33) ────────────────────────
+  //
+  // THE READER'S ASK PUT IT HERE, in their words: *"I think there should be
+  // note-kind options settings in the edit-mode of what's below … maybe as a
+  // hamburger menu beside the New note button and collapse chevron."* The mode
+  // is the door 1.0.24 already opened onto this head, and the second control on
+  // it needs no second door.
+  //
+  // ON EVERY GROUP, NOT ONLY THE EMPTY ONES. The removal is offered where the
+  // table has no rows, because removing a type with notes in it is not a thing
+  // this card may do; what a page calls its columns and what it scores them on
+  // is a question a group with forty notes in it asks louder, not quieter.
+  //
+  // A SYNC RATHER THAN A ONE-SHOT, for `syncRemovals`' reason on the same heads:
+  // `apply` runs on every live redraw, and a button written once would be
+  // written again beside itself the first time a note was filed.
+  //
+  // A GROUP NAMING A TYPE THE JOURNAL NO LONGER HAS GETS NOTHING. That fence
+  // draws a red *"Unknown … note type"* where its table would be — 1.0.23's
+  // `prune` is the repair — and there is no kind to carry the answers, so a `⋯`
+  // there would open onto a menu with nothing in it.
+  private syncOptions(): void {
+    const { plugin, type, path } = this.deps;
+    for (const { kindId, head } of this.hosts) {
+      if (!head) continue;
+      const kind = type.kinds.find((k) => k.id === kindId);
+      if (!kind) continue;
+      if (head.querySelector(`.${OPTIONS_CLS}`)) continue;
+      buildKindOptions({ plugin, type, path }, head, kind);
+    }
+  }
+
+  private clearOptions(): void {
+    for (const { head } of this.hosts) {
+      head?.querySelector(`.${OPTIONS_CLS}`)?.remove();
+    }
+  }
+
   // `buildAddCategoryButton`'s SHAPE EXACTLY, and that is the whole of the
   // styling. That control is the other hosted button in a `header:` bar on this
   // surface — a `span.ca-journal-widget.ca-journal-button` holding a
@@ -755,12 +812,22 @@ export class BelowEdit extends MarkdownRenderChild {
   }
 
   private async removeKind(kindId: string): Promise<void> {
-    const { plugin, type } = this.deps;
+    const { plugin, type, path } = this.deps;
     // THE MODE CLOSES FIRST. Removing a type repaints every open note, which
     // rebuilds this card from its fence — so ticks, the bar and these buttons
     // are all about to be replaced, and a mode left on would be a set of marks
     // on elements nothing is listening to. `onunload`'s own argument.
-    const ok = await promptRemoveKind(plugin.app, plugin, type.id, kindId);
+    // THE CARD'S OWN NOTE GOES WITH IT, because a page-added type listed on two
+    // cards leaves one card at a time — and which card is the one this control
+    // was drawn on. The same answer `buildKindOptions` is handed, resolved at
+    // the press for the same reason: a note can be renamed between the two.
+    const ok = await promptRemoveKind(
+      plugin.app,
+      plugin,
+      type.id,
+      kindId,
+      getFile(plugin.app, path)
+    );
     if (ok) this.setPicking(false);
   }
 

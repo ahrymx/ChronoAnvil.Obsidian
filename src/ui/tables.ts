@@ -47,6 +47,8 @@ import {
   registeredJournalTypes,
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
+import { kindColumns, ratingNoun } from "../journals/kind-columns";
+import { kindTableOverrideOf, pageKind, pageTypesOf } from "../journals/kind-tables";
 import { pageOrderOf } from "../journals/page-default";
 import { promptAddKind } from "../journals/kind-create";
 // The band's own table: which measures a preset names, which of them a scope
@@ -518,19 +520,14 @@ export function ratingDefOf(
   return plugin.settings.trackers.find((t) => t.id === id) ?? null;
 }
 
-// "Confidence" from "🎯 Confidence" — the registry label with its leading
-// glyph stripped. Split out from ratingWord below because the two readers want
-// different cases of the same noun: a stats band wants it lowercase under a
-// number, a table wants it title-cased over a column.
+// ── `ratingNoun` MOVED OUT IN 1.0.32 ─────────────────────────────────────
 //
-// `fallback` rather than a fixed string, because the two callers disagree about
-// what to say when there is no definition: a band has nothing better than the
-// generic word, while kind-table has the property's own id, which is at least
-// the thing the column is reading.
-function ratingNoun(def: TrackerDef | null, fallback: string): string {
-  if (!def) return fallback;
-  return def.label.replace(/^[^\p{L}\p{N}]+/u, "").trim() || fallback;
-}
+// It lived here and was private, and a second caller arrived that this file may
+// not be imported by: the kind editor in Settings, which shows each column's
+// DERIVED word as the placeholder over the box that overrides it. A placeholder
+// computed a second way is a placeholder that disagrees with the heading it
+// describes. It is `kind-columns.ts`' now, with the rest of what a kind's table
+// calls its columns, and `ratingWord` below goes through it.
 
 // "avg confidence" from "🎯 Confidence". The registry label carries an emoji
 // and title case for use as a widget heading; under a number in a stats band
@@ -607,20 +604,41 @@ function recordList(
   headings: string[],
   // Whether rows will put anything in their actions slot.
   //
-  // THE HEADING STRIP HAS TO KNOW. `actions` is `flex: 0 0 auto` beside the
-  // grid, so every row is that much narrower than the strip above it and every
-  // value column sits a button's width to the LEFT of its own heading. The
-  // strip pays the same reserve, or the table is subtly out of true in exactly
-  // the way nobody can name from looking at it.
+  // THE HEADING STRIP HAD TO KNOW, AND AS OF 1.0.31 IT NO LONGER DOES. The
+  // reserve this flag buys is a padding on the strip standing in for a slot on
+  // the rows — one of two such compensations, and both of them were symptoms of
+  // the strip and the rows being separate grids that could only ever be told to
+  // agree. They share one grid now, where an actions TRACK reserves its own
+  // width by existing, and the stylesheet undoes the padding.
+  //
+  // THE FLAG STAYS, because the fallback layout is still the whole of what an
+  // old webview gets and the compensation is still right there. It is also what
+  // the strip would need again the day anything else is put beside the grid.
   hasActions = false
 ): { list: HTMLElement; row: (opts: RecordRow) => RecordSlots } {
   // The name column gives way; the value columns are sized to their content,
   // because a date that wraps is unreadable and a count is one character.
   const tracks = `minmax(0, 1fr)${" auto".repeat(Math.max(0, headings.length - 1))}`;
 
-  const list = host.createDiv({ cls: "ca-list" });
+  const list = host.createDiv({ cls: "ca-list is-record" });
   list.setAttr("role", "table");
   if (hasActions) list.addClass("has-row-actions");
+  // THE TRACKS ON THE LIST, NOT ONLY ON EACH GRID THAT USES THEM (1.0.31).
+  //
+  // WHY THE COLUMNS WERE NEVER QUITE TRUE. The strip and every row carried the
+  // same track LIST and were separate grid containers, and an `auto` track is
+  // sized by the content of ITS OWN grid. So the heading strip sized "Status"
+  // to the word and each row sized it to "In Progress", the `Confidence` column
+  // the other way about — a heading wider than any gauge under it — and the two
+  // landed a few pixels apart in a direction that changed per column. Nobody can
+  // name that from looking at it; they can only see that it is off.
+  //
+  // One declaration here is what lets the stylesheet make the strip and the rows
+  // SUBGRIDS of a single grid, which is the only way two boxes can agree about a
+  // width neither of them decides. It is still set on the strip and on each row
+  // as well, because that is what the fallback reads — see `94-native-tables.css`,
+  // which keeps both layouts and chooses between them with `@supports`.
+  list.style.setProperty("--ca-row-cols", tracks);
 
   // Hidden by the container query rather than removed: it is the accessible
   // name for each column at any width, and at narrow widths the row's own
@@ -964,7 +982,18 @@ export function buildLevelIndex(
   // tables of notes, and a pluralisation the kind explicitly overrides. Two
   // spellings of one heading is one too many when the composer's is on the next
   // note down.
+  // AND A PAGE-ADDED NOTE TYPE ONLY WHERE THIS NOTE LISTS IT (1.0.33).
+  //
+  // The reader's ask: *"adding a new note-type to a table should not add this
+  // type to all index pages."* This widget is the RENDER-TIME form of the same
+  // list `childrenParts` composes, so it answers the question the same way — the
+  // note's own `notetypes`, read off the host note exactly as `kindTable` reads
+  // its column overrides two hundred lines down. Filtering only here would have
+  // left the leak open on every note that draws `level-index` instead of the
+  // composed groups, which is the shape the catalogue is moving toward.
+  const listed = pageTypesOf(plugin.app, getFile(plugin.app, ctx.sourcePath));
   for (const kind of type.kinds) {
+    if (kind.local && !listed.includes(kind.id)) continue;
     root.createDiv({
       cls: "ca-journal-level-index-head",
       text: `${kind.emoji} ${kindPlural(kind)}`,
@@ -2309,12 +2338,28 @@ export function kindTable(
     return root;
   }
 
+  // AND WHAT THIS PAGE SAYS ABOUT IT, OVER THE TOP (1.0.33). The reader's ask:
+  // *"there's no over-ride per index note-kind … maybe even, changed their mind
+  // for what they want 'Lessons' to be rated on for that particular index
+  // page."* `pageKind` is the journal's answer merged with the host note's, and
+  // it is the ONLY thing below that knows a page may disagree — everything from
+  // here down reads the merged source and cannot tell which half it came from.
+  //
+  // THE HOST NOTE, NOT THE FOLDER'S OWN. `buildLevelIndex` draws these tables
+  // for folders BENEATH the note it sits in, and the override is a fact about
+  // the index page rather than about the folder being listed — so it is read
+  // from `ctx.sourcePath` in both callers rather than from `folderPath`.
+  const page = pageKind(
+    kind,
+    kindTableOverrideOf(app, getFile(app, ctx.sourcePath), kind.id)
+  );
+
   // Both resolved from the registry rather than spelled out, the same rule
   // reviewProperties follows — a relabelled or re-keyed built-in must not
   // leave this reading a dead property.
   const statusId = getBuiltinTracker(plugin, "status")?.id ?? "status";
   const statusDef = getTracker(plugin, statusId) ?? null;
-  const ratingId = kind.rating ?? null;
+  const ratingId = page.rating ?? null;
   const ratingDef = ratingId ? getTracker(plugin, ratingId) ?? null : null;
 
   const notes = pagesUnder(app, folderPath).filter(
@@ -2370,12 +2415,17 @@ export function kindTable(
   // `displayName` the base table set — "Lesson", not "Title" — then one per
   // property the kind carries, labelled from the registry where it has an
   // entry and from the property name where it doesn't.
-  const columns = kindTableProperties(kind, statusId);
-  const heading = (property: string): string => {
-    if (property === "date") return "Date";
-    if (property === statusId) return ratingNoun(statusDef, "Status");
-    return ratingNoun(ratingDef, property);
-  };
+  //
+  // AND FROM THE KIND ITSELF WHERE THE READER HAS SAID SO (1.0.32). Every word
+  // above is a DERIVATION, and until now a derivation was the only thing a
+  // heading could be: the way to change the word over the Confidence column was
+  // to rename the Confidence tracker, in every journal and in every cell a
+  // reader fills in. `kindColumns` is that derivation plus the kind's own answer
+  // where it has one, which is the whole of the change on this surface.
+  //
+  // AND FROM THE PAGE WHERE IT HAS SAID SO (1.0.33) — `page` rather than `kind`,
+  // which is the whole of THAT change on this surface. See `pageKind` above.
+  const cols = kindColumns(plugin, page);
 
   // Was a `<table>`; see `recordList` above for why these three dashboards'
   // lists stopped being one. This was the first of the three converted, in
@@ -2384,7 +2434,7 @@ export function kindTable(
   // THE THIRD ARGUMENT IS "EVERY ROW CARRIES A `⋯`" (4.50), so the heading strip
   // reserves the same width the rows spend. A slot that appeared only on hover
   // would shift the whole row's columns under the pointer.
-  const { row: addRow } = recordList(root, [kind.label, ...columns.map(heading)], true);
+  const { row: addRow } = recordList(root, cols.map((c) => c.heading), true);
 
   for (const { note, date, done } of sorted) {
     const { main, actions, row } = addRow({
@@ -2414,15 +2464,19 @@ export function kindTable(
     // both facts about the one note the row is, so the control goes on the row.
     // See `kind-row-menu.ts`, which owns all of it; this file draws tables.
     attachKindRowMenu({ plugin, type, kind }, actions, note.file);
-    for (const property of columns) {
-      if (property === "date") {
+    // FROM THE SECOND COLUMN ON: `cols[0]` is the name, which the row component
+    // drew as its title. Iterating the same list the headings came from is what
+    // keeps a cell under its own heading — the two used to be built from two
+    // lists that agreed by construction, and one of them has a reader in it now.
+    for (const col of cols.slice(1)) {
+      if (col.key === "date") {
         recordCell(main, date ?? EMPTY_CELL);
-      } else if (property === statusId) {
+      } else if (col.key === "status") {
         recordCell(main, statusOf(note.fm) || EMPTY_CELL, "is-text");
       } else {
-        const v = Number(note.fm[property]);
+        const v = Number(note.fm[col.property]);
         const cell = recordCell(main, "");
-        ratingCell(cell, v, property === ratingId ? ratingDef : null);
+        ratingCell(cell, v, ratingDef);
       }
     }
   }
@@ -2532,7 +2586,11 @@ export function buildAddKindRow(
   // there the two strings are the same sentence; here they differ — the label
   // is the gesture and the tooltip is the consequence, which is the case
   // `addHeadButton` keeps its own tooltip for.
-  const hint = `Add a kind of note to ${type.name}`;
+  // AND IT SAYS WHERE THE GROUP LANDS, AS OF 1.0.33. `Add a kind of note to
+  // Study` was true about the JOURNAL and silent about the page — which is
+  // exactly the half a reader was surprised by when the old flow went on to
+  // offer the same group to every other index note in the subject.
+  const hint = `Add a kind of note to ${type.name} and list it on this page`;
   btn.setAttr("aria-label", hint);
   btn.setAttr("title", hint);
   btn.addEventListener("click", (evt) => {
@@ -2541,7 +2599,12 @@ export function buildAddKindRow(
     // fire because a note type was asked for — the same separation every other
     // control inside a section makes.
     evt.stopPropagation();
-    void promptAddKind(plugin.app, plugin, type.id);
+    // THE HOST NOTE, SO THE GROUP LANDS HERE AND ONLY HERE (1.0.33). The
+    // reader's ask: *"adding a new note-type to a table should not add this type
+    // to all index pages."* `buildAddKindRow` already resolved the file to
+    // decide whether to draw the control at all, so this is the same answer used
+    // twice rather than a second lookup.
+    void promptAddKind(plugin.app, plugin, type.id, file);
   });
   return btn;
 }

@@ -54,6 +54,16 @@ import {
   pageLayoutShown,
   pageOrderOf,
 } from "./page-default";
+import {
+  KIND_TABLES_KEY,
+  PAGE_TYPES_KEY,
+  pageTypesIn,
+  storedKindTables,
+  withKindTable,
+  withPageType,
+  withoutPageType,
+  type KindTableOverride,
+} from "./kind-tables";
 
 // ── Who owns a template ──────────────────────────────────────────────────
 //
@@ -294,6 +304,39 @@ export interface JournalKind {
   // Absent falls back to the confidence built-in, which is what every note
   // written before this existed already does.
   rating?: string;
+
+  // What this kind's TABLE calls its columns, keyed by role. 1.0.32.
+  //
+  // A fact about the table and not about the trackers it reads, which is the
+  // whole reason the field exists — see `kind-columns.ts`. Absent, and an
+  // absent key, both mean the derived word.
+  headings?: Record<string, string>;
+
+  // NOT ONE OF THE JOURNAL'S DEFAULTS — a note type that lives on one index
+  // page. 1.0.33.
+  //
+  // ── THE READER'S ASK ──────────────────────────────────────────────────
+  //
+  // *"test!!! was added directly into Web Design index page, but its appearing
+  // on the settings page (where only the defaults should be, Lesson &
+  // Cheatsheet)"* — after: *"adding a new note-type to a table should not add
+  // this type to all index pages. The only place the defaults should be
+  // configured like this is from chronanvil's journal settings."*
+  //
+  // ── WHY THE KIND STILL EXISTS AT THE JOURNAL ──────────────────────────
+  //
+  // A kind is what a note's `type:` names, what a template file is written for
+  // and what a create button resolves to. There is no such thing as one that
+  // exists on a page: the group on Web Design has to find it, and so does every
+  // note filed under it. So the journal owns it, and this flag says it is not
+  // part of what the journal OFFERS — `childrenParts` composes a group per
+  // default kind, and Settings' NOTE TYPES step lists the defaults.
+  //
+  // WHICH PAGES LIST IT IS THE PAGE'S OWN ANSWER, in its frontmatter under
+  // `notetypes` — see `kind-tables.ts`, where the same argument was already made
+  // for a page's column headings. The flag alone would make the group a stray
+  // everywhere; the pair is what makes it belong somewhere.
+  local?: boolean;
 }
 
 export interface JournalType {
@@ -774,6 +817,16 @@ export function buildJournalType(cfg: JournalConfig): JournalType {
     ],
     ...(k.rating ? { rating: k.rating } : {}),
     ...(k.plural ? { plural: k.plural } : {}),
+    // COPIED, NOT REFERENCED, on this map's own rule two comments down: a type
+    // handed out of this constructor is somebody else's to hold, and a shared
+    // map would make a relabelled column on one journal a relabelled column on
+    // every journal built from the same config object.
+    ...(k.headings ? { headings: { ...k.headings } } : {}),
+    // CARRIED, LIKE EVERY OTHER STORED FIELD ON THIS MAP. A kind that lost its
+    // `local` on the way through here would be composed onto every index note
+    // in the journal the next time one was reconciled, which is the whole of
+    // what the flag exists to stop.
+    ...(k.local ? { local: true } : {}),
   }));
 
   // One page template for the whole type, claimed once and shared by every
@@ -2007,6 +2060,78 @@ export class JournalManager {
       if (id) front[PAGE_LAYOUT_KEY] = id;
       else delete front[PAGE_LAYOUT_KEY];
     });
+  }
+
+  // What ONE INDEX NOTE says about one of its note types' tables. 1.0.33.
+  //
+  // `setPageLayout`'S SHAPE, AND ITS DELETE. An entry that has become blank is
+  // taken out and a property with nothing left in it goes with it, because
+  // absent is what "the journal's own answer" already spells — see
+  // `kind-tables.ts`, which holds the whole argument and the merge.
+  //
+  // THE FLATTENING IS THE MODULE'S, NOT THIS FUNCTION'S. `storedKindTables` is
+  // the one place that knows the shape on disk differs from the shape callers
+  // hold, so a writer here cannot invent a third one.
+  async setKindTable(
+    file: TFile,
+    kindId: string,
+    over: KindTableOverride
+  ): Promise<void> {
+    const fm = frontmatterOf(this.app, file);
+    const next = withKindTable(fm, kindId, over);
+    if (!next && !(KIND_TABLES_KEY in fm)) return;
+    await this.app.fileManager.processFrontMatter(file, (front) => {
+      if (next) front[KIND_TABLES_KEY] = storedKindTables(next);
+      else delete front[KIND_TABLES_KEY];
+    });
+  }
+
+  // The other half of a page-added note type: this index note says it lists it.
+  // 1.0.33.
+  //
+  // WRITTEN BEFORE THE SECTIONS ARE RECONCILED, never after — `childrenParts`
+  // composes a group for a `local` kind only where `ctx.localKinds` names it,
+  // and `indexSurfaces` reads that off this frontmatter. Reconcile first and the
+  // planner is asked about a kind this page has not yet claimed, so it composes
+  // nothing and the reader presses a button that does nothing visible.
+  //
+  // A SECOND PRESS MOVES NO BYTES, which is `withPageType` returning null —
+  // `setPageLayout`'s posture, and the reason listing a type a page already
+  // lists is not a modification of the file.
+  // RESOLVES TO THE LIST THE FILE NOW CARRIES, which is not a convenience.
+  // `frontmatterOf` reads Obsidian's metadata cache, and the cache is updated
+  // from a file event AFTER this returns — so a caller that wrote the claim and
+  // then re-read it through `pageTypesOf` would get the list as it was BEFORE
+  // the write. That is exactly what *"adding a new-note type no longer
+  // automatically updates the table (the user has to repair vault for it to
+  // show)"* was: the planner was asked about a page that had already claimed the
+  // kind and was told, by a stale cache, that it had not.
+  async listKindOnPage(file: TFile, kindId: string): Promise<string[]> {
+    const now = frontmatterOf(this.app, file);
+    const next = withPageType(now, kindId);
+    if (!next) return pageTypesIn(now);
+    await this.app.fileManager.processFrontMatter(file, (front) => {
+      front[PAGE_TYPES_KEY] = next;
+    });
+    return next;
+  }
+
+  // And off again — this card stops listing it. The kind is untouched: whether
+  // it also leaves the journal is `promptRemoveKind`'s question, and the answer
+  // is "only if no other card still lists it".
+  //
+  // THE KEY IS DELETED RATHER THAN LEFT EMPTY, because an empty list in a
+  // reader's property editor is a row saying nothing that they then have to
+  // decide about.
+  async unlistKindOnPage(file: TFile, kindId: string): Promise<string[]> {
+    const now = frontmatterOf(this.app, file);
+    const next = withoutPageType(now, kindId);
+    if (!next) return pageTypesIn(now);
+    await this.app.fileManager.processFrontMatter(file, (front) => {
+      if (next.length) front[PAGE_TYPES_KEY] = next;
+      else delete front[PAGE_TYPES_KEY];
+    });
+    return next;
   }
 
   // Which kind a note is, read off its own `type:`.

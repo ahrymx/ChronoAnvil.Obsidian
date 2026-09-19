@@ -67,17 +67,19 @@
 // the cheap question alone would be the second door deleting a classification the
 // first door would have counted.
 
-import { App, Notice } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import type { JournalConfig, JournalKindConfig } from "./custom-journal";
 import { buildJournalType, countNotesOfKind } from "./journal";
+import { kindPlural } from "./journal-sections";
 // THE ID RULE LIVES WITH THE EDITOR AND IS CALLED, NOT COPIED. A kind's id is
 // the `type:` value written into every note of that kind, and deriving it a
 // second way here is how two doors end up disagreeing about what a journal
 // called "Field Notes" is called on disk. `normaliseKinds` also does the
 // uniquing, which is the part that is easy to get subtly wrong.
 import { normaliseKinds } from "../core/settings-editors";
-import { offerDashboardCatchup } from "./dashboard-catchup";
+import { catchUpIndexNote, offerDashboardCatchup } from "./dashboard-catchup";
+import { pageTypesOf } from "./kind-tables";
 import { confirmAction, promptText } from "../ui/modals";
 import { repaintOpenNotes } from "../ui/livewidget";
 
@@ -92,7 +94,11 @@ import { repaintOpenNotes } from "../ui/livewidget";
 export async function promptAddKind(
   app: App,
   plugin: ChronoAnvilPlugin,
-  typeId: string
+  typeId: string,
+  // The index note the control was pressed from — the ONLY page that gains a
+  // group for the new type. See `addKindToJournal`, where the reader's ask is
+  // quoted and the two scopes are told apart.
+  host: TFile | null = null
 ): Promise<JournalKindConfig | null> {
   const cfg = (plugin.settings.customJournals ?? []).find((j) => j.id === typeId);
   if (!cfg) return null;
@@ -105,14 +111,14 @@ export async function promptAddKind(
     {
       description:
         "Singular, as one note would be called. It gets its own template, its " +
-        "own create button and its own group on this card. Its emoji, its " +
-        "rating and whether it can be split into pages are in Settings → " +
-        "ChronoAnvil → Journals.",
+        "own create button and its own group on this card — and on this card " +
+        "only. Its emoji, its rating, whether it can be split into pages, and " +
+        "which index notes list it are in Settings → ChronoAnvil → Journals.",
     }
   );
   const label = name?.trim();
   if (!label) return null;
-  return addKindToJournal(plugin, cfg, label);
+  return addKindToJournal(plugin, cfg, label, host);
 }
 
 // Add a named kind to a stored journal, and carry out everything that follows.
@@ -125,7 +131,25 @@ export async function promptAddKind(
 export async function addKindToJournal(
   plugin: ChronoAnvilPlugin,
   cfg: JournalConfig,
-  label: string
+  label: string,
+  // ── WHICH PAGES GET A GROUP FOR IT (1.0.33) ─────────────────────────
+  //
+  // The reader's ask: *"adding a new note-type to a table should not add this
+  // type to all index pages. The only place the defaults should be configured
+  // like this is from chronanvil's journal settings."*
+  //
+  // A NOTE HERE MEANS "THIS PAGE ONLY". The card's door hands the note it was
+  // pressed from and nothing else is written; a null means the vault-wide offer,
+  // which is what the Settings editor's save has always meant and still means.
+  // The kind itself joins the journal either way — a kind is what a note's
+  // `type:` names, what a template is written for and what a create button
+  // resolves to, so there is no such thing as one that exists on one page.
+  //
+  // WHICH IS WHY THE SENTENCE IS ABOUT DEFAULTS RATHER THAN ABOUT EXISTENCE.
+  // The journal's kinds are what a NEW index note composes a group per, and
+  // Settings → Journals is where that list is edited. What this door stopped
+  // doing is reaching back through every index note already on disk.
+  host: TFile | null = null
 ): Promise<JournalKindConfig | null> {
   const app = plugin.app;
   const journals = plugin.settings.customJournals ?? [];
@@ -146,6 +170,24 @@ export async function addKindToJournal(
     (k) => k.label.trim().toLowerCase() === label.toLowerCase()
   );
   if (taken) {
+    // ── UNLESS IT IS A PAGE-ADDED TYPE AND THIS PAGE IS NOT LISTING IT ───
+    //
+    // A `local` kind exists on the journal and is offered to nobody: it draws a
+    // group only on the pages naming it in `notetypes`. So a reader on a SECOND
+    // index note who types "Risk" is not typing a name that is already taken
+    // from where they are standing — there is no Risks group on their card and
+    // no row for one in Settings. Refusing them would be the plugin saying the
+    // type exists while showing them nowhere it does, and leaving them no way
+    // to reach it.
+    //
+    // The name is still not used twice: they get THIS kind, listed here. One
+    // `type:` value, one template, two cards that list it.
+    if (host && taken.local && !pageTypesOf(app, host).includes(taken.id)) {
+      const listing = await plugin.journals.listKindOnPage(host, taken.id);
+      await catchUpIndexNote(app, buildJournalType(cfg), host, listing);
+      repaintOpenNotes(app);
+      return taken;
+    }
     new Notice(`ChronoAnvil: “${cfg.name}” already has a ${taken.label} note type.`);
     return null;
   }
@@ -154,9 +196,24 @@ export async function addKindToJournal(
   // `preserveIds`, because every kind already here has notes on disk carrying
   // its id. This is the established-journal case by construction — a journal
   // with no notes has no card to press this from.
-  const kinds = normaliseKinds([...cfg.kinds, { id: "", emoji: "📝", label }], {
-    preserveIds: true,
-  });
+  const kinds = normaliseKinds(
+    [
+      ...cfg.kinds,
+      // ── `local` IS WHAT MAKES THE DOOR THE DOOR (1.0.33) ──────────────
+      //
+      // *"test!!! was added directly into Web Design index page, but its
+      // appearing on the settings page (where only the defaults should be,
+      // Lesson & Cheatsheet)"*. A kind added from a card is not one of the
+      // journal's defaults: Settings' NOTE TYPES step draws no row for it, and
+      // `childrenParts` composes a group for it only on a page that names it.
+      //
+      // Set from the caller's `host` rather than from a parameter of its own,
+      // because they are the same fact: the door that hands a note is the door
+      // that means "this page", and one that hands none is the editor's save.
+      { id: "", emoji: "📝", label, ...(host ? { local: true } : {}) },
+    ],
+    { preserveIds: true }
+  );
   const added = kinds.find((k) => !before.has(k.id));
   // Nothing new came out, which means `normaliseKinds` dropped the row — it
   // drops a row with no label, and a label of nothing but spaces is already
@@ -181,10 +238,27 @@ export async function addKindToJournal(
     new Notice(`ChronoAnvil: wrote ${written.join(", ")} ✅`);
   }
 
-  // The offer that writes to the reader's dashboards, shown in full first. This
-  // is the one consent in the flow, and it is the shared one — see
-  // `offerDashboardCatchup`.
-  await offerDashboardCatchup(app, buildJournalType(next));
+  // The group for the new type, written where the door says it belongs.
+  //
+  // ONE CALL SITE, TWO SCOPES, chosen by the caller rather than by a flag read
+  // in here: `catchUpIndexNote` writes the card the reader pressed and asks
+  // nothing, because the prompt they just answered said it would; the offer
+  // writes every dashboard and shows the whole plan first, because that is the
+  // journal's defaults changing under notes nobody is looking at. See `host`.
+  const type = buildJournalType(next);
+  if (host) {
+    // THE CLAIM IS WRITTEN FIRST, and the order is load-bearing: the planner
+    // reads `notetypes` off this note to decide whether a `local` kind's group
+    // belongs on it (`indexSurfaces` → `ctx.localKinds` → `listedKinds`).
+    // Reconcile before claiming and it is asked about a kind this page has not
+    // claimed, composes nothing, and the reader's button does nothing visible.
+    // THE WRITE'S OWN ANSWER, HANDED OVER. Re-reading the claim would read
+    // Obsidian's metadata cache, which is an event behind this write — see
+    // `catchUpIndexNote`, and *"adding a new-note type no longer automatically
+    // updates the table"*.
+    const listing = await plugin.journals.listKindOnPage(host, added.id);
+    await catchUpIndexNote(app, type, host, listing);
+  } else await offerDashboardCatchup(app, type);
 
   await plugin.journals.rebuildJournalHome();
   plugin.notifyJournalTypesChanged();
@@ -252,17 +326,54 @@ export async function promptRemoveKind(
   app: App,
   plugin: ChronoAnvilPlugin,
   typeId: string,
-  kindId: string
+  kindId: string,
+  // The index note the control was pressed from, where there is one. See
+  // `unlistKindHere` — a page-added type on two cards leaves one of them.
+  host: TFile | null = null
 ): Promise<boolean> {
   const cfg = (plugin.settings.customJournals ?? []).find((j) => j.id === typeId);
   if (!cfg) return false;
   const kind = cfg.kinds.find((k) => k.id === kindId);
   if (!kind) return false;
 
+  // ── A PAGE-ADDED TYPE LEAVES ONE CARD AT A TIME ─────────────────────
+  //
+  // The reader's report: *"removing a non-default page-kind that happens to have
+  // been created on two different index page is getting removed from both on
+  // repair"* — they took `examples` off Web Design, and the next Repair vault
+  // offered to take its table off Spreadsheets too, because the kind itself had
+  // left the journal and every card listing it was now carrying a table for a
+  // type that no longer existed.
+  //
+  // The claim is what is removed, not the kind. The kind goes only with the LAST
+  // card that lists it, which is the same act this door has always performed and
+  // the same window it has always asked it behind.
+  if (host && kind.local) {
+    const others = pagesListingKind(app, cfg, kindId).filter(
+      (f) => f.path !== host.path
+    );
+    if (others.length) return unlistKindHere(plugin, cfg, kind, host, others);
+  }
+
+  // ── WHAT "THE LAST ONE" COUNTS (1.0.33) ──────────────────────────────
+  //
+  // The guard exists because a journal with no note types draws a *What's
+  // below* card with nothing in it and no way to add the next one, so the
+  // question it asks is about what EVERY index note has — the defaults. A
+  // page-added type is not one of those: removing it leaves the defaults
+  // standing on every card, and it must never be the thing that keeps a default
+  // from being removable either.
+  //
+  // A journal always has at least one default — this guard is what guarantees
+  // it, and a journal is created with one — so the whole count is safe to pass
+  // when the kind going is a local one.
+  const remaining = kind.local
+    ? cfg.kinds.length
+    : cfg.kinds.filter((k) => !k.local).length;
   const refusal = kindRemovalRefusal(
     cfg.name,
     kind.label,
-    cfg.kinds.length,
+    remaining,
     countNotesOfKind(app, cfg.root, kindId)
   );
   if (refusal) {
@@ -270,11 +381,24 @@ export async function promptRemoveKind(
     return false;
   }
 
+  // WHERE IT GOES FROM IS NOT ALWAYS EVERYWHERE, as of 1.0.33. A page-added
+  // type is only on the cards that list it in `notetypes`, and telling a reader
+  // it is coming off "every other index" would be describing a reach it never
+  // had. The sentence says what is true of the type in front of them.
+  //
+  // THE STALE ID IN `notetypes` IS LEFT, DELIBERATELY. It names a kind the
+  // journal no longer has, so `listedKinds` ignores it and no group is drawn —
+  // and it is what makes the last clause of this sentence true for a local type
+  // too: adding the name back restores the group on exactly the cards that had
+  // it, rather than on none of them.
+  const reach = kind.local
+    ? `The ${kind.label} group and its create button come off the cards listing it.`
+    : `The ${kind.label} group and its create button come off this card and every other index in ${cfg.name}.`;
   const ok = await confirmAction(
     app,
     `Remove the ${kind.label} note type?`,
     `No note in ${cfg.name} is a ${kind.label}, so nothing you have written changes. ` +
-      `The ${kind.label} group and its create button come off this card and every other index in ${cfg.name}. ` +
+      `${reach} ` +
       `Its template file stays in your templates folder, and adding ${kind.label} back restores the group.`,
     "Remove it"
   );
@@ -295,6 +419,85 @@ export async function promptRemoveKind(
 // asking it to re-derive ids that are already the `type:` value on notes —
 // `preserveIds` exists to stop exactly that, so the honest thing is not to ask.
 //
+// Which index notes claim this note type, by their own frontmatter. 1.0.33.
+//
+// THE VAULT IS THE RECORD, because the claim is. A page-added type is listed by
+// the pages that list it and by nothing else — there is no second register to
+// keep in step, which is the property that makes a claim survive a rename, a
+// move and a folder copied into another vault.
+//
+// A WALK, AND CHEAP ENOUGH BECAUSE IT IS ASKED ONCE AT A PRESS.
+// `countNotesOfKind` directly below is the same walk for the same reason, and
+// `below-edit.ts` states the rule both follow: the cheap DOM question decides
+// whether the control is drawn, the vault walk decides what the press does.
+export function pagesListingKind(
+  app: App,
+  cfg: JournalConfig,
+  kindId: string
+): TFile[] {
+  const root = cfg.root;
+  return app.vault
+    .getMarkdownFiles()
+    .filter(
+      (f) =>
+        (!root || f.path.startsWith(`${root}/`)) &&
+        pageTypesOf(app, f).includes(kindId)
+    );
+}
+
+// This card stops listing it; the journal keeps it for the cards that still do.
+//
+// THE COUNT IS THIS INDEX'S OWN FOLDER, not the journal's root. Nothing is being
+// declassified — the type still exists, its template still exists, and a note
+// filed under another card's index still has its group — so the question the
+// guard has to ask is the narrower one it is actually about: are there notes of
+// this type HERE, which is what would be left unlisted by taking the table off
+// this page.
+async function unlistKindHere(
+  plugin: ChronoAnvilPlugin,
+  cfg: JournalConfig,
+  kind: JournalKindConfig,
+  host: TFile,
+  others: TFile[]
+): Promise<boolean> {
+  const app = plugin.app;
+  const here = host.parent?.path ?? "";
+  const notes = countNotesOfKind(app, here, kind.id);
+  if (notes > 0) {
+    new Notice(
+      `ChronoAnvil: ${notes} note${notes === 1 ? "" : "s"} under ${
+        host.parent?.name ?? here
+      } ${notes === 1 ? "is" : "are"} still ${kind.label} — move ${
+        notes === 1 ? "it" : "them"
+      } first, or this card would stop listing ${
+        notes === 1 ? "it" : "them"
+      }.`
+    );
+    return false;
+  }
+
+  // THE WINDOW SAYS WHERE IT SURVIVES, which is the whole difference between
+  // this act and the other one. A reader who reads "removed" and means it is
+  // owed the sentence telling them the type is still one press away on the other
+  // card, and the reader who wanted it gone everywhere is told how to get there.
+  const elsewhere = others.length === 1 ? "1 other index note" : `${others.length} other index notes`;
+  const ok = await confirmAction(
+    app,
+    `Stop listing ${kindPlural(kind)} on this page?`,
+    `${kind.label} was added to this card rather than to ${cfg.name}, and ${elsewhere} still ${
+      others.length === 1 ? "lists" : "list"
+    } it — so the note type stays and only this card's group goes. ` +
+      `Nothing you have written changes. Remove it from the last card listing it and it leaves ${cfg.name} altogether.`,
+    "Stop listing it"
+  );
+  if (!ok) return false;
+
+  const listing = await plugin.journals.unlistKindOnPage(host, kind.id);
+  await catchUpIndexNote(app, buildJournalType(cfg), host, listing);
+  repaintOpenNotes(app);
+  return true;
+}
+
 // THE CATCH-UP IS WHY THIS IS SAFE TO OFFER AT ALL (1.0.23). Every index in the
 // journal is carrying a `kind-table:` for the type that just left, and until
 // this release nothing could see that block, let alone offer to take it out —

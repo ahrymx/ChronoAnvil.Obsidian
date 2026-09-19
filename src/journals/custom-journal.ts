@@ -88,6 +88,42 @@ export interface JournalKindConfig {
   // for it to migrate INTO — the capability it granted is now unconditional.
   // Plural label, when the crude pluraliser would get it wrong.
   plural?: string;
+  // What this kind's table calls its columns, where the reader has said. 1.0.32.
+  //
+  // KEYED BY ROLE — `name`, `date`, `rating`, `status` — and never by the
+  // tracker a column reads. `kind-columns.ts` carries the whole argument; the
+  // short version is that a kind re-rated from Confidence to Accuracy should
+  // keep the word its rating column was given, and a tracker-keyed map would
+  // drop it and leave a stale entry under the old id.
+  //
+  // ABSENT IS THE DERIVATION, which is what every journal written before this
+  // existed has and goes on having. There is nothing to migrate.
+  headings?: Record<string, string>;
+  // NOT ONE OF THE JOURNAL'S DEFAULTS — a note type that lives on one index
+  // page. 1.0.33.
+  //
+  // ── THE READER'S ASK ──────────────────────────────────────────────────
+  //
+  // *"test!!! was added directly into Web Design index page, but its appearing
+  // on the settings page (where only the defaults should be, Lesson &
+  // Cheatsheet)"* — after: *"adding a new note-type to a table should not add
+  // this type to all index pages. The only place the defaults should be
+  // configured like this is from chronanvil's journal settings."*
+  //
+  // ── WHY THE KIND STILL EXISTS AT THE JOURNAL ──────────────────────────
+  //
+  // A kind is what a note's `type:` names, what a template file is written for
+  // and what a create button resolves to. There is no such thing as one that
+  // exists on a page: the group on Web Design has to find it, and so does every
+  // note filed under it. So the journal owns it, and this flag says it is not
+  // part of what the journal OFFERS — `childrenParts` composes a group per
+  // default kind, and Settings' NOTE TYPES step lists the defaults.
+  //
+  // WHICH PAGES LIST IT IS THE PAGE'S OWN ANSWER, in its frontmatter under
+  // `notetypes` — see `kind-tables.ts`, where the same argument was already made
+  // for a page's column headings. The flag alone would make the group a stray
+  // everywhere; the pair is what makes it belong somewhere.
+  local?: boolean;
   // Saved layouts this kind can be created from, beyond the default one.
   //
   // MOVED UP TO THE JOURNAL IN 3.18 follow-ups §5, and kept here only to be

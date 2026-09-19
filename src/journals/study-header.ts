@@ -51,6 +51,7 @@ import {
 import { settingsButton } from "../ui/section-frame";
 import { openJournalTemplateWindow } from "../ui/journal-template-modal";
 import { attachNoteRename } from "../ui/header-title";
+import { attachFileGestures } from "../ui/file-gestures";
 import { pageHeadSays } from "../ui/widgets/page-head";
 import type ChronoAnvilPlugin from "../main";
 import { folderNotePath, frontmatterOf, getFile, isoDate, moment, noExt, openFile } from "../core/util";
@@ -294,6 +295,12 @@ export function renderCrumb(
     evt.preventDefault();
     void openFile(app, file);
   });
+  // MIDDLE-CLICK AND RIGHT-CLICK (1.0.30). A crumb wears `internal-link` and
+  // has since 2.x, which buys it the look of a link and none of the behaviour —
+  // Obsidian's own handlers are bound to the note's rendered markdown, not to
+  // chrome this plugin builds. `file-gestures.ts` holds the argument; this is
+  // the trail on both banners, so both get it from the one call.
+  attachFileGestures(app, a, file);
   a.addEventListener("mouseover", (evt) => {
     app.workspace.trigger("hover-link", {
       event: evt,

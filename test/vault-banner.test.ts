@@ -635,9 +635,13 @@ describe("the bar's own anatomy", () => {
     const t = banner();
     expect(t).toContain('const trail = root.createDiv({ cls: "ca-avb-trail" });');
     expect(t).toContain('.createDiv({ cls: "ca-avb-here" })');
-    expect(t).toContain(
-      '.createSpan({ cls: "ca-avb-here-text", text: this.hereText(file, surface) });'
-    );
+    expect(t).toContain('cls: "ca-avb-here-text"');
+    expect(t).toContain("text: this.hereText(file, surface),");
+    // STILL TEXT, AND NOW ALSO A HANDLE ON THE NOTE (1.0.30). The tail gained a
+    // right-click and a middle-click and no editor — a menu that can rename the
+    // file is not the same thing as a field that renames it under the pointer,
+    // which is the doubling 4.51.6 removed and this must not put back.
+    expect(t).toContain("attachFileGestures(this.app, here, file);");
     expect(t).not.toContain('cls: "avb-titlerow"');
     // The calls, not the words — the comment where the title used to be built
     // names both of them, and it is the record of why they left.

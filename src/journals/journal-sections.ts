@@ -193,6 +193,23 @@ export interface SectionContext {
   // from `hasPages`; an index is the only surface that is not document-like,
   // and it never was.
   documentLike: boolean;
+  // WHICH PAGE-ADDED NOTE TYPES THIS PARTICULAR INDEX NOTE LISTS (1.0.33).
+  //
+  // The reader's ask: *"adding a new note-type to a table should not add this
+  // type to all index pages."*
+  //
+  // A kind marked `local` was added from one index card's `+ Add note type`.
+  // The journal still owns it — a `type:` value, a template and a create button
+  // all have to resolve — but it is not part of what the journal offers, so
+  // `childrenParts` composes a group for it only where this names it. The ids
+  // come off the host note's own `notetypes` frontmatter; see `kind-tables.ts`,
+  // which makes the same argument for a page's column headings.
+  //
+  // ABSENT ON A TEMPLATE, for the reason `hostFolder` is: a journal template is
+  // composed once and used by every index note of its level, so a page's answer
+  // written into it would be every page's answer. A template lists the defaults
+  // and nothing else.
+  localKinds?: readonly string[];
   // The tracker a grade on this note writes. On an index, the type's own —
   // the first rating any of its kinds declares — because an index's charts
   // plot the notes beneath it and those are what carry a rating at all.
@@ -2415,7 +2432,12 @@ function defaultHeadings(ctx: SectionContext): { title: string; body?: string[] 
 // every place this is used is a label the reader can overrule (a template they
 // edit, a column above numbers that speak for themselves).
 // A kind's plural: its own if it declared one, else the crude rule.
-export function kindPlural(kind: JournalKind): string {
+// TAKES THE TWO FIELDS IT READS, not a whole built kind (1.0.33). The stored
+// `JournalKindConfig` and the built `JournalKind` both carry a label and an
+// optional plural, and the rule for turning one into the other must not have a
+// second spelling for the callers holding a config — `kind-create.ts` words its
+// windows about kinds it has only ever read out of settings.
+export function kindPlural(kind: { label: string; plural?: string }): string {
   return kind.plural ?? plural(kind.label);
 }
 
@@ -2442,6 +2464,26 @@ export { plural } from "../core/util";
 // and has nothing repeatable in it: a level has one child level, not a list of
 // them, so there is no piece for a journal to gain. Empty means all-or-nothing,
 // which is what the section was everywhere before 3.18.
+// The kinds THIS surface lists, which is not always the journal's whole list.
+// 1.0.33.
+//
+// A kind added from one index card carries `local` and is offered to nobody; the
+// note that asked for it names it back in `ctx.localKinds`. Both halves are
+// needed and neither is enough alone — see `JournalKindConfig.local` for why the
+// kind still exists at the journal, and `PAGE_TYPES_KEY` for why the page has to
+// claim it rather than the flag doing the work by itself.
+//
+// THE ONE PLACE THE PAIR IS RESOLVED. `missingParts` offers what is not on the
+// page and `strayParts` prunes what is not a part, and both read this list — so
+// a local kind's group is composed on the page that claims it, left alone there,
+// and removed from a page that does not, without either routine learning the
+// word "local".
+export function listedKinds(ctx: SectionContext): JournalKind[] {
+  return ctx.type.kinds.filter(
+    (k) => !k.local || ctx.localKinds?.includes(k.id)
+  );
+}
+
 export function childrenParts(
   ctx: SectionContext,
   opts?: SectionOverrides
@@ -2496,8 +2538,9 @@ export function childrenParts(
   // drops rather than draws (`.ca-journal-sec-l1 > …widgets:empty`), so the card
   // opens with one line. A section whose parts each carry their own action has
   // nothing left to put in a strip of its own.
-  const grouped = ctx.type.kinds.length > 1;
-  return ctx.type.kinds.map((kind) => {
+  const kinds = listedKinds(ctx);
+  const grouped = kinds.length > 1;
+  return kinds.map((kind) => {
     const heading = named.get(kind.id) ?? `${kind.emoji} ${kindPlural(kind)}`;
     return {
       id: kind.id,
@@ -2531,7 +2574,8 @@ export function childrenBar(
   ctx: SectionContext,
   opts?: SectionOverrides
 ): string[] {
-  const primary = ctx.type.kinds[0];
+  const kinds = listedKinds(ctx);
+  const primary = kinds[0];
   // ── AND A TYPE WITH ONE KIND IS NAMED BY THAT KIND ──────────────────
   //
   // "What's below" is a generic word for a card holding several named groups.
@@ -2543,7 +2587,7 @@ export function childrenBar(
   // IT ALSO MEANS A ONE-KIND JOURNAL'S FENCE IS UNCHANGED BY THIS RELEASE, byte
   // for byte: bar, create button, table, which is what it has composed since
   // 2.54. Nothing to migrate where there was never a stack of bars to unstack.
-  const solo = ctx.type.kinds.length === 1 && primary;
+  const solo = kinds.length === 1 && primary;
   const named = solo ? `${primary.emoji} ${kindPlural(primary)}` : CHILDREN_BAR;
   // ── THE BAR CARRIES AN ACTION ONLY WHERE NOTHING ELSE CAN ───────────
   //

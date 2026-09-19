@@ -5,6 +5,204 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.34] - 2026-09-19
+
+### Fixed
+
+- **A note type added to a card appears on it straight away.** It went in, and
+  the table for it did not — the group only turned up after a **Repair vault**,
+  which found it later and wondered why nobody had noticed.
+
+  The page records which added note types it lists in its own frontmatter, and
+  the step that writes the tables read that record back through Obsidian's
+  metadata cache — which is filled from a file event *after* the write that
+  caused it. So it asked about a page that had just claimed the note type and was
+  told, by a cache one event behind, that it had not. The write now says what it
+  wrote.
+
+- **Removing an added note type takes it off the card you pressed, not off every
+  card listing it.** A type added on two index notes belongs to both, and
+  removing it from one used to take it out of the journal — so the next repair
+  offered to strip its table off the other one too, reading it as a type that no
+  longer existed.
+
+  Removing it now takes that card's claim off and leaves the note type alone
+  while any other card still lists it; the window says how many do and that
+  removing it from the last one takes it out of the journal for good. The guard
+  counts the notes under *that* index rather than the whole journal, which is the
+  question it is actually about: nothing is declassified, the template stays, and
+  a note filed under another card keeps its group.
+
+- **The journals list's Structure column no longer names them either.** A type
+  added from a card is hidden from **Settings → Journals → Structure**, but the
+  **Structure** pill on the journals table went on reading "Lesson, Cheatsheet,
+  example" beside an editor listing two note types. Two lists of the same thing
+  that disagree is worse than either, and this is the one you see first.
+
+## [1.0.33] - 2026-09-19
+
+### Added
+
+- **One index note can overrule its note types' tables.** 1.0.32 gave a note type
+  its own column headings, and that answer is a fact about the whole journal —
+  every Study topic in the vault calls the column whatever the Lesson type calls
+  it. A topic whose lessons are worth grading on **Accuracy** rather than
+  **Confidence**, or a note type added for one subject, had nowhere to say so.
+
+  Open **Edit** on a *What's below* card and every note type's heading now carries
+  a `⋯` beside its create button. It opens what that group looks like **on this
+  page**: what its notes are rated on — the note type's own answer, any of the
+  journal's number or scale trackers, or nothing — and what this page calls each
+  of its columns. The rating column appears, changes or disappears with the
+  answer, and every heading opens on a box whose placeholder is the word it would
+  fall back to, so clearing it visibly goes back.
+
+  Nothing is stored for an answer that agrees with the note type, so a heading you
+  did not really change still follows the note type when the note type is renamed.
+  **Use the note type's own settings** puts a whole group back in one press, and
+  appears only once there is something to undo.
+
+  The answers live in the index note's own frontmatter, under `kindtables`, so
+  they survive a rename and travel with the note.
+
+### Changed
+
+- **`+ Add note type` now lists the type on the card you pressed it from, and
+  nowhere else.** It used to finish by offering to list the new type on every
+  index note and template in the journal — so a group wanted on one Topic arrived
+  on every Topic in the subject, from a list of paths accepted in a single press.
+
+  The note type still joins the journal, because that is what a note's `type:`
+  names and what its template and create button are written for; what changed is
+  which pages gain a group for it. Which index notes list a type by default is a
+  question for **Settings → ChronoAnvil → Journals**, and saving there still
+  offers every dashboard the catch-up exactly as before.
+
+  Removing an empty note type is unchanged and still reaches every dashboard —
+  a type that has left the journal leaves a broken group behind on each of them,
+  and clearing those is a repair rather than a default.
+
+- **And it is no longer one of the journal's note types.** Scoping the write was
+  half the answer: a type added from a card still appeared in **Settings →
+  ChronoAnvil → Journals → Structure** beside **Lesson** and **Cheatsheet**, which
+  is the list of what the journal offers *every* index note.
+
+  It does not any more. **Note types** in Settings lists the journal's defaults,
+  a type added from a card is listed by the page that asked for it — in its own
+  frontmatter, under `notetypes` — and the card is where it is edited: rename its
+  heading and the note type follows, and **Edit → remove** takes it off while it
+  is empty, exactly as before. It also stops claiming a *new …* command in the
+  palette, since the card it lives on is where it can be made.
+
+  Typing the same name again on a second index note lists it there too, rather
+  than refusing a name you cannot see from where you are standing. Removing it
+  says which cards it comes off rather than claiming a reach it never had, and a
+  journal always keeps at least one type it offers everywhere.
+
+## [1.0.32] - 2026-09-19
+
+### Added
+
+- **A note type's table columns can be renamed.** The headings on an index note's
+  table came from four places and none of them was the table: the first from the
+  note type's name, **Date** from a literal in the code, and the two tracker
+  columns from whatever the tracker registry calls **Confidence**, **Accuracy** or
+  **Status**. So the only way to change the word over the Confidence column was to
+  rename the Confidence tracker — which renames it in the cell you fill in, in the
+  stats band, in the chart legend and in every other journal using it.
+
+  Each note type now carries its own words for its columns. **Settings → Journals
+  → a journal → Structure** gives every note type a **Table columns** row, with one
+  box per column sitting beside **Rated on** — the field that decides whether the
+  rating column exists at all, so changing it makes that box appear or go.
+
+  Each box shows the derived word as its placeholder, so an empty box is not a
+  blank heading, it is the word the table is using now. Clearing a box goes back
+  to following the note type and the tracker: nothing is stored for a heading that
+  agrees with its own derivation, so a column you left alone still follows the
+  tracker when the tracker is renamed.
+
+  The override is keyed by what the column **is** — name, date, rating, status —
+  and not by the tracker it reads, so a note type re-rated from Confidence to
+  Accuracy keeps the word you chose for its rating column.
+
+  Journals that say nothing draw exactly what they drew before. There is nothing
+  to migrate.
+
+## [1.0.31] - 2026-09-19
+
+### Fixed
+
+- **The values in a records table now line up with their headings.** The Lessons,
+  Cheatsheets and Topics tables — anything with a **Date / Confidence / Status**
+  or **Notes / Activity / Open** strip across the top — drew their headings and
+  their rows as separate grids that happened to be given the same list of
+  columns. A column sized to fit its own contents, and the two sets of contents
+  are not the same: the heading strip sized the status column to the word
+  *Status* while the rows sized it to *In Progress*, and **Confidence** went the
+  other way, a heading wider than any gauge under it. Every column was off by its
+  own amount, in its own direction.
+
+  Underneath that sat a constant 8px: a row lays its name, values and `⋯` out
+  with a gap between them and the heading strip did not, so even a column whose
+  widths happened to agree sat slightly left of its own heading.
+
+  The table is now one grid, with the heading strip and every row sharing its
+  columns rather than each measuring its own. The widest date in the table and
+  the word *Date* are measured against each other once, so the strip cannot drift
+  from the rows. Two padding rules that had been compensating for the old
+  behaviour are gone with it.
+
+  Nothing changes below 460px, where the strip is not drawn and the values are
+  already a single `2026-09-08 · In Progress` line under the title.
+
+## [1.0.30] - 2026-09-19
+
+### Added
+
+- **The bar at the top of a note answers middle-click and right-click.** Every
+  crumb in its trail and every destination on it wears `internal-link` and has
+  behaved like half a link: a plain click replaced what was in the pane, a
+  middle-click did nothing at all — on desktop, worse than nothing, since the
+  button started Electron's autoscroll instead — and a right-click got the
+  editor's menu for the note *underneath* the bar, which is a menu about a
+  different file than the one being pointed at.
+
+  Middle-click now opens that page in a new tab. Right-click opens Obsidian's
+  own file menu for it — Open in new tab, Rename, Move to…, Reveal in navigation,
+  and whatever your other plugins add for links — because the menu is assembled
+  by Obsidian rather than rebuilt here.
+
+  Both gestures reach the **Home**, **Diary** and **Journals** destinations, every
+  crumb of the trail, and the trail's tail, which is the note you are on and the
+  most obvious thing on the bar to right-click. They are deliberately absent from
+  **Today** and **Capture**: those two open a window rather than a note, so there
+  is nothing to put in a tab and nothing for a file menu to be about.
+
+  The journal header's trail shares the crumb renderer, so it gained the same
+  two gestures in the same change.
+
+## [1.0.29] - 2026-09-19
+
+### Changed
+
+- **"Link to diary" asks with a list, and no longer only offers days.** The
+  banner action used to put up a text box wanting `YYYY-MM-DD`, which meant you
+  had to know the date you wanted before you pressed the button, and meant the
+  only thing a page could be linked to was a day — a box of that shape cannot
+  say "this quarter". It now opens a picker, grouped **Days / Weeks / Months /
+  Quarters / Years**, with each group opening on the period the page already
+  sits in. Every row says whether that entry is already written or would be a
+  new one, so you can see what you are about to create before you create it.
+
+  Typing a date is still there, as **Another date…** at the end of the list. It
+  no longer answers the question — it MOVES the list, re-anchoring all five
+  groups on the date you gave. That is what keeps the reach unbounded: the
+  window the picker offers unasked is small, and nothing is out of reach.
+
+  The page's own `date:` is still only ever written where there is none, which
+  is what makes always asking safe now that any period can be picked.
+
 ## [1.0.28] - 2026-09-18
 
 ### Changed

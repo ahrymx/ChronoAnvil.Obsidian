@@ -311,6 +311,31 @@ export class Diary {
     return file;
   }
 
+  // ── ONE DOOR ONTO THE THREE OPENERS ──────────────────────────────────
+  //
+  // A grain and its period key, routed to whichever of the three creators above
+  // makes that grain. Three rather than one because the diary names its periods
+  // three ways — a day by its date, a month by `YYYY-MM`, and the other three by
+  // the ISO day their period starts on — and this is the map between a
+  // `TrackerClass` and that.
+  //
+  // MOVED HERE IN 1.0.29 FROM `resolveGrainEntry` IN capture.ts, which had been
+  // the only caller that needed all three at once and is no longer. A second
+  // copy of this switch is a second answer to "what does a monthly key look
+  // like", and the two would be discovered to disagree by a reader whose
+  // September page landed in a file called `Month-2026-09-01`.
+  async openOrCreateEntry(
+    grain: TrackerClass,
+    key: string,
+    opts: { reveal?: boolean } = {}
+  ): Promise<TFile | null> {
+    if (grain === "daily") return this.openOrCreateDay(key, opts);
+    if (grain === "monthly") return this.openOrCreateMonth(key, opts);
+    const unit = PERIOD_ENTRY_UNIT[grain];
+    if (!unit) return null;
+    return this.openOrCreatePeriodEntry(unit, key, opts);
+  }
+
   // ── §  KEEPING THE SPINE COMPLETE (4.81) ─────────────────────────────
   //
   // Creating an entry creates every period above it that has no note yet, and

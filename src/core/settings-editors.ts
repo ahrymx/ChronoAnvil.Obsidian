@@ -94,6 +94,12 @@ import {
 import { notify } from "./notify";
 import { journalFoldersOnDisk, removeJournal } from "./journal-removal";
 import { holdsTypedNotes } from "../journals/journal-import";
+import {
+  cleanHeadings,
+  kindColumns,
+  packHeadings,
+} from "../journals/kind-columns";
+import type { KindColumn, KindColumnKey } from "../journals/kind-columns";
 
 export const TRACKER_TYPE_LABELS: Record<TrackerType, string> = {
   number: "Number (stepper)",
@@ -1167,6 +1173,25 @@ export function normaliseKinds(
       ...(row.plural && row.plural !== plural(label)
         ? { plural: row.plural }
         : {}),
+      // THE SAME CARRY, ONE FIELD ALONG (1.0.32). `headings` is edited by this
+      // window — see `paintKinds` — but it is edited as a map, and the trap
+      // `plural` fell into above is the trap a map is MOST exposed to: rebuilt
+      // key by key from the boxes on screen, a role this build has no box for
+      // would be dropped by pressing Save. `cleanHeadings` keeps what it does
+      // not recognise and drops only what says nothing.
+      ...((): { headings?: Record<string, string> } => {
+        const headings = cleanHeadings(row.headings);
+        return headings ? { headings } : {};
+      })(),
+      // AND THE SAME CARRY AGAIN, FOR A FIELD THIS WINDOW CANNOT SEE (1.0.33).
+      // A kind added from an index card is marked `local` and `paintKinds`
+      // draws no row for it — *"The only place the defaults should be
+      // configured like this is from chronanvil's journal settings."* A row
+      // with no box on screen is precisely `plural`'s trap above, and the
+      // consequence here is worse than a bad heading: rebuilt without the
+      // flag, every page-added type would be composed onto every index note in
+      // the journal the next time Save was pressed.
+      ...(row.local ? { local: true } : {}),
     });
   }
   return out;
@@ -2113,7 +2138,29 @@ export class JournalEditModal extends SteppedEditorModal {
       (t, i, all) => all.findIndex((o) => o.id === t.id) === i
     );
 
+    // WHAT THIS STEP LISTS IS THE JOURNAL'S DEFAULTS (1.0.33).
+    //
+    // The reader's ask: *"test!!! was added directly into Web Design index
+    // page, but its appearing on the settings page (where only the defaults
+    // should be, Lesson & Cheatsheet)"* — after: *"The only place the defaults
+    // should be configured like this is from chronanvil's journal settings."*
+    //
+    // A kind marked `local` was added from one index card's `+ Add note type`
+    // and belongs to that card. It is still a kind on the journal — it has a
+    // template, a create button and a `type:` value — but it is not part of
+    // what this journal OFFERS, so it draws no row here. It is renamed, re-
+    // rated and removed from the `⋯` on its own group, which is the only place
+    // it exists on screen.
+    //
+    // FILTERED INSIDE THE LOOP RATHER THAN BEFORE IT, deliberately: `i` is the
+    // index `del` splices out of `this.draft.kinds`, so a `.filter()` first
+    // would have this window delete the WRONG kind on any journal that has a
+    // page-added one. The rows on screen are a subset; the indices are the
+    // array's own.
+    const offered = this.draft.kinds.filter((k) => !k.local).length;
+
     this.draft.kinds.forEach((kind, i) => {
+      if (kind.local) return;
       const row = host.createDiv({ cls: "ca-kind" });
 
       const head = row.createDiv({ cls: "ca-kind-head" });
@@ -2142,7 +2189,10 @@ export class JournalEditModal extends SteppedEditorModal {
       const del = head.createEl("button", { cls: "ca-kind-remove" });
       setIcon(del, "trash-2");
       del.setAttribute("aria-label", "Remove this kind");
-      del.disabled = this.draft.kinds.length <= 1;
+      // Counted over what is OFFERED, not over the array: a journal whose only
+      // remaining default sits beside two page-added kinds is still a journal
+      // about to have nothing to create.
+      del.disabled = offered <= 1;
       del.addEventListener("click", () => {
         this.draft.kinds.splice(i, 1);
         this.paintKinds();
@@ -2165,6 +2215,69 @@ export class JournalEditModal extends SteppedEditorModal {
         text: kind.rating
           ? "What a Recall sitting grades into, and what this journal's trend charts plot."
           : "Notes of this kind aren't scored.",
+      });
+
+      // ── What this kind's table calls its columns (1.0.32) ──────────────
+      //
+      // The reader's ask: *"there needs to be a way to edit these headers for
+      // page kinds, especially for trackers such as confidence or accuracy."*
+      //
+      // HERE, BECAUSE THIS ROW IS ALREADY THE ANSWER TO "WHAT IS THIS KIND
+      // CALLED AND WHAT IS IT RATED ON", and the rating is the field that
+      // decides whether the third column exists at all. A reader changing
+      // "Rated on" watches the box for that column appear beside it.
+      //
+      // ONE BOX PER COLUMN, EACH SHOWING THE DERIVED WORD AS ITS PLACEHOLDER.
+      // That is what makes an empty box readable: it is not a blank heading, it
+      // is the word the table is using, and typing over it is visibly a
+      // departure from it. Clearing it goes back — see `packHeadings`, which
+      // stores nothing for a box that agrees with its own derivation, so a
+      // heading left alone still follows the tracker when the tracker is
+      // renamed.
+      //
+      // NOT A ROW OF LABELS ABOVE THE BOXES. Four labels and four boxes is two
+      // lines for four words; the placeholder IS the label here, and it is the
+      // more useful of the two because it also says what the word is now.
+      const colsRow = row.createDiv({ cls: "ca-kind-field ca-kind-cols" });
+      colsRow.createSpan({
+        cls: "ca-kind-field-label",
+        text: "Table columns",
+      });
+      const boxes = colsRow.createDiv({ cls: "ca-kind-cols-boxes" });
+      const writeHeadings = (
+        cols: KindColumn[],
+        read: (key: KindColumnKey) => string
+      ): void => {
+        kind.headings = packHeadings(
+          cols.map((c) => ({
+            key: c.key,
+            value: read(c.key),
+            fallback: c.fallback,
+          }))
+        );
+      };
+      const columns = kindColumns(this.plugin, kind);
+      const typed = new Map<KindColumnKey, string>();
+      for (const col of columns) {
+        const box = boxes.createEl("input", {
+          type: "text",
+          cls: "ca-kind-col",
+          value: kind.headings?.[col.key] ?? "",
+        });
+        box.placeholder = col.fallback;
+        // NAMED WITH THE DERIVED WORD TOO, because a screen reader gets the
+        // placeholder only while the box is empty and this is the one thing
+        // that says which column a box belongs to.
+        box.setAttribute("aria-label", `Heading for the ${col.fallback} column`);
+        typed.set(col.key, box.value);
+        box.addEventListener("input", () => {
+          typed.set(col.key, box.value);
+          writeHeadings(columns, (k) => typed.get(k) ?? "");
+        });
+      }
+      colsRow.createSpan({
+        cls: "ca-kind-field-note",
+        text: "What the table on an index note calls each column. Empty follows the note type and the tracker.",
       });
 
       // A `Pages` CHECKBOX SAT HERE AND IS GONE (5.20). Every other field on

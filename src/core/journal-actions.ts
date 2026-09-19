@@ -99,7 +99,14 @@ export function journalActions(plugin: ChronoAnvilPlugin): Action[] {
       });
     }
 
+    // THE JOURNAL'S DEFAULTS, NOT ITS EVERY KIND (1.0.33). A kind added from one
+    // index card is listed on that card and nowhere else, so a command in every
+    // vault-wide palette would be the one place it reached everywhere — and a
+    // note made from it while standing somewhere else would land under an index
+    // that lists no table for it. Its create button sits beside its own rows,
+    // which is the whole of where it exists.
     for (const kind of type.kinds) {
+      if (kind.local) continue;
       out.push({
         id: idFor(type, kind.id),
         name: `${type.name}: new ${kind.label.toLowerCase()}`,

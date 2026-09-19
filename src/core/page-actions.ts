@@ -89,11 +89,16 @@ export const PAGE_ACTIONS: readonly PageAction[] = [
     // entry IS the diary, and a button offering to join it to itself would be
     // asking a question with no true answer. The refusal is by surface rather
     // than by reading the note, for the reason `PageActionContext` gives.
+    //
+    // THE BLURB STOPPED SAYING "THAT DAY" IN 1.0.29. It was accurate while the
+    // action asked for a `YYYY-MM-DD` and could not express anything else; the
+    // picker offers all five grains, and a sentence in Settings promising one of
+    // them is a reader deciding whether to keep a button on false information.
     id: "page-link-diary",
     label: "Link to diary",
     icon: "calendar-plus",
     blurb:
-      "Dates the page and links it from the diary entry for that day, so it turns up in search, on-this-day and the bridge.",
+      "Dates the page and links it from a diary entry you pick — a day, week, month, quarter or year — so it turns up in search, on-this-day and the bridge.",
     when: (ctx) => ctx.surface !== "entry",
     run: (p, path) => linkPageToDiary(p, path),
   },

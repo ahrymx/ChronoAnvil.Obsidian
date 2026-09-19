@@ -880,10 +880,14 @@ describe("the actions slot on a record row", () => {
     // no pages to bin — so a reserve there would push its columns off their own
     // headings in the opposite direction.
     const text = readCode("tables.ts");
+    // THE HEADINGS STOPPED BEING A LITERAL IN 1.0.32 — they are a kind's own
+    // words now, derived or stored — so this names the call rather than the
+    // argument. What it is still asserting is unchanged: the kind table asks
+    // for the reserve and nothing else does.
     expect(text).toContain(
-      "recordList(root, [kind.label, ...columns.map(heading)], true)"
+      "recordList(root, cols.map((c) => c.heading), true)"
     );
-    expect(text.match(/recordList\(root, \[[^;]*\], true\)/g) ?? []).toHaveLength(1);
+    expect(text.match(/recordList\(root, [^;]*, true\)/g) ?? []).toHaveLength(1);
   });
 
   it("keeps the control in the shared class family", () => {

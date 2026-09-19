@@ -2433,7 +2433,20 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     index: number
   ): void {
     const journals = this.plugin.settings.customJournals;
-    const kindNames = cfg.kinds.map((k) => k.label).join(", ");
+    // WHAT THE JOURNAL OFFERS, WHICH IS NOT EVERY KIND IT HOLDS (1.0.33).
+    //
+    // The reader's report: *"custom note-kinds are now hidden from the journal
+    // settings edit window, but not from the structure column."* Two lists of
+    // the same thing that disagree is worse than either, and this is the one a
+    // reader sees first — a pill reading "Lesson, Cheatsheet, example" beside an
+    // editor that lists two rows.
+    //
+    // `paintKinds` makes the same filter for the same reason; a type added from
+    // one index card is listed by that card and edited from it.
+    const kindNames = cfg.kinds
+      .filter((k) => !k.local)
+      .map((k) => k.label)
+      .join(", ");
     const tr = tbody.createEl("tr");
 
     // 1. Journal
