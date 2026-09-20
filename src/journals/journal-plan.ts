@@ -85,10 +85,12 @@ import { JournalType } from "./journal";
 import {
   answersOn,
   flatBlocks,
+  GRAPH_MARK,
   graphLinksSection,
   regroupFlatNote,
 } from "../core/note-sections";
 import type { FlatSection } from "../core/note-sections";
+import { stripPluginMarkup } from "../core/plain-markdown";
 import { isPageWidgetId } from "../core/widget-sections";
 import {
   addOps,
@@ -113,13 +115,24 @@ import {
   SectionOverrides,
   SectionPart,
   composeSectionRuns,
+  graphParentName,
   bracketKeyOf,
   questionsOf,
   sectionBlocks,
   widgetFormBar,
-  bracketSpanIn,
+  bracketClose,
+  bracketOpen,
+  headingTitlesIn,
   headingsFromTitles,
-  skeletonTitles,
+  isProseId,
+  proseIdFor,
+  proseOrdinalOf,
+  proseCountIn,
+  proseSpanIn,
+  proseSpansIn,
+  proseTitlesIn,
+  PROSE_KEY,
+  PROSE_SECTION_ID,
   renderBlock,
   renderSection,
   rowOf,
@@ -152,6 +165,8 @@ import {
   SectionOpKind,
   SectionView,
   SectionWant,
+  FLAG_OFF,
+  FLAG_ON,
   describeAnswers,
   idsOf,
   optionsFor,
@@ -364,40 +379,54 @@ function signaturesFor(ctx: SectionContext): {
   return { fences, regionOwners };
 }
 
-// A section with no fence at all — `headings`, and only `headings`.
+// A section with no fence at all — prose, and only prose.
 //
-// Signature matching cannot see it: its output is ordinary `## ` markdown.
+// Signature matching cannot see it: its output is the reader's own markdown.
 // Leaving it unattributed would have every Lesson template report its own prose
-// skeleton as blocks that aren't the catalogue's, and would make isHandEdited
-// true for a file the plugin had just written.
+// block as blocks that aren't the catalogue's, and would make isHandEdited true
+// for a file the plugin had just written.
 //
-// So fall back to the section's own `locate` probe, which is exactly what that
-// callback is for.
+// ── IT MATCHES THE BRACKET NOW, NOT A `##` ANYWHERE IN THE SEGMENT (1.0.36) ─
 //
-// ── WHY OVER-MATCHING IS STILL HARMLESS, ON A NEW ARGUMENT (5.6) ─────────
+// This used to fall back to the section's own `locate` probe, which was
+// `/^##\s+\S/m` — "any second-level heading in this text" — and so claimed a
+// WHOLE raw segment: the headings, the markers, and every word the reader had
+// typed under the last one. Two successive comments defended that. The first
+// said a markdown-only section is never removable, so the attribution changed
+// nothing; 5.6 made it removable and spent that argument. The second said the
+// only write is `cutBracketedSpan`, which is scoped to the markers, so a
+// segment claimed too widely is a segment nothing touches.
 //
-// This function claims a WHOLE raw segment, and a raw segment runs from one
-// fence to the next — so it holds the skeleton, the markers, and every word the
-// reader has typed under the last heading. Until 5.6 the justification for that
-// was one sentence: "a markdown-only section is never removable, so attributing
-// a reader's own `## Notes` to it changes nothing that happens to the file."
+// Both were true and both were arguments for why being wrong did not hurt yet.
+// The bracket is the section's extent, it has been readable off the file since
+// 5.6, and prose repeats — so the ordinal is the block's identity and a probe
+// that cannot count occurrences is no longer even expressible. A raw segment is
+// prose when it CONTAINS A PROSE MARKER, and `prose#2` is the second one in the
+// file.
 //
-// The skeleton is removable now, so that sentence is spent, and the replacement
-// has to be about the WRITE rather than about the attribution. It is: the only
-// thing removal does to this run is `cutBracketedSpan`, which copies everything
-// outside the markers verbatim and, inside them, drops only headings with
-// nothing written under them. A segment claimed too widely is therefore still a
-// segment nothing touches, and the reader's prose is safe because the cut is
-// scoped to the bracket rather than because the attribution was exact.
+// ONE TALLY ALONG THE WALK, which is `sectionOwners`' answer to the same
+// question (`core/sections.ts`) and for its reason: an occurrence number cannot
+// be worked out inside a `locate`, because every segment would see its own
+// bracket as the first one and a note with three blocks would report three
+// copies of `#1`.
 //
-// AN UNMARKED SKELETON IS CLAIMED THE SAME WAY AND CANNOT BE REMOVED AT ALL —
-// `planSections` and `journalRefusal` both ask `bracketSpanIn` before they will
-// write. So the pre-5.6 note keeps exactly the behaviour it had.
+// ── AND THE UNMARKED NOTE KEEPS THE OLD BEHAVIOUR EXACTLY ────────────────
+//
+// `marked` is false only for a note that carries no prose marker anywhere — the
+// pre-5.6 shape, whose headings nothing can tell from the reader's own prose.
+// There the old probe still runs and still claims the whole segment, because
+// that is what makes `journalRefusal` say *Reload this page* over a row the
+// reader can still see, rather than dropping the section off the window and
+// reporting their writing as foreign blocks. `planSections` and `journalRefusal`
+// both ask for a span before they will write, so nothing is cut on the strength
+// of this claim.
 function markdownOwnerOf(
   seg: Segment,
   ctx: SectionContext,
-  sections: JournalSection[]
-): JournalSection | null {
+  sections: JournalSection[],
+  tally: { n: number },
+  marked: boolean
+): { section: JournalSection; ids: string[] } | null {
   if (seg.kind !== "raw") return null;
   const text = seg.lines.join("\n");
   if (!text.trim()) return null;
@@ -406,9 +435,81 @@ function markdownOwnerOf(
     if (blocks.some((b) => b.kind === "fence")) continue;
     if (!blocks.some((b) => b.kind === "markdown" || b.kind === "bracketed"))
       continue;
-    if (s.locate(text, ctx) >= 0) return s;
+    if (isProseId(s.id)) {
+      // EVERY OPENER IN THIS SEGMENT IS AN ID, not just the first.
+      //
+      // A raw segment runs from one fence to the next, so a reader who wrote
+      // two prose blocks with no widget between them has BOTH inside one
+      // segment. Reporting only the first would leave the second with no run —
+      // present in the file, absent from the window, and uneditable — which is
+      // the shape of bug `sectionIds` exists to carry a list for. The run's
+      // first id still owns the run for everything that asks about extent; the
+      // rest ride along, and `spanOfRun` turns a global ordinal back into the
+      // span inside these lines.
+      const spans = proseSpansIn(seg.lines);
+      if (spans.length) {
+        const ids = spans.map(() => proseIdFor(++tally.n));
+        return { section: s, ids };
+      }
+      if (!marked && s.locate(text, ctx) >= 0) {
+        return { section: s, ids: [proseIdFor(++tally.n)] };
+      }
+      continue;
+    }
+    if (s.locate(text, ctx) >= 0) return { section: s, ids: [s.id] };
   }
   return null;
+}
+
+// Which span inside one run's lines a prose id names.
+//
+// The run's ids are consecutive ordinals — they were minted by one pass over
+// these very lines — so the offset from the run's first id IS the index into
+// `proseSpansIn(lines)`. Derived rather than stored because a run is rebuilt
+// from the text on every read, and a stored index would be the one thing in a
+// `SectionRun` that could be stale.
+// A wanted id as the catalogue row that describes it.
+//
+// EVERY PROSE BLOCK IS ONE CATALOGUE ENTRY. `sectionsFor` returns `headings`
+// and nothing else however many blocks a note carries, so every lookup that
+// takes an id off a run, off a `want` or off the editor has to come through
+// here — a bare `find(s.id === id)` answers undefined for `headings#2` and the
+// caller silently skips the section, which is a block that cannot be edited,
+// removed or planned and says nothing about why.
+export function sectionOfId(
+  sections: readonly JournalSection[],
+  id: string
+): JournalSection | undefined {
+  const direct = sections.find((s) => s.id === id);
+  if (direct) return direct;
+  return isProseId(id)
+    ? sections.find((s) => s.id === PROSE_SECTION_ID)
+    : undefined;
+}
+
+// What a prose row is called, where a note carries more than one block.
+//
+// THE ORDINAL IS THE LABEL'S, TOO (1.0.36). The reader asked for "copy prose
+// block #" and "move prose block #", and a window listing three rows all
+// reading **Prose** answers neither — the number is the only thing telling
+// them apart, since every block holds different words and the same everything
+// else. The first keeps the bare label, exactly as its id keeps the bare
+// `headings`: one block is the ordinary case and numbering it would imply a
+// second that may not exist.
+export function proseLabelOf(section: JournalSection, id: string): string {
+  const n = isProseId(id) ? (proseOrdinalOf(id) ?? 1) : 1;
+  return n > 1 ? `${section.label} ${n}` : section.label;
+}
+
+export function proseSpanOfRun(
+  runIds: readonly string[],
+  id: string
+): number {
+  const first = runIds.find((x) => isProseId(x));
+  const base = first ? proseOrdinalOf(first) : null;
+  const want = proseOrdinalOf(id);
+  if (base === null || want === null) return 1;
+  return Math.max(1, want - base + 1);
 }
 
 // Whether `sub` is a sub-multiset of `all` — every keyword in `sub` present in
@@ -650,8 +751,26 @@ function ownersBySignature(seg: Segment, sigs: Signature[]): JournalSection[] {
 }
 
 // Split a raw segment where a frontmatter block or region comment is followed
-// by other content (such as the prose skeleton or another region), so that
+// by other content (such as a prose block or another region), so that
 // lookaheads like region absorption do not swallow unrelated sections.
+//
+// ── AND ONE MORE TIME, AT EVERY PROSE BRACKET (1.0.36) ──────────────────
+//
+// A raw segment runs from one fence to the next, so two prose blocks with
+// nothing but a blank line between them arrived here as ONE segment and left as
+// one run carrying two ids. Everything downstream works in chunks — a chunk is
+// a run's lines — so two blocks in one chunk cannot be reordered against each
+// other and nothing can be put between them. `planSections` reported the move
+// anyway, because it reasons about ids and not about chunks, and the write then
+// changed nothing: the reader pressed Save, the plan said *moves Prose 2 above
+// Tasks*, and the modal said **nothing to change**. That disagreement is the
+// one thing the note at the top of this file says must not happen.
+//
+// So each bracketed span becomes a segment of its own, and whatever sits
+// between two of them becomes another. A blank line between two blocks is then
+// an ordinary filler run, which is exactly what a blank line between two fenced
+// sections has always been — and the machinery that moves those needs nothing
+// new to move these.
 //
 // EXPORTED BECAUSE `SectionRun.from`/`to` ARE INDICES INTO ITS OUTPUT (5.10),
 // not into `segment(...)`. A caller holding a run and wanting its lines has to
@@ -725,6 +844,35 @@ export function splitRawSegments(segs: readonly Segment[]): Segment[] {
     }
   }
 
+  // A POST-PASS RATHER THAN A FOURTH RULE IN THE LOOP. The rules above are
+  // ordered — the region rule pushes the lines BEFORE an opener as one segment,
+  // and a prose rule ahead of it would hand it a head it had already cut
+  // differently. Run afterwards, this sees whatever the loop settled on and
+  // splits only what it is about.
+  return out.flatMap((seg) => (seg.kind === "raw" ? atProseBrackets(seg) : [seg]));
+}
+
+// One raw segment as its prose blocks and the lines around them.
+//
+// Each bracketed span is a segment; each stretch between two of them is a
+// segment; the head before the first and the tail after the last are segments.
+// An empty piece is not pushed, so a segment holding exactly one block and
+// nothing else comes back unchanged — which is every note in every vault until
+// somebody ticks Prose a second time.
+function atProseBrackets(seg: Segment): Segment[] {
+  const spans = proseSpansIn(seg.lines);
+  if (spans.length < 2) return [seg];
+  const out: Segment[] = [];
+  const push = (from: number, to: number): void => {
+    if (to > from) out.push({ kind: "raw", lines: seg.lines.slice(from, to) });
+  };
+  let at = 0;
+  for (const span of spans) {
+    push(at, span.open);
+    push(span.open, span.close + 1);
+    at = span.close + 1;
+  }
+  push(at, seg.lines.length);
   return out;
 }
 
@@ -759,13 +907,22 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
   const segs = splitRawSegments(segment(text.split("\n")));
   const { fences, regionOwners } = signaturesFor(ctx);
 
+  // THE PROSE TALLY, CARRIED ALONG THE WALK. See `markdownOwnerOf`: a block's
+  // ordinal is its position in the file, and this loop is the only thing that
+  // reads the file in order. `marked` is asked once, of the whole text, because
+  // "this note predates the markers" is a fact about the note rather than about
+  // whichever segment is in hand.
+  const prose = { n: 0 };
+  const marked = proseCountIn(text) > 0;
+
   const runs: SectionRun[] = [];
   let i = 0;
   while (i < segs.length) {
     const seg = segs[i];
     const owners = ownersBySignature(seg, fences);
-    const owner =
-      owners[0] ?? markdownOwnerOf(seg, ctx, sectionsFor(ctx)) ?? null;
+    const found =
+      markdownOwnerOf(seg, ctx, sectionsFor(ctx), prose, marked) ?? null;
+    const owner = owners[0] ?? (found ? { id: found.ids[0] } : null);
 
     if (!owner) {
       runs.push({
@@ -821,7 +978,9 @@ export function parseSections(text: string, ctx: SectionContext): SectionRun[] {
     }
     runs.push({
       sectionId: owner.id,
-      sectionIds: owners.length ? owners.map((o) => o.id) : [owner.id],
+      sectionIds: owners.length
+        ? owners.map((o) => o.id)
+        : (found?.ids ?? [owner.id]),
       from: i,
       to: end,
       filler: false,
@@ -890,7 +1049,7 @@ function describeRefusedRemove(
 // this refusal is read over a template as often as over a note, and a template
 // is not a note.
 export const UNMARKED_PROSE_REFUSAL =
-  "written as ordinary markdown here — Reload this page to mark it, " +
+  "written as ordinary markdown here — Reload this note to mark it, " +
   "or delete the headings by hand";
 
 function describeKept(kept: readonly { key: string; lines: number }[]): string {
@@ -1483,6 +1642,27 @@ export function planSections(
   const present = new Set(runs.flatMap((r) => r.sectionIds));
   const sections = sectionsFor(ctx);
   const byId = new Map(sections.map((s) => [s.id, s]));
+  const resolve = (id: string): JournalSection | undefined =>
+    byId.get(id) ?? sectionOfId(sections, id);
+  // ── AND ONE ENTRY PER ID THE PLAN WILL NAME, LABELLED (1.0.36) ──────
+  //
+  // `addOps` and `moveOpsFor` take a MAP and read a label off it, and a bare
+  // catalogue map answers undefined for `headings#2` — so ticking a second
+  // prose block produced no `add` op at all, and the write that followed had
+  // nothing in `adding` to compose. Aliased here rather than resolved inside
+  // those two, which are shared with every other catalogue and have no reason
+  // to learn what a repeating section is.
+  //
+  // THE ALIAS KEEPS THE CATALOGUE'S `id` AND TAKES THE BLOCK'S LABEL. Every
+  // read of `section.id` below is a key into `sectionOverrides`, which is the
+  // TYPE's table and has one row for prose however many blocks a note holds;
+  // the label is the only field an ordinal changes.
+  const named = new Map(byId);
+  for (const id of new Set([...want, ...runs.flatMap((r) => r.sectionIds)])) {
+    if (named.has(id)) continue;
+    const row = sectionOfId(sections, id);
+    if (row) named.set(id, { ...row, label: proseLabelOf(row, id) });
+  }
   const segs = splitRawSegments(segment(text.split("\n")));
   const rewriting = new Set(reconfigured([...present], requested));
   const ops: SectionOp[] = [];
@@ -1494,8 +1674,22 @@ export function planSections(
   // that is what the reader is ticking. What they share is the run they sit in,
   // which is why the region and gap scans below are computed from the run.
   for (const run of runs) for (const runId of run.sectionIds) {
-    const section = byId.get(runId);
+    const section = resolve(runId);
     if (!section) continue;
+    // ── THE ID, THE LABEL AND THE ORDINAL ARE THE RUN'S, NOT THE ROW'S ──
+    //
+    // (1.0.36.) Every op below used to read `section.id` and `section.label`,
+    // which was the same string as `runId` for all of the nine years this
+    // catalogue held no repeating section. Prose is one catalogue entry and
+    // several blocks, so an op naming `headings` for the second block would be
+    // matched against the first by every caller that keys a plan by id —
+    // `reconfigured`, `describeAnswers`, the change list's own row lookup —
+    // and the reader would tick block 2 and watch block 1 change.
+    //
+    // `nth` IS WITHIN THE RUN, which is what both writes take: `proseSpanIn`
+    // counts spans in the lines it is handed, and the lines here are the run's.
+    const rowLabel = proseLabelOf(section, runId);
+    const nth = proseSpanOfRun(run.sectionIds, runId);
     if (want.includes(runId)) {
       const runLines: string[] = [];
       for (let i = run.from; i <= run.to; i++) runLines.push(...segs[i].lines);
@@ -1525,7 +1719,12 @@ export function planSections(
       // boldest write in it, and every other write is reported in the detail
       // rather than swallowed. A fence can want all three at once — a journal
       // that gained one kind and lost another is exactly that.
-      const kindOfOp = rewriting.has(section.id)
+      // `runId` RATHER THAN `section.id`, WHICH FOR PROSE IS NOT THE SAME
+      // STRING (1.0.36). `rewriting` is keyed by what the reader ticked, so
+      // reading the catalogue's id here reported "unchanged" for an edit to
+      // the second block — the plan describing a file the write would not
+      // produce, which is the one thing a preview must never do.
+      const kindOfOp = rewriting.has(runId)
         ? "reconfigure"
         : strays.length
           ? "prune"
@@ -1566,24 +1765,20 @@ export function planSections(
       // here: the preview and the write disagreeing is the whole failure this
       // sentence exists to prevent.
       const listSkel = skeletonOf(section, ctx);
-      const listed = listedTitles(
-        section,
-        ctx,
-        optionsFor(requested, section.id)
-      );
+      const listed = listedTitles(section, ctx, optionsFor(requested, runId));
       const orphans =
         listSkel && listed && listed.length
-          ? (rewriteBracketedSpan(runLines, listSkel, listed)?.orphans ?? [])
+          ? (rewriteBracketedSpan(runLines, listSkel, listed, nth)?.orphans ?? [])
           : [];
       ops.push({
         kind: kindOfOp,
-        sectionId: section.id,
-        label: section.label,
+        sectionId: runId,
+        label: rowLabel,
         ...(orphans.length ? { keepsContent: orphans } : {}),
-        detail: rewriting.has(section.id)
+        detail: rewriting.has(runId)
           ? describeAnswers(
               questionsOf(section, ctx),
-              optionsFor(requested, section.id),
+              optionsFor(requested, runId),
               journalHostLabel(ctx)
             ) +
             (orphans.length ? ` — ${describeKept(orphans)}` : "") +
@@ -1596,17 +1791,38 @@ export function planSections(
       });
       continue;
     }
-    if (!sectionRemovable(section, ctx, sectionOverrides(ctx, section.id))) {
+    // ── PROSE IS REFUSED BY ORDINAL, AND THE DOOR OUTRANKS THE LOCK ────
+    //
+    // (1.0.36.) `sectionRemovable` is handed a SECTION and the catalogue row is
+    // `locked`, so asking it about `headings#2` would refuse a block the reader
+    // added themselves. The ordinal is the whole of the difference, and it is
+    // scoped here rather than inside `sectionRemovable` because that function
+    // is shared with nine catalogues that have no repeating section.
+    //
+    // AND AN UNMARKED BLOCK IS TOLD ABOUT THE DOOR EVEN THOUGH IT IS LOCKED.
+    // A note written before 5.6 has no brackets, so neither the removal NOR the
+    // headings toggle can be honoured on it — and **Reload this page** is the
+    // one gesture that fixes both. Saying "required" there would be true and
+    // useless; `journalRefusal` orders the two the same way, and these two must
+    // agree because the row prints one and the change list the other.
+    const proseUnmarked =
+      isProseId(runId) && !proseSpanIn(text.split("\n"), proseOrdinalOf(runId) ?? 1);
+    const refusedHere = isProseId(runId)
+      ? proseUnmarked || (proseOrdinalOf(runId) ?? 1) <= 1
+      : !sectionRemovable(section, ctx, sectionOverrides(ctx, section.id));
+    if (refusedHere) {
       // Asked for but refused, and said so. Silently keeping a section a
       // reader unticked would be the designer lying, which is the thing the
       // whole feature exists not to do.
       ops.push({
         kind: "keep",
-        sectionId: section.id,
-        label: section.label,
-        detail: section.locked
-          ? "required — cannot be removed"
-          : "written as ordinary markdown — delete it by hand",
+        sectionId: runId,
+        label: rowLabel,
+        detail: proseUnmarked
+          ? UNMARKED_PROSE_REFUSAL
+          : section.locked
+            ? "required — cannot be removed"
+            : "written as ordinary markdown — delete it by hand",
       });
       continue;
     }
@@ -1620,19 +1836,19 @@ export function planSections(
     // end, so the branch is here rather than absent.
     const skel = skeletonOf(section, ctx);
     if (skel !== null) {
-      const cut = cutBracketedSpan(runLinesOf(segs, run), skel);
+      const cut = cutBracketedSpan(runLinesOf(segs, run), skel, nth);
       ops.push(
         cut === null
           ? {
               kind: "keep",
-              sectionId: section.id,
-              label: section.label,
+              sectionId: runId,
+              label: rowLabel,
               detail: UNMARKED_PROSE_REFUSAL,
             }
           : {
               kind: "remove",
-              sectionId: section.id,
-              label: section.label,
+              sectionId: runId,
+              label: rowLabel,
               detail: describeProseRemove(cut.kept),
               ...(cut.kept.length ? { keepsContent: cut.kept } : {}),
             }
@@ -1667,16 +1883,16 @@ export function planSections(
       // section. That is a keystroke they already know and can undo.
       ops.push({
         kind: "keep",
-        sectionId: section.id,
-        label: section.label,
+        sectionId: runId,
+        label: rowLabel,
         detail: describeRefusedRemove(keeps),
       });
       continue;
     }
     ops.push({
       kind: "remove",
-      sectionId: section.id,
-      label: section.label,
+      sectionId: runId,
+      label: rowLabel,
       detail: describeRemove(section, keeps),
       ...(keeps.length ? { keepsContent: keeps } : {}),
     });
@@ -1685,7 +1901,7 @@ export function planSections(
   // Additions, in the order the reader asked for them rather than in
   // catalogue order: `want` is an ordered list now, and a plan that renamed
   // its own input would be describing a different request.
-  const added = addOps(want, (id) => present.has(id), byId, describeAdd);
+  const added = addOps(want, (id) => present.has(id), named, describeAdd);
   const adding = added.adding;
   ops.push(...added.ops);
 
@@ -1712,7 +1928,7 @@ export function planSections(
       runs.flatMap((r) => r.sectionIds),
       want,
       adding,
-      byId
+      named
     )
   );
 
@@ -1864,7 +2080,23 @@ export function applySections(
 
   const segs = splitRawSegments(segment(text.split("\n")));
   const runs = parseSections(text, ctx);
-  const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
+  // EVERY PROSE ID ALIASED ONTO THE ONE CATALOGUE ROW, before any of the seven
+  // lookups below runs. `headings#2` is not in the catalogue — one entry
+  // describes every prose block — and a bare map answers undefined for it, so
+  // each of those lookups would skip the block in silence: no cut, no heading
+  // rewrite, no bar, and nothing said about why.
+  //
+  // AN ALIAS RATHER THAN A RESOLVING WRAPPER, because `joinRowChunk` takes the
+  // map itself and a lookalike object would have to keep pace with `Map`'s
+  // surface for no gain.
+  const catalogue = sectionsFor(ctx);
+  const byId = new Map(catalogue.map((s) => [s.id, s]));
+  const proseRow = byId.get(PROSE_SECTION_ID);
+  if (proseRow) {
+    for (const id of [...want, ...runs.flatMap((r) => r.sectionIds)]) {
+      if (isProseId(id)) byId.set(id, proseRow);
+    }
+  }
 
   // `Chunk`'s two fields — `ids`, in file order because a row fence is two
   // sections in one block, and `lines` — plus the one this surface adds. A
@@ -1909,7 +2141,12 @@ export function applySections(
             // character away from the rule it was written for and the reason a
             // group made in the editor could not be titled again. The control
             // is on the group card; see `renderBlock` in `section-editor.ts`.
-            listedSection
+            // AND NONE AT ALL FOR PROSE (1.0.36). `withAnswers` writes lines
+            // into a FENCE and splices spans inside directives; a prose block
+            // is neither, its two questions are both answered over the bracket
+            // by `withListedHeadings` below, and handing this run a question
+            // list would have it looking for a fence in the reader's prose.
+            listedSection && !isProseId(id)
               ? questionsOf(listedSection, ctx).filter(
                   (q) => q.kind !== "form" || id === run.sectionIds[0]
                 )
@@ -1921,7 +2158,8 @@ export function applySections(
               out,
               listedSection,
               ctx,
-              optionsFor(requested, id)
+              optionsFor(requested, id),
+              proseSpanOfRun(run.sectionIds, id)
             );
           }
         }
@@ -2039,23 +2277,53 @@ export function applySections(
     // here. It is called again rather than carried across, because the op
     // carries a description and this needs the lines, and a plan that shipped
     // its own output would be a second thing to keep equal to the file.
+    const doomedProse = doomed.find((id) => isProseId(id));
     const skelGone = doomed
       .map((id) => byId.get(id))
       .filter((sec): sec is JournalSection => sec !== undefined)
       .map((sec) => skeletonOf(sec, ctx))
       .find((k) => k !== null);
     if (skelGone) {
-      const cut = cutBracketedSpan(runLinesOf(segs, run), skelGone);
+      // WHICH BLOCK OF THIS RUN, where the run holds more than one (1.0.36).
+      const cut = cutBracketedSpan(
+        runLinesOf(segs, run),
+        skelGone,
+        doomedProse ? proseSpanOfRun(run.sectionIds, doomedProse) : 1
+      );
       if (cut) {
-        // NO FOLLOWING FILLER IS EATEN, unlike every other removal here. The
-        // blank this run sat behind is one of its own lines, and
-        // `cutBracketedSpan` has already decided what to leave of it — taking
-        // the next run's blank as well would close the gap the note needs.
-        chunks.push({
-          ids: [],
-          filler: !cut.lines.some((l) => l.trim() !== ""),
-          lines: cut.lines,
-        });
+        // WHERE THE ONE BLOCK OF A NOTE IS CONCERNED, NO FOLLOWING FILLER IS
+        // EATEN, unlike every other removal here: the blank that run sat behind
+        // is one of its own lines, `cutBracketedSpan` has already decided what
+        // to leave of it, and taking the next run's blank as well would close
+        // the gap the note needs.
+        //
+        // ── AND WHERE THERE ARE SEVERAL, THE OPPOSITE (1.0.36) ──────────
+        //
+        // `splitRawSegments` cuts a segment holding more than one block into a
+        // segment per block, so the blanks between them are filler runs beside
+        // them — which is what makes two blocks reorderable, and which makes
+        // this run exactly like every other removable section again. The cut
+        // then comes back EMPTY rather than holding a separator, and the blank
+        // on each side has to be accounted for by whoever is doing the removing.
+        //
+        // The next run's, by preference, which is the rule the region path uses
+        // and leaves the two neighbours one blank apart. A block at the end of
+        // the file has no filler after it — the hidden graph link is content,
+        // not a separator — so there the blank ALREADY EMITTED above it comes
+        // back off instead. One of the two, never both.
+        const empty = !cut.lines.some((l) => l.trim() !== "");
+        chunks.push({ ids: [], filler: empty, lines: cut.lines });
+        if (empty && cut.lines.length === 0) {
+          const next = runs[ri + 1];
+          if (next?.filler && isBlank(segs[next.from].lines)) {
+            ri++;
+          } else {
+            const at = chunks.length - 2;
+            if (chunks[at]?.filler && isBlank(chunks[at].lines)) {
+              chunks.splice(at, 1);
+            }
+          }
+        }
         continue;
       }
     }
@@ -2074,6 +2342,43 @@ export function applySections(
     if (runs[ri + 1]?.filler && isBlank(segs[runs[ri + 1].from].lines)) ri++;
   }
 
+  // ── THE FILE'S TERMINATOR IS NOT ONE OF THE CHUNKS' LINES (1.0.36) ──
+  //
+  // A note that ends in a newline splits into a last line that is the empty
+  // string, and that empty string reaches here as the last line of the last
+  // chunk — where it is indistinguishable from a blank separator. A section
+  // added at the very END is composed as `["", ...block]`, so appending it
+  // after the terminator put TWO blank lines between the note and the new
+  // block, and put the block after the newline that was supposed to close the
+  // file.
+  //
+  // Detached here and restored below, which is the only place both halves can
+  // agree: `insertionPoint` is shared with every other catalogue and must not
+  // learn that the last line of the last chunk is not really a line, and the
+  // restore is unconditional arithmetic once the terminator is gone. Nothing
+  // could land there before prose repeated — every catalogue id outranks the
+  // graph comment the template writes last — which is why this is 1.0.36's.
+  const lastChunk = chunks[chunks.length - 1];
+  if (text.endsWith("\n") && lastChunk?.lines[lastChunk.lines.length - 1] === "") {
+    lastChunk.lines.pop();
+  }
+
+  // ── AND THE HIDDEN PARENT LINK IS A TAIL OF THE SAME KIND (1.0.36) ──
+  //
+  // `%% chronoanvil-graph %%` and its links line are the LAST thing this plugin
+  // writes into a note and the only text it claims in one a reader owns:
+  // `setGraphLinks` appends them to a file that has none, and both other
+  // surfaces normalise the blank run ABOVE them. They are not a section, so
+  // they carry no id, so `order` cannot rank anything against them — and a
+  // second prose block, being the only thing that has ever sorted after every
+  // catalogue id, landed BELOW the link and left it stranded mid-note.
+  //
+  // Lifted off for the same reason as the terminator above and restored in the
+  // same place: a file-level tail that no section owns. Only ever taken from
+  // the END of the last chunk, so a reader who has written below the block
+  // keeps their file exactly as it is — this declines rather than tidies.
+  const graphTail = detachGraphTail(chunks);
+
   // Insertions, positioned against the catalogue's order: after the last
   // preceding section the file actually has, else before the earliest
   // following one, else at the end. A reader who reordered their template
@@ -2081,7 +2386,27 @@ export function applySections(
   // ORDERED THE WAY THIS SURFACE COMPOSES, layout included — see
   // `surfaceLayout`. This is the rank `insertionPoint` reads, so a section
   // re-added through the editor goes back where the template would have put it.
-  const order = sectionsFor(ctx, surfaceLayout(ctx)).map((s) => s.id);
+  // ── AND WITH ONE RANK PER PROSE BLOCK, NOT ONE PER CATALOGUE ROW ────
+  //
+  // (1.0.36.) `insertionPoint` reads a rank off this list and answers -1 for an
+  // id that is not on it, which ranks ABOVE everything — so a second prose
+  // block added through the window landed at the top of the note, above the
+  // banner. The catalogue's `headings` is expanded here into as many ids as
+  // this write could be handling, in ordinal order, so block 2 outranks block 1
+  // and both sit exactly where the one entry did.
+  const proseHigh = Math.max(
+    1,
+    ...[...want, ...runs.flatMap((r) => r.sectionIds)].map(
+      (id) => proseOrdinalOf(id) ?? 0
+    )
+  );
+  const order = sectionsFor(ctx, surfaceLayout(ctx))
+    .map((s) => s.id)
+    .flatMap((id) =>
+      id === PROSE_SECTION_ID
+        ? Array.from({ length: proseHigh }, (_, i) => proseIdFor(i + 1))
+        : [id]
+    );
   for (const id of adding) {
     const section = byId.get(id);
     if (!section) continue;
@@ -2094,7 +2419,7 @@ export function applySections(
     const markdown = renderSection(
       section,
       ctx,
-      renderOptionsFor(section, ctx, requested)
+      renderOptionsFor(section, ctx, requested, id)
     );
     // A CELL GOES BACK INTO ITS ROW, NOT BESIDE IT — the other half of the cut
     // above, and the property `insertionPoint` names as the reason it stops
@@ -2108,7 +2433,7 @@ export function applySections(
         ctx,
         byId,
         order,
-        renderOptionsFor(section, ctx, requested),
+        renderOptionsFor(section, ctx, requested, id),
         // THE OVERRIDES THE LAYOUT DECLARES, for the member ahead of the
         // arrival — asked so its keywords are the ones it would actually
         // compose. No other catalogue has per-section overrides to render with.
@@ -2150,8 +2475,45 @@ export function applySections(
   // was not in the list.
   if (moving) permuteChunks(chunks, want);
 
-  const next = chunks.flatMap((c) => c.lines).join("\n");
+  // The graph block goes back on the end, below everything — including
+  // anything just added there, which is the whole point of having taken it off.
+  // It is also now out of `permuteChunks`' reach, so moving the section it used
+  // to share a chunk with no longer drags the hidden link along with it.
+  if (graphTail.length) chunks.push({ ids: [], filler: false, lines: graphTail });
+
+  // ── AND THE TERMINATOR GOES BACK ON ─────────────────────────────────
+  //
+  // (1.0.36.) The other half of the detach above. Only ever added back: a note
+  // that arrived without a trailing newline keeps it that way, since that is
+  // the reader's file and not ours to reformat.
+  const body = chunks.flatMap((c) => c.lines).join("\n");
+  const next = text.endsWith("\n") && !body.endsWith("\n") ? body + "\n" : body;
   return next === text ? null : next;
+}
+
+// ── LIFTING THE GRAPH BLOCK OFF THE END (1.0.36) ─────────────────────────
+//
+// The marker line, the links line under it, the blank run above them and any
+// blank run below — spliced out of the last chunk and handed back, so the
+// caller can put them where they belong once everything else has been placed.
+//
+// ASKED OF THE LAST CHUNK ONLY, AND OF ITS END ONLY. The block is a tail or it
+// is nothing: a note with the reader's own writing after it is a note where
+// this must do nothing at all, and a note with the marker somewhere in the
+// middle is one whose author put it there. Returning `[]` is the ordinary
+// answer and leaves every byte where it was.
+function detachGraphTail(chunks: { lines: string[] }[]): string[] {
+  const last = chunks[chunks.length - 1];
+  if (!last) return [];
+  const lines = last.lines;
+  let end = lines.length;
+  while (end > 0 && lines[end - 1].trim() === "") end--;
+  // The links line, and the marker immediately above it. Both, or neither —
+  // `setGraphLinks` writes them as a pair and nothing else here may split one.
+  if (end < 2 || lines[end - 2].trim() !== GRAPH_MARK) return [];
+  let from = end - 2;
+  while (from > 0 && lines[from - 1].trim() === "") from--;
+  return lines.splice(from, lines.length - from);
 }
 
 // The lines of a removed section's run that must survive: its non-empty
@@ -2289,8 +2651,7 @@ function trimEdges(lines: readonly string[]): string[] {
 // the same question `fenceContentLoss` asks of a fence, for the same reason.
 function pristineBodies(
   section: JournalSection,
-  ctx: SectionContext,
-  key: string
+  ctx: SectionContext
 ): Map<string, string> {
   const out = new Map<string, string>();
   const composed = renderSection(
@@ -2298,7 +2659,10 @@ function pristineBodies(
     ctx,
     sectionOverrides(ctx, section.id)
   ).split("\n");
-  const span = bracketSpanIn(composed, key);
+  // NTH IS ALWAYS 1 HERE. This reads what the catalogue WOULD write, which is
+  // one section rendered on its own — one block, one span. The ordinal belongs
+  // to the reader's file, not to the schematic.
+  const span = proseSpanIn(composed, 1);
   if (!span) return out;
   for (const g of spanGroups(composed.slice(span.open + 1, span.close))) {
     if (g.title === null) continue;
@@ -2314,7 +2678,7 @@ function skeletonOf(
 ): { key: string; pristine: Map<string, string> } | null {
   const key = bracketKeyOf(section, ctx, sectionOverrides(ctx, section.id));
   if (key === null) return null;
-  return { key, pristine: pristineBodies(section, ctx, key) };
+  return { key, pristine: pristineBodies(section, ctx) };
 }
 
 // Has the reader written under this heading?
@@ -2332,9 +2696,24 @@ function isWritten(g: SpanGroup, pristine: Map<string, string>): boolean {
 function rewriteBracketedSpan(
   lines: readonly string[],
   skel: { key: string; pristine: Map<string, string> },
-  titles: readonly string[]
+  titles: readonly string[],
+  nth = 1,
+  // ── WHAT A HEADING THAT IS NOT THERE YET OPENS WITH (1.0.36) ──────────
+  //
+  // Absent, a new heading is composed EMPTY, and that is the `lines` box's
+  // behaviour and stays it: a title typed into that box is the reader's own
+  // and the plugin has no prompt text for it.
+  //
+  // The tick is the other caller and wants the opposite. *Add default
+  // headings* re-ticked has to put back exactly what unticking took out —
+  // prompt text included, or the round trip loses the type's own words the
+  // first time somebody changes their mind — so it hands the pristine bodies
+  // in. Passed rather than read off `skel` for that reason: `skel.pristine` is
+  // also what `isWritten` compares against, and using it unconditionally here
+  // would re-seed a heading the reader had emptied on purpose.
+  seed?: ReadonlyMap<string, string>
 ): { lines: string[]; orphans: { key: string; lines: number }[] } | null {
-  const span = bracketSpanIn(lines, skel.key);
+  const span = proseSpanIn(lines, nth);
   if (!span) return null;
 
   const groups = spanGroups(lines.slice(span.open + 1, span.close));
@@ -2359,7 +2738,8 @@ function rewriteBracketedSpan(
   for (const title of titles) {
     const at = groups.findIndex((g, i) => !taken.has(i) && g.title === title);
     if (at === -1) {
-      blocks.push([`## ${title}`, "", ""]);
+      const body = seed?.get(title);
+      blocks.push([`## ${title}`, "", ...(body ? body.split("\n") : [""])]);
       continue;
     }
     taken.add(at);
@@ -2409,13 +2789,63 @@ function withListedHeadings(
   lines: string[],
   section: JournalSection,
   ctx: SectionContext,
-  options: Record<string, unknown> | undefined
+  options: Record<string, unknown> | undefined,
+  nth = 1
 ): string[] {
-  const titles = listedTitles(section, ctx, options);
-  if (!titles || !titles.length) return lines;
   const skel = skeletonOf(section, ctx);
   if (!skel) return lines;
-  return rewriteBracketedSpan(lines, skel, titles)?.lines ?? lines;
+  // ── THE TICK IS ANSWERED BEFORE THE LIST (1.0.36) ────────────────────
+  //
+  // *Add default headings* unticked means "take the ones nobody has written
+  // under out of this block", which is `cutBracketedSpan` doing exactly what a
+  // removal asks of it — the difference is that the block itself stays. So the
+  // untick runs the same cut, scoped to this block, and then there is no list
+  // left to write.
+  //
+  // WHICH IS WHY IT RETURNS EARLY RATHER THAN COMPOSING AN EMPTY LIST. An empty
+  // `titles` reaches `rewriteBracketedSpan` as "the reader emptied the box",
+  // and that path deliberately leaves the span alone rather than clearing it.
+  //
+  // ── AND ONLY WHERE THE ANSWER CHANGED, WHICH IS THE WHOLE GATE ───────
+  //
+  // The tick is DERIVED, so the editor sends its current value back on every
+  // save whether or not the reader touched it — and a bare `=== FLAG_OFF`
+  // therefore pruned on every save of a block that happens to be missing one
+  // default. A reader who typed their own five headings into the box below
+  // would have had them cut by the next Save of any other row on the page.
+  // A transition is the only thing this question can honestly act on:
+  //
+  //   on → off   take the defaults nobody has written under out
+  //   off → on   put them back, around whatever survived
+  //   unchanged  the list below answers, exactly as it did before the tick
+  const q = questionsOf(section, ctx).find((x) => x.kind === "flag" && x.derived);
+  const asked = q ? options?.[q.key] : undefined;
+  const defaults = defaultProseTitles(section, ctx);
+  const span = proseSpanIn(lines, nth);
+  const here = span
+    ? headingTitlesIn(lines.slice(span.open + 1, span.close))
+    : [];
+  const was = proseDefaultsOn(here, defaults);
+  if (q && asked === FLAG_OFF && was) {
+    return pruneBracketedSpan(lines, skel, nth)?.lines ?? lines;
+  }
+  const titles = listedTitles(section, ctx, options);
+  if (q && asked === FLAG_ON && !was) {
+    // THE DEFAULTS FIRST, IN THE TYPE'S OWN ORDER, and then anything the block
+    // holds that is not one of them. That is what makes the re-tick undo the
+    // untick BYTE FOR BYTE: a survivor is a default, so it lands back in its
+    // catalogue position with the reader's writing still under it, and a
+    // heading they invented keeps its place after the list rather than being
+    // shuffled into it.
+    const kept = titles && titles.length ? titles : here;
+    const merged = [...defaults, ...kept.filter((t) => !defaults.includes(t))];
+    return (
+      rewriteBracketedSpan(lines, skel, merged, nth, skel.pristine)?.lines ??
+      lines
+    );
+  }
+  if (!titles || !titles.length) return lines;
+  return rewriteBracketedSpan(lines, skel, titles, nth)?.lines ?? lines;
 }
 
 // The options a section is rendered with: the layout's defaults, the reader's
@@ -2430,12 +2860,17 @@ function withListedHeadings(
 function renderOptionsFor(
   section: JournalSection,
   ctx: SectionContext,
-  requested: readonly SectionWant[]
+  requested: readonly SectionWant[],
+  // WHICH BLOCK IS BEING COMPOSED, where the section repeats (1.0.36). The
+  // DECLARED half stays the catalogue's — a type ships one prose skeleton,
+  // not one per block — and only the reader's answer is read per id, because
+  // that is the half a reader gave about this block.
+  id: string = section.id
 ): SectionOverrides {
   const declared = sectionOverrides(ctx, section.id);
   const opts: Record<string, unknown> = {
     ...declared,
-    ...(optionsFor(requested, section.id) ?? {}),
+    ...(optionsFor(requested, id) ?? {}),
   };
   const q = questionsOf(section, ctx).find((x) => x.kind === "lines");
   const titles = listedTitles(section, ctx, opts);
@@ -2451,13 +2886,55 @@ function renderOptionsFor(
   return opts as SectionOverrides;
 }
 
-function cutBracketedSpan(
+// The untick: take the headings nobody has written under OUT of a prose block,
+// and leave the block standing.
+//
+// ── WHY THIS IS NOT `cutBracketedSpan` WITH A FLAG (1.0.36) ──────────────
+//
+// The two share a rule and nothing else. Both keep exactly the groups
+// `isWritten` says are the reader's — that predicate is the one thing removal
+// and relisting have agreed on since 5.6 and neither may fork it — but a
+// removal is getting rid of the BLOCK and takes the markers with it, while an
+// untick is a change to what is inside one. Cutting the markers here would turn
+// a block into unmarked prose: the section falls off the window, the tick can
+// never be put back, and the reader is told to *Reload this page*, all as the
+// result of clearing a checkbox.
+//
+// THE SHAPE IS `renderBlock`'s, to the blank line — marker, blank, body, blank,
+// marker — because a block that survives an untick and one composed fresh have
+// to be the same bytes or the next equivalence test reports the note as
+// hand-edited.
+function pruneBracketedSpan(
   lines: readonly string[],
-  skel: { key: string; pristine: Map<string, string> }
+  skel: { key: string; pristine: Map<string, string> },
+  nth = 1
 ): { lines: string[]; kept: { key: string; lines: number }[] } | null {
-  const span = bracketSpanIn(lines, skel.key);
+  const span = proseSpanIn(lines, nth);
   if (!span) return null;
+  const { kept, survivors } = spanSurvivors(lines, span, skel);
+  const body = trimEdges(survivors);
+  return {
+    lines: [
+      ...lines.slice(0, span.open),
+      bracketOpen(PROSE_KEY),
+      "",
+      ...(body.length ? body : [""]),
+      "",
+      bracketClose(PROSE_KEY),
+      ...lines.slice(span.close + 1),
+    ],
+    kept,
+  };
+}
 
+// Which groups inside one span the reader has written in. Shared by the cut and
+// the prune so the two cannot come to different answers about whose paragraph
+// a line is — see `isWritten`.
+function spanSurvivors(
+  lines: readonly string[],
+  span: { open: number; close: number },
+  skel: { key: string; pristine: Map<string, string> }
+): { kept: { key: string; lines: number }[]; survivors: string[] } {
   const kept: { key: string; lines: number }[] = [];
   const survivors: string[] = [];
   for (const g of spanGroups(lines.slice(span.open + 1, span.close))) {
@@ -2469,6 +2946,18 @@ function cutBracketedSpan(
     kept.push({ key: g.title, lines: g.written });
     survivors.push(...g.lines);
   }
+  return { kept, survivors };
+}
+
+function cutBracketedSpan(
+  lines: readonly string[],
+  skel: { key: string; pristine: Map<string, string> },
+  nth = 1
+): { lines: string[]; kept: { key: string; lines: number }[] } | null {
+  const span = proseSpanIn(lines, nth);
+  if (!span) return null;
+
+  const { kept, survivors } = spanSurvivors(lines, span, skel);
 
   const body = tidyBlanks([
     ...lines.slice(0, span.open),
@@ -2615,19 +3104,7 @@ function composeFrom(
     ctx,
     (s) => optionsFor(s.id)
   ).join("\n\n");
-  // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
-  // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level
-  // is CALLED and never the name of any note, so every journal note in the
-  // vault linked to something that does not exist and Obsidian drew a phantom
-  // node for each distinct noun. `ctx.type.name` is the type's folder note
-  // (`03 - Journals/Study/Study.md`), which always resolves.
-  //
-  // ONE LEVEL COARSER THAN THE TRUTH, deliberately and for now: a lesson's real
-  // parent is its topic's index NOTE, and this context carries the level a note
-  // is at but not the path of the note above it. Naming the type is true —
-  // every note in Study is inside Study — where naming "Lesson" was not.
-  const parentName = ctx.type.name;
-  return body + graphLinksSection([parentName]).trimEnd();
+  return body + graphLinksSection([graphParentName(ctx)]).trimEnd();
 }
 
 // Re-exported so a caller planning a whole type doesn't need journal-sections
@@ -2987,7 +3464,8 @@ export function levelAdditionCost(noun: string, count: number): string[] {
 function answeredIn(
   text: string,
   section: JournalSection,
-  ctx: SectionContext
+  ctx: SectionContext,
+  id: string = section.id
 ): Record<string, string> {
   const questions = questionsOf(section, ctx);
   const out = answersInText(text, questions);
@@ -3014,15 +3492,72 @@ function answeredIn(
   if (!list) return out;
   if (bracketKeyOf(section, ctx, sectionOverrides(ctx, section.id)) === null)
     return out;
-  const titles = skeletonTitles(text);
+  // THE NTH BLOCK'S HEADINGS, NOT THE FIRST'S (1.0.36). `id` is which prose
+  // block this row is; a reader editing the headings of their second block
+  // must not be shown the first block's list and must not write over it.
+  const titles = proseTitlesIn(text, proseOrdinalOf(id) ?? 1);
   if (titles) out[list.key] = titles.join("\n");
+  // ── AND THE DERIVED TICK BESIDE IT (1.0.36) ─────────────────────────
+  //
+  // *Add default headings* has no line in any fence — see `FlagQuestion.derived`
+  // — so its answer is read off the block itself.
+  //
+  // EVERY DEFAULT, NOT ANY OF THEM, AND THE DIFFERENCE IS THE ROUND TRIP. This
+  // read `titles.some(...)` for one turn, which is the honest reading of the
+  // label taken on its own — and it made the untick unable to stick. Cutting
+  // the defaults keeps the ones the reader has WRITTEN under, by design, and a
+  // survivor is a default title; so the box came back ticked the moment the
+  // window was reopened, over a block whose prompts had just been taken out.
+  // "All of them" is the answer the write can actually produce and undo: after
+  // a prune the box reads unticked, and re-ticking composes exactly what the
+  // prune removed.
+  const flag = questions.find((q) => q.kind === "flag" && q.derived);
+  if (flag && titles) {
+    out[flag.key] = proseDefaultsOn(titles, defaultProseTitles(section, ctx))
+      ? FLAG_ON
+      : FLAG_OFF;
+  }
   return out;
+}
+
+// Does this block open with the headings its type composes?
+//
+// ONE PREDICATE, BOTH SIDES OF THE TICK — the row reads it to draw the box and
+// the write reads it to tell an untick from a list edit. 4.21's rule, on the
+// smallest question in the file: a second derivation is how the box and the
+// file come to disagree about what it is showing.
+function proseDefaultsOn(
+  titles: readonly string[],
+  defaults: readonly string[]
+): boolean {
+  return defaults.length > 0 && defaults.every((t) => titles.includes(t));
+}
+
+// The heading titles this note's type would compose into a fresh prose block.
+//
+// OFF THE SECTION'S OWN `render`, so the one place the list is decided stays
+// `defaultHeadings` and a type that declares its own skeleton answers for
+// itself. Reading the catalogue's generic three here would tick the box for a
+// Study Lesson whose headings are none of them.
+function defaultProseTitles(
+  section: JournalSection,
+  ctx: SectionContext
+): string[] {
+  const composed = renderSection(
+    section,
+    ctx,
+    sectionOverrides(ctx, section.id)
+  ).split("\n");
+  const span = proseSpanIn(composed, 1);
+  if (!span) return [];
+  return headingTitlesIn(composed.slice(span.open + 1, span.close));
 }
 
 const rowFor = (
   section: JournalSection,
   ctx: SectionContext,
-  text?: string
+  text?: string,
+  id: string = section.id
 ): SectionView => {
   // THROUGH `questionsOf`, so the derived form toggle reaches the row (5.11). A
   // section that declares nothing can still HAVE a question, which is why this
@@ -3043,7 +3578,17 @@ const rowFor = (
   //   through it, so every section may be reordered against every other. A
   //   diary entry is the one surface where that is not true.
   return viewOf(section, {
-    removable: sectionRemovable(section, ctx, sectionOverrides(ctx, section.id)),
+    id,
+    label: proseLabelOf(section, id),
+    // A PROSE BLOCK PAST THE FIRST IS THE READER'S TO REMOVE (1.0.36). The
+    // catalogue row is `locked` because a leaf note must have somewhere to
+    // write; the second and third blocks are ones they asked for, and nothing
+    // about the note stops being true when one goes. `journalRefusal` scopes
+    // the wording the same way, and these two must agree — the row reads one
+    // and the window prints the other.
+    removable: isProseId(id)
+      ? (proseOrdinalOf(id) ?? 1) > 1
+      : sectionRemovable(section, ctx, sectionOverrides(ctx, section.id)),
     movable: true,
     questions,
     // WHICH SECTION THIS ONE MAY BE WELDED UNDER, forwarded and never decided
@@ -3076,7 +3621,7 @@ const rowFor = (
     // nothing; `find`, `review`, `tasks` and `tags` hid it, because a `folder`
     // question was enough to open this branch.
     ...(text !== undefined && questions.length
-      ? { answered: answeredIn(text, section, ctx) }
+      ? { answered: answeredIn(text, section, ctx, id) }
       : {}),
   });
 };
@@ -3091,40 +3636,92 @@ const rowFor = (
 function journalRefusal(
   section: JournalSection,
   ctx: SectionContext,
-  text: string
+  text: string,
+  id: string = section.id
 ): string | null {
+  // ── PROSE IS LOCKED BY ORDINAL, NOT BY THE ROW (1.0.36) ─────────────
+  //
+  // One catalogue entry describes every prose block, and `locked` on it would
+  // otherwise refuse the removal of a block the reader added themselves. The
+  // first block is what the note cannot be without; the rest are theirs. Kept
+  // here beside the other refusals rather than in `sectionRemovable`, which is
+  // handed a SECTION and has no ordinal to scope an answer by — and which is
+  // also what `rowFor` reads for the chip, so the two are one `isProseId`
+  // apart on purpose.
+  if (isProseId(id)) {
+    // THE DOOR OUTRANKS THE LOCK, and `planSections` orders them the same way:
+    // a block written before the markers existed refuses the headings toggle
+    // as well as the removal, and **Reload this page** is what fixes both.
+    // Only the unmarked half is asked of the first block — the other half asks
+    // the PLAN, and the plan's answer for a locked row is the predicate
+    // "required — cannot be removed", which is this sentence said worse.
+    if ((proseOrdinalOf(id) ?? 1) > 1) {
+      return proseNoteRefusal(section, ctx, text, id);
+    }
+    return (
+      unmarkedProseRefusal(section, ctx, text, id) ??
+      "Part of every journal note, so it can't be removed. You can still move it."
+    );
+  }
   if (!sectionRemovable(section, ctx, sectionOverrides(ctx, section.id))) {
     return section.locked
       ? "Part of every journal note, so it can't be removed. You can still move it."
       : "Written as ordinary markdown — the plugin cannot tell it from your own prose, so delete it by hand.";
   }
-  // A SECTION THAT IS REMOVABLE IN PRINCIPLE AND NOT FROM THIS NOTE (5.6).
-  //
-  // The row asks about a file, which is what this function is for and what its
-  // own header says: `SectionView.removable` answers "ignoring what is written
-  // in it", and the case it cannot cover is a skeleton composed before the
-  // markers existed. Sentence-cased here for the same 4.21 reason the plan's
-  // details are not — a row's subtitle is a sentence and a plan's detail is a
-  // predicate.
+  return proseNoteRefusal(section, ctx, text, id);
+}
+
+// A SECTION THAT IS REMOVABLE IN PRINCIPLE AND NOT FROM THIS NOTE (5.6).
+//
+// The row asks about a file, which is what this function is for and what its
+// own header says: `SectionView.removable` answers "ignoring what is written
+// in it", and the case it cannot cover is a prose block composed before the
+// markers existed. Sentence-cased here for the same 4.21 reason the plan's
+// details are not — a row's subtitle is a sentence and a plan's detail is a
+// predicate.
+//
+// ITS OWN FUNCTION AS OF 1.0.36, because the locked first block wants this
+// half of `proseNoteRefusal` and not the other: the other asks `planSections`,
+// and what the plan says about a row it has already refused is the predicate
+// this sentence replaces.
+function unmarkedProseRefusal(
+  section: JournalSection,
+  ctx: SectionContext,
+  text: string,
+  id: string
+): string | null {
   const bracketKey = bracketKeyOf(
     section,
     ctx,
     sectionOverrides(ctx, section.id)
   );
-  if (bracketKey !== null && !bracketSpanIn(text.split("\n"), bracketKey)) {
-    return (
-      UNMARKED_PROSE_REFUSAL.charAt(0).toUpperCase() +
-      UNMARKED_PROSE_REFUSAL.slice(1) +
-      "."
-    );
+  if (
+    bracketKey === null ||
+    proseSpanIn(text.split("\n"), proseOrdinalOf(id) ?? 1)
+  ) {
+    return null;
   }
+  return (
+    UNMARKED_PROSE_REFUSAL.charAt(0).toUpperCase() +
+    UNMARKED_PROSE_REFUSAL.slice(1) +
+    "."
+  );
+}
+
+// The half of `journalRefusal` that reads the FILE rather than the catalogue.
+function proseNoteRefusal(
+  section: JournalSection,
+  ctx: SectionContext,
+  text: string,
+  id: string
+): string | null {
+  const unmarked = unmarkedProseRefusal(section, ctx, text, id);
+  if (unmarked !== null) return unmarked;
   // Asked of the plan rather than of the file, so the answer is the one that
   // will actually be acted on: `planSections` is what decides, and it reports a
   // refused removal as a `keep` carrying the reason.
-  const want = sectionsPresent(text, ctx).filter((id) => id !== section.id);
-  const op = planSections(text, ctx, want).find(
-    (o) => o.sectionId === section.id
-  );
+  const want = sectionsPresent(text, ctx).filter((x) => x !== id);
+  const op = planSections(text, ctx, want).find((o) => o.sectionId === id);
   // THE DETAIL ALONE, SENTENCE-CASED (4.21). This read `${label} ${detail}` and
   // the details are written as predicates — "holds 3 charts", "is required" — so
   // the sentence opened with a label of unknown number, which is the grammar
@@ -3190,29 +3787,77 @@ function asFlat(section: JournalSection, ctx: SectionContext): FlatSection {
 // This journal surface, as the editor sees it.
 export function journalSectionModel(ctx: SectionContext): SectionModel {
   const find = (id: string): JournalSection | undefined =>
-    sectionsFor(ctx).find((s) => s.id === id);
+    sectionOfId(sectionsFor(ctx), id);
   const flats = (): FlatSection[] =>
     sectionsFor(ctx).map((s) => asFlat(s, ctx));
+  // ── ONE CATALOGUE ROW, AS MANY ROWS AS THE FILE HAS BLOCKS (1.0.36) ──
+  //
+  // The window lists SECTIONS and prose repeats, so the list it is handed has
+  // to be the file's blocks rather than the catalogue's entry. This expands
+  // `headings` in place — in place, so a prose block keeps the position
+  // composition gave it and the rows either side of it stay where they were.
+  //
+  // THE ORDER IS THE FILE'S. `sectionsPresent` reads down the note, so the ids
+  // arrive in the order the blocks appear, and `prose#2` is the second one a
+  // reader sees on the page as well as the second one in this list.
+  //
+  // ONE SPARE BEYOND WHAT THE TEXT HOLDS, which is `flatNoteModel`'s rule for
+  // the same reason: the ids the window can OFFER have to include the one it
+  // does not have yet, or *add another* has nothing legal to stage.
+  const proseIds = (text: string | undefined): string[] => {
+    const n = text === undefined ? 0 : proseCountIn(text);
+    // A NOTE WITH NO MARKED BLOCK STILL HAS A ROW. Either it predates 5.6 —
+    // where the row carries the refusal naming the route to fixing it — or it
+    // is a caller with no text at all, asking what this SURFACE is, and the
+    // answer is that a leaf note has prose.
+    return Array.from({ length: Math.max(n, 1) + 1 }, (_, i) => proseIdFor(i + 1));
+  };
+  const expand = (text: string | undefined): { id: string; section: JournalSection }[] =>
+    sectionsFor(ctx).flatMap((s) =>
+      s.id === PROSE_SECTION_ID
+        ? proseIds(text).map((id) => ({ id, section: s }))
+        : [{ id: s.id, section: s }]
+    );
   return {
     // NO TEXT MEANS NO WIDGETS — `flatNoteModel`'s rule, and the entry model's
     // (5.26). A caller with no note in hand is asking what this SURFACE is,
     // and the page-widget tail is what a note here could be GIVEN. Every
     // caller in the UI passes the text; `template-editor.ts` is the one that
     // does not, and it asks for one catalogue row by id.
-    sections: (text) =>
-      sectionsFor(ctx)
-        .filter((s) => text !== undefined || !isPageWidgetId(s.id))
-        .map((s) => rowFor(s, ctx, text)),
+    sections: (text) => {
+      const here = text === undefined ? [] : sectionsPresent(text, ctx);
+      return expand(text)
+        .filter(({ id }) => text !== undefined || !isPageWidgetId(id))
+        // THE SPARE IS OFFERED BY `addable`, NOT LISTED HERE. `sections` is
+        // what the file HAS; a block nobody has written is not one of them, and
+        // listing it would draw an empty row under every note.
+        //
+        // AND A TEXTLESS CALL STILL OFFERS ONE. `sections()` with no note is
+        // asking what this SURFACE is, and `test/section-model.test.ts` holds
+        // the contract that every id `present` can return is one `sections()`
+        // offers — so dropping prose entirely there would say a journal leaf
+        // has no prose at all, which is the one thing it certainly has. One
+        // row, never the spare: the surface has prose, and how many blocks is
+        // a fact about a file.
+        .filter(
+          ({ id }) =>
+            !isProseId(id) ||
+            (text === undefined
+              ? (proseOrdinalOf(id) ?? 1) === 1
+              : here.includes(id))
+        )
+        .map(({ id, section }) => rowFor(section, ctx, text, id));
+    },
     present: (text) => sectionsPresent(text, ctx),
     addable: (text) => {
-      const present = new Set(sectionsPresent(text, ctx));
-      return sectionsFor(ctx)
-        .filter((s) => !present.has(s.id))
-        .map((s) => rowFor(s, ctx));
+      const here = new Set(sectionsPresent(text, ctx));
+      return expand(text)
+        .filter(({ id }) => !here.has(id))
+        .map(({ id, section }) => rowFor(section, ctx, undefined, id));
     },
     refusal: (id, text) => {
       const s = find(id);
-      return s ? journalRefusal(s, ctx, text) : null;
+      return s ? journalRefusal(s, ctx, text, id) : null;
     },
     plan: (text, want) => planSections(text, ctx, want),
     apply: (text, want) => applySections(text, ctx, want),
@@ -3230,6 +3875,27 @@ export function journalSectionModel(ctx: SectionContext): SectionModel {
     // alone would seed the window's `joined` bits from the file and give it no
     // way to write a change back, so the first Save would flatten the group it
     // had just drawn.
+    // ── COPY THIS PROSE BLOCK (1.0.36) ──────────────────────────────
+    //
+    // The span's lines with the two markers taken off, which is exactly what
+    // `stripPluginMarkup` does and has done since 5.6 — *"a bracket's markers
+    // are around the reader's own document and only the markers go"*. Asked
+    // through the model rather than reached for by the editor, so the window
+    // keeps knowing nothing about what a prose block is.
+    //
+    // NULL FOR A BLOCK WITH NOTHING IN IT, and for every other section. An
+    // empty clipboard is a control that appeared to do nothing, which is worse
+    // than a control that was never drawn.
+    excerpt: (id, text) => {
+      if (!isProseId(id)) return null;
+      const lines = text.split("\n");
+      const span = proseSpanIn(lines, proseOrdinalOf(id) ?? 1);
+      if (!span) return null;
+      const body = stripPluginMarkup(
+        lines.slice(span.open + 1, span.close).join("\n")
+      ).trim();
+      return body === "" ? null : body;
+    },
     blocks: (text) => flatBlocks(text, flats()),
     regroup: (text, blocks, pages, stacks) =>
       regroupFlatNote(text, flats(), blocks, pages, stacks),

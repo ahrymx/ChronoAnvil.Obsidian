@@ -124,15 +124,22 @@ body.ca-grain-subtle {
 }
 
 /* Section Card Surface Propagation */
-.ca-journal-sec-block {
+/* PROSE RIDES EVERY ONE OF THESE (1.0.38), because it wears the section
+   surface itself — see the foot of 70-section-surface.css. A preset that
+   repainted the sections and left the writing on the theme's own grey would be
+   the one place the two came apart. */
+.ca-journal-sec-block,
+.ca-prose-block {
   background: var(--ca-surface-card);
   border-left-color: var(--ca-border-subtle);
   border-right-color: var(--ca-border-subtle);
 }
-.ca-journal-sec-block.is-first {
+.ca-journal-sec-block.is-first,
+.ca-prose-block.is-prose-first {
   border-top-color: var(--ca-border-subtle);
 }
-.ca-journal-sec-block.is-last {
+.ca-journal-sec-block.is-last,
+.ca-prose-block.is-prose-last {
   border-bottom-color: var(--ca-border-subtle);
 }
 
@@ -313,7 +320,15 @@ body.ca-preset-technical .ca-vb-tile {
   border: 1px solid var(--ca-border-subtle);
 }
 
-body.ca-preset-technical .ca-journal-sec-block,
+/* A SURFACE RUN IS NOT ON THIS LIST, AND THAT IS THE FIX (1.0.38).
+   `.ca-journal-sec-block` and `.ca-prose-block` sat here and took `4px` on all
+   four corners — every block of a run, not just the two that end it. This
+   preset already sets `--ca-radius-md: 4px` on the body above, so the four end
+   rules in 70-section-surface.css draw the angular corner by themselves; the
+   blanket rule only ever added a hairline notch at every seam between two
+   members. Invisible while a section was three widgets tall. Not invisible the
+   day prose became a surface and a run became forty lines of Live Preview,
+   which is when it was reported as jagged middles. */
 body.ca-preset-technical .callout[data-callout="note"],
 body.ca-preset-technical .ca-journal-calendar,
 body.ca-preset-technical .ca-stat {

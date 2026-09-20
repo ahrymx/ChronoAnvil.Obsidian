@@ -179,7 +179,7 @@ export class JournalTemplates {
     const text = await this.app.vault.read(file);
     const { sections, options, drops } = wantFromJournalNote(text, ctx);
     if (!sections.length) {
-      new Notice("ChronoAnvil: this page has no sections to save.");
+      new Notice("ChronoAnvil: this note has no sections to save.");
       return false;
     }
 
@@ -228,7 +228,7 @@ export class JournalTemplates {
     const text = await this.app.vault.read(file);
     const { sections, options } = wantFromJournalNote(text, ctx);
     if (!sections.length) {
-      new Notice("ChronoAnvil: this page has no sections to save.");
+      new Notice("ChronoAnvil: this note has no sections to save.");
       return false;
     }
     const details = await promptLayoutSave(

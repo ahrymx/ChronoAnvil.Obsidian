@@ -242,10 +242,16 @@ describe("the record lists share one builder", () => {
     // token slot is. A page index has no value columns, so it uses
     // createListRow directly rather than bending recordList to describe a
     // table with no columns.
+    //
+    // THE ORDINAL BECAME A PATH IN 1.0.38 — `1`, `1.1`, `1.2`, `2` — because the
+    // list nests now, and two pages both numbered `1` at two indents is what the
+    // indent alone leaves ambiguous. Still the token slot, still one string.
     const s = t();
     const at = s.indexOf("pages.forEach((page, i) =>");
     expect(at).toBeGreaterThan(0);
-    expect(s.slice(at, at + 400)).toContain("token: String(i + 1)");
+    const fn = s.slice(at, at + 1200);
+    expect(fn).toContain("const number = prefix ? `${prefix}.${i + 1}` : String(i + 1);");
+    expect(fn).toContain("token: number,");
   });
 
   it("has retired the page index's private family", () => {
@@ -384,7 +390,10 @@ describe("nothing is painted in its container's colour", () => {
     // The card is the one thing that should be `--background-secondary`; the
     // fix is for the things sitting on it, not the surface itself.
     const t = css();
-    const at = t.indexOf(".ca-journal-sec-block {");
+    // ONE RULE FOR TWO SURFACES SINCE 1.0.38: prose wears the section card,
+    // so the selector list names both — see the foot of 70-section-surface.css.
+    const at = t.indexOf(".ca-journal-sec-block,\n.ca-prose-block {");
+    expect(at).toBeGreaterThan(0);
     const block = t.slice(at, t.indexOf("\n}", at));
     expect(block).toContain("background: var(--background-secondary)");
   });

@@ -2546,7 +2546,13 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   font-weight: 600;
   color: var(--text-normal);
 }
-.ca-tpl-toggle {
+.ca-tpl-toggle,
+/* Copy takes the toggle's metrics and a class of its own (1.0.36). The same
+   button on the same line, and a separate name because it is the one control
+   here that is drawn above the refusal return — `test/section-editor.test.ts`
+   asserts that Remove is not, and a shared literal would have made that sweep
+   pass on the wrong button. */
+.ca-tpl-copy {
   font-size: var(--ca-text-xs);
   padding: var(--ca-space-1) var(--ca-space-4);
 }

@@ -574,7 +574,7 @@ export function slotQuestions(
     // box empty is a band that falls back to the scope's own arrangement; a
     // later box empty is one cell fewer. Both are working directives, which is
     // the whole test `questionIsRequired` applies.
-    emptyLabel: at === 0 ? "This page's own choice" : "Nothing",
+    emptyLabel: at === 0 ? "This note's own choice" : "Nothing",
     empty: "This build defines no stat measures.",
   }));
 }

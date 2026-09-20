@@ -320,9 +320,13 @@ describe("the CSS is one class, not one per widget", () => {
       rules.indexOf(".ca-journal-sec-fold {"),
       rules.indexOf("}", rules.indexOf(".ca-journal-sec-fold {"))
     );
+    // ONE RULE FOR TWO SURFACES SINCE 1.0.38: prose wears the section card, so
+    // the selector list names both — and §1.6's left edge now has three things
+    // to agree about rather than two.
+    const surface = ".ca-journal-sec-block,\n.ca-prose-block {";
     const block = rules.slice(
-      rules.indexOf(".ca-journal-sec-block {"),
-      rules.indexOf("}", rules.indexOf(".ca-journal-sec-block {"))
+      rules.indexOf(surface),
+      rules.indexOf("}", rules.indexOf(surface))
     );
     expect(fold).toContain("--ca-sec-pad-x: 12px");
     expect(block).toContain("--ca-sec-pad-x: 12px");

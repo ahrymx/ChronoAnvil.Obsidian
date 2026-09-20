@@ -723,7 +723,7 @@ export function layOutRow(
       text: "+",
       attr: {
         type: "button",
-        "aria-label": "Split the last column into a page of its own",
+        "aria-label": "Split the last column into a tab of its own",
       },
     });
     button.addEventListener("click", () => tabs.addPage?.());
@@ -771,7 +771,7 @@ export function layOutRow(
   // on anything and has not been since the reader asked for one shape.
   const strip = foot.createDiv({
     cls: GROUP_TABS_CLASS,
-    attr: { role: "tablist", "aria-label": "Pages in this group" },
+    attr: { role: "tablist", "aria-label": "Tabs in this group" },
   });
 
   const buttons = rows.map((row, n) => {
@@ -784,7 +784,7 @@ export function layOutRow(
       attr: {
         type: "button",
         role: "tab",
-        "aria-label": `Page ${n + 1} of ${rows.length}`,
+        "aria-label": `Tab ${n + 1} of ${rows.length}`,
       },
     });
     return button;

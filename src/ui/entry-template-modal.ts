@@ -87,7 +87,7 @@ class EntryTemplateModal extends Modal {
       // What the window is FOR, in one sentence, because the two halves of it
       // act on different things and a reader who mixes them up either edits
       // every future entry by accident or edits none of them by accident.
-      text: `What a new ${label.toLowerCase()} entry is built from — and what this page can do about it.`,
+      text: `What a new ${label.toLowerCase()} entry is built from — and what this note can do about it.`,
     });
 
     const body = contentEl.createDiv({ cls: "ca-editor-body" });
@@ -116,7 +116,7 @@ class EntryTemplateModal extends Modal {
 
     const row = host.createDiv({ cls: "ca-tpl-actions" });
     const save = row.createEl("button", {
-      text: "Save this page as the default",
+      text: "Save this note as the default",
       cls: "mod-cta",
     });
     save.addEventListener("click", () => {
@@ -127,7 +127,7 @@ class EntryTemplateModal extends Modal {
         // it does.
         const ok = await confirmAction(
           this.app,
-          "Save this page as the default?",
+          "Save this note as the default?",
           `Every new ${CLASS_DEFS[
             this.grain
           ].label.toLowerCase()} entry will be built from this page's sections, in this page's order. Entries you already have keep what they have.`,
@@ -139,7 +139,7 @@ class EntryTemplateModal extends Modal {
       })();
     });
 
-    const asLayout = row.createEl("button", { text: "Save this page as a layout…" });
+    const asLayout = row.createEl("button", { text: "Save this note as a layout…" });
     asLayout.addEventListener("click", () => {
       void (async () => {
         const saved = await this.manager.promptSaveLayout(this.grain, this.notePath);
@@ -151,7 +151,7 @@ class EntryTemplateModal extends Modal {
   // ── saved layouts, and reloading from one ────────────────────────────
 
   private drawLayouts(host: HTMLElement): void {
-    host.createDiv({ cls: "ca-tpl-band", text: "Reload this page" });
+    host.createDiv({ cls: "ca-tpl-band", text: "Reload this note" });
 
     // THE GATE, ASKED ONCE FOR THE WHOLE BAND. Every reload replaces the same
     // body, so what is in the way does not vary by which template is being
@@ -194,7 +194,7 @@ class EntryTemplateModal extends Modal {
         emptyCallout(
           "layout-template",
           "No saved layouts yet",
-          "“Save this page as a layout…” keeps this arrangement under a name you can reload onto a later entry."
+          "“Save this note as a layout…” keeps this arrangement under a name you can reload onto a later entry."
         )
       );
     }

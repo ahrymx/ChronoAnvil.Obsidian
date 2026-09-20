@@ -649,7 +649,12 @@ describe("the editor cannot learn which surface it is on", () => {
       "refusal",
       "sections",
     ];
-    const optional = ["blocks", "instanceOf", "regroup"];
+    // `excerpt` JOINED THEM IN 1.0.36, and it is the first optional method
+    // that RETURNS A READER'S OWN TEXT rather than an arrangement. It still
+    // says nothing about which surface it is on: the editor asks it of a row
+    // and draws a Copy button where the answer is not null, which is a fact
+    // about that section's content and not about the catalogue behind it.
+    const optional = ["blocks", "excerpt", "instanceOf", "regroup"];
     for (const { name, model } of surfaces()) {
       const keys = Object.keys(model).sort();
       // Every one of the six, on every surface.

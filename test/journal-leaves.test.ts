@@ -24,7 +24,11 @@ import { describe, expect, it } from "vitest";
 
 import { STUDY_JOURNAL, journalNounOf } from "../src/journals/journal";
 import { sectionContext } from "../src/journals/journal-sections";
-import { nextPageOrder, pageOrderOf } from "../src/journals/page-default";
+import {
+  nextPageOrder,
+  pageOrderOf,
+  reorderedPages,
+} from "../src/journals/page-default";
 import { readCode, readSrc, srcFiles } from "./sources";
 
 const lesson = STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!;
@@ -204,15 +208,26 @@ describe("what can be turned into a dashboard, and by what", () => {
     expect(everywhere).not.toContain("note-convert-to-dashboard");
   });
 
-  it("refuses a page, which is what keeps pages from nesting", () => {
-    // `pageKindOf` resolves a KIND from `type:`, and a page's `type:` is
-    // deliberately not a kind id — so the one caller cannot be reached from a
-    // page, and the refusal says which note to open instead rather than naming
-    // a capability the reader was never offered.
+  it("accepts a page, which is what lets pages nest", () => {
+    // WAS "refuses a page, which is what keeps pages from nesting" (1.0.38).
+    // `pageKindOf` resolves a KIND from `type:`, a page's `type:` is
+    // deliberately not a kind id, and `newPage` read that null as "this note
+    // holds no pages" — so the refusal a reader met was a fact about a lookup
+    // rather than about the note in front of them.
+    //
+    // `pagesHostOf` asks the question the callers actually have: what are this
+    // note's pages built from. A leaf answers with its own kind; a page answers
+    // with the journal's shared page config and the leaf it ultimately belongs
+    // to, found by walking the folders up.
     const t = readCode("journal.ts");
-    expect(t).toContain('const isPage = type.kinds.some((k) => k.pages.id === value);');
-    expect(t).toContain("A page holds no pages of its own.");
-    expect(t).toContain("open \"${owner}\" to add another.");
+    expect(t).toContain("private pagesHostOf(");
+    expect(t).toContain("type.kinds.some((k) => k.pages.id === value)");
+    // The sentence the reader used to get, gone with the rule that produced it.
+    expect(t).not.toContain("A page holds no pages of its own.");
+    expect(t).not.toContain("open \"${owner}\" to add another.");
+    // What is left refuses a note this journal does not own, which is the only
+    // thing this block was ever right about.
+    expect(t).toContain("This isn't one of ${type.name}'s notes.");
   });
 });
 
@@ -261,7 +276,9 @@ describe("creating a page asks before it moves anything", () => {
     // path, the duplicate check and the ordinal all have to come after it.
     const t = body();
     const move = t.indexOf("promoteToDashboard(");
-    expect(t.indexOf("`${host.parent.path}/${safeTitle}.md`")).toBeGreaterThan(move);
+    expect(
+      t.indexOf("`${folderNote.parent.path}/${safeTitle}.md`")
+    ).toBeGreaterThan(move);
     expect(t.indexOf("nextPageOrder(")).toBeGreaterThan(move);
   });
 });
@@ -272,7 +289,9 @@ describe("a note's type is read, never compared raw", () => {
     // text-reading fallback — which lowercases, and so quietly did this
     // function's job as well as its own, at the cost of a file read.
     const t = readCode("journal.ts");
-    const at = t.indexOf("private pageKindOf(");
+    // A FREE FUNCTION SINCE 1.0.38, not a private method: `buildPagesTable` came
+    // to need the same answer and has no manager to ask it on.
+    const at = t.indexOf("export function pageKindOf(");
     expect(at).toBeGreaterThan(0);
     const fn = t.slice(at, at + 400);
     expect(fn).toContain('normaliseTypeValue(fm["type"])');
@@ -282,13 +301,23 @@ describe("a note's type is read, never compared raw", () => {
   it("resolves the pages of a note the same way in the pages table", () => {
     // 5.2 made this exact repair in `isContainerFolder` and named the reason:
     // a raw property compared against a lowercase id misses every match.
+    //
+    // THE HOST'S HALF MOVED TO `pagesHostOf` IN 1.0.38, which normalises through
+    // the same reader one call deeper — and had to, because the host may now be
+    // a page, whose `type:` is not a kind at all. Each candidate page's half is
+    // where it was, in the walk that lists them.
     const t = readCode("tables");
     const at = t.indexOf("export function buildPagesTable(");
     expect(at).toBeGreaterThan(0);
     const fn = t.slice(at, at + 1600);
-    expect(fn).toContain("noteTypeOf(app, file)");
-    expect(fn).toContain("noteTypeOf(app, f)");
+    expect(fn).toContain("pagesHostOf(app, type, file, frontmatterOf(app, file))");
     expect(fn).not.toContain('fm["type"]');
+    const walk = t.indexOf("function pagesBeside(");
+    expect(walk).toBeGreaterThan(0);
+    expect(t.slice(walk, walk + 900)).toContain("noteTypeOf(app, f)");
+    expect(readCode("journal.ts")).toContain(
+      'const t = normaliseTypeValue(fm["type"]);'
+    );
   });
 });
 
@@ -303,8 +332,161 @@ describe("the leaf keeps the surfaces this pass did not touch", () => {
     expect(src).toContain("applies: (ctx) => ctx.hasPages");
     expect(sectionContext(STUDY_JOURNAL, { kind: lesson }).hasPages).toBe(true);
     expect(sectionContext(STUDY_JOURNAL, { kind: practice }).hasPages).toBe(true);
-    // A page holds no pages, which is what stops a page offering to contain
-    // itself — see `surfaceOf`'s `{ page }` branch.
-    expect(sectionContext(STUDY_JOURNAL, { page: lesson }).hasPages).toBe(false);
+    // AND A PAGE ANSWERS YES TOO, AS OF 1.0.38. It read false, and that is what
+    // made "pages do not nest" a fact about the catalogue as well as about
+    // `newPage`. An INDEX is the surface that answers no now, and its reason is
+    // the structural one this field has always been about: an index holds notes.
+    expect(sectionContext(STUDY_JOURNAL, { page: lesson }).hasPages).toBe(true);
+    expect(sectionContext(STUDY_JOURNAL, { depth: 0 }).hasPages).toBe(false);
+  });
+});
+
+describe("moving a page up or down its note (1.0.38)", () => {
+  // The list was read-only for four releases: `order` was stamped once at
+  // creation and never written again, so a reader who wrote their pages out of
+  // sequence reordered them by renaming files until the basename tie-break put
+  // them right.
+
+  const run = (...orders: (number | null)[]) =>
+    orders.map((order, i) => ({ path: `N/p${i + 1}.md`, order }));
+  const at = (moved: { path: string; order: number }[]) =>
+    moved.sort((a, b) => a.order - b.order).map((m) => m.path);
+
+  it("renumbers the whole run rather than swapping two ordinals", () => {
+    // THE CHEAP MOVE IS A SWAP, AND IT WORKS ONLY ON A RUN THAT IS ALREADY 1..n.
+    // `nextPageOrder` is max+1, so 1,3,4 is as ordinary as 1,2,3 — and the
+    // swap's result there would be an order nobody can predict from the screen.
+    const out = reorderedPages(run(1, 3, 4), "N/p3.md", -1);
+    expect(out).toEqual([
+      { path: "N/p1.md", order: 1 },
+      { path: "N/p3.md", order: 2 },
+      { path: "N/p2.md", order: 3 },
+    ]);
+  });
+
+  it("moves a page down, and leaves max equal to the length", () => {
+    // Which is what keeps `nextPageOrder` working: max+1 after a reorder is
+    // n+1, so the next page made lands after every page there is.
+    const out = reorderedPages(run(1, 2, 3), "N/p1.md", 1);
+    expect(at(out)).toEqual(["N/p2.md", "N/p1.md", "N/p3.md"]);
+    expect(nextPageOrder(out.map((o) => o.order))).toBe(4);
+  });
+
+  it("says nothing to do at either end, and for a path that is not here", () => {
+    // AN EMPTY LIST IS A NO-OP, not a failure: the caller writes nothing and
+    // says nothing, which is what a disabled arrow pressed anyway should do.
+    expect(reorderedPages(run(1, 2, 3), "N/p1.md", -1)).toEqual([]);
+    expect(reorderedPages(run(1, 2, 3), "N/p3.md", 1)).toEqual([]);
+    expect(reorderedPages(run(1, 2, 3), "N/elsewhere.md", 1)).toEqual([]);
+    expect(reorderedPages([], "N/p1.md", 1)).toEqual([]);
+  });
+
+  it("resolves a missing ordinal on the way past, rather than carrying it", () => {
+    // A page written by hand has no `order` at all and sorts LAST, which is the
+    // table's rule and `pageOrderOf`'s. There is nothing to swap it WITH, and
+    // swapping a number with a null either loses a position or invents one —
+    // renumbering answers it instead, and the reader's next press behaves.
+    const out = reorderedPages(run(1, null, 2), "N/p2.md", -1);
+    expect(at(out)).toEqual(["N/p1.md", "N/p2.md", "N/p3.md"]);
+    expect(out.every((o) => Number.isFinite(o.order))).toBe(true);
+  });
+
+  it("sorts the run exactly as the table drew it", () => {
+    // LOAD-BEARING. A reader pressing ↑ moves the row ABOVE the one they can
+    // see; an order this disagreed with would move a page past a neighbour it
+    // had never been drawn beside. Two unnumbered pages tie on ordinal and break
+    // on basename, in both places.
+    const pages = [
+      { path: "N/Beta.md", order: null },
+      { path: "N/Alpha.md", order: null },
+      { path: "N/First.md", order: 1 },
+    ];
+    expect(at(reorderedPages(pages, "N/Alpha.md", 1))).toEqual([
+      "N/First.md",
+      "N/Beta.md",
+      "N/Alpha.md",
+    ]);
+  });
+
+  it("is pure, so the rule is checkable without a vault", () => {
+    // `page-default.ts`'s header is the standing rule — *no `App`, no plugin, no
+    // DOM* — and it is why the arithmetic is not in the widget that writes it.
+    const fn = readCode("page-default");
+    const at2 = fn.indexOf("export function reorderedPages(");
+    expect(at2).toBeGreaterThan(0);
+    const body = fn.slice(at2, fn.indexOf("\n}", at2));
+    expect(body).not.toContain("app.");
+    expect(body).not.toContain("processFrontMatter");
+  });
+});
+
+describe("what a page's row in the list can do (1.0.38)", () => {
+  const rows = () => readCode("tables");
+
+  it("writes the run the pure helper hands back, and nothing else", () => {
+    const src = rows();
+    expect(src).toContain("const moves = reorderedPages(");
+    expect(src).toContain('front["order"] = m.order;');
+    // RESOLVED AT THE WRITE, NEVER CAPTURED AT THE RENDER — `kind-row-menu.ts`'s
+    // rule, because a row drawn before somebody moved the file holds a path that
+    // is no longer anybody's.
+    expect(src).toContain("const file = getFile(plugin.app, m.path);");
+  });
+
+  it("lists a promoted page's own pages under it", () => {
+    // The sentence that stood at the top of this widget — *"not recursively,
+    // because a sub-folder under a lesson belongs to a different note"* — was
+    // the flat model's justification and is false as of 1.0.38.
+    const src = rows();
+    expect(src).toContain("if (isPromotedPath(page.file.path)) {");
+    expect(src).toContain("drawPageRows(table, pagesBeside(app, page.file, pageId), number, depth + 1);");
+    expect(src).not.toContain("belongs to a different note.");
+  });
+
+  it("numbers by position rather than by ordinal", () => {
+    // `1`, `1.1`, `1.2`, `2`. Two pages both numbered `1` at two indents is the
+    // ambiguity the indent alone leaves.
+    expect(rows()).toContain("const number = prefix ? `${prefix}.${i + 1}` : String(i + 1);");
+  });
+
+  it("draws the controls only where there is something to write with", () => {
+    // A journal or an owning kind that cannot be resolved still LISTS — a reader
+    // can read their pages on a damaged vault — and it is the controls that go
+    // quiet, because every one of them writes.
+    expect(rows()).toContain("if (table.type && table.host) {");
+  });
+});
+
+describe("the ⋯ on a page's row (1.0.38)", () => {
+  const menu = () => readCode("kind-row-menu");
+
+  it("renames through the one rename, which knows about folder notes", () => {
+    // A PROMOTED PAGE IS A FOLDER NOTE, so its folder moves first and the note
+    // follows it — or the folder is left with no note of its own inside and
+    // every link derived from the folder path breaks. Writing that here would
+    // have been writing it a second time.
+    expect(menu()).toContain("const failed = await renameNote(plugin.app, file, title);");
+    expect(readSrc("header-title")).toContain("export async function renameNote(");
+  });
+
+  it("offers a new page inside, which only Phase 2 made possible", () => {
+    expect(menu()).toContain("table.plugin.journals.newPage(table.type, path)");
+  });
+
+  it("shares the bin rows rather than spelling a second deletion", () => {
+    const src = menu();
+    const at = src.indexOf("export function attachPageRowMenu(");
+    expect(at).toBeGreaterThan(0);
+    expect(src.slice(at, at + 2000)).toContain("addDeleteRows(menu, table, path);");
+  });
+
+  it("identifies the row by path, never by the TFile", () => {
+    // 4.50.2's rule, and it matters more here than on a kind's row: Rename is
+    // the one item in this file that MOVES the note it acts on.
+    const src = menu();
+    const at = src.indexOf("export function attachPageRowMenu(");
+    const fn = src.slice(at, at + 2000);
+    expect(fn).toContain("const path = file.path;");
+    expect(fn).toContain("const live = getFile(table.plugin.app, path);");
   });
 });

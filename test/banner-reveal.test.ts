@@ -256,7 +256,12 @@ describe("what a reveal calls itself", () => {
     expect(labelled.get("subject-index.md")).toBe("🗂️ Topics");
     expect(labelled.get("topic-index.md")).toBe("🗂️ What's below");
     expect(labelled.get("lesson.md")).toBe("📄 Pages");
-    expect(labelled.has("page.md")).toBe(false);
+    // A PAGE SAYS THE SAME WORD AS A LESSON NOW (1.0.38). It composed the banner
+    // and the prose and nothing else, so it named nothing a reveal could hide;
+    // pages nest, its template ships the index, and the chevron over it is the
+    // one a lesson has. What a page still never composes is `level-index` —
+    // that is an INDEX's table of the notes below it, and a page holds pages.
+    expect(labelled.get("page.md")).toBe("📄 Pages");
     expect(composed.get("page.md")).not.toContain("level-index");
   });
 });
@@ -310,10 +315,12 @@ describe("which lines of a welded fence the index owns", () => {
   });
 
   it("answers null for a fence with no index in it", () => {
-    // A page's banner. Nothing to reveal, so nothing registers and the strip
-    // draws one button rather than two.
-    expect(belowSpanIn(fenceOf("page.md"))).toBeNull();
+    // WAS A PAGE'S BANNER, and a page's fence carries a Pages index as of
+    // 1.0.38 — so the example had to become one that still has nothing to
+    // reveal. A banner with a tracker row welded under it is that fence: two
+    // sections, one card, and no table of anything below.
     expect(belowSpanIn(["journal-header", "tracker:status"])).toBeNull();
+    expect(belowSpanIn(["journal-header", "actions"])).toBeNull();
     // And an index with no head above it names nothing a button could say.
     expect(belowSpanIn(["journal-header", "pages-table"])).toBeNull();
   });

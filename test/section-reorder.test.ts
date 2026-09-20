@@ -254,13 +254,13 @@ describe("starting a page inside a group", () => {
     expect(ops).toHaveLength(1);
     expect(ops[0].kind).toBe("regroup");
     expect(ops[0].label).toBe("Open tasks");
-    expect(ops[0].detail).toBe("Open tasks starts a new page of its group");
+    expect(ops[0].detail).toBe("Open tasks starts a new tab of its group");
   });
 
   it("names the other direction too, because the control is a toggle", () => {
     const paged = blocked(["tasks", "logbook"]) as string;
     const ops = pageBreakOps(view(paged), view(home()), label);
-    expect(ops.map((o) => o.detail)).toEqual(["Open tasks joins the page before it"]);
+    expect(ops.map((o) => o.detail)).toEqual(["Open tasks joins the tab before it"]);
   });
 
   it("names two breaks in the group's own order", () => {

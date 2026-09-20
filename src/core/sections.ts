@@ -1042,11 +1042,27 @@ export function viewOf<Ctx>(
     questions?: readonly SectionQuestion[];
     answered?: Record<string, string>;
     weldable?: boolean;
+    // ── THE ID THE ROW WEARS, WHERE IT IS NOT THE CATALOGUE'S (1.0.36) ──
+    //
+    // A repeating section is ONE catalogue entry and several rows: prose is
+    // `headings`, `headings#2`, `headings#3`, all rendered by the same
+    // `render` and all described by the same label and blurb. So the surface
+    // that knows how many there are supplies the id, and everything else on
+    // the view still comes from the entry.
+    //
+    // FORWARDED RATHER THAN DERIVED HERE, on `category`'s rule: an ordinal is
+    // a fact about a FILE, and this function has none.
+    id?: string;
+    // AND THE NAME IT WEARS WITH IT. A repeating section's rows are told apart
+    // by their ordinal and by nothing else — same label, same blurb, same icon
+    // — so the surface that mints the ids names the rows too. Defaulted to the
+    // catalogue's, which is what every non-repeating section wants.
+    label?: string;
   } = {}
 ): SectionView {
   return {
-    id: section.id,
-    label: section.label,
+    id: policy.id ?? section.id,
+    label: policy.label ?? section.label,
     blurb: section.blurb,
     icon: section.icon,
     // FORWARDED, NEVER DECIDED HERE. The subject is the catalogue's to state;

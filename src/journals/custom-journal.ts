@@ -25,6 +25,7 @@ import {
   templateTargets,
 } from "./journal-sections";
 import type { SectionOverrides } from "./journal-sections";
+import { graphParentName } from "./journal-sections";
 import { graphLinksSection } from "../core/note-sections";
 import { journalSurface } from "../trackers/trackers";
 import type { TrackerDef } from "../trackers/trackers";
@@ -608,18 +609,6 @@ export function composeTemplate(
     (s) => layout?.options?.[s.id]
   ).filter(Boolean);
 
-  // THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read
-  // `ctx.type.levels[d].noun` — "Topic", "Lesson" — which is the word a level
-  // is CALLED and never the name of any note, so every journal note in the
-  // vault linked to something that does not exist and Obsidian drew a phantom
-  // node for each distinct noun. `ctx.type.name` is the type's folder note
-  // (`03 - Journals/Study/Study.md`), which always resolves.
-  //
-  // ONE LEVEL COARSER THAN THE TRUTH, deliberately and for now: a lesson's real
-  // parent is its topic's index NOTE, and this context carries the level a note
-  // is at but not the path of the note above it. Naming the type is true —
-  // every note in Study is inside Study — where naming "Lesson" was not.
-  const parentName = ctx.type.name;
 
   // Frontmatter abuts what follows it with no blank line, matching every
   // shipped asset. That matters for exactly one line: `chronoanvil:spacer` is
@@ -630,7 +619,7 @@ export function composeTemplate(
     [`${templateFrontmatter(ctx)}\n${body[0] ?? ""}`, ...body.slice(1)]
       .join("\n\n")
       .replace(/\n+$/, "") +
-    graphLinksSection([parentName])
+    graphLinksSection([graphParentName(ctx)])
   );
 }
 
@@ -668,9 +657,22 @@ export function templateFrontmatter(ctx: SectionContext): string {
   });
   if (ctx.noteKind === "page") {
     // A page names the note it belongs to and its position in it, and carries
-    // neither a date nor a rating: both belong to the parent, which is the
-    // whole reason a long note splits into pages rather than into more notes.
+    // no DATE: the date is the parent's, which is the whole reason a long note
+    // splits into pages rather than into more notes.
     lines.push("order: {{order}}", "created: {{created}}");
+    // ── AND IT CARRIES ITS RATING AS OF 1.0.38 ──────────────────────────
+    //
+    // *"…and carries neither a date nor a rating: both belong to the parent"*
+    // stood here, and the rating half is reversed. `trackerSeeds` holds the
+    // argument and the measurement behind it — a page's `type:` is not a kind,
+    // so it is outside every average and outside the review queue whatever it
+    // holds, and the reader asked a new page to open with the same stacked card
+    // a lesson does. The grid needs the property seeded or its first cell is a
+    // control over a value that is not there.
+    if (ctx.rating && !RESERVED_KEYS.has(ctx.rating)) {
+      lines.push(`${ctx.rating}: 1`);
+    }
+    lines.push("status: in-progress");
   } else if (ctx.noteKind === "leaf") {
     lines.push("date: {{date}}", "created: {{created}}");
     if (ctx.rating && !RESERVED_KEYS.has(ctx.rating)) {

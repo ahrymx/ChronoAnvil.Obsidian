@@ -473,9 +473,11 @@ describe("section bodies are marked for the surface", () => {
     // A card costs horizontal padding twice on a ~360px column, which was the
     // mockups' objection and a real one.
     const css = readCss();
-    const at = css.indexOf(".ca-journal-sec-block {");
-    expect(at).toBeGreaterThan(0);
-    const narrow = css.indexOf("@container (max-width: 460px)", at);
+    // ONE RULE FOR TWO SURFACES SINCE 1.0.38: prose wears the section card,
+    // so the selector list names both — see the foot of 70-section-surface.css.
+    const narrow = css.indexOf(
+      "@container (max-width: 460px) {\n  .ca-journal-sec-block,\n  .ca-prose-block {"
+    );
     expect(narrow).toBeGreaterThan(0);
     // One variable, not two paddings: the header rule bleeds to the card's
     // edges by cancelling exactly this inset, so a breakpoint that changed the
@@ -541,7 +543,9 @@ describe("section bodies are marked for the surface", () => {
     // padding and no border, so a child's margins collapse THROUGH them and the
     // gap lands outside the element painting the background.
     const css = readCss();
-    const at = css.indexOf(".ca-journal-sec-block {");
+    // ONE RULE FOR TWO SURFACES SINCE 1.0.38: prose wears the section card,
+    // so the selector list names both — see the foot of 70-section-surface.css.
+    const at = css.indexOf(".ca-journal-sec-block,\n.ca-prose-block {");
     expect(at).toBeGreaterThan(0);
     const block = css.slice(at, css.indexOf("}", at));
     expect(block).toContain("display: flow-root");

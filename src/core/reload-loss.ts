@@ -243,18 +243,20 @@ export function reloadLoss(
   // not a piece of structure the composer itself emits.
   //
   // THE STRUCTURE IS GATHERED FROM `composed`, NOT LISTED HERE. It is `---` and
-  // `` `chronoanvil:spacer` `` on an entry, and the whole prose skeleton on a
-  // journal leaf. A list written into this file would be a second copy of a
+  // `` `chronoanvil:spacer` `` on an entry, and every prose block's markers and
+  // default headings on a journal leaf. A list written into this file would be a second copy of a
   // decision the composers make, and it would go wrong silently — reporting the
   // reader's own page as full of prose — the first time one of them emitted
   // anything new.
   //
-  // AND IT IS WHY THE JOURNAL SIDE CAN ASK THIS AT ALL. `parseSections`
-  // deliberately over-matches a markdown-only section — `markdownOwnerOf`'s own
-  // comment says attributing a reader's `## Notes` to `headings` "changes
-  // nothing that happens to the file" — so a runs walk cannot see prose typed
-  // under a heading. This diff can: the composed `## Notes` appears on both
-  // sides and cancels, and the paragraph under it does not.
+  // AND IT IS WHY THE JOURNAL SIDE CAN ASK THIS AT ALL. A runs walk cannot see
+  // prose typed under a heading, and that is as true after 1.0.36 as it was
+  // before: attribution stopped guessing — `markdownOwnerOf` claims a segment
+  // for prose because it holds a BRACKET now, rather than because it holds any
+  // `##` at all — but a block still owns every word between its two markers,
+  // which is the reader's paragraph and the composed heading alike. This diff
+  // can tell them apart: the composed `## Notes` appears on both sides and
+  // cancels, and the paragraph under it does not.
   const structure = new Set(looseLines(composed));
   for (const line of looseLines(text)) {
     if (structure.has(line)) continue;

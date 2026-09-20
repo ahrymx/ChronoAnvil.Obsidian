@@ -670,7 +670,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     glyph: "⏮️",
     bar: "⏮️ Go to period",
     blurb:
-      "A prev/next pair around a date picker that re-scopes this page to another week, month, quarter or year.",
+      "A prev/next pair around a date picker that re-scopes this note to another week, month, quarter or year.",
     category: "diary",
     // IT WRITES THE PROPERTY IT WANTED TO FIND, which is worse than a refusal
     // and is why this one is not a matter of taste. `shiftPeriod` puts
@@ -682,7 +682,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     needs: "period",
     arg: {
       kind: "choice",
-      label: "the period this page steps through",
+      label: "the period this note steps through",
       // ASKED RATHER THAN DEFAULTED, unlike the dispatcher, which falls back to
       // `week` for an unrecognised argument. That fallback is right for a line
       // somebody typed and wrong for a line this window writes: a navigator
@@ -863,12 +863,12 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     blurb: "The pages beneath this folder, one row each.",
     category: "journals",
     // IT ANSWERS WITH THE NEIGHBOURS, which is the second reason a widget is in
-    // this field at all — see `WidgetNeed`. Only a journal LEAF supplies this;
-    // an index holds notes rather than pages, a page holds neither, and a flat
-    // note has no kind to ask. On the one surface that does supply it, the
-    // catalogue's own 📄 Pages section has already claimed the keyword, so the
-    // net effect is that this row leaves the add list everywhere it could only
-    // ever have drawn somebody else's pages.
+    // this field at all — see `WidgetNeed`. A journal LEAF supplies this, and so
+    // does a PAGE as of 1.0.38; an index holds notes rather than pages, and a flat
+    // note has no kind to ask. On the surfaces that do supply it, the catalogue's
+    // own 📄 Pages section has already claimed the keyword, so the net effect is
+    // that this row leaves the add list everywhere it could only ever have drawn
+    // somebody else's pages.
     needs: "pages",
   },
   "review-queue": {

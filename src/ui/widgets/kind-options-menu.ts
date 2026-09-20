@@ -109,7 +109,7 @@ export function buildKindOptions(
   // NAMED AFTER THE GROUP IT ACTS ON, which is 4.48's rule and `kind-row-menu`'s
   // for the same reason: `overflowButton` writes "More", and a card of four
   // groups would read out as "More, More, More, More".
-  button.setAttr("aria-label", `Options for ${plural(kind.label)} on this page`);
+  button.setAttr("aria-label", `Options for ${plural(kind.label)} on this note`);
   // NO SECOND `stopPropagation` HERE, AND `buildRemove` IS WHY THERE LOOKS LIKE
   // THERE SHOULD BE. The head folds the group when clicked, and the removal
   // beside this has to say so because it wires its own handler onto a plain
@@ -139,7 +139,7 @@ function addRatingRows(
     id ? trackerLabel(ctx, id) : "nothing";
 
   menu.addItem((item) =>
-    item.setTitle(`${plural(kind.label)} on this page are rated on…`).setIsLabel(true)
+    item.setTitle(`${plural(kind.label)} on this note are rated on…`).setIsLabel(true)
   );
   menu.addItem((item) =>
     item
@@ -188,7 +188,7 @@ function addHeadingRows(
 ): void {
   const { shown, inherited } = columnWords(ctx, kind, over);
   menu.addItem((item) =>
-    item.setTitle("This page's column headings…").setIsLabel(true)
+    item.setTitle("This note's column headings…").setIsLabel(true)
   );
   shown.forEach((col, i) => {
     const base = inherited[i]?.heading ?? col.fallback;
@@ -230,7 +230,7 @@ async function renameColumn(
 ): Promise<void> {
   const typed = await promptText(
     ctx.plugin.app,
-    `What this page calls the “${inherited}” column`,
+    `What this note calls the “${inherited}” column`,
     inherited,
     // THE BOX OPENS ON THE OVERRIDE, NOT ON THE WORD ON SCREEN. Where there is
     // no override the two are the same string anyway; where there is one, an

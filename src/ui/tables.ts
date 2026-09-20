@@ -18,7 +18,7 @@
 
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
-import { childFiles, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, noteTypeOf, openFile, openGlobalSearch } from "../core/util";
+import { childNotes, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, noteTypeOf, openFile, openGlobalSearch } from "../core/util";
 import { pagesUnder, recencyMs, relativeActivity, tagsOf } from "../core/query";
 import type { PageInfo } from "../core/query";
 import { formatPeriodLabel } from "../charts/charts";
@@ -34,6 +34,7 @@ import { sectionFrame, splitGlyph } from "./section-frame";
 import { statStrip } from "./stat-strip";
 import type { StatCard } from "./stat-strip";
 export { emptyCallout, emptyHead, emptyLine };
+import type { PagesHost } from "../journals/journal";
 import {
   JournalKind,
   JournalType,
@@ -44,12 +45,13 @@ import {
   journalTypeAtPath,
   journalTypeOfNote,
   kindsCarrying,
+  pagesHostOf,
   registeredJournalTypes,
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
 import { kindColumns, ratingNoun } from "../journals/kind-columns";
 import { kindTableOverrideOf, pageKind, pageTypesOf } from "../journals/kind-tables";
-import { pageOrderOf } from "../journals/page-default";
+import { isPromotedPath, pageOrderOf, reorderedPages } from "../journals/page-default";
 import { promptAddKind } from "../journals/kind-create";
 // The band's own table: which measures a preset names, which of them a scope
 // can answer, and how many cells a band may have. Pure — see `stats-band.ts`
@@ -62,7 +64,7 @@ import {
   statScopeOf,
 } from "../journals/stats-band";
 import { attachCellMenus } from "./widgets/stats-band-menu";
-import { attachKindRowMenu } from "./widgets/kind-row-menu";
+import { attachKindRowMenu, attachPageRowMenu } from "./widgets/kind-row-menu";
 import { journalChartRefusal, journalTallyRefusal, summarize } from "../charts/charts";
 import { partsOf } from "../core/section-model";
 import {
@@ -2590,7 +2592,7 @@ export function buildAddKindRow(
   // Study` was true about the JOURNAL and silent about the page — which is
   // exactly the half a reader was surprised by when the old flow went on to
   // offer the same group to every other index note in the subject.
-  const hint = `Add a kind of note to ${type.name} and list it on this page`;
+  const hint = `Add a note type to ${type.name} and list it on this note`;
   btn.setAttr("aria-label", hint);
   btn.setAttr("title", hint);
   btn.addEventListener("click", (evt) => {
@@ -2611,8 +2613,24 @@ export function buildAddKindRow(
 
 // ── pages-table ──────────────────────────────────────────────────────
 // The page index on a promoted note's dashboard. Reads the markdown files
-// sitting beside the folder note — not recursively, because a sub-folder under
-// a lesson belongs to a different note.
+// sitting beside the folder note, and then — as of 1.0.38 — the files beside
+// each of THOSE that has been promoted in turn, indented under it.
+//
+// ── THE SENTENCE THAT USED TO STAND HERE WAS THE FLAT MODEL ──────────
+//
+// *"not recursively, because a sub-folder under a lesson belongs to a different
+// note."* It was true while pages could not nest: the only folder under a
+// lesson was another lesson's, so descending would have listed somebody else's
+// notes. A page may now hold pages, so a sub-folder under a lesson is that
+// lesson's own page, and the recursion lists what the reader put there.
+//
+// WHAT STOPS IT FROM CLIMBING INTO SOMEBODY ELSE'S NOTES IS THE SAME TEST IT
+// ALWAYS WAS: a file counts only if its `type:` is the page id. A promoted LEAF
+// sitting beside a page — which is what the old sentence was really about — has
+// a kind's `type:` and is skipped, folder and all.
+//
+// NO DEPTH CAP. A folder tree is finite and cannot cycle, and a cap would be
+// the 1.0.23 refusal again with a larger number in it.
 //
 // A page is identified by its `type` matching the kind's `pages.id`, which is
 // deliberately not one of the type's kinds: that is what keeps pages out of the
@@ -2645,27 +2663,23 @@ export function buildPagesTable(
   // `noteTypeOf` is the reader with the trim and the lowercase in it, and 5.2
   // made exactly this repair in `isContainerFolder` for exactly this reason.
   // Nothing here is new but the second and third call sites.
-  const kind = type?.kinds.find((k) => k.id === noteTypeOf(app, file));
-  const pageId = kind?.pages?.id ?? "page";
-  const label = kind?.pages?.label ?? "Page";
+  //
+  // ── AND THE HOST MAY ITSELF BE A PAGE NOW (1.0.38) ──────────────────
+  //
+  // This was `type?.kinds.find((k) => k.id === noteTypeOf(app, file))`, which is
+  // the first of the three refusals that kept pages flat, met a third time: a
+  // page's `type:` is not a kind, so a page hosting this table found no kind,
+  // fell to the `"page"` default and — by luck rather than by design — listed
+  // its own pages correctly while the MENU rows below had no kind to name.
+  // `pagesHostOf` is the question both halves actually want, and it walks up to
+  // the owning leaf when the note it is asked about is a page.
+  const host = type
+    ? pagesHostOf(app, type, file, frontmatterOf(app, file))
+    : null;
+  const pageId = host?.pages.id ?? "page";
+  const label = host?.pages.label ?? "Page";
 
-  // `order` THROUGH `pageOrderOf`, which is the property's one reader — the
-  // allocator in `newPage` writes what this sorts on, and they used to be two
-  // opinions about what a missing ordinal means. Absent still sorts last: a page
-  // nobody numbered belongs after every page somebody did.
-  const pages = childFiles(file.parent)
-    .filter((f) => f.path !== file.path)
-    .map((f) => ({
-      file: f,
-      type: noteTypeOf(app, f),
-      order: pageOrderOf(frontmatterOf(app, f)),
-    }))
-    .filter((p) => p.type === pageId)
-    .sort((a, b) => {
-      const av = a.order ?? Number.MAX_SAFE_INTEGER;
-      const bv = b.order ?? Number.MAX_SAFE_INTEGER;
-      return av !== bv ? av - bv : a.file.basename.localeCompare(b.file.basename);
-    });
+  const pages = pagesBeside(app, file, pageId);
 
   if (pages.length === 0) {
     emptyLine(
@@ -2687,27 +2701,190 @@ export function buildPagesTable(
     return emptyHead(root, "none yet");
   }
 
-  // The same row as the two lists above, with the ordinal in the component's
-  // `token` slot — which is what that slot is: the small fixed thing before the
-  // name. `jpt-index`, `jpt-row` and `jpt-title` were this list's own three
-  // classes for a shape three other lists already had.
-  //
-  // No heading strip and no value columns: a page index is a name and its
-  // position, so `recordList`'s grid would be one track with a blank header
-  // over it. `createListRow` directly, therefore, rather than bending the
-  // helper to describe a table with no columns.
   const list = root.createDiv({ cls: "ca-list" });
+  drawPageRows(
+    { plugin, ctx, list, pageId, ...(host && type ? { type, host } : {}) },
+    pages,
+    "",
+    0
+  );
+  return root;
+}
+
+/** One page of a note, with its ordinal as the file states it. */
+interface PageEntry {
+  file: TFile;
+  order: number | null;
+}
+
+// The pages of one note: the files beside it whose `type:` is the page id.
+//
+// THE SORT IS `reorderedPages`', AND IT HAS TO BE. A reader pressing ↑ moves the
+// row above the one they can see, so the arithmetic that renumbers the run and
+// the list that drew it must agree about what "above" means — see the same
+// comparator, spelled once more, inside `reorderedPages`.
+function pagesBeside(app: App, note: TFile, pageId: string): PageEntry[] {
+  if (!note.parent) return [];
+  // `childNotes`, NOT `childFiles` — a promoted page is a folder note one
+  // folder down, and reading only the loose files here is what dropped it from
+  // this list the moment it grew pages of its own. See `childNotes`, which
+  // carries the report.
+  return childNotes(note.parent)
+    .filter((f) => f.path !== note.path)
+    .map((f) => ({
+      file: f,
+      type: noteTypeOf(app, f),
+      // `order` THROUGH `pageOrderOf`, which is the property's one reader — the
+      // allocator in `newPage` writes what this sorts on, and they used to be
+      // two opinions about what a missing ordinal means. Absent still sorts
+      // last: a page nobody numbered belongs after every page somebody did.
+      order: pageOrderOf(frontmatterOf(app, f)),
+    }))
+    .filter((p) => p.type === pageId)
+    .sort((a, b) => {
+      const av = a.order ?? Number.MAX_SAFE_INTEGER;
+      const bv = b.order ?? Number.MAX_SAFE_INTEGER;
+      return av !== bv ? av - bv : a.file.basename.localeCompare(b.file.basename);
+    })
+    .map(({ file, order }) => ({ file, order }));
+}
+
+/** Everything a row needs that is a fact about the TABLE rather than the row. */
+interface PageTableContext {
+  plugin: ChronoAnvilPlugin;
+  ctx: MarkdownPostProcessorContext;
+  list: HTMLElement;
+  pageId: string;
+  // Absent on a note whose journal or owning kind could not be resolved. The
+  // list still draws — a reader can read their pages on a damaged vault — and
+  // the CONTROLS are what go quiet, because every one of them writes.
+  type?: JournalType;
+  host?: PagesHost;
+}
+
+// One run of siblings, then each promoted one's own run beneath it.
+//
+// ── THE NUMBER SAYS WHERE YOU ARE, NOT ONLY WHAT ORDER YOU ARE IN ────
+//
+// `1`, `1.1`, `1.2`, `2` rather than a flat ordinal restarting at each depth.
+// Two pages both numbered `1` in one list, at two indents, is the ambiguity the
+// indent alone leaves — and the dotted form is the one every reader has already
+// met in a table of contents.
+function drawPageRows(
+  table: PageTableContext,
+  pages: PageEntry[],
+  prefix: string,
+  depth: number
+): void {
+  const { plugin, ctx, list, pageId } = table;
+  const app = plugin.app;
   pages.forEach((page, i) => {
-    createListRow(list, {
-      token: String(i + 1),
+    const number = prefix ? `${prefix}.${i + 1}` : String(i + 1);
+    // The same row as the two lists above, with the ordinal in the component's
+    // `token` slot — which is what that slot is: the small fixed thing before
+    // the name. `jpt-index`, `jpt-row` and `jpt-title` were this list's own
+    // three classes for a shape three other lists already had.
+    //
+    // No heading strip and no value columns: a page index is a name, a position
+    // and its controls, so `recordList`'s grid would be one track with a blank
+    // header over it. `createListRow` directly, therefore, rather than bending
+    // the helper to describe a table with no columns.
+    const row = createListRow(list, {
+      token: number,
       title: page.file.basename,
       titleRender: (slot) =>
         internalLink(slot, app, page.file, page.file.basename, ctx.sourcePath),
       dense: true,
+      // THE INDENT IS A CLASS PER DEPTH, capped at the depth the stylesheet
+      // defines. Past it the rows stop moving right rather than marching off
+      // the card — a reader eight pages deep has a scrollbar problem, not a
+      // legibility one.
+      cls: depth > 0 ? [`ca-jpt-nest-${Math.min(depth, 4)}`] : [],
     });
+    if (table.type && table.host) {
+      addPageMoveButtons(table, row.actions, pages, page);
+      attachPageRowMenu(
+        { plugin, type: table.type, kind: table.host.kind },
+        row.actions,
+        page.file
+      );
+    }
+    // A PROMOTED PAGE HOLDS PAGES, and listing them here is the whole of 1.0.38
+    // on this surface. `isPromotedPath` is the same test `newPage` writes with,
+    // so a page appears under its parent exactly when the promotion that made
+    // it possible has happened.
+    if (isPromotedPath(page.file.path)) {
+      drawPageRows(table, pagesBeside(app, page.file, pageId), number, depth + 1);
+    }
   });
+}
 
-  return root;
+// ── MOVING A PAGE WITHIN ITS NOTE (1.0.38) ────────────────────────────
+//
+// The list was read-only for four releases: `order` was stamped once at creation
+// and never written again. A reader who wrote their pages out of sequence had to
+// rename files until the basename tie-break put them right.
+//
+// THE ARITHMETIC IS NOT HERE. `reorderedPages` is pure and lives beside the two
+// functions that already own what an ordinal means, for the reason
+// `page-default.ts`'s header gives — it is what lets the rule be checked without
+// a vault. This reads the run, calls it, and writes back what comes out.
+//
+// THE WHOLE RUN IS REWRITTEN, not two entries swapped. `nextPageOrder` is max+1,
+// so a real note's ordinals are 1,3,4 as often as 1,2,3 and a hand-made page has
+// none at all; renumbering resolves every one of those on the way past, and
+// leaves max equal to the length so the allocator keeps working.
+function addPageMoveButtons(
+  table: PageTableContext,
+  actions: HTMLElement,
+  run: PageEntry[],
+  page: PageEntry
+): void {
+  const at = run.findIndex((p) => p.file.path === page.file.path);
+  const moves = actions.createDiv({ cls: "ca-jpt-moves" });
+  const arrow = (delta: -1 | 1, label: string, icon: string): void => {
+    const b = moves.createEl("button", {
+      cls: "ca-jpt-move",
+      attr: { "aria-label": `${label} ${page.file.basename}`, title: label, type: "button" },
+    });
+    setIcon(b, icon);
+    // DISABLED AT THE ENDS RATHER THAN SILENT THERE. `reorderedPages` returns an
+    // empty list for a move that cannot happen, so pressing it would be a no-op
+    // either way — and a control that looks live and does nothing is the thing
+    // 1.0.36 spent a release removing from the section editor.
+    b.disabled = at + delta < 0 || at + delta >= run.length;
+    b.addEventListener("click", () => {
+      void applyPageOrder(table.plugin, run, page.file.path, delta);
+    });
+  };
+  arrow(-1, "Move up", "chevron-up");
+  arrow(1, "Move down", "chevron-down");
+}
+
+async function applyPageOrder(
+  plugin: ChronoAnvilPlugin,
+  run: PageEntry[],
+  path: string,
+  delta: -1 | 1
+): Promise<void> {
+  const moves = reorderedPages(
+    run.map((p) => ({ path: p.file.path, order: p.order })),
+    path,
+    delta
+  );
+  if (moves.length === 0) return;
+  for (const m of moves) {
+    const file = getFile(plugin.app, m.path);
+    // RESOLVED AT THE WRITE, NEVER CAPTURED AT THE RENDER — `kind-row-menu.ts`'s
+    // rule, for the same reason: a row drawn before somebody moved the file is a
+    // row holding a path that is no longer anybody's.
+    if (!file) continue;
+    await plugin.app.fileManager.processFrontMatter(file, (front) => {
+      front["order"] = m.order;
+    });
+  }
+  // NOTHING REPAINTS ANYTHING. The table is a `liveScopedWidget` watching the
+  // folder, so the frontmatter writes are themselves the events that redraw it.
 }
 
 // ── journal-breakdown ────────────────────────────────────────────────

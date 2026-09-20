@@ -485,23 +485,33 @@ describe("the arrangement the presets ship (5.20)", () => {
     ["study", "topic-index", ["journal-header", "header:🗂️ What's below"]],
     ["study", "lesson", ["journal-header", "header:📄 Pages"]],
     ["study", "practice", ["journal-header", "header:📄 Pages"]],
-    // AND A PAGE IS THE BANNER AND THE PROSE. It is not graded — a per-page
-    // rating would count a note's own parts as its peers — so even `trackers`
-    // is absent here, and this is the shortest template the plugin writes. It
-    // is also the one surface that gets no Pages index: a page holds none.
-    ["study", "page", ["journal-header"]],
+    // ── AND A PAGE COMPOSES LIKE A LEAF AS OF 1.0.38 ───────────────────
+    //
+    // This read `["journal-header"]` with the note: *"a page is the banner and
+    // the prose. It is not graded — a per-page rating would count a note's own
+    // parts as its peers — so even `trackers` is absent here, and this is the
+    // shortest template the plugin writes. It is also the one surface that gets
+    // no Pages index: a page holds none."* Every clause of that is now false.
+    //
+    // A page holds pages, and the rating claim was stale rather than wrong-
+    // headed: `confidenceKinds` has narrowed an average to the kinds that carry
+    // the tracker since 2.36, and a page's `type:` is not a kind — so a page was
+    // already outside every average and every queue, with or without the
+    // property. The reader asked for the stacked card a lesson gets, in those
+    // three words: banner, trackers, pages.
+    ["study", "page", ["journal-header", "header:📄 Pages"]],
     ["projects", "area-index", ["journal-header", "header:🗂️ Projects"]],
     ["projects", "project-index", ["journal-header", "header:🗂️ What's below"]],
     ["projects", "update", ["journal-header", "header:📄 Pages"]],
     ["projects", "decision", ["journal-header", "header:📄 Pages"]],
-    ["projects", "page", ["journal-header"]],
+    ["projects", "page", ["journal-header", "header:📄 Pages"]],
     ["exercise-diet", "block-index", ["journal-header", "header:🗂️ What's below"]],
     ["exercise-diet", "workout", ["journal-header", "header:📄 Pages"]],
     ["exercise-diet", "meal", ["journal-header", "header:📄 Pages"]],
-    ["exercise-diet", "page", ["journal-header"]],
+    ["exercise-diet", "page", ["journal-header", "header:📄 Pages"]],
     ["media", "medium-index", ["journal-header", "header:🎬 Titles"]],
     ["media", "title", ["journal-header", "header:📄 Pages"]],
-    ["media", "page", ["journal-header"]],
+    ["media", "page", ["journal-header", "header:📄 Pages"]],
   ];
 
   for (const [presetId, stem, expected] of CASES) {

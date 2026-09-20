@@ -392,7 +392,7 @@ every journal, Study included: the **banner**, the **tracker grid** that sits
 inside it, the table of **what is below** (a folder's notes, or a long note's
 pages), and the **prose skeleton** — the markdown headings the note opens with, always last, so
 nothing the plugin composes sits under your own writing. Next-Next-Next-Create
-gives you that, which is a page you can start using rather than a page you have
+gives you that, which is a journal you can start using rather than one you have
 to prune.
 
 Everything else is a box. A review queue, a search box, an activity chart, a
@@ -406,14 +406,17 @@ Cooking journal whose Cuisine index aggregates and whose Dish index lists
 recipes.
 
 **Pages is one of those boxes.** Tick **📄 Pages** on a note type's own template
-and long notes of that kind can be split into pages, each with its own Recall
-deck — the note gains a table of its pages and a **New page** button, and the
-journal gains one shared **Page** template for all of them. Untick it and the
-kind goes back to being a single page; notes already split keep their pages and
-go on working. There is no second place to say this: the tick *is* the setting.
+and notes of that kind open with a table of their pages and a **New page**
+button; the journal carries one shared **Page** template for all of them. Untick
+it and new notes of that kind open without the table — notes already split keep
+their pages and go on working, and **New page** still splits any note that needs
+it. There is no second place to say this: the tick *is* the setting.
+
+A page can hold pages of its own, as deep as you like — see *Splitting a note
+across pages*.
 
 You can change your mind at any time on any note: *Edit sections…* is the same
-list, on a page that already exists, and it shows you the change before it
+list, on a note that already exists, and it shows you the change before it
 writes anything. On a journal you have already created, **Settings → Journals →
 edit → Sections** lists the templates themselves — pressing *Edit sections* on
 one opens the same window over the template, which is where the Pages tick lives
@@ -433,6 +436,21 @@ then **Save as layout…** on that note writes those headings into every note of
 that kind you make afterwards. Titles only — the words you wrote under a heading
 stay in the note you wrote them in.
 
+**And it is drawn as a section now.** The writing between those markers sits on
+the same card every other section sits on — the same fill, the same hairline
+edge, the same rounded corners at the top and bottom of the run, the same inset
+on a phone — so a note reads as one stack of sections rather than a stack of
+cards followed by loose text. It picks up whichever aesthetic preset you have
+chosen, like everything else.
+
+Nothing is put inside a fence to do it. Your writing is still ordinary markdown
+in the file: headings, links, tasks, callouts, tables and code blocks behave
+exactly as they did, the outline still lists your headings, and the card is gone
+the moment the plugin is. You will see it while reading and in Live Preview;
+source mode shows the file as it is, markers and all, which is what source mode
+is for. A block you have emptied is not drawn at all, because a card with
+nothing in it is not telling you anything.
+
 You can also write the list without leaving the change window.
 **Note: edit sections…** gives the Prose skeleton row a box holding the note's
 headings, one per line: reorder them, rename one, add one, take one out. The
@@ -449,7 +467,7 @@ under stays with everything beneath it, and the change list names each one it is
 keeping. Untick it on a note you have not written in and nothing is left behind.
 A note written before those markers existed has none, so its skeleton is prose the
 plugin cannot pick out — the box is not drawn and the row says why. **Reload
-this page**, from the template window or the note's own command, composes the
+this note**, from the template window or the note's own command, composes the
 skeleton again with its markers and gives you both.
 
 **The templates are written once, at Create, and then they're yours.** Nothing
@@ -637,36 +655,54 @@ the file in order to know where to look for the file, and a vault that had
 moved its infrastructure root is exactly the vault whose mirror could not then
 be found.
 
-### Splitting a lesson across pages
+### Splitting a note across pages
 
-A lesson that has grown too long for one note can be split. Press **New Page**
-on it (or run *New page in this note*) and the lesson becomes a small
-dashboard: the note moves into a folder of its own, keeps everything you had
-written, and gains a Pages list at the top. Each page after that is a note
-beside it.
+Any note that has grown too long for one screen can be split. Press **New Page**
+on it (or run *New page in this note*) and the note becomes a small dashboard:
+it moves into a folder of its own, keeps everything you had written, and gains a
+Pages list at the top. Each page after that is a note beside it.
 
-The move updates every link pointing at the lesson, and nothing you wrote is
+The move updates every link pointing at the note, and nothing you wrote is
 replaced — the Pages section is added above your content, not instead of it.
-*Convert this note to a dashboard* does the same move without creating a page,
-for when the reason is "this is getting long" rather than "I want to write the
-next bit now".
 
-Splitting a long lesson also makes it harder to *find*, which is why
+**Pages hold pages.** A page that grows too long is the same note a lesson was
+when it grew too long, so press **New Page** on it and it splits in exactly the
+same way, as deep as you like. The Pages list shows the whole structure at once:
+sub-pages sit indented under their parent and are numbered `1`, `1.1`, `1.2`,
+`2`, so the number tells you where you are as well as what order you are in.
+
+**Every page names the note it belongs to.** The small line above a page's title
+reads *Study · Page of <the note>*, and that name is a link — click it to go up,
+middle-click for a new tab, right-click for the file menu. The breadcrumb trail
+on the vault bar goes up the same chain, one step at a time.
+
+**The Pages list is a control, not just an index.** Each row carries:
+
+* **↑ ↓** — move a page up or down. The whole list is renumbered as you go, so
+  the numbers you see are the order the pages are in.
+* **⋯** — *Rename…* (every link pointing at the page follows it), *New page
+  inside* (split this one without opening it first), and *Delete note…*.
+
+Deleting a page that holds pages of its own takes them with it — it lives in a
+folder, and the folder goes.
+
+Splitting a long note also makes it harder to *find*, which is why
 **`journal-search`** exists: one large note is greppable in one place, five
 pages are five places. The search indexes bodies, so a phrase you wrote on page
-three is findable, and each result names the lesson the page belongs to. Tick **Find**
+three is findable, and each result names the note the page belongs to. Tick **Find**
 in *Edit sections…* on the Subject Index to put it there; put
 `journal-search:all` on your homepage if you'd rather search everything at
 once.
 
-**A page is not a lesson**, and that distinction does the work. Pages carry no
-Confidence and no Status, never appear in the review queue, are not counted in
-a confidence average, and don't show up in a topic's Lessons table. The lesson
-stays the thing you review and rate; the pages are where its content lives. A
-page's banner still names the lesson it belongs to, so you can always get back.
-
-Only Lessons can hold pages — a Practice note is a set of exercises rather than
-a document that grows.
+**A page is not a lesson**, and that distinction does the work at every depth.
+A new page opens with the same stacked card a lesson gets — a banner, its
+trackers, and its own Pages list — so you can rate a page and mark it done
+like anything else. What a page never does is stand in for the note it belongs
+to: it doesn't appear in the review queue, isn't counted in a confidence
+average, and doesn't show up in a topic's Lessons table. That exclusion is by
+the page's **type**, not by its properties, so it holds however you grade one.
+The lesson stays the thing you review and schedule; the pages are where its
+content lives.
 
 ### Reviewing
 
@@ -708,9 +744,9 @@ not ratchet: a bad run lowers the rating, because Confidence is meant to say how
 well the material stuck this time, not how long you have owned the note.
 
 A recall block **on a page grades the lesson the page belongs to**, and says so
-under the cards. Pages carry no Confidence of their own, so there is nowhere
-else for the grade to go — and the lesson is the thing the queue schedules
-anyway. On an index note, where nothing reads a Confidence rating, the cards
+under the cards — worth reading, because a page has a Confidence box of its own
+and the grade does not land in it. The lesson is the thing the queue schedules,
+so the lesson is what a deck moves. On an index note, where nothing reads a Confidence rating, the cards
 still study but grading is declined rather than writing a property that nothing
 would ever look at.
 
@@ -1081,11 +1117,11 @@ ChronoAnvil's own pages — the homepage, Search, the dashboards, journal notes 
 
 **And in editing mode the cards stay drawn.** Live Preview hands a code block back to the editor whenever the cursor is inside it, so a click near a card — or a Ctrl+E on a diary entry, where the banner is the first thing under the cursor — used to turn it into a wall of directives. The cursor now steps *over* a ChronoAnvil block rather than into it: the arrow keys pass it in one press, and a click lands above or below it.
 
-**And ChronoAnvil's markers stay out of sight.** Alongside the cards, a ChronoAnvil page carries markup that reading mode shows nothing of: the comment a **note** or **tasks** field parks your words in, the two invisible lines bracketing a note's prose skeleton, the hidden `%%` link that puts the note in its place in the graph, and the inert `chronoanvil:spacer` strip on line 0. Editing mode used to print all of it as literal text between your paragraphs. It now draws them as nothing there too, so a page reads the same either way. Only ChronoAnvil's own markers go — a comment you wrote yourself stays exactly where it is, and so does anything inside a code block, including the examples on this page.
+**And ChronoAnvil's markers stay out of sight.** Alongside the cards, a ChronoAnvil page carries markup that reading mode shows nothing of: the comment a **note** or **tasks** field parks your words in, the two invisible lines bracketing a note's prose skeleton, the hidden `%%` link that puts the note in its place in the graph, and the inert `chronoanvil:spacer` strip on line 0. Editing mode used to print all of it as literal text between your paragraphs. It now draws them as nothing there too, so a page reads the same either way. Only ChronoAnvil's own markers go — a comment you wrote yourself stays exactly where it is, and so does anything inside a code block, including the examples in this note.
 
 **And a stray keystroke cannot take a card with it.** Selecting a whole note — Ctrl+A, or a drag that runs past a card — and then deleting or typing used to remove everything it covered, including the fences and, since the markers went out of sight, text you could no longer see. In editing mode those lines are now kept: the deletion takes your prose and leaves the page's own lines standing, one blank line apart, exactly as they were composed. Backspace at a card's edge likewise leaves it alone. Nothing else is affected — ordinary typing, undo and redo all behave as they always did, and so does every change ChronoAnvil itself writes.
 
-**To remove a section for real, use *Edit sections…*** — the same window that adds one. To edit the directives or the markers by hand, switch to source mode — the *Toggle Live Preview/Source mode* command, or Settings → Editor → Default editing mode. Nothing is hidden there: source mode is plain text and every line is yours to change. Source mode is unfiltered as well as unhidden: a select-all there deletes everything, the way it always has. This applies only to ChronoAnvil's own fences and markers; every other code block in your vault behaves exactly as it always has, and so does a ```chronoanvil block printed *inside* a longer fence, the way the examples on this page are written.
+**To remove a section for real, use *Edit sections…*** — the same window that adds one. To edit the directives or the markers by hand, switch to source mode — the *Toggle Live Preview/Source mode* command, or Settings → Editor → Default editing mode. Nothing is hidden there: source mode is plain text and every line is yours to change. Source mode is unfiltered as well as unhidden: a select-all there deletes everything, the way it always has. This applies only to ChronoAnvil's own fences and markers; every other code block in your vault behaves exactly as it always has, and so does a ```chronoanvil block printed *inside* a longer fence, the way the examples in this note are written.
 
 To stop it for one note, add `obsidianUIMode: source` to that note's properties. The same key works the other way on any note (`obsidianUIMode: preview`), and it is the key the *Force note view mode* community plugin reads, so a vault that already uses that plugin needs nothing from this one. There is no plugin setting for it: the decision is a line in the note.
 
@@ -1103,7 +1139,7 @@ A preset sets ChronoAnvil's own tokens only. It sits *on top of* your Obsidian t
 
 **Every page's head wears the colour of what it is.** The first thing on a ChronoAnvil page is its head: what kind of note this is in small caps, the note's own name under it, a spine down the left edge and a rule beneath, both drawn in the colour of the thing the page is about. A daily entry is amber, a weekly dashboard teal, a monthly violet, a yearly gold; a journal takes a hue derived from its own name, so Study is the same colour on its dashboard, on every subject and on every lesson. **That is true of every page, not only the ones that are a grain or a journal.** The Diary folder note takes the diary's amber and a Logbook the yearly gold; the Homepage, Search and the journals index take your Obsidian theme's own accent, which is the honest answer for a page that is not about one window of time. The preset decides how heavy the spine is: two pixels under Editorial Monastic, three under the other two. **On a stack the spine becomes the card's own left edge**, running its full height rather than stopping where the name ends: a welded card has one coloured edge instead of a grey border with a coloured stub inside it, and the name sits on the same gutter as the chevrons under it. **The chevrons themselves are outlined pills** — a hairline and a full radius at rest, a ground under the pointer and while the section is open.
 
-**The Homepage says what day it is.** Its head has no kind to name — it is the vault's front page, and the top bar already says so twice — so the small-caps line above the name carries today's date instead, which is the one fact nothing else on any page carries. Search takes the same line. It is read from the clock as the page is drawn rather than ticking on its own, so a vault left open overnight shows yesterday until the note is touched or reopened.
+**The Homepage says what day it is.** Its head has no kind to name — it is the vault's own index, and the top bar already says so twice — so the small-caps line above the name carries today's date instead, which is the one fact nothing else on any page carries. Search takes the same line. It is read from the clock as the page is drawn rather than ticking on its own, so a vault left open overnight shows yesterday until the note is touched or reopened.
 
 **Page ground** is the texture drawn behind a ChronoAnvil page. Seventeen of them, in five families:
 
@@ -1125,13 +1161,13 @@ A ground is drawn from your theme's own colours rather than from a fixed palette
 
 Double-clicking a folder in the file explorer opens its same-named note (e.g. `Development/Development.md`). A single click always expands/collapses the folder, same as any other folder. Toggle this off in the plugin settings if you prefer plain folders.
 
-ChronoAnvil writes several of these for you, and they are the pages you land on: `02 - Diary/02 - Diary.md` is about the diary, `03 - Journals/03 - Journals.md` is about every journal at once, and **each journal's own folder gets one too** — `03 - Journals/Study/Study.md`, and one for each journal you have. A journal's page opens with six sections — its name, its contents as cards, a stats band, a twelve-month activity band scoped to that journal alone, what was written lately, and its open tasks; a Review queue, a Tally, a Tags cloud and a charts region are offered in **“Edit this note's sections…”** rather than written for you, because each of them draws nothing on a journal that has not got the thing it counts.
+ChronoAnvil writes several of these for you, and they are the **indexes** you land on: `02 - Diary/02 - Diary.md` is about the diary, `03 - Journals/03 - Journals.md` is about every journal at once, and **each journal's own folder gets one too** — `03 - Journals/Study/Study.md`, and one for each journal you have. An index holds notes; a page is held by a note; a note type is what a note is — three words for three things that are easy to run together. A journal's index opens with six sections — its name, its contents as cards, a stats band, a twelve-month activity band scoped to that journal alone, what was written lately, and its open tasks; a Review queue, a Tally, a Tags cloud and a charts region are offered in **“Edit this note's sections…”** rather than written for you, because each of them draws nothing on a journal that has not got the thing it counts.
 
-**Every journal's page is written from the same list**, so a journal you make next year opens the same way as the one you made today — and from then on the page is yours. The **⋯** control at the right of its breadcrumb row carries *Edit sections…*, *Add a section…* and *Wide page*, the same three every other dashboard's does. Only *Contents* is locked — a page about a journal with no way into the journal is worse than no page at all. **Set up / repair vault** will offer to put back a section you removed, and shows you the change before making it; it never removes anything you added.
+**Every journal's index is written from the same list**, so a journal you make next year opens the same way as the one you made today — and from then on the note is yours. The **⋯** control at the right of its breadcrumb row carries *Edit sections…*, *Add a section…* and *Wide page*, the same three every other dashboard's does. Only *Contents* is locked — an index of a journal with no way into the journal is worse than no index at all. **Set up / repair vault** will offer to put back a section you removed, and shows you the change before making it; it never removes anything you added.
 
-None of these paths is a setting. They are derived from the folders, so renaming a folder in the file explorer carries its page along with everything else under it — and the pages themselves write no folder into their directives, so nothing inside them needs updating either.
+None of these paths is a setting. They are derived from the folders, so renaming a folder in the file explorer carries its index along with everything else under it — and the indexes themselves write no folder into their directives, so nothing inside them needs updating either.
 
-A journal's page is also the note the **journal cards** point at, and where a `banner:` property in the frontmatter is read from to give a card its image. Run **Set up / repair vault** to write any that are missing; a journal you make afterwards gets one as it is created.
+A journal's index is also the note the **journal cards** point at, and where a `banner:` property in the frontmatter is read from to give a card its image. Run **Set up / repair vault** to write any that are missing; a journal you make afterwards gets one as it is created.
 
 ## A note on paths
 

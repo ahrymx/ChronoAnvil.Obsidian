@@ -681,6 +681,26 @@ export interface FlagQuestion extends SectionQuestionCommon {
   // control is a checkbox, so `on` is what ticking it means.
   on: string;
   off: string;
+  // ── A FLAG WHOSE ANSWER IS NOT A LINE IN A FENCE (1.0.36) ───────────
+  //
+  // Everything above assumes the answer IS `line`, present or absent, inside a
+  // fence the section composed. Prose composes no fence and no directive — it
+  // is a bracketed span of the reader's markdown — so its *Add default
+  // headings* tick has nothing to write a modifier into, and `withFlagLine`
+  // handed an empty `line` would match every blank line in the chunk and strip
+  // them.
+  //
+  // So a derived flag declares itself, `withAnswers` steps over it, and the
+  // catalogue that declared it owns both halves: the journal planner reads this
+  // one off the bracket's headings and writes it by composing them in or
+  // cutting them out. That is the route `LinesQuestion` already takes for its
+  // own answer, one question along on the same row.
+  //
+  // `line` AND `after` STAY REQUIRED AND ARE WRITTEN `""`. Making them optional
+  // would weaken the type for the five ordinary flags that must have them, to
+  // describe one that must not — and an empty string is only reachable behind
+  // this field, which is the thing that is checked.
+  derived?: true;
 }
 
 // The two answers a `FlagQuestion` takes, spelled as strings for
@@ -1099,6 +1119,28 @@ export interface SectionModel {
     pages?: readonly string[],
     stacks?: readonly string[]
   ): string | null;
+
+  // ── WHAT THIS SECTION SAYS, AS PLAIN MARKDOWN (1.0.36) ────────────────
+  //
+  // One section's own text, with the plugin's markup taken off, or null where
+  // the section has none to give. The editor draws **Copy** on exactly the
+  // rows that answer, so a model that implements nothing draws no button and
+  // a model that implements it decides per row — which is the shape `blocks`,
+  // `regroup` and `instanceOf` already set, and the reason the editor can stay
+  // ignorant of what a prose block is.
+  //
+  // THE READER ASKED FOR IT BY BLOCK NUMBER: *"perhaps to allow for special
+  // actions for each prose block (copy prose block #, move prose block #)"*.
+  // Move was already free — every row carries the arrows — so this is the half
+  // that needed a control, and it is on the ROW rather than in the note for the
+  // same reason 4.8.1 took the block drag out: the window is where a block is
+  // addressed by number, and the note is where it is read.
+  //
+  // NOT A WRITE, WHICH IS WHY IT IS NOT A `SectionOp`. Save is still the only
+  // thing that touches the file; this hands the reader a string and changes
+  // nothing, so it is the one control on a row that works while the row is
+  // locked, being removed, or waiting on a question.
+  excerpt?(sectionId: string, text: string): string | null;
 }
 
 // One block of a note, as the editor needs it.
@@ -1285,8 +1327,13 @@ export function withAnswers(
   // ALL OF THEM, WHERE A FORM IS ONE. A section has exactly one form — the two
   // answers are exclusive — and may wear any number of modifiers, none of which
   // is about any of the others. See `FlagQuestion`.
+  //
+  // EXCEPT A DERIVED ONE, WHOSE ANSWER IS NOT A LINE AT ALL. See
+  // `FlagQuestion.derived` — its catalogue owns the read and the write, and
+  // `flag.line` is `""` here, which `withFlagLine` would read as "the keyword
+  // of a blank line" and filter every blank in the chunk on.
   for (const flag of questions) {
-    if (flag.kind !== "flag") continue;
+    if (flag.kind !== "flag" || flag.derived) continue;
     const want = options[flag.key];
     if (typeof want !== "string") continue;
     out = withFlagLine(out, flag.line, flag.after, want === FLAG_ON);
@@ -1643,8 +1690,8 @@ export function pageBreakOps(
         sectionId: id,
         label: name,
         detail: now.has(id)
-          ? `${name} starts a new page of its group`
-          : `${name} joins the page before it`,
+          ? `${name} starts a new tab of its group`
+          : `${name} joins the tab before it`,
       });
     }
   }

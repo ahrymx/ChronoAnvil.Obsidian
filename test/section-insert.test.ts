@@ -363,10 +363,12 @@ describe("what a note is, in one field", () => {
     ).toBe(true);
   });
 
-  it("still keeps the Pages section off a page", () => {
-    // The bug this shape caused, pinned: a page was built with `isPage: false`,
-    // so the command offered it a pages-table and a New page button — a page
-    // offering to contain pages.
+  it("offers a page the Pages section, and still calls it a page", () => {
+    // WAS "still keeps the Pages section off a page". The bug this shape caused
+    // was a page built with `isPage: false`, which offered it a pages-table AND
+    // seeded it a rating grid. Pages nest as of 1.0.38, so the first half is the
+    // feature — what the wrong branch still gets wrong is the second, and that
+    // is what this asserts instead.
     const page = resolveSectionHost(
       REFS,
       "03 - Journals/Maths/Algebra/Quadratics/Roots.md",
@@ -376,6 +378,10 @@ describe("what a note is, in one field", () => {
       addableSections(page as NonNullable<typeof page>, "").some(
         (s) => s.id === "pages"
       )
-    ).toBe(false);
+    ).toBe(true);
+    // The distinction the `{ page }` branch exists for, unmoved: this is a
+    // page, not the note it is a page of.
+    expect(page?.noteKind).toBe("page");
+    expect(page?.typeValue).toBe("page");
   });
 });

@@ -28,7 +28,7 @@
 // `applyLayout` is tested.
 
 import { describe, expect, it } from "vitest";
-import { readCss, readSrc, styleSheets } from "./sources";
+import { fnBody, readCss, readSrc, styleSheets } from "./sources";
 import { composeHomeNote } from "../src/diary/home-sections";
 import { composeSearchNote } from "../src/diary/search-sections";
 import { composeDiaryDashboardNote } from "../src/diary/diary-dashboard-sections";
@@ -541,7 +541,7 @@ describe("where the rail is drawn, and what it replaces", () => {
   it("stands where the eyebrow stood, and only one of the two draws", () => {
     expect(head()).toContain("if (rail) buildRail(root, rail);");
     expect(head()).toContain(
-      'else if (said.eyebrow) root.createDiv({ cls: "ca-jph-eyebrow", text: said.eyebrow });'
+      "else if (said.eyebrow) buildEyebrow(app, root, said, ctx.sourcePath);"
     );
   });
 
@@ -569,9 +569,132 @@ describe("where the rail is drawn, and what it replaces", () => {
   it("is not a second set of breadcrumbs", () => {
     // Obsidian's own trail sits directly above the note and goes to every one of
     // these folders already.
-    const src = head();
-    expect(src).not.toContain('createEl("a"');
-    expect(src).not.toContain("openFile(");
+    //
+    // ── SCOPED TO THE RAIL IN 1.0.38, BECAUSE THE HEAD GREW A LINK ────────
+    //
+    // This used to sweep the whole file, and the sweep was standing in for the
+    // rail because the rail was the only thing in it that could have drawn one.
+    // A page's eyebrow names the note it is a page OF and that name IS a link,
+    // so the file-wide version would now forbid the feature rather than the
+    // duplication. The argument was never about the file: it is that the RAIL's
+    // steps are FOLDERS, and the trail above the note already goes to all of
+    // them. A parent note is not on that trail as a destination the eyebrow
+    // duplicates — it is the one fact the page did not carry at all.
+    const rail = fnBody("buildRail", "page-head");
+    expect(rail).not.toContain('createEl("a"');
+    expect(rail).not.toContain("openFile(");
+  });
+
+  it("gives the parent every gesture the plugin's other links have", () => {
+    // 1.0.30's finding, and the reason it is a checklist rather than a habit: a
+    // link wearing `internal-link` and none of the behaviour is WORSE than a
+    // plain one, because it looks like it should work. Obsidian's own handlers
+    // are bound to the note's rendered markdown, not to chrome a plugin builds.
+    const src = fnBody("buildEyebrow", "page-head");
+    expect(src).toContain('cls: "internal-link ca-jph-parent"');
+    expect(src).toContain("void openFile(app, file);");
+    expect(src).toContain("attachFileGestures(app, a, file);");
+    expect(src).toContain('"hover-link"');
+    // The whole name on hover, since the CSS clips it.
+    expect(src).toContain('title: parent.label');
+  });
+
+  it("prints the parent as text when there is no file to point at", () => {
+    // `journalCrumbs`' rule since 4.36: a crumb with no file is text, never a
+    // dead link. The `parent:` fallback is exactly that case — it is a NAME,
+    // written at creation, not a resolution.
+    const src = fnBody("buildEyebrow", "page-head");
+    const text = src.indexOf('el.createSpan({ cls: "ca-jph-parent"');
+    expect(text).toBeGreaterThan(0);
+    expect(text).toBeLessThan(src.indexOf('createEl("a"'));
+  });
+});
+
+describe("the parent, named in the eyebrow (1.0.38)", () => {
+  // THE BUG REPORT WAS A LINE OF PROSE. On a page of a cheatsheet the head read
+  // `STUDY · PAGE` and stopped, so the reader typed **Parent page:** and the
+  // cheatsheet's name into the page's own body by hand. The plugin knew that
+  // fact and was not printing it.
+
+  it("joins the parent on in one place, and only one", () => {
+    // The composition is what keeps `eyebrow` a plain string. Two callers SPLIT
+    // it — `pageHeadSays` on `·` — so a richer shape would move that predicate's
+    // work into each of them, which is the failure `PageHeadText`'s own header
+    // is about.
+    const src = fnBody("headEyebrow", "page-head");
+    expect(src).toContain("const text = eyebrowFor(plugin, file, surface);");
+    expect(src).toContain("`${text} of ${parent.label}`");
+    // eyebrowFor itself is untouched — asserted next door, and this is the half
+    // that makes that true: nothing below composes a second time.
+    expect(code("page-head").split("} of ${").length).toBe(2);
+  });
+
+  it("asks `resolveUp`, which was already right at any depth", () => {
+    // `core/links.ts` has answered "which folder note is one step up" since 2.x
+    // for the bar's **Up** pill, in terms of THIS note's folder rather than the
+    // journal's shape. That is why nesting cost the head nothing.
+    const src = fnBody("pageParentOf", "page-head");
+    expect(src).toContain("const up = resolveUp(plugin.app, file);");
+    expect(src).toContain("return { label: up.file.basename, file: up.file };");
+    expect(readSrc("links")).toContain("export function resolveUp(");
+  });
+
+  it("falls back to `parent:`, which is the first reader that property has had", () => {
+    // `journal-template.ts` calls it *"the ONLY thing tying a page to the note
+    // it is a page of"*, and until this release NOTHING in src/ read it. It is
+    // written at creation, so it names the note that held the page then — right
+    // when the folder note is missing, wrong when the page has been moved.
+    // Hence second, and hence unlinked.
+    const src = fnBody("pageParentOf", "page-head");
+    expect(src).toContain('frontmatterOf(plugin.app, file)["parent"]');
+    expect(src).toContain("file: null");
+    // An unfilled template token is not a name: the page TEMPLATE carries the
+    // literal `{{parent}}`, lives under the journal root and declares a page's
+    // `type:`, so a reader editing it would meet `PAGE OF {{PARENT}}`.
+    expect(src).toContain('!label.includes("{{")');
+  });
+
+  it("asks it on a page and on nothing else", () => {
+    // A leaf's parent is the index above it and an index's is the journal —
+    // both already named by the rail and by the bar's trail. Naming either would
+    // be the doubling this head exists to remove.
+    const src = fnBody("pageParentOf", "page-head");
+    expect(src).toContain('if (surface !== "journal") return null;');
+    expect(src).toContain("type.kinds.some((k) => k.pages.id === value)");
+  });
+
+  it("keeps the line to one row and clips its end, not a flex item", () => {
+    // `HTML ↔ CSS Pointers & Syntax Cheatsheet` is a real note name from the
+    // vault this was written for. At 0.7em in caps it wraps the head's top line
+    // into two — the line the whole head is measured from.
+    //
+    // ── AND IT IS NOT A FLEX ROW, WHICH IS THE POINT OF THIS TEST ────────
+    //
+    // It was, and the vault render read **PAGE OFHTML ↔ CSS…**: the lead text
+    // ends in the space before the name, and a flex item's trailing whitespace
+    // is stripped at the end of its line box. The markup was right and could not
+    // have shown it. Plain inline content keeps the space, and `text-overflow`
+    // works on a block with inline children — the name is always LAST, so
+    // clipping the line clips the name and nothing else.
+    const eyebrow = ruleFor(".ca-journal-page-head .ca-jph-eyebrow");
+    expect(eyebrow).not.toContain("display: flex");
+    expect(eyebrow).toContain("text-overflow: ellipsis");
+    expect(eyebrow).toContain("white-space: nowrap");
+    expect(eyebrow).toContain("overflow: hidden");
+    // Not a second accent on the head's top line: that would make the parent
+    // louder than the note the reader is actually on.
+    const parent = ruleFor(
+      ".ca-journal-page-head .ca-jph-eyebrow .ca-jph-parent"
+    );
+    expect(parent).toContain("color: inherit");
+  });
+
+  it("still lets the strip suppress a fact the head now says twice over", () => {
+    // `pageHeadSays` compares whole segments, and a page's segment reads
+    // `Page of <name>`. An exact match would answer NO to "does the head say
+    // Page?" on the one surface where it plainly does.
+    const src = fnBody("pageHeadSays", "page-head");
+    expect(src).toContain("seg === want || seg.startsWith(`${want} of `)");
   });
 });
 

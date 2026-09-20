@@ -312,13 +312,61 @@ export function childFolders(folder: TFolder | null): TFolder[] {
 }
 
 // The markdown files directly inside a folder — not recursive, unlike
-// filesUnder. What a folder note's own page list wants: pages sit beside their
-// dashboard, and a sub-folder below it is a different note's business.
+// filesUnder. The loose files at one level, and nothing about what is below
+// them.
+//
+// THE SENTENCE THAT USED TO END THIS PARAGRAPH IS NOW `childNotes`' JOB — see
+// below. It read *"what a folder note's own page list wants: pages sit beside
+// their dashboard, and a sub-folder below it is a different note's business."*
+// That stopped being true in 1.0.38 and this function is no longer the one a
+// page list should call.
 export function childFiles(folder: TFolder | null): TFile[] {
   if (!folder) return [];
   return folder.children
     .filter((c): c is TFile => c instanceof TFile && c.extension === "md")
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ── THE NOTES AT ONE LEVEL, PROMOTED OR NOT (1.0.38) ──────────────────
+//
+// `childFiles` plus the folder note of each folder directly inside — which is
+// the difference between "the files here" and "the notes here", and the second
+// is what every caller asking about a note's PAGES actually meant.
+//
+// AND IT IS A BUG REPORT. A page promoted so it could hold pages of its own
+// disappeared from its parent's Pages list the moment it was promoted:
+// promotion moves `Page.md` into `Page/Page.md`, so it stopped being a child
+// FILE of the folder the list reads and became a child of a child. The
+// recursion that lists its pages beneath it was already written and correct —
+// it was never reached, because the row that would have carried it was gone.
+// Three call sites had the same hole, all three spelling "the pages of this
+// note" as "the markdown files beside it":
+//
+//   * the Pages table, where the page vanished from the list;
+//   * `newPage`'s ordinal allocator, which could not see a promoted page's
+//     `order` and would hand the number out a second time;
+//   * the bin's confirmation, which undercounted what a promoted note takes
+//     with it.
+//
+// A PROMOTED NOTE IS RECOGNISED BY NAME, not by frontmatter, which is
+// `isPromotedPath`'s rule spelled over a `TFolder`: the note whose basename is
+// its folder's. Every other file in that sub-folder belongs to IT, and the
+// caller gets none of them — one level, as the name says. A sub-folder with no
+// folder note contributes nothing, exactly as it always did.
+//
+// NOT FILTERED BY `type:` HERE. This answers where the notes ARE; which of them
+// are pages is the caller's question, and every caller already asks it.
+export function childNotes(folder: TFolder | null): TFile[] {
+  if (!folder) return [];
+  const notes = childFiles(folder);
+  for (const sub of childFolders(folder)) {
+    const note = sub.children.find(
+      (c): c is TFile =>
+        c instanceof TFile && c.extension === "md" && c.basename === sub.name
+    );
+    if (note) notes.push(note);
+  }
+  return notes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ── Shared by nav.ts / calendar.ts ─────────────────────────────────────

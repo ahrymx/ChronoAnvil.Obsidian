@@ -659,7 +659,14 @@ describe("the bar's own anatomy", () => {
     expect(t).toContain('attachNoteRename(app, row, file, "ca-jph-title");');
     // …and the eyebrow is on the head, ABOVE that row, so an edit that empties
     // the title cannot take "Daily entry" with it.
-    const eyebrow = t.indexOf('cls: "ca-jph-eyebrow"');
+    //
+    // BY THE CALL, NOT BY THE `createDiv` (1.0.38). The eyebrow's markup moved
+    // into `buildEyebrow` when a page's eyebrow gained a link to its parent, and
+    // a helper is declared below the function that calls it — so the string this
+    // read for is now BELOW the title row in the file while the element it makes
+    // is still above it on screen. What the ordering was ever standing for is
+    // where `buildPageHead` puts each one.
+    const eyebrow = t.indexOf("buildEyebrow(app, root, said");
     expect(eyebrow).toBeGreaterThan(0);
     expect(t.indexOf('cls: "ca-jph-titlerow"')).toBeGreaterThan(eyebrow);
     expect(readSrc("header-title")).toContain("row.empty();");
@@ -1092,11 +1099,27 @@ describe("what the Banner section became", () => {
     expect(t).toContain("type.kinds.find((k) => k.pages.id === id)?.pages.label");
   });
 
-  it("does not print the date twice on an untitled entry", () => {
-    // The rule the bar's meta slot already follows, one surface down: an entry
-    // with no title of its own IS called by its date, so a subtitle repeating
-    // it is the same words twice.
-    expect(head()).toContain("sub: date && date !== title ? date : null,");
+  it("prints no line under the name at all", () => {
+    // 1.0.35. The head used to carry a `sub` — the note's date, where the date
+    // was not already the title. On an index note with no date it formatted an
+    // epoch, and the reader's answer was to take the line rather than fix the
+    // date: every surface that showed it already says the date somewhere the
+    // reader was reading anyway.
+    //
+    // THE FIELD, NOT JUST THE DIV. A head that still computed a subtitle and
+    // declined to draw it is the same string derived twice, which is what the
+    // module's own opening comment exists to prevent.
+    //
+    // ASSERTED ON THE LIVE FORMS, not on the word: both files keep a comment
+    // naming the deleted class, which is the record of why it went.
+    const t = head();
+    expect(t).not.toContain('cls: "ca-jph-sub"');
+    expect(t).not.toContain("said.sub");
+    expect(t).not.toContain("sub: string | null");
+    expect(readCss()).not.toContain(".ca-jph-sub {");
+    // `dateLabel` STAYS, and this is the half a sweep would take by accident:
+    // the pencil's target is decided by whether the note has a date.
+    expect(t).toContain("titleTargetFor(surface, date !== null)");
   });
 
   it("carries no properties, and that is the decision", () => {

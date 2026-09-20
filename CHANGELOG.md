@@ -5,6 +5,164 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38] - 2026-09-20
+
+### Changed
+
+- **A page can hold pages of its own, as deep as you like.** Splitting a note
+  gave you a flat list and nothing else: a page that grew too long was the same
+  note a lesson had been when it grew too long, and the answer it got was no.
+  Press **New Page** on a page and it splits exactly as its parent did. The
+  Pages list shows the whole shape at once — sub-pages indented under the page
+  they belong to, numbered `1`, `1.1`, `1.2`, `2`, so the number says where you
+  are as well as what order you are in. The breadcrumb trail goes up the chain
+  one step at a time, however deep it runs.
+
+- **A new page opens with the full card.** It used to compose as a bare banner:
+  no trackers, no Pages list, because the old model said a page was a leaf of a
+  leaf and had nothing to rate and nothing to hold. Both halves of that are now
+  false, so a new page arrives with the same stack a lesson does — banner,
+  tracker grid, and its own Pages list ready for the next split. Grading one
+  changes nothing outside it: a page is kept out of the review queue and the
+  confidence average by its type, not by having no rating to give.
+
+- **Every page names the note it belongs to, and the name is a link.** The line
+  above a page's title read *Study · Page* and stopped, so the one fact a page
+  most needed — which note it is part of — was nowhere on the page. It now reads
+  *Study · Page of <the note>*: click to go up, middle-click for a new tab,
+  right-click for the file menu, hover for the preview.
+
+- **A folder's dashboard note is called an index, everywhere.** The settings
+  list, the template window and the in-vault documentation had three different
+  words for one object, and one of those words was already taken by the sub-notes
+  a long note is split into. One noun per thing: an index holds notes, a page is
+  held by a note, and a note type is what a note is.
+
+- **The pages inside a widget group are called tabs.** That is what the
+  directive that makes them has always been called; only the labels and the two
+  commands said otherwise, in a plugin where "page" already meant two things.
+
+- **The wording across the plugin says "note" where it meant the note you are
+  looking at.** Reload, the options menus, the layout picker's own-choice row and
+  about fifty other labels said page; every one of them is about the note in
+  front of you, and now says so.
+
+- **The prose skeleton is now a section called Prose, and every journal note
+  has one.** It used to be a row you could untick: five headings the template
+  composed, bracketed so the plugin could take them away again. What it never
+  described was the thing readers actually use it for — the plain markdown they
+  write under those headings, which had no row, no name and no place in
+  **Edit sections…** at all.
+
+  Prose is that block, and it is mandatory: the first one cannot be removed,
+  because a journal note without somewhere to write is not a journal note. The
+  headings moved behind a tick on the row called **Add default headings**, which
+  starts on for every note the template composes and can be turned off without
+  touching a word that has been written.
+
+- **A note can hold as many prose blocks as it needs.** Tick **Prose** again in
+  **Edit sections…** and a second block is composed below everything else;
+  blocks are numbered by their order in the file — **Prose**, **Prose 2** — so
+  moving one or deleting one renumbers the rest and nothing has to be rewritten.
+  A block you added can be removed again, on the same terms the skeleton always
+  had: a heading nobody has written under goes, a heading with a line beneath it
+  stays, with everything under it.
+
+- **Unticking Add default headings cuts the scaffolding and leaves the
+  writing.** The tick reads back from the file rather than from a setting, so it
+  is on exactly when every default heading is present; unticking it takes out
+  the ones that are still empty, and ticking it again puts them back with the
+  prompts they shipped with.
+
+### Added
+
+- **The pages list reorders.** Each row carries **↑ ↓**; the whole list is
+  renumbered as you go, so the numbers on screen are the order the pages are in,
+  and a page written by hand with no position of its own is given one on the way
+  past.
+
+- **A ⋯ on each page's row.** *Rename…*, which carries every wikilink pointing
+  at the page along with it and moves its folder too when the page has one;
+  *New page inside*, which splits a page without opening it first; and
+  *Delete note…*, which takes a page's own pages with it.
+
+- **A page's hidden graph link points at the note it belongs to.** Every journal
+  note linked to its journal's own index, one level coarser than the truth
+  because nothing knew the note above. A page has always known, so Graph View
+  now draws the chain a split note actually forms rather than a star.
+
+- **Prose is drawn as a section.** It was the one section of a journal note with
+  nothing behind it — every other section is something the plugin renders, so it
+  arrives on a card, while the writing sat straight on the page and a lesson read
+  as a stack of cards followed by loose text. The writing now sits on the same
+  card as everything above it: the same fill, the same edge, the same rounded
+  corners at the top and bottom of the block, the same inset on a phone, and the
+  same response to an aesthetic preset.
+
+  **Nothing is put inside a fence to do it.** Your prose is the same ordinary
+  markdown it always was — headings, links, tasks, callouts, tables and code
+  blocks behave exactly as they did, the outline still lists your headings, and
+  the card is gone the moment the plugin is. A block you have emptied is not
+  drawn at all.
+
+  **It is one card while you are editing, too.** In the editor the card is drawn
+  a source line at a time, so a heading, a code fence, a quote or a horizontal
+  rule used to leave a stripe of the page showing through the middle of it and
+  the corners rounded where the writing had simply carried on. Only the top and
+  bottom of a block are rounded now, and the run between them is unbroken. A
+  code block inside your writing is held off both edges of the card and rounded
+  at its own ends, the way reading view has always drawn it.
+
+- **Copy, on a prose block's row in Edit sections….** It puts that block's
+  markdown on the clipboard without the plugin's markers, and says how many
+  lines it took.
+
+### Fixed
+
+- **A page you split stays in the list it was in.** Pressing **New Page** on a
+  page gave it a folder of its own and took it off its parent's Pages list —
+  the list the button was pressed from. Everything that asked for a note's
+  pages was asking for the markdown files sitting beside it, and a page that
+  has just been given a folder is no longer one of them. It is listed again,
+  with its own pages indented underneath it. Two quieter versions of the same
+  mistake go with it: a newly made page could be handed a number a split page
+  was already holding, and the delete confirmation counted only the top row of
+  what a folder takes rather than every note inside it.
+
+- **Prose blocks can be reordered, and a section can go between them.** Moving
+  Prose 2 above Prose 1, or dropping Tasks between the two, reported the move in
+  the preview and then saved nothing — **nothing to change**. Two blocks with
+  only a blank line between them were being read as a single indivisible piece
+  of the note, so there was no position between them to move anything to. They
+  are now separate pieces, and the blank between them is an ordinary separator.
+
+- **A second prose block goes above the note's hidden parent link, not below
+  it.** That link — the invisible comment that tells Obsidian's graph which
+  note this one hangs off — is the last thing the plugin writes into a note,
+  and a block added at the very end was landing underneath it and leaving it
+  stranded mid-file. It now stays where it belongs, and moving a section no
+  longer drags it along.
+
+- **Adding a section at the very end of a note keeps the note's last line
+  ending.** A block composed after everything else landed on the wrong side of
+  the file's trailing newline and left a doubled blank line above itself.
+  Nothing could reach that position before this release.
+
+## [1.0.35] - 2026-09-19
+
+
+### Removed
+
+- **The date line under a page banner's name.** Every banner printed the note's
+  date in small type beneath its title, and on an index note — a subject page,
+  a topic page — there was no date to print, so it formatted an empty one and
+  said **Mon 1 Jan 2001**.
+
+  The line is gone rather than corrected. Where it was right it was also a
+  repetition: a lesson's date is already at the end of its breadcrumb row, and a
+  diary entry's date *is* its title. Nothing that was only said there has been
+  lost.
+
 ## [1.0.34] - 2026-09-19
 
 ### Fixed
@@ -52,7 +210,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Open **Edit** on a *What's below* card and every note type's heading now carries
   a `⋯` beside its create button. It opens what that group looks like **on this
   page**: what its notes are rated on — the note type's own answer, any of the
-  journal's number or scale trackers, or nothing — and what this page calls each
+  journal's number or scale trackers, or nothing — and what this note calls each
   of its columns. The rating column appears, changes or disappears with the
   answer, and every heading opens on a box whose placeholder is the word it would
   fall back to, so clearing it visibly goes back.
@@ -396,7 +554,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`New page` is no longer offered where it cannot work.** It was gated on
   nothing more than "this note is somewhere in a journal", so the palette listed
-  it on front pages and on pages themselves — surfaces that hold no pages — and
+  it on index notes and on pages themselves — surfaces that hold no pages — and
   the command then did nothing. It is now offered on the notes that hold pages
   and nowhere else, and a page asked for one of its own says so in its own words.
 
@@ -890,7 +1048,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   journal note, journal dashboard and diary entry a menu of things you can do to
   the page, and one place to change your mind about it: a switch in Settings that
   covers the whole vault. Settings still decides which items the menu holds; the
-  banner's own row in *Edit sections…* now decides whether this page offers one at
+  banner's own row in *Edit sections…* now decides whether this note offers one at
   all. Untick **Show the action menu** and the control leaves that page's name;
   tick it and it comes back. Nothing else in the note moves either way — the line
   goes back exactly where the page would have been written with it.
@@ -925,7 +1083,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hides the control and changes no note, so turning it back on restores it
   exactly as it was.
 
-- **Link this page to the diary.** It writes the page's date — asking for one if
+- **Link this note to the diary.** It writes the note's date — asking for one if
   the page has none — opens or creates the diary entry for that day, and links
   back to the page from that entry's Attachments. Dating a page is what joins it
   to the diary's timeline, so search, *on this day* and the bridge all start

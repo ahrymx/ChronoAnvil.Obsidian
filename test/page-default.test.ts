@@ -377,25 +377,42 @@ describe("what the palette asks before it offers `New page`", () => {
     ).toBe(true);
   });
 
-  it("says no to a page, which is what stops the refusal being needed", () => {
-    // The sibling of the folder note above: same depth, NOT a folder note. This
-    // is the surface the reader met *"only lessons can hold pages"* on.
+  it("says yes to a page, which is what lets pages nest", () => {
+    // WAS "says no to a page". The sibling of the folder note above: same
+    // depth, NOT a folder note. `=== L + promoted` admitted exactly two shapes
+    // and this missed by one, which is the first of the three refusals a page
+    // met on its way to holding a page of its own.
     expect(at("03 - Journals/Study/Maths/Algebra/Quadratics/Part 1.md")).toBe(
-      false
+      true
     );
+    // And its own page, one deeper again, once it has been promoted.
+    expect(
+      at("03 - Journals/Study/Maths/Algebra/Quadratics/Part 1/Part 1.md")
+    ).toBe(true);
+    expect(
+      at("03 - Journals/Study/Maths/Algebra/Quadratics/Part 1/Detail.md")
+    ).toBe(true);
   });
 
   it("says no to an index at either depth, which holds notes not pages", () => {
+    // THE ONE REFUSAL THE `>=` KEPT, and the one worth checking rather than
+    // asserting: an index is a folder note, so its right-hand side is its own
+    // depth plus one and it can never reach it. A leaf at the same folder count
+    // passes because it is NOT a folder note — the two are told apart by
+    // promotion rather than by depth, which is what survives losing the cap.
     expect(at("03 - Journals/Study/Maths/Algebra/Algebra.md")).toBe(false);
     expect(at("03 - Journals/Study/Maths/Maths.md")).toBe(false);
   });
 
-  it("says no to a note filed where the journal puts none", () => {
-    // Too shallow, too deep, and outside the root entirely. The last is the
-    // one that matters most: this runs on every palette keystroke against every
-    // registered journal, and a blind slice would answer for all of them.
+  it("says no to a note filed above the leaf line, or outside the root", () => {
+    // WAS "…where the journal puts none", and the middle case has changed
+    // sides: there is no ceiling any more, so a note filed four folders deep is
+    // a page of a page of a page and answers yes. Too SHALLOW still answers no,
+    // and outside the root is the one that matters most — this runs on every
+    // palette keystroke against every registered journal, and a blind slice
+    // would answer for all of them.
     expect(at("03 - Journals/Study/Stray.md")).toBe(false);
-    expect(at("03 - Journals/Study/A/B/C/D/Deep.md")).toBe(false);
+    expect(at("03 - Journals/Study/A/B/C/D/Deep.md")).toBe(true);
     expect(at("99 - Elsewhere/Random/Note.md")).toBe(false);
     expect(pathHoldsPages({ root: "", levels: [] }, "Note.md")).toBe(false);
   });
@@ -406,7 +423,11 @@ describe("what the palette asks before it offers `New page`", () => {
     const flat = { root: "J/Notes", levels: [] };
     expect(pathHoldsPages(flat, "J/Notes/Thoughts.md")).toBe(true);
     expect(pathHoldsPages(flat, "J/Notes/Thoughts/Thoughts.md")).toBe(true);
-    expect(pathHoldsPages(flat, "J/Notes/Thoughts/Part 1.md")).toBe(false);
+    // A page of that note, which holds pages of its own as of 1.0.38.
+    expect(pathHoldsPages(flat, "J/Notes/Thoughts/Part 1.md")).toBe(true);
+    // The journal's own folder note is the one thing above the leaf line here,
+    // and it is still refused.
+    expect(pathHoldsPages(flat, "J/Notes/Notes.md")).toBe(false);
   });
 
   it("asks nothing of the vault, which is the whole reason it exists", () => {

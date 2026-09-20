@@ -104,7 +104,7 @@ export class EntryTemplates {
     const text = await this.app.vault.read(file);
     const { want, drops } = wantFromEntry(text, this.ctxFor(grain));
     if (!want.length) {
-      new Notice("ChronoAnvil: this page has no sections to save.");
+      new Notice("ChronoAnvil: this note has no sections to save.");
       return;
     }
 
@@ -179,7 +179,7 @@ export class EntryTemplates {
     const text = await this.app.vault.read(file);
     const { want } = wantFromEntry(text, this.ctxFor(grain));
     if (!want.length) {
-      new Notice("ChronoAnvil: this page has no sections to save.");
+      new Notice("ChronoAnvil: this note has no sections to save.");
       return false;
     }
     const details = await promptLayoutSave(

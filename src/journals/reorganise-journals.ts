@@ -67,7 +67,7 @@ class ReorganiseJournalsModal extends Modal {
       // anything. Reordering a list that also drives a folder tree invites the
       // question "does this move my notes?", and the answer has to be on the
       // window rather than in a changelog.
-      text: "The order journals appear in, on this page and on the homepage. Nothing moves on disk — no folder is renamed and no note is touched.",
+      text: "The order journals appear in, on this note and on the homepage. Nothing moves on disk — no folder is renamed and no note is touched.",
     });
 
     this.renderList(contentEl.createDiv({ cls: "ca-reorder-list" }));

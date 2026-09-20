@@ -167,6 +167,14 @@ describe("what a row offers", () => {
     const at = body.indexOf("if (refusal) return;");
     expect(at).toBeGreaterThan(0);
     expect(at).toBeLessThan(body.indexOf('cls: "ca-tpl-toggle"'));
+    // AND COPY IS THE ONE CONTROL ON THE OTHER SIDE OF THAT LINE (1.0.36).
+    // It is not a change — it reads a block and writes to the clipboard — so
+    // the reason the rest of the row is absent does not reach it, and the
+    // first prose block of every journal leaf is locked and is the block a
+    // reader most wants out of the window. Its own class is what keeps the
+    // assertion above pointed at Remove.
+    expect(body.indexOf('cls: "ca-tpl-copy"')).toBeGreaterThan(0);
+    expect(body.indexOf('cls: "ca-tpl-copy"')).toBeLessThan(at);
   });
 
   it("the reason in place, not on Save", () => {

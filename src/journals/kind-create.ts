@@ -483,7 +483,7 @@ async function unlistKindHere(
   const elsewhere = others.length === 1 ? "1 other index note" : `${others.length} other index notes`;
   const ok = await confirmAction(
     app,
-    `Stop listing ${kindPlural(kind)} on this page?`,
+    `Stop listing ${kindPlural(kind)} on this note?`,
     `${kind.label} was added to this card rather than to ${cfg.name}, and ${elsewhere} still ${
       others.length === 1 ? "lists" : "list"
     } it — so the note type stays and only this card's group goes. ` +

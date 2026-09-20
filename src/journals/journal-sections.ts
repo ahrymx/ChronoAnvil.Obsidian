@@ -42,6 +42,7 @@ import {
   pageWidgetKeywords,
 } from "../core/widget-sections";
 import { looseLines } from "../core/reload-loss";
+import { INDEX_TITLE } from "../core/vocabulary";
 import {
   STATS_BAND_WORDS,
   STAT_PRESET_SHORTHAND,
@@ -497,11 +498,85 @@ function markdown(lines: string[], tight = false): SectionBlock {
     : { kind: "markdown", lines };
 }
 
-// The one bracketed span that exists. Named rather than inlined because it is
-// written by the catalogue, read by the planner and asserted by the tests, and
-// a marker whose key is a string literal in three files is a marker that will
-// eventually be four spellings.
-export const SKELETON_KEY = "skeleton";
+// The bracketed span's key. Named rather than inlined because it is written by
+// the catalogue, read by the planner and asserted by the tests, and a marker
+// whose key is a string literal in three files is a marker that will eventually
+// be four spellings.
+//
+// ── IT WAS `skeleton` AND IS NOW `prose` (1.0.36) ────────────────────────
+//
+// The section was called *Prose skeleton* and named after the three headings it
+// composed, which was the smaller half of what it held: everything the reader
+// typed under the last heading was inside the same span and had no name at all.
+// It is *Prose* now — the reader's writing, of which the headings are one
+// optional convenience — so the marker says so.
+//
+// THE OLD SPELLING IS READ AND NEVER WRITTEN. Every note composed between 5.6
+// and now carries `<!--chronoanvil-skeleton-->`, and a rename that could not
+// read them would silently turn every one of those into unmarked prose — the
+// pre-5.6 state, in which nothing can be removed and the heading box will not
+// draw. So `proseSpansIn` accepts both and `renderBlock` emits only the new
+// one, which is the same shape as the `almanac:` compatibility in ten other
+// files. `test/legacy-tokens.test.ts` is where that contract is kept.
+export const PROSE_KEY = "prose";
+export const LEGACY_PROSE_KEY = "skeleton";
+
+// ── THE SECTION'S ID IS STILL `headings`, AND THAT IS DELIBERATE (1.0.36) ─
+//
+// The row is called *Prose* now. Its id is not, and must not become `prose`,
+// for two reasons that both bite:
+//
+// 1. `prose` IS ALREADY TAKEN, by the `note:`/`list:` field section a reader
+//    sees as *Notes field*. Two sections cannot share an id — `sectionsFor`
+//    returns them in one array and every lookup in this file is `find(s.id
+//    === …)`. Swapping the two ids to tidy the mismatch would move the
+//    collision rather than remove it.
+// 2. AN ID IS STORED AND A LABEL IS NOT. A saved layout's `sections` list is a
+//    list of these ids, living in the reader's plugin settings; so is every key
+//    of `SectionOverrides`. Renaming the id turns every saved journal layout in
+//    every vault into one that names a section the catalogue no longer has —
+//    which composes a leaf note with no prose block at all. A visible rename is
+//    not worth a settings migration.
+//
+// So the id is the old word, the label is the new one, and this comment is
+// here so the next reader who notices the mismatch finds the reason before the
+// rename.
+export const PROSE_SECTION_ID = "headings";
+
+// ── A PROSE BLOCK'S ID IS ITS POSITION IN THE FILE (1.0.36) ──────────────
+//
+// `headings` is the first prose block, `headings#2` the second, and so on. The
+// bare id rather than `headings#1` for the first, because every stored layout,
+// every `SectionOverrides` key and every test in the tree already names it —
+// an ordinal on the one that existed before this release would be a migration
+// to express a fact nothing had needed.
+//
+// NOT `instanceId` FROM `widget-sections.ts`, which is the tree's other
+// ordinal vocabulary. That one spells an id `w:journal-card#2` and `instanceIdOf`
+// gates on BOTH the `w:` prefix and the keyword being in the page-widget
+// registry — prose has no keyword, no fence and no registry row, so it would be
+// rejected by the only reader of that spelling. Two ordinals for two different
+// things, each parsed where it is written.
+const PROSE_INSTANCE_SEP = "#";
+
+export function proseIdFor(n: number): string {
+  return n <= 1 ? PROSE_SECTION_ID : `${PROSE_SECTION_ID}${PROSE_INSTANCE_SEP}${n}`;
+}
+
+// Which prose block this id names, or null where it names something else.
+export function proseOrdinalOf(id: string): number | null {
+  if (id === PROSE_SECTION_ID) return 1;
+  if (!id.startsWith(PROSE_SECTION_ID + PROSE_INSTANCE_SEP)) return null;
+  const n = Number(id.slice(PROSE_SECTION_ID.length + PROSE_INSTANCE_SEP.length));
+  // `Number("")` is 0 and `Number("2x")` is NaN — both are ids nobody wrote,
+  // and an ordinal below 1 is not a position in a list.
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+// Whether this id names a prose block at all.
+export function isProseId(id: string): boolean {
+  return proseOrdinalOf(id) !== null;
+}
 
 // A bracketed prose span: visible markdown, invisible edges.
 function bracketed(key: string, lines: string[]): SectionBlock {
@@ -523,47 +598,143 @@ export function bracketClose(key: string): string {
   return `<!--/chronoanvil-${key}-->`;
 }
 
-// Where this key's bracketed span sits in `lines`, or null when the file has
-// none.
-//
-// NULL IS THE ANSWER FOR EVERY NOTE WRITTEN BEFORE 5.6, and callers are
-// expected to treat it as "this skeleton is unmarked prose" rather than as an
-// error. That is the whole of the backwards story: an old note keeps the old
-// refusal, a rebuild from the template writes the markers, and nothing has to
-// migrate a vault.
-//
-// FIRST OPENER, FIRST CLOSER AFTER IT. A second pair would mean a note that had
-// the skeleton added twice, which `locate` already declines to do; taking the
-// first is the conservative half of that, because a span that stops early
-// leaves prose ALONE and a span that runs long would swallow it.
-export function bracketSpanIn(
-  lines: readonly string[],
-  key: string
-): { open: number; close: number } | null {
-  const open = lines.findIndex((l) => l.trim() === bracketOpen(key));
-  if (open === -1) return null;
-  const shut = bracketClose(key);
-  for (let i = open + 1; i < lines.length; i++) {
-    if (lines[i].trim() === shut) return { open, close: i };
-  }
-  return null;
+/** One prose block's extent, and which spelling of the marker delimits it. */
+export interface ProseSpan {
+  open: number;
+  close: number;
+  key: string;
 }
 
-// The `## ` titles inside this note's skeleton, or null when it has no bracket.
+// Every prose span in these lines, in file order.
+//
+// NONE IS THE ANSWER FOR EVERY NOTE WRITTEN BEFORE 5.6, and callers are
+// expected to treat an empty list as "this note's prose is unmarked" rather
+// than as an error. That is the whole of the backwards story: an old note keeps
+// the old refusal, a rebuild from the template writes the markers, and nothing
+// has to migrate a vault.
+//
+// ── IT RETURNS A LIST BECAUSE A NOTE MAY HAVE SEVERAL (1.0.36) ───────────
+//
+// This was `bracketSpanIn`, singular, and its own comment said why: *"a second
+// pair would mean a note that had the skeleton added twice, which `locate`
+// already declines to do"*. Prose is a repeatable section now — a reader can
+// add a second block below a tracker and write in it — so a second pair is the
+// ordinary case and the ordinal is the block's identity. `prose#2` IS the
+// second span in this list, which is why the marker carries no id of its own:
+// nothing has to be renumbered when one moves or goes.
+//
+// ONE PASS, AND A SECOND OPENER ABANDONS THE FIRST. The singular version took
+// the first opener and the first closer after it, on the argument that *"a span
+// that stops early leaves prose ALONE and a span that runs long would swallow
+// it"*. That argument is sharper here, because a file can now legitimately hold
+// two openers: if an unclosed marker were allowed to run on, it would swallow
+// the next block whole and the reader would lose a write to a cut scoped by it.
+// So an opener met while already open starts over — the unterminated one yields
+// nothing, and every well-formed pair after it is still found.
+//
+// BOTH SPELLINGS, MERGED IN FILE ORDER. See `LEGACY_PROSE_KEY`.
+export function proseSpansIn(lines: readonly string[]): ProseSpan[] {
+  const opener = new Map<string, string>();
+  for (const key of [PROSE_KEY, LEGACY_PROSE_KEY]) {
+    opener.set(bracketOpen(key), key);
+  }
+  const out: ProseSpan[] = [];
+  let open = -1;
+  let key = "";
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const starts = opener.get(line);
+    if (starts !== undefined) {
+      open = i;
+      key = starts;
+      continue;
+    }
+    if (open !== -1 && line === bracketClose(key)) {
+      out.push({ open, close: i, key });
+      open = -1;
+      key = "";
+    }
+  }
+  return out;
+}
+
+// ── WHAT A PROSE BLOCK COVERS ON SCREEN (1.0.38) ─────────────────────────
+//
+// *"can prose sections gain a very minimal background so they fit the section
+// aesthetic of chronoanvil? It is important that prose is not put into a code
+// block so that standard markdown syntax still works."*
+//
+// Both halves of that are already settled by the shape prose has: the markers
+// are HTML comments around ORDINARY markdown, which is 5.6's whole argument for
+// a bracket rather than a fence — *"visible markdown, invisible edges"*. So the
+// surface is painted over lines the file does not know are painted, and a
+// heading, a list, a link and a `$$` block go on being what they are. Nothing
+// here changes a byte of the note.
+//
+// THE MARKER LINES ARE NOT IN IT, which is why this is not `proseSpansIn` with
+// the ends kept. An opener renders as nothing in reading mode and is hidden in
+// Live Preview, so painting its row would put a blank band above the writing —
+// the same empty-row failure `marker-lines.ts::merged` spends a paragraph on,
+// arriving from the other side.
+//
+// AND NEITHER ARE THE BLANK LINES AT EITHER END. The composer writes a blank
+// after the opener and before the closer, and a reader who leaves three of them
+// under their last paragraph has left three blank rows, not three rows of
+// prose. Trimming is what makes the surface end where the writing does.
+//
+// AN EMPTY BLOCK GETS NO SURFACE AT ALL. A prose block a reader has emptied is
+// a legitimate state — see `proseTitlesIn` on why an empty array is not null —
+// and a band of colour with nothing in it is the 1.0.23 tick's mistake in
+// another costume: chrome saying "something could go here" on every note that
+// has nothing there.
+export interface ProseSurface {
+  /** First line of the writing, 0-based and inside the markers. */
+  from: number;
+  /** Last line of the writing, 0-based and inside the markers. */
+  to: number;
+}
+
+export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
+  const out: ProseSurface[] = [];
+  for (const span of proseSpansIn(lines)) {
+    let from = span.open + 1;
+    let to = span.close - 1;
+    while (from <= to && lines[from].trim() === "") from++;
+    while (to >= from && lines[to].trim() === "") to--;
+    if (from <= to) out.push({ from, to });
+  }
+  return out;
+}
+
+// The nth prose span (1-based), or null where the note has no such block.
+export function proseSpanIn(
+  lines: readonly string[],
+  n: number
+): ProseSpan | null {
+  return proseSpansIn(lines)[n - 1] ?? null;
+}
+
+// How many prose blocks this note carries.
+export function proseCountIn(text: string): number {
+  return proseSpansIn(looseLines(text)).length;
+}
+
+// The `## ` titles inside this note's nth prose block, or null when it has no
+// such block.
 //
 // NULL AND AN EMPTY ARRAY MEAN DIFFERENT THINGS, which is the whole reason this
-// returns one. Null is "this note predates the markers, so nothing can say where
-// its skeleton stops" — the state in which the editor draws no box and the
-// planner refuses a write. An empty array is "the bracket is here and there is
-// nothing in it", which is a note whose skeleton a reader emptied and which
-// Save can perfectly well write into.
+// returns one. Null is "there is no marked block here, so nothing can say where
+// its headings stop" — the state in which the editor draws no box and the
+// planner refuses a write. An empty array is "the bracket is here and there are
+// no headings in it", which is a block a reader emptied, or one they added to
+// write plain paragraphs in, and which Save can perfectly well write into.
 //
 // OFF `looseLines`, so a `## ` inside a fence or inside a region is not one.
 // The same walk the reload check uses, which is what keeps "what the page says"
 // and "what a rewrite would destroy" reading the same page.
-export function skeletonTitles(text: string): string[] | null {
+export function proseTitlesIn(text: string, n = 1): string[] | null {
   const lines = looseLines(text);
-  const span = bracketSpanIn(lines, SKELETON_KEY);
+  const span = proseSpanIn(lines, n);
   if (!span) return null;
   return headingTitlesIn(lines.slice(span.open + 1, span.close));
 }
@@ -1194,15 +1365,28 @@ const TITLE_SETTLED = {
 // marked region, and one that composed what it had not applied for could not
 // happen at all.
 function trackerSeeds(ctx: SectionContext, opts?: SectionOverrides): string[] {
-  // A page carries no tracker grid: its ratings belong to the note it is a page
-  // of, and a per-page Confidence would mean the note's own average silently
-  // counted its parts as peers.
-  if (ctx.noteKind === "page") return [];
+  // ── A PAGE CARRIES A GRID AS OF 1.0.38, AND THE OLD REASON WAS STALE ────
+  //
+  // This opened `if (ctx.noteKind === "page") return [];`, on the argument that
+  // *"a per-page Confidence would mean the note's own average silently counted
+  // its parts as peers."* That was true when it was written and stopped being
+  // true in 2.36: `confidenceKinds` narrowed an average to the kinds that CARRY
+  // the tracker, and it builds that list from `type.kinds`. A page's `type:` is
+  // `kind.pages.id`, which is deliberately not a kind — so a page is outside
+  // every average, and outside the review queue, whatever property it holds.
+  // The exclusion was doing nothing but keeping the grid off the page.
+  //
+  // THE READER ASKED FOR IT BACK, on the shape of the note rather than on the
+  // arithmetic: a new page should open with the same stacked card a lesson does
+  // — banner, trackers, pages — because a page that is worth splitting out is a
+  // thing you come back to, and "have I got this yet" is the question you come
+  // back with. A page of a lesson grades as a Lesson's page: `sectionContext`
+  // hands a page its owning kind, so `ctx.rating` is the kind's.
   const out: string[] = [];
-  // A leaf note seeds the rating it is graded on; an index note is not graded,
-  // so it gets Status alone — which is what both shipped Study index templates
-  // carry.
-  if (ctx.noteKind === "leaf" && ctx.rating) out.push(`tracker:${ctx.rating}`);
+  // A leaf or a page seeds the rating it is graded on; an index note is not
+  // graded, so it gets Status alone — which is what both shipped Study index
+  // templates carry.
+  if (ctx.noteKind !== "index" && ctx.rating) out.push(`tracker:${ctx.rating}`);
   if (
     ctx.rating !== "status" &&
     kindAllowsTracker(ctx.type, ctx.kind?.id ?? null, "status")
@@ -1806,10 +1990,30 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     blurb: "The index of pages this note has been split across.",
     surface: "leaf",
     locked: false,
-    // A page holds no pages: `{ page }` contexts answer false, which is the one
-    // refusal left in this predicate and the only one that was ever structural.
+    // An index holds notes rather than pages; everything below the leaf line
+    // holds pages, a page included as of 1.0.38. See `SectionContext.hasPages`.
     applies: (ctx) => ctx.hasPages,
-    default: (ctx) => ctx.hasPages,
+    // ── AND SHIPPED ON ONE TOO, WHICH IS A REVERSAL INSIDE 1.0.38 ───────
+    //
+    // This read `default: (ctx) => ctx.noteKind !== "page"`, and the argument
+    // was that every page shipping an empty *"No pages yet"* card would be the
+    // 1.0.23 tick's mistake with the sign flipped — the section arriving when it
+    // is earned rather than by default.
+    //
+    // THE READER LOOKED AT A PAGE AND ASKED FOR THE OTHER THING, in one line:
+    // *"update the new page default to the full stack banner (banner, trackers,
+    // pages)."* What the argument above missed is that the empty card is not the
+    // cost it was in 1.0.23. There, the tick was a per-kind CAPABILITY and an
+    // empty card meant "this kind can be split" on a kind nobody would split.
+    // Here it means "this page can be split", which is now true of every page
+    // and is the thing this release exists to say. A page whose card reads
+    // *No pages yet — press "New Page" to add one* is a page telling the reader
+    // that the depth they just gained goes on going.
+    //
+    // AND IT MAKES THE THREE SURFACES ONE SHAPE. A page composed from this
+    // template opens with the same stacked card a lesson does, which is what
+    // the reader was pointing at.
+    default: always,
     // WELDED FOR THE SAME REASON AND ON THE SAME TERMS as `children` above,
     // which is the same section on a leaf: a Lesson's Pages index is what is
     // below a Lesson. See that entry for what the weld costs.
@@ -2300,21 +2504,44 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   // ticked and becomes a property of the array. Moving this entry up again
   // reintroduces the bug for whichever section overtakes it.
   {
-    id: "headings",
+    id: PROSE_SECTION_ID,
     icon: "📝",
     category: "writing",
-    label: "Prose skeleton",
-    // NAMES THE DOOR (5.6). The headings are editable in the note like any
-    // other markdown, and "Save as layout…" has read them back off the page by
-    // title since 4.33 — so a reader who wants their own skeleton has always
-    // been able to have one and has had no way to find that out. The blurb is
-    // where a row says what it is, and this row's second sentence is the only
-    // documentation of a feature that already works.
+    // ── IT WAS "PROSE SKELETON" AND IS NOW "PROSE" (1.0.36) ────────────
+    //
+    // The old name described the three `## ` headings this composes, which
+    // were never the larger half of what the block holds: everything the
+    // reader types under the last heading is inside the same bracket, and had
+    // no name at all. The reader's ask settled it — *"the prose skeleton
+    // section should be upgraded to Prose, a mandatory section which
+    // encompasses the plain markdown block a user writes"* — and the headings
+    // became what they always were: a convenience, behind a tick.
+    label: "Prose",
+    // IT NAMED THE DOOR UNTIL 1.0.36, AND THE DOOR MOVED INSIDE. The old blurb
+    // read *"rename them in the note and use Save as layout…"*, which was the
+    // only documentation of a read-back that had existed unannounced since
+    // 4.33. 5.6 put the list in a box on this very row and this release puts a
+    // tick above it, so the gesture the blurb had to name is now two controls
+    // the reader is looking at. What the blurb says instead is the thing
+    // nothing else on screen can: that there may be more than one of these.
     blurb:
-      "The markdown headings a note of this kind opens with. " +
-      "Edit them here, then Save as layout to keep them.",
+      "Where you write. Add as many prose blocks as the note needs; " +
+      "each one can open with a set of headings.",
     surface: "leaf",
-    locked: false,
+    // ── MANDATORY, ON THE READER'S CALL (1.0.36) ───────────────────────
+    //
+    // *"a mandatory section (can't be removed)"*. A leaf note with nowhere to
+    // write is a page that composes everything about a note except the note —
+    // which is the argument `default: always` already made below, now made
+    // properly: `always` could be unticked, and this cannot.
+    //
+    // IT LOCKS THE FIRST BLOCK AND NOTHING ELSE. `journalRefusal` asks this
+    // flag of the CATALOGUE row, and every prose block shares that row, so the
+    // refusal is scoped by ordinal where it is asked rather than by a second
+    // catalogue entry that would differ from this one in one field. A reader
+    // who added a second block is removing something they added; the first is
+    // the one the note cannot be without.
+    locked: true,
     // On by default, and PLAIN MARKDOWN rather than a widget. Until 2.42 the
     // catalogue could not express a heading at all, so Study's Lesson and
     // Practice stayed hand-written assets while every custom journal's notes
@@ -2357,10 +2584,33 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // reason: an affordance without the capability behind it is worse than a
     // sentence naming the route that works.
     questions: (ctx) => [
+      // ── THE TICK, AND THEN WHICH (1.0.36) ────────────────────────────
+      //
+      // *"The skeleton part should remain as a toggle 'Add Default Headings'."*
+      // The tick says WHETHER this block opens with headings; the box below
+      // says WHICH. Two questions rather than one because they are two
+      // decisions and a reader makes the first far more often: a second prose
+      // block added to hold a paragraph wants no headings at all, and emptying
+      // a textarea to say so reads as a way to lose work.
+      //
+      // `derived` — see `FlagQuestion`. Prose composes no fence, so there is no
+      // modifier line to write and the journal planner owns both halves: the
+      // read is "does this block still carry any heading this type composes",
+      // the write is composing them in or cutting the untouched ones out.
+      {
+        kind: "flag",
+        key: "defaults",
+        label: "the default headings",
+        derived: true,
+        line: "",
+        after: "",
+        on: "Add default headings",
+        off: "No default headings",
+      },
       {
         kind: "lines",
         key: "headings",
-        label: "the headings this page opens with",
+        label: "the headings this note opens with",
         placeholder: (
           sectionOverrides(ctx, "headings")?.headings ?? defaultHeadings(ctx)
         )
@@ -2370,17 +2620,33 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         settled: {
           text: "written as ordinary markdown here",
           hint:
-            "This page's headings were written before ChronoAnvil marked where " +
+            "This note's headings were written before ChronoAnvil marked where " +
             "the skeleton starts, so it cannot tell them from your own prose. " +
-            "Edit them in the page itself, or use Reload this page to get the " +
+            "Edit them in the page itself, or use Reload this note to get the " +
             "box back.",
         },
       },
     ],
-    // "Does this note already have prose headings?" is the question that
-    // matters to both callers: the equivalence test asking what a template
-    // contains, and "add a section" declining to append a second skeleton.
-    locate: (t) => probe(t, /^##\s+\S/m),
+    // ── THE MARKER FIRST, THE OLD PROBE ONLY WHERE THERE IS NONE (1.0.36) ─
+    //
+    // "Does this note already have a prose block?" is the question that matters
+    // to both callers: the equivalence test asking what a template contains,
+    // and "add a section" deciding where a new block goes.
+    //
+    // A `##` ANYWHERE USED TO BE THE WHOLE ANSWER, which is why the attribution
+    // built on it claimed a reader's own heading along with the catalogue's —
+    // see `markdownOwnerOf`. The bracket is the honest answer and has been
+    // readable since 5.6.
+    //
+    // THE FALLBACK IS THE PRE-5.6 NOTE AND NOTHING ELSE. Its headings carry no
+    // markers, so a probe is all there is; finding them is what keeps the row
+    // on screen, wearing the refusal that names the route to fixing it, rather
+    // than dropping the section out of the window and reporting the reader's
+    // own writing as blocks that aren't the catalogue's.
+    locate: (t) => {
+      const at = t.search(/^<!--\/?chronoanvil-(?:prose|skeleton)-->$/m);
+      return at >= 0 ? at : probe(t, /^##\s+\S/m);
+    },
     render: (ctx, opts) => {
       const headings = opts?.headings ?? defaultHeadings(ctx);
       // ONE BRACKETED BLOCK, WHERE THIS WAS ONE `markdown` BLOCK PER HEADING.
@@ -2406,7 +2672,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         if (i > 0) lines.push("");
         lines.push(`## ${h.title}`, "", ...(h.body ?? [""]));
       });
-      return [bracketed(SKELETON_KEY, lines)];
+      return [bracketed(PROSE_KEY, lines)];
     },
   },
 ];
@@ -2673,7 +2939,19 @@ export function sectionContext(
   // the second half was the per-kind tick; `kind.pages` is now every kind's, so
   // the first half is the whole test — and it is the half that was always
   // structural. See `SectionContext.hasPages`.
-  const hasPages = !isPage;
+  //
+  // ── AND A PAGE ANSWERS YES AS OF 1.0.38 ─────────────────────────────────
+  //
+  // `!isPage` was the last of the three refusals that kept pages flat, and the
+  // one that governed the SECTION rather than the act: with it false, 📄 Pages
+  // neither applied to a page nor could be added to one, so even a reader who
+  // reached `newPage` from the palette had nowhere for the index to live.
+  //
+  // An index is the only surface left answering no, and its reason is unchanged
+  // and structural: an index holds NOTES. Everything below the leaf line holds
+  // pages — which is what "at or below the leaf line" means in `pathHoldsPages`,
+  // the same question asked of a path instead of a context.
+  const hasPages = true;
   return {
     type,
     noteKind: isPage ? "page" : "leaf",
@@ -2687,7 +2965,9 @@ export function sectionContext(
     ownNoun: isPage ? kind.pages.label : kind.label,
     hasSubContainers: false,
     hasPages,
-    documentLike: hasPages || isPage,
+    // Every leaf and every page, which is what it has meant since 1.0.23 — the
+    // `|| isPage` half was carrying the surface `hasPages` used to exclude.
+    documentLike: true,
     rating: kind.rating ?? null,
   };
 }
@@ -2757,8 +3037,23 @@ export function sectionsFor(
       // argument composeTemplate already makes about `required` and inclusion:
       // the wizard cannot produce this order, and this function is also what a
       // preset, a saved variant and any future caller reach.
-      const pa = a.s.locked ? 0 : 1;
-      const pb = b.s.locked ? 0 : 1;
+      //
+      // ── AND IT IS THE BANNER, NOT `locked` (1.0.36) ──────────────────
+      //
+      // This read `s.locked`, which was the same set for as long as the banner
+      // was the only required section in this catalogue — `test/journal-
+      // sections.test.ts` asserted exactly that. Prose is locked now, because a
+      // journal leaf must have somewhere to write, and the two properties are
+      // not the same claim: `locked` says a section CANNOT BE REMOVED and this
+      // rule says one MUST BE FIRST. Reading the first as the second hoisted
+      // every prose block to the top of the note the moment a layout named an
+      // order, which is how a wizard round trip came back with the trackers and
+      // the page index unwelded and below the reader's writing.
+      //
+      // The argument above is unchanged and is the banner's alone: its first
+      // block is the spacer, and the spacer has to be on line 0.
+      const pa = a.s.id === BANNER_ID ? 0 : 1;
+      const pb = b.s.id === BANNER_ID ? 0 : 1;
       if (pa !== pb) return pa - pb;
       const ra = rank.get(a.s.id) ?? Infinity;
       const rb = rank.get(b.s.id) ?? Infinity;
@@ -3000,13 +3295,19 @@ export function targetIdFor(ctx: SectionContext): string {
 // some kind declared `pages` — *"on a journal without one the checkbox would
 // tick a surface the journal does not have and produce a layout nothing could
 // ever reload"* — and every journal has that surface now, the way every one has
-// always had a front page. See `JournalPages`.
+// always had an index. See `JournalPages`.
+//
+// THE LABEL COMES FROM THE REGISTRY AS OF 1.0.38, and the row above it is why it
+// had to. Two rows in one list read "Front page" and "Page" — one word, two
+// meanings, four pixels apart — while `vocabulary.ts` declared that word
+// RESERVED for the second of them. `INDEX_TITLE` is the noun; see the comment
+// on `INDEX` for what the collision cost the reader.
 export function layoutTargetsFor(
   type: JournalType
 ): { id: string; label: string }[] {
   return [
     ...type.kinds.map((k) => ({ id: k.id, label: k.label })),
-    { id: LAYOUT_SURFACE_INDEX, label: "Front page" },
+    { id: LAYOUT_SURFACE_INDEX, label: INDEX_TITLE },
     { id: LAYOUT_SURFACE_PAGE, label: "Page" },
   ];
 }
@@ -3139,4 +3440,44 @@ export function detectSections(text: string, ctx: SectionContext): string[] {
     .filter((s) => s.at >= 0)
     .sort((a, b) => a.at - b.at)
     .map((s) => s.id);
+}
+
+// ── WHO A GENERATED JOURNAL NOTE LINKS TO, IN ITS HIDDEN GRAPH BLOCK ──────
+//
+// THE TYPE'S OWN NOTE, NOT THE LEVEL'S NOUN. This read `ctx.type.levels[d].noun`
+// — "Topic", "Lesson" — which is the word a level is CALLED and never the name
+// of any note, so every journal note in the vault linked to something that does
+// not exist and Obsidian drew a phantom node for each distinct noun.
+// `ctx.type.name` is the type's folder note (`03 - Journals/Study/Study.md`),
+// which always resolves.
+//
+// ONE LEVEL COARSER THAN THE TRUTH, deliberately and for now: a lesson's real
+// parent is its topic's index NOTE, and this context carries the level a note is
+// at but not the path of the note above it. Naming the type is true — every note
+// in Study is inside Study — where naming "Lesson" was not.
+//
+// ── EXCEPT ON A PAGE, WHERE THE TRUTH IS ALREADY WRITTEN DOWN (1.0.38) ─────
+//
+// *"this context carries the level a note is at but not the path of the note
+// above it"* is the whole of the compromise above, and on ONE surface it is
+// false: a page's template carries `parent: {{parent}}`, filled by `newPage`
+// with the basename of the note it is a page of. So the coarse answer is not the
+// only one available here — it is the one that was available everywhere.
+//
+// AND IT IS WORTH MORE ON A PAGE THAN ANYWHERE ELSE, now that pages nest. The
+// graph's job on a chain is to show the chain, and every page linking past its
+// own parent to the journal's folder note draws a star with the journal at the
+// centre and the structure the reader built nowhere in it.
+//
+// ── ONE FUNCTION, BECAUSE IT WAS TWO COPIES AND THEY DRIFTED IMMEDIATELY ──
+//
+// `composeJournalTemplate` and `composedFrom` each carried this decision and
+// the paragraph above it, word for word. Changing the page's answer in one of
+// them made `isHandEdited` report every freshly composed page template as hand
+// edited — that predicate compares a file against what the catalogue would
+// write, so two spellings of one rule is a file reporting itself as edited by
+// the reader who has never opened it. The suite caught it; the point is that it
+// had to.
+export function graphParentName(ctx: SectionContext): string {
+  return ctx.noteKind === "page" ? "{{parent}}" : ctx.type.name;
 }

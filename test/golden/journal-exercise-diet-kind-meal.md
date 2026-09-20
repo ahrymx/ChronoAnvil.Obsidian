@@ -22,7 +22,7 @@ button:exercise-diet:new-page
 pages-table
 ```
 
-<!--chronoanvil-skeleton-->
+<!--chronoanvil-prose-->
 
 ## Overview
 
@@ -36,7 +36,7 @@ pages-table
 
 
 
-<!--/chronoanvil-skeleton-->
+<!--/chronoanvil-prose-->
 
 %% chronoanvil-graph %%
 %% [[Exercise & Diet|​]] %%

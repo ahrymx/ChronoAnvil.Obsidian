@@ -6,10 +6,14 @@
 // LICENSING.md.
 
 import { describe, it, expect } from "vitest";
+import { TFile, TFolder } from "obsidian";
 import { studyFile } from "./study-template";
+import { readCode } from "./sources";
+import { childNotes } from "../src/core/util";
 import {
   STUDY_JOURNAL,
   journalAncestors,
+  kindsCarrying,
   pagesSectionBlock,
 } from "../src/journals/journal";
 import { insertBelowBanner } from "../src/trackers/entry-trackers";
@@ -85,15 +89,16 @@ describe("crumbs through a promoted note", () => {
     ).toEqual(["Maths", "Algebra", "Quadratics"]);
   });
 
-  it("extends the cap by exactly one, in every journal", () => {
-    // WAS "does not extend the cap for a type with no pages" — a stray note
-    // filed too deep in an unpaged type must not invent crumbs for folders the
-    // type has no noun for. There is no unpaged type now, so the +1 is every
-    // journal's, and what it describes is the folder a promotion makes.
+  it("has no cap at all any more, in any journal", () => {
+    // WAS "extends the cap by exactly one" (1.0.23), and before that "does not
+    // extend the cap for a type with no pages". Both were arguing about where
+    // the trail should stop, and the answer 1.0.38 gives is that it stops where
+    // the folders do. A page holds pages, so every folder between the root and
+    // the note is a note that holds the one below it — there is no depth left
+    // at which a folder is not describable.
     //
-    // THE CAP STILL BITES, which is the half worth keeping: one level deeper
-    // than a page can be is still refused, so a note filed four folders into a
-    // one-level journal gets two crumbs and not three.
+    // THE ROOT GUARD IS THE ONE THAT STAYED, and it is the one that was ever
+    // doing the work: a note outside the type's root still invents nothing.
     const cooking = buildJournalType({
       id: "cooking",
       name: "Cooking",
@@ -112,7 +117,17 @@ describe("crumbs through a promoted note", () => {
       journalAncestors(cooking,
         "03 - Journals/Cooking/Sauces/Warm/Hollandaise/Step one.md"
       ).map((a) => a.name)
-    ).toEqual(["Sauces", "Warm"]);
+    ).toEqual(["Sauces", "Warm", "Hollandaise"]);
+    // And a page of a page of a page, which is the shape this release added.
+    expect(
+      journalAncestors(cooking,
+        "03 - Journals/Cooking/Sauces/Warm/Hollandaise/Step one/Whisking.md"
+      ).map((a) => a.name)
+    ).toEqual(["Sauces", "Warm", "Hollandaise", "Step one"]);
+    // Outside the root: still nothing, at any depth.
+    expect(
+      journalAncestors(cooking, "03 - Journals/Study/A/B/C/D.md")
+    ).toEqual([]);
   });
 });
 
@@ -158,13 +173,24 @@ describe("the shipped templates", () => {
     expect(t).toContain("journal-header");
   });
 
-  it("gives a page no confidence or status of its own", () => {
-    // A page is not a unit of review. Both properties belong to the lesson,
-    // which is what the queue schedules and the trend plots.
+  it("grades a page, and keeps it out of the queue by its type", () => {
+    // WAS "gives a page no confidence or status of its own", on the reason that
+    // *"a page is not a unit of review"*. The conclusion is still true and the
+    // MECHANISM was never the missing property: `confidenceKinds` narrowed an
+    // average to the kinds that carry the tracker in 2.36 and builds the list
+    // from `type.kinds`, so a page's `type:` — `kind.pages.id`, deliberately not
+    // a kind — has been outside every average and every queue ever since,
+    // whatever it holds. The 1.0.38 template grades the page for the reader's
+    // own sake; nothing aggregates it.
     const t = asset("template-page.md");
-    expect(t).not.toMatch(/^confidence:/m);
-    expect(t).not.toMatch(/^status:/m);
-    expect(t).not.toContain("tracker:confidence");
+    expect(t).toMatch(/^confidence: 1$/m);
+    expect(t).toMatch(/^status: in-progress$/m);
+    expect(t).toContain("tracker:confidence");
+    // THE GUARANTEE, ASSERTED WHERE IT ACTUALLY LIVES. If a page's type ever
+    // became a kind, this fails — which is the only way the paragraph above
+    // could stop being true.
+    expect(STUDY_JOURNAL.kinds.some((k) => k.id === "page")).toBe(false);
+    expect(kindsCarrying(STUDY_JOURNAL, "confidence")).not.toContain("page");
   });
 
   it("gives the Lesson template a Pages section", () => {
@@ -306,5 +332,117 @@ describe("promoting a note that already has a page index", () => {
     );
     const out = promote(t);
     expect(out.indexOf("pages-table")).toBeLessThan(out.indexOf("## Overview"));
+  });
+});
+
+// ── THE PAGE THAT VANISHED WHEN IT WAS PROMOTED (1.0.38) ──────────────
+//
+// A bug report from the vault, one release into nesting: `HTML Divisions` was
+// listed under its cheat sheet, the reader pressed New page on it, and it
+// disappeared from the list it had been sitting in. Promotion moves
+// `HTML Divisions.md` into `HTML Divisions/HTML Divisions.md`, and every caller
+// asking for "the pages of this note" was asking `childFiles` for the markdown
+// files BESIDE it — which the promoted page had just stopped being one of.
+//
+// The recursion that would have listed its own pages underneath it was already
+// written and already correct. It was never reached: the row that carries it
+// was gone.
+describe("the notes at one level, promoted or not", () => {
+  // A folder tree from paths, the shape `getAbstractFileByPath` returns.
+  const tree = (root: string, paths: readonly string[]): TFolder => {
+    const folder = new TFolder(root);
+    const subs = new Map<string, string[]>();
+    for (const rel of paths) {
+      const cut = rel.indexOf("/");
+      if (cut === -1) {
+        folder.children.push(new TFile(`${root}/${rel}`));
+        continue;
+      }
+      const name = rel.slice(0, cut);
+      subs.set(name, [...(subs.get(name) ?? []), rel.slice(cut + 1)]);
+    }
+    for (const [name, rest] of subs) {
+      folder.children.push(tree(`${root}/${name}`, rest));
+    }
+    return folder;
+  };
+
+  const names = (folder: TFolder): string[] =>
+    childNotes(folder).map((f) => f.path);
+
+  it("counts a promoted page, which sits one folder down", () => {
+    const folder = tree("Web Design/Cheat Sheet", [
+      "Cheat Sheet.md",
+      "test1.md",
+      "HTML Divisions/HTML Divisions.md",
+    ]);
+    expect(names(folder)).toContain(
+      "Web Design/Cheat Sheet/HTML Divisions/HTML Divisions.md"
+    );
+    // AND THE NOTE ITSELF IS STILL IN THE LIST. `pagesBeside` drops the host by
+    // path; that is not this function's job and never was.
+    expect(names(folder)).toContain("Web Design/Cheat Sheet/Cheat Sheet.md");
+  });
+
+  it("stops at one level, which is the whole of the promise", () => {
+    // The promoted page's OWN pages belong to it, and listing them here would
+    // flatten the tree this release exists to build. `drawPageRows` asks again
+    // with the promoted page as the note, and gets them there.
+    const folder = tree("Web Design/Cheat Sheet", [
+      "Cheat Sheet.md",
+      "HTML Divisions/HTML Divisions.md",
+      "HTML Divisions/test.md",
+      "HTML Divisions/Deeper/Deeper.md",
+    ]);
+    expect(names(folder)).not.toContain(
+      "Web Design/Cheat Sheet/HTML Divisions/test.md"
+    );
+    expect(names(folder)).not.toContain(
+      "Web Design/Cheat Sheet/HTML Divisions/Deeper/Deeper.md"
+    );
+  });
+
+  it("takes nothing from a folder that holds no note of its own", () => {
+    // An attachments folder, a folder a reader made by hand and has not filled.
+    // `isPromotedPath`'s rule over a TFolder: the note whose basename is its
+    // folder's, and no other file in there is anybody's business here.
+    const folder = tree("Web Design/Cheat Sheet", [
+      "Cheat Sheet.md",
+      "attachments/diagram.md",
+      "Sketches/notes.md",
+    ]);
+    expect(names(folder)).toEqual(["Web Design/Cheat Sheet/Cheat Sheet.md"]);
+  });
+
+  it("sorts one run, not the loose files and then the promoted ones", () => {
+    // Both halves land in the same `localeCompare` as `childFiles` alone used
+    // to be, so the basename tie-break `pagesBeside` falls back on when nobody
+    // numbered a page still means what it says.
+    const folder = tree("Topic/Lesson", [
+      "Charlie.md",
+      "Alpha/Alpha.md",
+      "Delta.md",
+      "Bravo/Bravo.md",
+    ]);
+    expect(names(folder).map((p) => p.split("/").pop())).toEqual([
+      "Alpha.md",
+      "Bravo.md",
+      "Charlie.md",
+      "Delta.md",
+    ]);
+  });
+
+  it("is what the three callers that meant it now ask", () => {
+    // All three spelled "the pages of this note" as "the files beside it", and
+    // all three were wrong in the same way the moment a page could be promoted:
+    // the list, the ordinal allocator, and the bin's confirmation.
+    expect(readCode("tables")).toContain("return childNotes(note.parent)");
+    expect(readCode("journal.ts")).toContain("childNotes(folderNote.parent)");
+    // The bin goes further, because the bin takes the FOLDER: every note under
+    // it, not the row at the top of it.
+    expect(readCode("kind-row-menu")).toContain(
+      "filesUnder(plugin.app, file.parent.path).map((f) => f.path)"
+    );
+    expect(readCode("kind-row-menu")).not.toContain("childFiles(file.parent)");
   });
 });

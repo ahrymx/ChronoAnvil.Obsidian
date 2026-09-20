@@ -2669,7 +2669,7 @@ function specWithWanted(
 export function graphLinksSection(links: readonly string[]): string {
   if (!links || links.length === 0) return "";
   const wikilinks = links.map((l) => `[[${l}|\u200B]]`).join(" ");
-  return `\n\n%% chronoanvil-graph %%\n%% ${wikilinks} %%\n`;
+  return `\n\n${GRAPH_MARK}\n%% ${wikilinks} %%\n`;
 }
 
 // The same block, re-aimed — the half a COMPOSED note never needs.
@@ -2706,5 +2706,15 @@ export function setGraphLinks(text: string, links: readonly string[]): string {
     : text.replace(/\s*$/, "") + block;
 }
 
+// ── THE MARKER, SPELLED ONCE (1.0.36) ───────────────────────────────────
+//
+// Exported because `journal-plan.ts` works in LINES rather than in text: it
+// lifts this block off the end of a note before it inserts a section, so a
+// section added at the very end lands above the hidden link rather than below
+// it. A second literal spelling of the marker over there would be a second
+// thing to keep equal to the regex below, and the one property both halves
+// depend on is that they name the same two lines.
+export const GRAPH_MARK = "%% chronoanvil-graph %%";
+
 // The block as it is written above: the marker line, then the links line.
-const GRAPH_BLOCK_RE = /%% chronoanvil-graph %%\n%%[^\n]*%%/;
+const GRAPH_BLOCK_RE = new RegExp(`${GRAPH_MARK}\n%%[^\n]*%%`);

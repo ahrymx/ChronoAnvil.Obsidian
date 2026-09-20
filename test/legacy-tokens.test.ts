@@ -44,6 +44,17 @@ import {
 import { decodeRegistryMirror } from "../src/core/registry-mirror";
 import { decodeJournalManifest } from "../src/journals/journal-manifest";
 import { RULES, migrateText } from "../tools/migrate-vault.mjs";
+import { STUDY_JOURNAL } from "../src/journals/journal";
+import { journalTemplateFiles } from "../src/journals/custom-journal";
+import {
+  LEGACY_PROSE_KEY,
+  PROSE_KEY,
+  bracketClose,
+  bracketOpen,
+  proseCountIn,
+  sectionContext,
+} from "../src/journals/journal-sections";
+import { planSections, sectionsPresent } from "../src/journals/journal-plan";
 
 describe("reading a vault written before the rename", () => {
   it("finds a legacy body region and returns its content", () => {
@@ -198,6 +209,74 @@ describe("the migration map covers what the plugin writes", () => {
         [asVaultToken, asCssClass],
         `rule ${from} -> ${to} lands outside both namespaces`
       ).toContain(to);
+    }
+  });
+});
+
+// ── THE SECOND READ-BOTH-WRITE-ONE CONTRACT (1.0.36) ─────────────────────
+//
+// The rename above is not the only place this plugin reads a spelling it no
+// longer writes. 5.6 bracketed the prose skeleton in `<!--chronoanvil-skeleton-->`
+// and 1.0.36 renamed the section to Prose and the marker with it. Every note
+// written between those two releases carries the old pair, and the failure mode
+// is the rename's exactly: a block the plugin cannot see is a block it refuses
+// to remove, offers to compose a second copy of, and cuts nothing from.
+//
+// IT IS NOT A MIGRATION RULE, and the last test here says why out loud — both
+// spellings are already in the `chronoanvil` namespace, so there is no
+// `almanac` form to rewrite and `tools/migrate-vault.mjs` has nothing to do.
+// The compatibility lives in `proseSpansIn` and nowhere else.
+describe("the prose marker's own rename", () => {
+  const lessonCtx = sectionContext(STUDY_JOURNAL, {
+    kind: STUDY_JOURNAL.kinds.find((k) => k.id === "lesson")!,
+  });
+  const lesson = (): string =>
+    journalTemplateFiles(STUDY_JOURNAL).find((f) => f.name === "lesson.md")!
+      .content;
+  // The same Lesson as it was written before 1.0.36.
+  const old = (): string =>
+    lesson()
+      .split(bracketOpen(PROSE_KEY))
+      .join(bracketOpen(LEGACY_PROSE_KEY))
+      .split(bracketClose(PROSE_KEY))
+      .join(bracketClose(LEGACY_PROSE_KEY));
+
+  it("finds a block marked with the old spelling", () => {
+    const text = old();
+    expect(text).toContain("<!--chronoanvil-skeleton-->");
+    expect(text).not.toContain("<!--chronoanvil-prose-->");
+    expect(proseCountIn(text)).toBe(1);
+    expect(sectionsPresent(text, lessonCtx)).toContain("headings");
+  });
+
+  it("plans against it as a marked block, not as loose markdown", () => {
+    // THE ASSERTION THAT MATTERS, because the other spelling of "cannot see it"
+    // is not a crash — it is the refusal a note with no markers at all gets,
+    // which would be wrong here and unexplainable to whoever wrote the note.
+    const op = planSections(old(), lessonCtx, []).find(
+      (o) => o.sectionId === "headings"
+    )!;
+    expect(op.kind).toBe("keep");
+    expect(op.detail).not.toContain("Reload this page");
+  });
+
+  it("writes the new spelling and only the new spelling", () => {
+    for (const file of journalTemplateFiles(STUDY_JOURNAL)) {
+      expect(file.content, file.name).not.toContain("chronoanvil-skeleton");
+    }
+    expect(lesson()).toContain("<!--chronoanvil-prose-->");
+  });
+
+  it("needs no migration rule, because both spellings are already ours", () => {
+    for (const [from] of RULES as [string, string][]) {
+      expect(from).not.toContain("skeleton");
+    }
+    for (const marker of [
+      bracketOpen(LEGACY_PROSE_KEY),
+      bracketClose(LEGACY_PROSE_KEY),
+      bracketOpen(PROSE_KEY),
+    ]) {
+      expect(migrateText(marker), marker).toBe(marker);
     }
   });
 });

@@ -83,12 +83,26 @@ describe("the `pages` gate, which is a fact about the surface now", () => {
     expect(defaultSectionIds(ctx)).toContain("pages");
   });
 
-  it("never offers it on a page, which is what a page is a page OF", () => {
+  it("offers it on a page too, and ships it on one", () => {
+    // WAS "never offers it on a page, which is what a page is a page OF", and
+    // that sentence was the whole of 1.0.23's flat model. A page that grows too
+    // long to read is the same note a lesson was when it grew too long, so as
+    // of 1.0.38 the surface answers yes and a page holds pages at any depth.
+    //
+    // AND THE DEFAULT WENT WITH IT, ON A SECOND PASS. The first draft shipped
+    // `false` here, arguing that an empty *"No pages yet"* card on every page in
+    // the vault would be the 1.0.23 tick's mistake with the sign flipped. The
+    // reader looked at a composed page and asked for the stacked card a lesson
+    // gets — banner, trackers, pages — and the analogy does not hold: in 1.0.23
+    // an empty card meant "this KIND can be split" on a kind nobody would split,
+    // where here it means "this page can be split", which is the thing this
+    // release exists to say and is true of every page there is.
     const type = buildJournalType(CONFIG());
     const page = templateTargets(type).find((t) => t.ctx.noteKind === "page");
     expect(page).toBeDefined();
-    expect(page!.ctx.hasPages).toBe(false);
-    expect(sectionsFor(page!.ctx).map((s) => s.id)).not.toContain("pages");
+    expect(page!.ctx.hasPages).toBe(true);
+    expect(sectionsFor(page!.ctx).map((s) => s.id)).toContain("pages");
+    expect(defaultSectionIds(page!.ctx)).toContain("pages");
   });
 
   it("never offers it on an index, which holds notes rather than pages", () => {
@@ -189,12 +203,15 @@ describe("the wizard's Sections checklist, which draws an ordinary row", () => {
     expect(rows.indexOf("pages")).toBeLessThan(rows.indexOf("headings"));
   });
 
-  it("draws it on the leaf targets and nowhere else", () => {
+  it("draws it on every target that holds notes below it, and no index", () => {
+    // WAS "on the leaf targets and nowhere else". A page target joins them in
+    // 1.0.38; an index still does not, because an index holds NOTES and the
+    // notes it holds are named by the kind tables above, not by a pages list.
     const draft = CONFIG();
     const p = wizard(draft);
     for (const t of targetsOf(draft)) {
-      const leaf = t.ctx.noteKind === "leaf";
-      expect(p.rows(t).includes("pages"), t.key).toBe(leaf);
+      const holds = t.ctx.noteKind !== "index";
+      expect(p.rows(t).includes("pages"), t.key).toBe(holds);
     }
   });
 

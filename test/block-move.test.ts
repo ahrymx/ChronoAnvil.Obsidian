@@ -874,7 +874,8 @@ describe("the gesture around it", () => {
     // relied on one would draw at the FOOT of its block, which in a section run
     // is the head of the next one. That was 4.7.1's bug and this is why it
     // cannot come back.
-    const secAt = rules.indexOf(".ca-journal-sec-block {");
+    const secAt = rules.indexOf(".ca-journal-sec-block,\n.ca-prose-block {");
+    expect(secAt).toBeGreaterThan(0);
     expect(
       rules.slice(secAt, rules.indexOf("}", secAt)),
       "the section surface no longer turns the flex context off"

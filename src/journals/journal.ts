@@ -21,7 +21,7 @@ import {
   FENCE_OPEN,
   FENCE_CLOSE,
 } from "../core/constants";
-import { activeMarkdownFile, childFiles, childFolders, createFileEnsuringFolders, ensureFolder, fillTemplate, frontmatterOf, getFile, getFolder, normaliseTypeValue, noteTypeOf, nowTimestamp, openFile, plural, readTemplate, slugify, today } from "../core/util";
+import { activeMarkdownFile, childFolders, childNotes, createFileEnsuringFolders, ensureFolder, fillTemplate, folderNotePath, frontmatterOf, getFile, getFolder, normaliseTypeValue, noteTypeOf, nowTimestamp, openFile, plural, readTemplate, slugify, today } from "../core/util";
 // TYPE-ONLY, and load-bearing. `buildJournalType` used to be imported from
 // custom-journal.ts as a value and called at module scope (STUDY_JOURNAL,
 // below), while custom-journal.ts imports back from here — so whether that
@@ -1678,19 +1678,26 @@ export function journalAncestors(
   // The last segment is the file itself; a folder note repeats its folder's
   // name, so dropping the filename leaves the containers either way.
   //
-  // The cap is the type's own depth, plus one for the promotion any note may
-  // make. A promoted note is a container the type's `levels` doesn't describe —
-  // Study has two levels but a page sits three folders deep — so capping at
-  // levels.length alone would drop the lesson from its own page's trail, leaving
-  // a crumb trail that skips the note the page belongs to.
+  // ── AND THERE IS NO CAP ANY MORE (1.0.38) ──────────────────────────────
   //
-  // THE +1 WAS CONDITIONAL ON A PAGED KIND UNTIL 1.0.23, *"so a stray note filed
-  // far too deep in a type that has no pages still can't invent crumbs for
-  // folders the type has no noun for"*. There is no such type now: every journal
-  // can promote a note, so every journal's trail has the extra level to describe
-  // and the condition could only ever answer yes.
-  const depth = type.levels.length + 1;
-  const folders = parts.slice(0, -1).slice(0, depth);
+  // This read `.slice(0, type.levels.length + 1)`: the type's own depth, plus
+  // one for the promotion any note may make. The +1 was itself a repair — Study
+  // has two levels while a page sits three folders deep, so capping at
+  // `levels.length` dropped the lesson from its own page's trail — and the
+  // moment pages nest, the same argument asks for +2, then +3, which is a cap
+  // chasing a tree.
+  //
+  // WHAT THE CAP WAS PROTECTING is a note filed deeper than the journal puts
+  // one, inventing crumbs for folders the type has no noun for. That protection
+  // is gone and it is right that it is gone: a promoted page is a folder the
+  // type's `levels` does not describe either, and the reader has just asked for
+  // as many of them as they like. A folder under the root is now a note that can
+  // hold pages, so every one of them is an ancestor worth naming.
+  //
+  // THE GUARD THAT MATTERS IS STILL ABOVE, and it is the one that was load-
+  // bearing all along: a path outside this root returns `[]` rather than slicing
+  // a trail out of somebody else's folders.
+  const folders = parts.slice(0, -1);
   return folders.map((name, i) => ({
     name,
     folder: [root, ...folders.slice(0, i + 1)].join("/"),
@@ -2177,29 +2184,17 @@ export class JournalManager {
 
   // ── Pages: splitting one note across several ────────────────────────────
   //
-  // The kind a note belongs to, and its page config, resolved from the note's
-  // own `type` frontmatter rather than from where it sits — the same reason
-  // the banner reads `type` for its own index test.
-  // NORMALISED, LIKE EVERY OTHER READ OF THIS PROPERTY (5.20). It compared the
-  // raw string against a lowercase id, so `type: Lesson` matched nothing and the
-  // two callers fell through to their text-reading fallback — which lowercases,
-  // and so quietly did this function's job as well as its own. That fallback is
-  // for a metadata cache a moment behind a save; leaving it to cover a case
-  // analysis this could answer directly meant a file read on every New Page for
-  // anyone who had ever capitalised a `type:` by hand.
-  //
-  // WHAT IT REFUSES, SINCE 1.0.23. It ended `return kind?.pages ? kind : null`,
-  // where the second half was the per-kind capability tick; every kind has pages
-  // now, so what is left is the only question there ever was for this function —
-  // is this note one of THIS journal's leaf notes. A page answers no (its `type`
-  // is the page id, which is deliberately not a kind), and so does an index
-  // note, a note of another journal, and a note with no `type` at all.
-  private pageKindOf(
+  // `pageKindOf` and `pagesHostOf` are free functions below the class. They were
+  // private methods until 1.0.38, when `buildPagesTable` came to need the same
+  // answer and had no manager to ask: the question is *"given this journal and
+  // this note, what are its pages built from"* and nothing in it is about the
+  // manager's state. The prose that was here is on the functions themselves.
+  private pagesHostOf(
     type: JournalType,
+    file: TFile,
     fm: Record<string, unknown>
-  ): JournalKind | null {
-    const t = normaliseTypeValue(fm["type"]);
-    return (t == null ? undefined : type.kinds.find((k) => k.id === t)) ?? null;
+  ): PagesHost | null {
+    return pagesHostOf(this.app, type, file, fm);
   }
 
   // Whether a note has already been promoted: a folder note is one whose
@@ -2220,10 +2215,16 @@ export class JournalManager {
   //     API would break the links that make it worth having.
   //   • append, never rewrite. The Pages section is spliced in below the
   //     banner and nothing else in the note is touched.
+  //
+  // ── AND IT TAKES THE PAGE CONFIG, NOT THE KIND (1.0.38) ────────────────
+  //
+  // `kind.pages.label` was all it ever read, and asking for a whole `JournalKind`
+  // is what made "promote a PAGE" unaskable: a page has no kind of its own.
+  // `pagesHostOf` answers for both surfaces, so this takes what it returns.
   async promoteToDashboard(
     type: JournalType,
     file: TFile,
-    kind: JournalKind
+    pages: JournalPages
   ): Promise<TFile | null> {
     if (this.isPromoted(file)) return file;
     const parent = file.parent?.path;
@@ -2247,7 +2248,7 @@ export class JournalManager {
     const moved = getFile(this.app, target);
     if (!moved) return null;
 
-    const label = kind.pages.label;
+    const label = pages.label;
     const original = await this.app.vault.read(moved);
     const lines = original.split("\n");
     // Only the half (or halves) the note doesn't already have. A lesson written
@@ -2282,20 +2283,24 @@ export class JournalManager {
     }
 
     let fm = frontmatterOf(this.app, file);
-    let kind = this.pageKindOf(type, fm);
-    if (!kind) {
+    let host = this.pagesHostOf(type, file, fm);
+    if (!host) {
       // Fallback: if metadataCache is momentarily behind after a save, parse type from text
       try {
         const text = await this.app.vault.read(file);
         const match = /^type:\s*["']?([^"'\n\r]+)["']?/m.exec(text);
         if (match && match[1]) {
           const directType = match[1].trim();
-          const fallbackKind = type.kinds.find(
-            (k) => k.id.toLowerCase() === directType.toLowerCase()
-          );
-          if (fallbackKind) {
-            kind = fallbackKind;
-            fm = { ...fm, type: directType };
+          // THE FALLBACK READS THE PAGE ID TOO (1.0.38). It matched `kinds`
+          // alone, which was correct while only a leaf could host a page; a page
+          // created moments ago is exactly the note whose `type: page` the cache
+          // has not seen yet, and that is the note a reader presses New page on
+          // when they split it further.
+          const retry = { ...fm, type: directType };
+          const found = this.pagesHostOf(type, file, retry);
+          if (found) {
+            host = found;
+            fm = retry;
           }
         }
       } catch {
@@ -2317,26 +2322,24 @@ export class JournalManager {
     // than saying no twice. Anything else — an index, a note with no `type`, a
     // stray file under the root — is not one of this journal's notes at all.
     //
-    // BOTH ARE BACKSTOPS RATHER THAN THE PATH. `newPageHere` is gated on
+    // ── AND THE PAGE ARM IS GONE (1.0.38) ────────────────────────────────
+    //
+    // *"A page holds no pages — open X to add another."* was the third of the
+    // three refusals, and the only one a reader ever read. It was true because
+    // `pageKindOf` made it true; the reader's ask was that it stop being. What
+    // is left refuses a note this journal does not own, which is the sentence
+    // this block was reduced to in 1.0.23 with one arm still attached.
+    //
+    // STILL A BACKSTOP RATHER THAN THE PATH. `newPageHere` is gated on
     // `canHoldPages` (`core/actions.ts`), so the palette does not offer the
-    // command on either surface, and the button only exists inside a 📄 Pages
-    // section, which only a leaf composes. This is what a hand-typed
-    // `button:<type>:new-page` on the wrong note gets.
-    if (!kind) {
-      const value = normaliseTypeValue(fm["type"]);
-      const isPage = type.kinds.some((k) => k.pages.id === value);
-      const owner = file.parent?.name;
-      notify.fail(
-        isPage
-          ? owner
-            ? `A page holds no pages — open "${owner}" to add another.`
-            : "A page holds no pages of its own."
-          : `This isn't one of ${type.name}'s notes.`
-      );
+    // command on an index, and the button only exists inside a 📄 Pages section.
+    // This is what a hand-typed `button:<type>:new-page` on the wrong note gets.
+    if (!host) {
+      notify.fail(`This isn't one of ${type.name}'s notes.`);
       return;
     }
 
-    const pages = kind.pages;
+    const { pages, kind } = host;
 
     // THE PAGE DIALOGUE IS THE TITLE DIALOGUE (4.50 §4). It was a bare
     // `promptText` — a title and nothing else — which is the other half of what
@@ -2366,7 +2369,7 @@ export class JournalManager {
     // exactly the same result either way, which is why the ordering read as an
     // implementation detail for four releases.
     //
-    // THE WINDOW NEEDS NOTHING FROM THE PROMOTION. It named `host.basename`,
+    // THE WINDOW NEEDS NOTHING FROM THE PROMOTION. It named the promoted note,
     // and promotion moves a note's PATH, never its basename — so `file` answers
     // the same string before the move as after it. That was the whole of the
     // dependency, and stating it is what keeps someone from restoring the old
@@ -2383,8 +2386,8 @@ export class JournalManager {
     if (!details?.title.trim()) return;
     const safeTitle = details.title.trim().replace(/[\\/:"*?<>|]/g, "-");
 
-    const host = await this.promoteToDashboard(type, file, kind);
-    if (!host?.parent) return;
+    const folderNote = await this.promoteToDashboard(type, file, pages);
+    if (!folderNote?.parent) return;
 
     // AFTER THE PROMOTION, AND IT STILL CANNOT FIRE ON AN UNPROMOTED NOTE. The
     // folder this path is in either did not exist a moment ago — in which case
@@ -2392,7 +2395,7 @@ export class JournalManager {
     // `promoteToDashboard` returned it untouched and the check is the same
     // check it always was. So moving the window up did not buy a collision that
     // costs a promotion.
-    const notePathNew = `${host.parent.path}/${safeTitle}.md`;
+    const notePathNew = `${folderNote.parent.path}/${safeTitle}.md`;
     if (getFile(this.app, notePathNew)) {
       notify.fail(`"${safeTitle}" already exists in this note`);
       return;
@@ -2423,16 +2426,22 @@ export class JournalManager {
     // hand. So does a COUNT of the files beside it, which is what stood here —
     // see `nextPageOrder`, which owns the rule and states the deletion that
     // breaks both.
+    //
+    // `childNotes` SINCE 1.0.38, AND IT IS THE ALLOCATOR'S CORRECTNESS. A page
+    // promoted to hold pages of its own moves into a folder, so `childFiles`
+    // stopped seeing it and stopped seeing its `order` — max+1 over a run with
+    // the largest ordinal missing hands that ordinal out a second time, and two
+    // pages then sort by basename at the same position.
     const order = nextPageOrder(
-      childFiles(host.parent)
-        .filter((f) => f.path !== host.path)
+      childNotes(folderNote.parent)
+        .filter((f) => f.path !== folderNote.path)
         .map((f) => pageOrderOf(frontmatterOf(this.app, f)))
     );
 
     const content = fillTemplate(tpl, {
       title: safeTitle,
       type: pages.id,
-      parent: host.basename,
+      parent: folderNote.basename,
       subject: typeof fm["subject"] === "string" ? fm["subject"] : "",
       topic: typeof fm["topic"] === "string" ? fm["topic"] : "",
       order: String(order),
@@ -2462,11 +2471,21 @@ export class JournalManager {
   // missing and the command reduced to moving a note into a folder named after
   // itself: step one of `newPage`, and a drag in Obsidian's own file explorer.
   //
-  // IT IS NOT REPLACED, AND PAGES DO NOT NEST. `newPage` promotes on the way
-  // past, `pageKindOf` answers null for a page, and there is no other caller of
-  // `promoteToDashboard` left — so a page cannot be turned into a dashboard to
-  // hold pages of its own, from any surface. That is the reader's call, in those
-  // words.
+  // IT IS NOT REPLACED, AND `newPage` IS STILL THE ONLY ROAD TO A PROMOTION.
+  // `newPage` promotes on the way past and there is no other caller of
+  // `promoteToDashboard` left, so the only way a note becomes a folder note is
+  // by being asked for a page.
+  //
+  // ── AND THE SECOND HALF OF THIS PARAGRAPH IS REVERSED (1.0.38) ───────
+  //
+  // It read *"AND PAGES DO NOT NEST… a page cannot be turned into a dashboard
+  // to hold pages of its own, from any surface. That is the reader's call, in
+  // those words."* It was the reader's call and they have made the opposite one,
+  // on the evidence of their own vault: a page that grows too long to read is
+  // the same note a lesson was when it grew too long, and the answer it got was
+  // no. `pagesHostOf` replaced the `pageKindOf` refusal this sentence named, so
+  // **New page** on a page promotes it exactly as it does a lesson — by this
+  // same function, which needed nothing added to it.
   //
   // WHAT WENT WITH IT: a second `when` gate, a second refusal sentence, the
   // `isIndex` argument on `journalBannerMenu` (its only reader), and a fallback
@@ -2714,4 +2733,80 @@ export class JournalManager {
     if (this.studyMissingNotice()) return Promise.resolve();
     return this.newNote(this.studyJournal()!, type, folderArg);
   }
+}
+
+/** What a note's pages are built from: the config, and the leaf kind that owns it. */
+export interface PagesHost {
+  pages: JournalPages;
+  kind: JournalKind;
+}
+
+// Which of this journal's LEAF kinds a note is, from its frontmatter.
+//
+// WHAT IT REFUSES, SINCE 1.0.23. It ended `return kind?.pages ? kind : null`,
+// where the second half was the per-kind capability tick; every kind has pages
+// now, so what is left is the only question there ever was — is this note one of
+// THIS journal's leaf notes. A page answers no (its `type` is the page id, which
+// is deliberately not a kind), and so does an index note, a note of another
+// journal, and a note with no `type` at all.
+export function pageKindOf(
+  type: JournalType,
+  fm: Record<string, unknown>
+): JournalKind | null {
+  const t = normaliseTypeValue(fm["type"]);
+  return (t == null ? undefined : type.kinds.find((k) => k.id === t)) ?? null;
+}
+
+// ── WHAT A NOTE'S PAGES ARE BUILT FROM, LEAF OR PAGE (1.0.38) ────────────
+//
+// The second of the three refusals that kept pages flat. `pageKindOf` answers
+// "which of this journal's LEAF kinds is this", and `newPage` treated a `null`
+// as "this note holds no pages" — so a page, whose `type` is deliberately not
+// a kind, could never be the host of one.
+//
+// WHAT THE CALLERS ACTUALLY WANT IS `kind.pages`, and every kind of a journal
+// shares one object: `buildJournalType` builds `{ id, label, template }` once
+// and hands the same value to every kind, which is the fact that makes a page
+// answerable at all. So for a page the config is the journal's, full stop.
+//
+// THE KIND IS STILL RESOLVED, by walking up. `pageLayoutText` composes a page
+// against `sectionContext(type, { page: kind })`, which reads the kind's rating
+// and noun — so a sub-page of a Lesson must compose as a Lesson's page and not
+// as an arbitrary one. The walk asks each folder above for its folder note and
+// stops at the first one whose `type:` is a kind, which is the owning leaf at
+// any depth. It stops at the journal root, so it cannot climb out.
+//
+// NULL IS STILL "NOT ONE OF THIS JOURNAL'S NOTES", and an index still answers
+// it: an index's `type` is a level id, which is neither a kind nor the page id.
+export function pagesHostOf(
+  app: App,
+  type: JournalType,
+  file: TFile,
+  fm: Record<string, unknown>
+): PagesHost | null {
+  const own = pageKindOf(type, fm);
+  if (own) return { pages: own.pages, kind: own };
+
+  const value = normaliseTypeValue(fm["type"]);
+  if (!value || !type.kinds.some((k) => k.pages.id === value)) return null;
+
+  const root = normalizePath(type.root);
+  for (
+    let folder = file.parent;
+    folder && normalizePath(folder.path).startsWith(root);
+    folder = folder.parent
+  ) {
+    const note = getFile(app, folderNotePath(folder.path));
+    const kind = note ? pageKindOf(type, frontmatterOf(app, note)) : null;
+    if (kind) return { pages: kind.pages, kind };
+  }
+
+  // A PAGE WHOSE OWNER CANNOT BE READ IS STILL A PAGE. The folder note may be
+  // missing, or its `type:` may have been hand-edited away; the page config is
+  // the journal's either way, so the only thing lost is which kind's layout a
+  // new page composes from. Falling back to the first kind keeps New page
+  // working on a note the vault has damaged, rather than refusing with a
+  // sentence about a file the reader is not looking at.
+  const first = type.kinds[0];
+  return first ? { pages: first.pages, kind: first } : null;
 }

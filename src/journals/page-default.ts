@@ -100,6 +100,72 @@ export function nextPageOrder(existing: readonly (number | null)[]): number {
   return known.length === 0 ? 1 : Math.max(...known) + 1;
 }
 
+/** One page, as the reorder arithmetic needs to see it. */
+export interface PageOrder {
+  path: string;
+  order: number | null;
+}
+
+// ── MOVING A PAGE UP OR DOWN ITS NOTE (1.0.38) ───────────────────────────
+//
+// The list was read-only for four releases: `order` was stamped once at creation
+// and never written again, so a reader who wrote their pages out of sequence
+// reordered them by renaming files until the tie-break put them right. The arrows
+// write the property the table already sorts on.
+//
+// ── IT RENUMBERS THE WHOLE RUN, AND THAT IS THE DECISION ────────────────
+//
+// The cheap move is to SWAP the two ordinals. It works on a run that is already
+// 1..n and does something arbitrary on every other run, and every other run is
+// the common one: `nextPageOrder` is max+1, so pages 1,2,3 with the second
+// deleted and two added are 1,3,4,5 — and a hand-made page has no `order` at
+// all, sorting last with nothing to swap WITH. Swapping a number with `null`
+// either loses a position or invents one.
+//
+// So the arithmetic is: sort the run the way the table sorts it, move one entry
+// one place, and hand back 1..n. Every ambiguity the file's own header describes
+// — the gaps, the collisions, the missing ordinals — is resolved by the write
+// rather than carried through it, and `nextPageOrder`'s max+1 keeps working
+// because max is now exactly the length.
+//
+// PURE, AND IN THIS FILE, for the reason its header gives: *no `App`, no plugin,
+// no DOM… the only reason this release can be checked without a vault.* The
+// widget reads the list, calls this, and writes back what it returns.
+//
+// AN EMPTY RETURN MEANS "NOTHING TO DO", not "failure": the top page pressed ↑,
+// the bottom pressed ↓, or a path that is not in this run at all. The caller
+// writes nothing and says nothing, which is what a no-op should look like from
+// the outside.
+export function reorderedPages(
+  current: readonly PageOrder[],
+  path: string,
+  delta: -1 | 1
+): PageOrder[] {
+  // THE TABLE'S OWN SORT, SPELLED ONCE MORE — and it must stay the table's,
+  // because a reader pressing ↑ moves the row ABOVE the one they can see. An
+  // order this disagreed with would move a page past a neighbour it had never
+  // been drawn beside.
+  const sorted = [...current].sort((a, b) => {
+    const av = a.order ?? Number.MAX_SAFE_INTEGER;
+    const bv = b.order ?? Number.MAX_SAFE_INTEGER;
+    if (av !== bv) return av - bv;
+    return baseOf(a.path).localeCompare(baseOf(b.path));
+  });
+  const from = sorted.findIndex((p) => p.path === path);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= sorted.length) return [];
+
+  const moved = sorted[from];
+  const rest = sorted.filter((_, i) => i !== from);
+  rest.splice(to, 0, moved);
+  return rest.map((p, i) => ({ path: p.path, order: i + 1 }));
+}
+
+// The basename the tie-break compares, without a `TFile` to ask.
+function baseOf(path: string): string {
+  return (path.split("/").pop() ?? path).replace(/\.md$/, "");
+}
+
 /** One row of a layout dropdown. Structurally `TemplateChoice`, without the UI import. */
 export interface LayoutChoice {
   id: string;
@@ -196,6 +262,10 @@ export function isPromotedPath(path: string): boolean {
 // of this journal" — and the two surfaces that are not, an index note and a page
 // itself, are exactly what this excludes.
 //
+// AS OF 1.0.38 A PAGE IS NO LONGER ONE OF THEM. The question is "is this note at
+// or below the leaf line", and an index is the only surface left that answers
+// no. See the arithmetic below for why that is one operator.
+//
 // PATH ARITHMETIC RATHER THAN FRONTMATTER, and the reason is the caller.
 // `core/actions.ts`'s `when` predicates run on every palette keystroke for every
 // action, under a rule written down in that file: *settings and the active
@@ -205,15 +275,32 @@ export function isPromotedPath(path: string): boolean {
 // every note in a journal and then apologised is what this replaces.
 //
 // THE ARITHMETIC, for a journal with L levels: a leaf sits L folders below the
-// root, and a PROMOTED leaf — a folder note — sits one deeper, because promotion
-// gives it a folder of its own. So an index note fails it (a folder note above
-// L + 1), a page fails it (L + 1 folders deep and NOT a folder note), and both
-// shapes of leaf pass.
+// root, and a PROMOTED note — a folder note — sits one deeper than the notes
+// beside it, because promotion gives it a folder of its own. An index note is a
+// folder note at or above L, so it fails; everything at or below the leaf line
+// passes.
+//
+// ── AND IT WAS `===`, WHICH IS WHAT FORBADE NESTING (1.0.38) ─────────────
+//
+// One operator, and it was the first of the three refusals a page met. `=== L`
+// admits exactly two shapes — the leaf and the promoted leaf — so a page (L + 1
+// folders, not a folder note) failed by one, and a promoted page (L + 2, a
+// folder note) failed by one the other way. The reader's ask was *"page
+// hierarchy via folders"*, and the folders were already there: nothing in the
+// tree needed a new level, only permission to go past the line.
+//
+// `>=` IS NOT A LOOSENING OF THE INDEX CASE, which is the half worth checking
+// rather than asserting. An index at depth d is a folder note, so the right-hand
+// side is d + 1 and it needs `d >= d + 1` — false at every depth, including the
+// deepest level, where a leaf at the same folder count passes because it is not
+// a folder note. The two are told apart by promotion, not by depth, and that is
+// what survives dropping the cap.
 //
 // WRONG ONLY ABOUT A NOTE FILED SOMEWHERE THE JOURNAL DOES NOT PUT ONE, where it
-// answers no and the command is not offered. `newPage` still resolves the kind
-// from `type:` and still refuses in its own words, so nothing here decides
-// whether the page is MADE — only whether the palette offers to.
+// answers yes to a stray note filed deeper than any journal note — the price of
+// having no ceiling any more. `newPage` still resolves the note's own `type:`
+// and still refuses in its own words, so nothing here decides whether the page
+// is MADE — only whether the palette offers to.
 export function pathHoldsPages(
   type: { root: string; levels: readonly unknown[] },
   notePath: string
@@ -222,7 +309,7 @@ export function pathHoldsPages(
   if (root === "" || !notePath.startsWith(`${root}/`)) return false;
   const rel = notePath.slice(root.length).replace(/^\//, "");
   const folders = rel.split("/").length - 1;
-  return folders === type.levels.length + (isPromotedPath(notePath) ? 1 : 0);
+  return folders >= type.levels.length + (isPromotedPath(notePath) ? 1 : 0);
 }
 
 // The pages of a title: every markdown file beside it in its own folder.

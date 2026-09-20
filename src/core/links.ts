@@ -55,7 +55,14 @@ export interface LinkTarget {
 // (self-titled to match its own folder, e.g. "Topic/Topic.md" — up is the
 // folder above that one) or a plain leaf note living inside a folder (e.g.
 // a lesson note inside "Topic/" — up is that note's own folder).
-function resolveUp(app: App, file: TFile): LinkTarget {
+// ── AND IT IS THE PAGE HEAD'S PARENT LOOKUP TOO, AS OF 1.0.38 ──────────────
+//
+// Exported for `page-head.ts`, which names a page's parent in its eyebrow. The
+// question is identical — *which folder note is one step up from this note* —
+// and it is right at ANY depth, which is what made nesting cost the head
+// nothing: the rule is stated in terms of this note's own folder, so a page of
+// a page of a page resolves by the same two lines as a page of a lesson.
+export function resolveUp(app: App, file: TFile): LinkTarget {
   const parent = file.parent;
   const isFolderNote = !!parent && file.basename === parent.name;
   const target = isFolderNote ? parent?.parent ?? null : parent;

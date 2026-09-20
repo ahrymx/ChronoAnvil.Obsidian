@@ -292,16 +292,27 @@ describe("what surface a page presents", () => {
     // the bug described above, where the two halves of the answer disagreed.
     const ctx = pageCtx();
     expect(ctx?.noteKind).toBe("page");
-    expect(ctx?.hasPages).toBe(false);
     expect(ctx?.ownNoun).toBe("Page");
+    // AND `hasPages` IS NO LONGER THE FIELD THAT SAYS SO (1.0.38). It read
+    // false here, which is what made a page a surface that could hold nothing;
+    // the distinction this test is about lives in `noteKind` and in the
+    // typeValue below, neither of which moved.
+    expect(ctx?.typeValue).toBe("page");
   });
 
-  it("is never offered a page index of its own", () => {
+  it("is offered a page index of its own, and is shipped one", () => {
     const ctx = pageCtx();
     expect(ctx).toBeTruthy();
-    // `applies` is what withholds it; addableSections filters on top of that.
+    // `applies` is what offers it; `default` is what a fresh template gets, and
+    // both say yes as of 1.0.38. The first draft of this release shipped `false`
+    // here — the section arriving when it is earned — and the reader looked at a
+    // page and asked for the other thing: a new page opens with the same stacked
+    // card a lesson does. The empty card reads *No pages yet*, which is a page
+    // saying the depth just gained goes on going.
     const offered = sectionsFor(ctx!).map((s) => s.id);
-    expect(offered).not.toContain("pages");
+    expect(offered).toContain("pages");
+    const pages = sectionsFor(ctx!).find((s) => s.id === "pages")!;
+    expect(pages.default?.(ctx!)).toBe(true);
   });
 });
 

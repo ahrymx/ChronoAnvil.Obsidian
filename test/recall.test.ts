@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 
 import { studyComposed, studyFile } from "./study-template";
+import { STUDY_JOURNAL, kindsCarrying } from "../src/journals/journal";
 import {
   RecallPair,
   confidenceFor,
@@ -356,13 +357,15 @@ describe("the shipped templates", () => {
     expect(t).toContain("<!--chronoanvil:recall");
   });
 
-  it("still gives a page no rating of its own", () => {
-    // Carrying a recall block must not have quietly turned a page into a unit
-    // of review — that would put it back in the queue and the average.
-    const t = asset("template-page.md");
-    expect(t).not.toMatch(/^confidence:/m);
-    expect(t).not.toMatch(/^status:/m);
-    expect(t).not.toContain("tracker:confidence");
+  it("still keeps a page out of the queue and the average", () => {
+    // WAS "still gives a page no rating of its own", and the worry it guarded —
+    // *"carrying a recall block must not have quietly turned a page into a unit
+    // of review"* — is the right worry asserted on the wrong thing. A page
+    // carries its rating as of 1.0.38; what keeps it out of the queue and the
+    // average is that its `type:` is not one of the journal's kinds, which is
+    // where both filters look. Assert that, and the property is free to move.
+    expect(STUDY_JOURNAL.kinds.some((k) => k.id === "page")).toBe(false);
+    expect(kindsCarrying(STUDY_JOURNAL, "confidence")).not.toContain("page");
   });
 
   it("keeps Recall off the Practice template", () => {

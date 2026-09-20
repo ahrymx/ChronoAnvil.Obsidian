@@ -18,6 +18,7 @@ import {
   defaultSectionIds,
   detectSections,
   findSection,
+  proseIdFor,
   sectionContext,
   sectionsFor,
   surfaceLayout,
@@ -614,28 +615,51 @@ describe("nothing the plugin did not write is touched", () => {
     // container of its own — it is under a `## `, interleaved with the
     // catalogue's — so "keep the whole section" and "drop the whole section"
     // are both wrong and the choice has to be made one heading at a time.
+    //
+    // ON A SECOND PROSE BLOCK, BECAUSE THE FIRST CANNOT GO (1.0.36). Prose is
+    // part of every journal note now, so the block a reader may untick is one
+    // they added — and that is the note this builds. The rule under test is
+    // unchanged and is the same code; what changed is which block a reader is
+    // allowed to point it at.
     const lesson = allTemplates().find((t) => t.file.includes("lesson"))!;
-    const note = lesson.text
-      .replace("What is this lesson about, and why does it matter?", "")
-      .replace("- **Definition:** \n- **Example:** ", "- **Definition:** ohms law");
+    const two = applySections(lesson.text, lesson.ctx, [
+      ...sectionsPresent(lesson.text, lesson.ctx),
+      proseIdFor(2),
+    ])!;
+    // Both edits land in the LAST block, which is the one being removed: empty
+    // one heading out, write a line under another.
+    const inSecond = (text: string, find: string, put: string): string => {
+      const at = text.lastIndexOf(find);
+      return `${text.slice(0, at)}${put}${text.slice(at + find.length)}`;
+    };
+    const note = inSecond(
+      inSecond(two, "What is this lesson about, and why does it matter?", ""),
+      "- **Definition:** \n- **Example:** ",
+      "- **Definition:** ohms law"
+    );
 
-    // ONLY THE SKELETON IS UNTICKED. Asking for an empty note would remove
+    // ONLY THE SECOND BLOCK IS UNTICKED. Asking for an empty note would remove
     // every section at once, and the blank lines four removals leave between
     // them would say nothing about this one.
     const want = sectionsPresent(note, lesson.ctx).filter(
-      (id) => id !== "headings"
+      (id) => id !== "headings#2"
     );
     const op = planSections(note, lesson.ctx, want).find(
-      (o) => o.sectionId === "headings"
+      (o) => o.sectionId === "headings#2"
     )!;
     expect(op.kind).toBe("remove");
     expect(op.keepsContent?.map((k) => k.key)).toContain("Key Concepts");
     expect(op.keepsContent?.map((k) => k.key)).not.toContain("Overview");
 
     const after = applySections(note, lesson.ctx, want)!;
-    expect(after).toContain("## Key Concepts");
     expect(after).toContain("ohms law");
-    expect(after).not.toContain("## Overview");
+    // COUNTED RATHER THAN SEARCHED FOR, because the first block still carries a
+    // copy of every heading in the second. One `## Overview` left means the
+    // empty one went; two `## Key Concepts` means the written one stayed.
+    const count = (hay: string, needle: string): number =>
+      hay.split(needle).length - 1;
+    expect(count(after, "## Overview")).toBe(1);
+    expect(count(after, "## Key Concepts")).toBe(2);
     // No marker survives a removal, and no gap opens where the empty headings
     // were: `tidyBlanks` is what stops a note growing a blank line every time
     // somebody unticks something.

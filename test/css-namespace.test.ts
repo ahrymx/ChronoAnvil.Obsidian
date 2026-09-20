@@ -36,12 +36,23 @@ const ALLOWED = new Set([
   // OBSIDIAN'S OWN, which this plugin reads and must spell exactly. These are
   // the whole legitimate case for an unprefixed class: an element the host
   // built, or a hook the host looks for.
+  //
+  // `cm-content` is CodeMirror's editable container, `cm-line` one source line
+  // inside it and `mod-cm6` the marker the editor view wears in Live Preview.
+  // The prose surface is painted on `.cm-line` there, and the three are spelt
+  // together so the rule outranks Obsidian's own `.markdown-source-view.mod-cm6
+  // .HyperMD-…` line spacing — see 70-section-surface.css. `cm-embed-block` is
+  // the container Obsidian mounts a rendered block into, named in
+  // `OBSIDIAN_DOM` for the same reason and excluded from that rule so the
+  // surface is never painted behind a card that has one already.
   "app-header", "callout", "callout-content", "callout-icon", "callout-title",
-  "callout-title-inner", "clickable-icon", "cm-editor", "cm-scroller",
+  "callout-title-inner", "clickable-icon", "cm-content", "cm-editor",
+  "cm-embed-block",
+  "cm-line", "cm-scroller",
   "cm-sizer", "dropdown", "inline-title", "internal-link",
   "markdown-preview-sizer", "markdown-preview-view", "markdown-reading-view",
   "markdown-source-view", "metadata-container", "mobile-header",
-  "mobile-navbar", "mobile-toolbar", "mod-cta", "mod-warning",
+  "mobile-navbar", "mobile-toolbar", "mod-cm6", "mod-cta", "mod-warning",
   "modal-button-container", "modal-close-button", "modal-content", "open",
   "setting-item", "setting-item-control",
   "setting-item-info", "setting-item-inline", "setting-item-name",
@@ -55,6 +66,19 @@ const ALLOWED = new Set([
   // file. New notes get `ca-wide`; this stays so an un-migrated vault keeps
   // its wide pages. See tools/migrate-vault.mjs, which rewrites it on request.
   "almanac-wide",
+
+  // OBSIDIAN'S OWN, in the spelling only a stylesheet needs. `-bg` is the row
+  // of a code fence that carries the code's own colour, and `-begin`/`-end`
+  // are its two marker rows — where Live Preview stops showing the three
+  // backticks and draws the block's top and bottom instead. The prose surface
+  // paints every line of the writing and names `-bg` as the one exception, so
+  // all three words are load-bearing. They are not in `OBSIDIAN_DOM` because
+  // nothing in `src/` reads them; this is the only file that needs the words.
+  "HyperMD-codeblock-bg", "HyperMD-codeblock-begin", "HyperMD-codeblock-end",
+  "HyperMD-codeblock-begin-bg", "HyperMD-codeblock-end-bg",
+  // And `hr` is a CLASS on the row Obsidian puts a horizontal rule in —
+  // `hr cm-line`, per the editor's own DOM — not the element it looks like.
+  "hr",
 ]);
 
 // COLLISION EXEMPTIONS: words that coincide with a `.ca-X` CSS class name

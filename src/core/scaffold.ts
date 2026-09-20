@@ -1848,7 +1848,7 @@ export class Scaffold {
         if (regrouped !== titledSummary) {
           ops.push({
             kind: "migrate",
-            detail: "group this page's sections the way this version lays them out",
+            detail: "group this note's sections the way this version lays them out",
           });
         }
         out.push({

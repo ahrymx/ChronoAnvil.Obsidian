@@ -58,8 +58,10 @@ import { periodAnchor, valueLabel } from "../../diary/periodnav";
 // the one cast and the `MomentLike` surface every date-doing module in the tree
 // already reads. It is also the import `eslint`'s `no-restricted-globals` rule
 // leaves standing — the global is the error, not the module.
-import { dashboardGrainOf, folderNotePath, folderPrefix, frontmatterOf, moment, normaliseTypeValue, noteTypeOf } from "../../core/util";
+import { dashboardGrainOf, folderNotePath, folderPrefix, frontmatterOf, moment, noExt, normaliseTypeValue, noteTypeOf, openFile } from "../../core/util";
 import { LOGBOOK_TITLE } from "../../core/vocabulary";
+import { resolveUp } from "../../core/links";
+import { attachFileGestures } from "../file-gestures";
 import { addPageActionsControl } from "./actions-menu";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
@@ -129,10 +131,26 @@ export interface PageHeadText {
   surface: BannerSurface;
   /** What this note IS — "Daily entry", "Study · Lesson". "" where none fits. */
   eyebrow: string;
+  /**
+   * The note this one is a page OF, when there is one; null on every other
+   * surface. The label is already the TAIL of `eyebrow` — see `eyebrowFor`.
+   *
+   * ── WHY THIS IS A SECOND FIELD AND NOT A RICHER `eyebrow` (1.0.38) ──────
+   *
+   * `eyebrow` is a plain string because two callers ASK it a question rather
+   * than draw it: `pageHeadSays` splits it on `·` so the tracker card's context
+   * strip can withhold a fact the head already states. Making it a node, or a
+   * list of parts, would move that predicate's work into every caller — and the
+   * comment above `PageHeadText` is about exactly the failure that causes.
+   *
+   * So the string stays whole and this says which part of it is a LINK. The
+   * `file` is null when the parent cannot be resolved, and the head then prints
+   * the label as text: `journalCrumbs` has followed the same rule since 4.36,
+   * because a dead link to a note that is not there is a step to nowhere.
+   */
+  parent: { label: string; file: TFile | null } | null;
   /** The name the head prints, whatever the pencil writes to. */
   title: string;
-  /** The date under the name, or null where the date IS the name. */
-  sub: string | null;
   /**
    * What the pencil writes to, or `"none"` where the head prints a name the
    * reader does not own — see the overview arm of `pageHeadText`.
@@ -241,7 +259,7 @@ export function pageHeadText(
 ): PageHeadText | null {
   const surface = bannerSurfaceOf(file.path, bannerScopeOf(plugin));
   if (!surface) return null;
-  const eyebrow = eyebrowFor(plugin, file, surface);
+  const { text: eyebrow, parent } = headEyebrow(plugin, file, surface);
 
   // THE PERIOD IS THE PAGE'S NAME, AND IT IS NOT A NAME ANYONE TYPED (4.51.7).
   // A period dashboard is `Monthly.md` on disk and *August 2026* on screen, and
@@ -256,8 +274,8 @@ export function pageHeadText(
       return {
         surface,
         eyebrow,
+        parent,
         title: valueLabel(role.unit, periodAnchor(plugin.app, file, role.unit)),
-        sub: null,
         target: "none",
       };
     }
@@ -268,11 +286,8 @@ export function pageHeadText(
   return {
     surface,
     eyebrow,
+    parent,
     title,
-    // THE DATE UNDER THE NAME, AND ONLY WHERE IT IS NOT THE NAME. An untitled
-    // entry is called by its date, so a subtitle repeating it is the same words
-    // twice — the rule the bar's meta slot already follows.
-    sub: date && date !== title ? date : null,
     target: titleTargetFor(surface, date !== null),
   };
 }
@@ -290,9 +305,20 @@ export function pageHeadSays(
   const eyebrow = pageHeadText(plugin, file)?.eyebrow;
   if (!eyebrow) return false;
   const want = fact.trim().toLowerCase();
-  return eyebrow
-    .split("·")
-    .some((part) => part.trim().toLowerCase() === want);
+  return eyebrow.split("·").some((part) => {
+    const seg = part.trim().toLowerCase();
+    // ── AND A SEGMENT MAY NOW CARRY A SECOND FACT (1.0.38) ───────────────
+    //
+    // A page's segment reads `Page of HTML + CSS Cheat Sheet`, and an exact
+    // match would answer NO to *"does the head say Page?"* on the one surface
+    // where it plainly does. The predicate exists to stop a fact being printed
+    // twice, so it has to read the segment the way a reader does.
+    //
+    // THE PREFIX, NOT A `includes`. `of` is the join this file writes and the
+    // only one; matching anywhere in the segment would suppress "Lesson" under
+    // a head reading `Page of Lesson Four`, which is a different note's name.
+    return seg === want || seg.startsWith(`${want} of `);
+  });
 }
 
 // The head, or null on a note the bar does not reach.
@@ -379,7 +405,7 @@ export function buildPageHead(
   // same string it has always said.
   const rail = railOf(plugin, file, said.surface);
   if (rail) buildRail(root, rail);
-  else if (said.eyebrow) root.createDiv({ cls: "ca-jph-eyebrow", text: said.eyebrow });
+  else if (said.eyebrow) buildEyebrow(app, root, said, ctx.sourcePath);
 
   const row = root.createDiv({ cls: "ca-jph-titlerow" });
   const date = dateLabel(plugin, file);
@@ -408,8 +434,162 @@ export function buildPageHead(
   // was careful about for the same reason.
   if (withActions) addPageActionsControl(row, plugin, file.path);
 
-  if (said.sub) root.createDiv({ cls: "ca-jph-sub", text: said.sub });
+  // ── AND NOTHING UNDER THE NAME (1.0.35) ─────────────────────────────────
+  //
+  // A `.ca-jph-sub` div stood here printing the note's date — `sub` on
+  // `PageHeadText`, filled where the date was not already the title. It is
+  // deleted, field and rule and all, on the reader's call: *"there is a
+  // sub-header stating 'Mon 1 Jan 2001'. To be honest, even though it is wrong,
+  // there is no need for this subheader to be in a page banner — it is safe to
+  // remove."*
+  //
+  // BOTH HALVES OF THAT ARE TRUE AND THE SECOND IS THE ONE THAT DECIDES IT.
+  // The wrong date was real: `entryDateLabel` falls back to `isoDate(basename)`
+  // and then formats whatever `journal-date` holds, so an index note that never
+  // had a date — a subject page, which is the one in the screenshot — got a
+  // formatted epoch rather than nothing. But fixing the date would have left a
+  // correct date line on a head that has no business carrying one: a leaf
+  // note's date is already in the trail row's meta slot (`metaFor`), a diary
+  // entry's is its title, and a period dashboard's is its title. The line
+  // repeated something on every surface it appeared on.
+  //
+  // WHAT THIS DOES NOT DELETE is `dateLabel`. It still decides the pencil's
+  // target (`titleTargetFor(surface, date !== null)`) and still stands in as
+  // the property pencil's placeholder, which is why it reads as unused here
+  // and is not.
   return root;
+}
+
+// The eyebrow as the head both SAYS it and DRAWS it. 1.0.38.
+//
+// ── THE READER WROTE THE PARENT IN BY HAND, WHICH IS THE BUG REPORT ──────
+//
+// A page's head read `STUDY · PAGE` and stopped. The note it is a page OF was
+// named nowhere on the page — the vault bar's trail has it, but that is chrome
+// above the note and off entirely in some setups — so the reader typed
+// **Parent page:** and the cheatsheet's name into the prose of the page itself.
+// A fact a reader maintains by hand is a fact the plugin already knows and is
+// not printing.
+//
+// `PAGE OF HTML + CSS CHEAT SHEET` is what they chose over the alternatives: a
+// crumb row under the head, a back arrow beside the title. It costs no new row,
+// it reads as a sentence, and the eyebrow was already the line that says what
+// this note IS — *a page of that* is the whole answer rather than half of it.
+//
+// COMPOSED HERE AND NOWHERE ELSE, which is what keeps `eyebrow` a string the
+// two asking callers can still split (see `PageHeadText.parent`). `eyebrowFor`
+// answers what KIND of note this is, unchanged on every surface; this joins the
+// parent on to it, and only this knows the word `of` is the join.
+function headEyebrow(
+  plugin: ChronoAnvilPlugin,
+  file: TFile,
+  surface: BannerSurface
+): { text: string; parent: PageHeadText["parent"] } {
+  const text = eyebrowFor(plugin, file, surface);
+  const parent = text ? pageParentOf(plugin, file, surface) : null;
+  return { text: parent ? `${text} of ${parent.label}` : text, parent };
+}
+
+// The note this one is a page of, or null where the question does not apply.
+//
+// ── `resolveUp` ANSWERS IT, AT EVERY DEPTH, AND IT ALREADY DID ───────────
+//
+// `core/links.ts` has computed this since 2.x for the bar's **Up** pill: a
+// folder note's parent is its folder's folder, a plain note's is its own
+// folder, and the folder note of whichever that is, is the answer. It is stated
+// in terms of THIS note's folder rather than the journal's shape, so the moment
+// pages nest it keeps being right without being touched — a page of a page of a
+// page resolves by the same two lines as a page of a lesson.
+//
+// THE FALLBACK IS `parent:`, AND IT IS THE FIRST READER THAT PROPERTY HAS EVER
+// HAD. `journal-template.ts` calls it *"the ONLY thing tying a page to the note
+// it is a page of"*, and until this release nothing in `src/` read it: every
+// comment claiming it mattered was describing an intention. It is written at
+// creation and stands for the note that HELD the page then, so it is the right
+// answer when the folder note is missing and the wrong one when the page has
+// been moved — hence second, and hence unlinked. A crumb with no file is text,
+// never a dead link; `journalCrumbs` has followed that rule since 4.36.
+function pageParentOf(
+  plugin: ChronoAnvilPlugin,
+  file: TFile,
+  surface: BannerSurface
+): PageHeadText["parent"] {
+  if (surface !== "journal") return null;
+  const type = journalTypeAtPath(plugin, file.path);
+  if (!type) return null;
+  // ONLY A PAGE. A leaf's parent is the index above it, which the rail and the
+  // bar's trail both name already, and an index's is the journal — naming
+  // either would be the doubling this whole head exists to remove.
+  const value = normaliseTypeValue(noteTypeOf(plugin.app, file));
+  if (value == null || !type.kinds.some((k) => k.pages.id === value)) return null;
+
+  const up = resolveUp(plugin.app, file);
+  if (up.file) return { label: up.file.basename, file: up.file };
+
+  const declared = frontmatterOf(plugin.app, file)["parent"];
+  const label = typeof declared === "string" ? declared.trim() : "";
+  // AN UNFILLED TOKEN IS NOT A NAME. The page TEMPLATE carries the literal
+  // `{{parent}}`, it lives under the journal root, and it declares `type: page`
+  // — so a reader who opens their template to edit it reaches every line above.
+  // `PAGE OF {{PARENT}}` is the kind of wrong that looks like a broken plugin.
+  return label && !label.includes("{{") ? { label, file: null } : null;
+}
+
+// The eyebrow's markup: text, with the parent's name as a real link.
+//
+// THE SAME FOUR GESTURES EVERY OTHER LINK HERE HAS, copied from `renderCrumb`
+// (`study-header.ts`) rather than reinvented — `internal-link` for the theme's
+// look, a click handler because Obsidian's own are bound to rendered markdown
+// and not to chrome a plugin builds, `attachFileGestures` for middle-click and
+// the file menu, and a `hover-link` trigger for the page preview. 1.0.30 is the
+// release that learned a link wearing the class and none of the behaviour is
+// worse than a plain one, because it looks like it should work.
+function buildEyebrow(
+  app: ChronoAnvilPlugin["app"],
+  root: HTMLElement,
+  said: PageHeadText,
+  sourcePath: string
+): void {
+  const el = root.createDiv({ cls: "ca-jph-eyebrow" });
+  const parent = said.parent;
+  // THE LABEL IS THE TAIL OF THE STRING, and `headEyebrow` is what makes that
+  // true. The guard is not defensive noise: the two are separate fields, and a
+  // future arm that composes them differently must fall back to plain text
+  // rather than slice the wrong number of characters off a reader's head.
+  if (!parent || !said.eyebrow.endsWith(parent.label)) {
+    el.setText(said.eyebrow);
+    return;
+  }
+  el.createSpan({
+    text: said.eyebrow.slice(0, said.eyebrow.length - parent.label.length),
+  });
+  const file = parent.file;
+  if (!file) {
+    el.createSpan({ cls: "ca-jph-parent", text: parent.label });
+    return;
+  }
+  const href = noExt(file.path);
+  const a = el.createEl("a", {
+    cls: "internal-link ca-jph-parent",
+    href,
+    text: parent.label,
+    attr: { "data-href": href, "aria-label": parent.label, title: parent.label },
+  });
+  a.addEventListener("click", (evt) => {
+    evt.preventDefault();
+    void openFile(app, file);
+  });
+  attachFileGestures(app, a, file);
+  a.addEventListener("mouseover", (evt) => {
+    app.workspace.trigger("hover-link", {
+      event: evt,
+      source: "ca-page-head",
+      hoverParent: el,
+      targetEl: a,
+      linktext: href,
+      sourcePath,
+    });
+  });
 }
 
 // What this note IS, in small caps over its name.
@@ -603,7 +783,8 @@ function dateLabel(plugin: ChronoAnvilPlugin, file: TFile): string | null {
   return entryDateLabel(plugin.app, file, grainOf(plugin, file));
 }
 
-// What the title row will read, so the subtitle can decline to repeat it.
+// What the title row will read. Also decides the pencil's target, which is why
+// it survived the subtitle it was written for (1.0.35).
 function titleTextOf(
   app: ChronoAnvilPlugin["app"],
   file: TFile,

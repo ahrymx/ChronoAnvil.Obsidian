@@ -159,7 +159,7 @@ describe("patch 5: the option reaches the catalogue that understands it", () => 
     expect(at).toBeGreaterThan(0);
     const body = src.slice(at, src.indexOf("\n}", at));
     expect(body.indexOf("...declared")).toBeLessThan(
-      body.indexOf("optionsFor(requested, section.id)")
+      body.indexOf("optionsFor(requested, id)")
     );
     // And nothing composes those two layers anywhere else.
     expect(src).not.toContain("renderSection(section, ctx, {");

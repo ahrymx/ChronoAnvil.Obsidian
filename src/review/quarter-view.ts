@@ -165,7 +165,7 @@ function renderBody(
       text:
         s.months.every((m) => m.future)
           ? "This quarter hasn't started yet."
-          : "Nothing to roll up yet — this page fills in from the monthly entries.",
+          : "Nothing to roll up yet — this note fills in from the monthly entries.",
     });
   }
 }

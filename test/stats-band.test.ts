@@ -689,7 +689,7 @@ describe("every cell is configurable, on a note that already has a band", () => 
       slot3: "",
       slot4: "",
     });
-    expect(questions()[0].emptyLabel).toBe("This page's own choice");
+    expect(questions()[0].emptyLabel).toBe("This note's own choice");
     expect(questions()[1].emptyLabel).toBe("Nothing");
   });
 

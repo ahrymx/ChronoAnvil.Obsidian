@@ -23,7 +23,7 @@ button:study:new-page
 pages-table
 ```
 
-<!--chronoanvil-skeleton-->
+<!--chronoanvil-prose-->
 
 ## Overview
 
@@ -48,7 +48,7 @@ What is this lesson about, and why does it matter?
 
 - [[]]
 
-<!--/chronoanvil-skeleton-->
+<!--/chronoanvil-prose-->
 
 %% chronoanvil-graph %%
 %% [[Study|​]] %%

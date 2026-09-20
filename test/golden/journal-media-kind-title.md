@@ -24,7 +24,7 @@ button:media:new-page
 pages-table
 ```
 
-<!--chronoanvil-skeleton-->
+<!--chronoanvil-prose-->
 
 ## Overview
 
@@ -38,7 +38,7 @@ pages-table
 
 
 
-<!--/chronoanvil-skeleton-->
+<!--/chronoanvil-prose-->
 
 %% chronoanvil-graph %%
 %% [[Media|​]] %%

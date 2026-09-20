@@ -151,6 +151,16 @@ function surfaceOf(type: JournalType, value: string): SectionContext | null {
   //
   // sectionContext has had a `{ page }` branch since the catalogue existed and
   // templateTargets uses it correctly; this was the one caller that didn't.
+  //
+  // ── HALF OF THAT BUG IS NOW THE FEATURE, AND HALF IS STILL A BUG (1.0.38) ──
+  //
+  // Pages nest, so offering a page the 📄 Pages section is right and the `{ page }`
+  // branch does it deliberately: `hasPages` is true on both surfaces now. What
+  // the wrong branch got wrong is the OTHER half, and it is untouched — a page
+  // built as `{ kind: owner }` still reports `noteKind: "leaf"`, still seeds a
+  // rating grid, and still composes the owner's typeValue into a note whose
+  // `type:` is `page`. The distinction the fix drew was never about pages
+  // containing pages; it was about a page pretending to be its parent.
   const owner = type.kinds.find((k) => k.pages.id.toLowerCase() === value);
   if (owner) return sectionContext(type, { page: owner });
 
@@ -930,7 +940,7 @@ export class SectionInserter {
     const sections = markdown.split("\n").filter((l) => /^#{2,3}\s/.test(l)).length;
     notify.ok(
       sections === 0
-        ? "Copied as plain markdown — there is no writing on this page yet."
+        ? "Copied as plain markdown — there is no writing on this note yet."
         : `Copied as plain markdown — ${sections} section${sections === 1 ? "" : "s"}.`
     );
   }
@@ -1078,10 +1088,15 @@ export class SectionInserter {
       if (q.kind === "lines") continue;
       // AND A FLAG IS SKIPPED FOR THE FORM'S REASON, WORD FOR WORD (1.0.11). The
       // section is about to be written with the modifiers its catalogue composes,
-      // which is the answer an unanswered flag means; and the only flag in the
-      // tree is on a banner, which this command cannot add to a note at all —
-      // every banner is locked. The toggle is in the editor, on the row that
-      // describes the block the line is in.
+      // which is the answer an unanswered flag means. The toggle is in the
+      // editor, on the row that describes the block the line is in.
+      //
+      // TWO FLAGS AS OF 1.0.36, AND THE SECOND ONE STRENGTHENS THE SKIP. The
+      // first was the banner's `actions`, on a section this command cannot add
+      // to a note at all — every banner is locked — so the rule held vacuously.
+      // Prose's **Add default headings** is one a reader CAN add here, and its
+      // unanswered state is the one they want: a block composed with nothing in
+      // it is a block with nowhere to start writing.
       if (q.kind === "flag") continue;
       if (!q.values.length) {
         new Notice(`ChronoAnvil: ${q.empty}`);

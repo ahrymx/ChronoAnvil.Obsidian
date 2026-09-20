@@ -657,6 +657,75 @@ export function attachHeaderRename(
 // banner already used.
 const ILLEGAL_NAME = /[\\/:*?"<>|]/;
 
+// Rename a note to `next`, moving its folder with it where it has one.
+//
+// Returns null on success, or the sentence to show the reader. A STRING RATHER
+// THAN A THROW, because every caller has somewhere of its own to put it — the
+// inline editor restores the title and shows a `Notice`, the pages list shows
+// one and leaves the row alone — and a rename that fails is an ordinary answer
+// rather than an exceptional one.
+//
+// ── A LAYER'S NAME IS ITS FOLDER'S, NOT ITS NOTE'S ──────────────────
+//
+// A subject or topic is `Subjects/Algebra/Algebra.md`, and everything that links
+// to it derives the path from the FOLDER — the Journals card on the home note,
+// the breadcrumbs, the topic tables, `folderNotePath` itself. Renaming the note
+// alone left a folder still called Algebra with no note of its own inside it, so
+// every one of those links pointed at a file that no longer existed. The banner
+// looked right, because it reads the file it was rendered for; everything
+// pointing AT it broke.
+//
+// So the folder moves first and the note follows it. `renameFile` on a folder is
+// what updates links to the notes inside it, and doing the note first would
+// strand the folder note for the moment in between.
+//
+// A NOTE THAT IS NOT A FOLDER NOTE — the homepage, an unpromoted page — takes
+// the second branch and renames one file, which is the whole of what it needs.
+//
+// ── EXTRACTED IN 1.0.38, AND THE SECOND CALLER IS WHY ────────────────
+//
+// The pages list grew a **Rename** row, and a page may be promoted: writing the
+// rename a second time would have been writing the two-step folder move a second
+// time, which is the defect above waiting to be reintroduced by somebody who had
+// only ever seen an unpromoted page.
+export async function renameNote(
+  app: App,
+  file: TFile,
+  next: string
+): Promise<string | null> {
+  if (ILLEGAL_NAME.test(next)) {
+    return `A note name can't contain \\ / : * ? " < > |`;
+  }
+  const folder = isFolderNote(file) ? file.parent : null;
+  if (folder) {
+    const above = folder.parent?.path ?? "";
+    const folderTarget = above && above !== "/" ? `${above}/${next}` : next;
+    if (app.vault.getAbstractFileByPath(folderTarget)) {
+      return `"${next}" already exists here`;
+    }
+    try {
+      await app.fileManager.renameFile(folder, folderTarget);
+      // Obsidian updates `file.path` in place when its folder moves, so the note
+      // is now `<folderTarget>/<old name>.md` and this second rename is the one
+      // that makes the pair agree again.
+      await app.fileManager.renameFile(file, `${folderTarget}/${next}.md`);
+    } catch (err) {
+      return `Couldn't rename this: ${String(err)}`;
+    }
+    return null;
+  }
+
+  const parent = file.parent?.path ?? "";
+  const target = parent ? `${parent}/${next}.md` : `${next}.md`;
+  if (getFile(app, target)) return `"${next}" already exists in this folder`;
+  try {
+    await app.fileManager.renameFile(file, target);
+  } catch (err) {
+    return `Couldn't rename this note: ${String(err)}`;
+  }
+  return null;
+}
+
 // The same control, writing a PROPERTY instead of the filename. 4.51.6.
 //
 // WHY IT LIVES BESIDE `attachNoteRename` RATHER THAN AT ITS CALLER. They are one
@@ -799,61 +868,11 @@ export function attachNoteRename(
         restore();
         return;
       }
-      if (ILLEGAL_NAME.test(next)) {
-        new Notice("A note name can't contain \\ / : * ? \" < > |");
+      const failed = await renameNote(app, file, next);
+      if (failed) {
+        new Notice(failed);
         restore();
         return;
-      }
-      // A LAYER'S NAME IS ITS FOLDER'S, not its note's.
-      //
-      // A subject or topic is `Subjects/Algebra/Algebra.md`, and everything
-      // that links to it derives the path from the FOLDER — the Journals card
-      // on the home note, the breadcrumbs, the topic tables, `folderNotePath`
-      // itself. Renaming the note alone left a folder still called Algebra with
-      // no note of its own inside it, so every one of those links pointed at a
-      // file that no longer existed. The banner looked right, because it reads
-      // the file it was rendered for; everything pointing AT it broke.
-      //
-      // So the folder moves first and the note follows it. `renameFile` on a
-      // folder is what updates links to the notes inside it, and doing the note
-      // first would strand the folder note for the moment in between.
-      //
-      // A PAGE THAT IS NOT A FOLDER NOTE — the homepage — takes the second
-      // branch and renames one file, which is the whole of what it needs.
-      const folder = isFolderNote(file) ? file.parent : null;
-      if (folder) {
-        const above = folder.parent?.path ?? "";
-        const folderTarget = above && above !== "/" ? `${above}/${next}` : next;
-        if (app.vault.getAbstractFileByPath(folderTarget)) {
-          new Notice(`"${next}" already exists here`);
-          restore();
-          return;
-        }
-        try {
-          await app.fileManager.renameFile(folder, folderTarget);
-          // Obsidian updates `file.path` in place when its folder moves, so
-          // the note is now `<folderTarget>/<old name>.md` and this second
-          // rename is the one that makes the pair agree again.
-          await app.fileManager.renameFile(file, `${folderTarget}/${next}.md`);
-        } catch (err) {
-          new Notice(`Couldn't rename this: ${String(err)}`);
-          restore();
-        }
-        return;
-      }
-
-      const parent = file.parent?.path ?? "";
-      const target = parent ? `${parent}/${next}.md` : `${next}.md`;
-      if (getFile(app, target)) {
-        new Notice(`"${next}" already exists in this folder`);
-        restore();
-        return;
-      }
-      try {
-        await app.fileManager.renameFile(file, target);
-      } catch (err) {
-        new Notice(`Couldn't rename this note: ${String(err)}`);
-        restore();
       }
       // On success Obsidian re-renders the view for the renamed file, which
       // rebuilds this header — no manual repaint here.

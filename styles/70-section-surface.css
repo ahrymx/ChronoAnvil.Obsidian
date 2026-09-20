@@ -21,7 +21,8 @@
    collapse straight through them and the seam would land outside the element
    painting the background. Obsidian's own `.callout` — which every empty state
    uses — carries exactly such a margin. */
-.ca-journal-sec-block {
+.ca-journal-sec-block,
+.ca-prose-block {
   background: var(--background-secondary);
   margin-top: 0;
   margin-bottom: 0;
@@ -41,13 +42,15 @@
   border-left: 1px solid var(--ca-border-subtle);
   border-right: 1px solid var(--ca-border-subtle);
 }
-.ca-journal-sec-block.is-first {
+.ca-journal-sec-block.is-first,
+.ca-prose-block.is-prose-first {
   border-top: 1px solid var(--ca-border-subtle);
   border-radius: var(--ca-radius-md) var(--ca-radius-md) 0 0;
   padding-top: 2px;
   box-shadow: inset 0 1px 0 var(--ca-edge-highlight);
 }
-.ca-journal-sec-block.is-last {
+.ca-journal-sec-block.is-last,
+.ca-prose-block.is-prose-last {
   border-bottom: 1px solid var(--ca-border-subtle);
   border-radius: 0 0 var(--ca-radius-md) var(--ca-radius-md);
   padding-bottom: 10px;
@@ -55,7 +58,8 @@
 }
 /* One block that is both — a fence carrying a header and everything under it,
    or a section collapsed down to its bar. Four corners. */
-.ca-journal-sec-block.is-first.is-last {
+.ca-journal-sec-block.is-first.is-last,
+.ca-prose-block.is-prose-first.is-prose-last {
   border-radius: var(--ca-radius-md);
 }
 /* ── A BLOCK THAT ALREADY IS A CARD DOES NOT GET A SECOND ONE (4.59.0) ──
@@ -250,7 +254,8 @@
    ~360px column, which was the mockups' objection and a real one — so below
    the breakpoint the surface keeps its background and gives up its inset. */
 @container (max-width: 460px) {
-  .ca-journal-sec-block {
+  .ca-journal-sec-block,
+  .ca-prose-block {
     --ca-sec-pad-x: 8px;
   }
 }
@@ -461,3 +466,267 @@
   padding-bottom: 0;
 }
 
+
+/* ── The prose surface (1.0.38) ──────────────────────────────────────────
+ *
+ * *"can prose sections gain a very minimal background so they fit the section
+ * aesthetic of chronoanvil?"* — and then, on seeing it: *"make it match the
+ * surface of sections/widgets (with rounded corners, exactly the same)."*
+ *
+ * Prose was the one section of a journal note with nothing behind it. Every
+ * other section is a fence the plugin renders, so it arrives inside a card by
+ * construction; prose is the reader's own markdown between two HTML comments,
+ * and it rendered straight onto the page. On a lesson that reads as a stack of
+ * cards followed by loose text — the same complaint this file's opening
+ * paragraph answers for sections.
+ *
+ * ── IT SHIPPED MINIMAL FIRST, AND HERE IS WHY IT CHANGED ────────────────
+ *
+ * The first cut was a tint and nothing else: `--ca-surface-inset`, no borders,
+ * on the argument that a section's border says *this is a unit the plugin drew
+ * and can fold* and prose is neither. That argument was answering a question
+ * nobody had asked. A reader does not read a border as a claim about who
+ * authored a block; they read two different surfaces down one note as two
+ * different KINDS of thing — and prose is not a different kind of thing from
+ * the sections around it. It is the part of the note they wrote themselves.
+ *
+ * ── SO IT IS THE SAME RULE, NOT A COPY OF ONE ───────────────────────────
+ *
+ * "Exactly the same" is a property that has to survive the next edit to this
+ * file, and two rules with matching declarations is precisely how that stops
+ * being true — quietly, at the first change to a radius or a border colour. So
+ * `.ca-prose-block` joins the four surface selectors above and the phone
+ * breakpoint below them, rather than restating any of it. 99-aesthetic-presets
+ * makes the same move for the same reason, so prose follows Editorial and
+ * Technical by construction instead of by a second list somebody has to
+ * remember.
+ *
+ * `is-prose-first` / `is-prose-last` RATHER THAN THE SECTION'S OWN END CLASSES,
+ * which is the one place the two must NOT be the same: `markSectionBodies`
+ * writes `is-first`/`is-last` on every block of the note as a toggle against
+ * its own answer, so a prose block — never a section member — would have its
+ * end classes stripped by whichever pass ran last. ui/prose-surface.ts carries
+ * that reasoning beside the code that depends on it.
+ *
+ * ── THE EDGES GIVE UP THEIR MARGINS; THE MIDDLE KEEPS ITS OWN ───────────
+ *
+ * `.ca-journal-sec-block > :first-child` zeroes the top margin of EVERY member
+ * block's first child, under this file's rule that *the spacing at the edges of
+ * the surface is the surface's to decide*. Prose cannot join that selector, and
+ * the reason is what the blocks are: a section's are widgets, where an interior
+ * margin is chrome, and prose's are paragraphs and headings, where it is the
+ * reader's own structure. Zeroing every one of them would close the air above
+ * `## Notes` and run the writing together.
+ *
+ * So only the ENDS give theirs up. At the top of the block there is no
+ * paragraph above the heading, so its margin reads as a band of colour between
+ * the top border and the title; at the bottom the same margin reads as a band
+ * above the border. Between them, nothing changes. */
+.ca-prose-block.is-prose-first > :first-child,
+.ca-prose-block.is-prose-first > :first-child > :first-child {
+  margin-top: 0;
+}
+.ca-prose-block.is-prose-last > :last-child,
+.ca-prose-block.is-prose-last > :last-child > :last-child {
+  margin-bottom: 0;
+}
+
+
+/* ── LIVE PREVIEW: A RUN OF LINES, NOT A RUN OF BLOCKS (1.0.38) ──────────
+ *
+ * *"it looks much better in reading mode than in edit mode, where it is
+ * disrupted (some lines do not have the surface, but most do). The rounded
+ * corners seem to make some jagged edges in the middle lines — maybe only
+ * apply to first and last line within the html fence of each prose block?"*
+ *
+ * The paint is the same paint in both modes; what differs is what it lands on.
+ * Reading mode hands us one element per markdown block, and the rules at the
+ * top of this file already state that a member has no vertical margin — so the
+ * blocks abut and the run reads as one card. Live Preview hands us one element
+ * per SOURCE LINE, and those lines are Obsidian's, already carrying Obsidian's
+ * own spacing: `.HyperMD-header-N` has a margin above it, a code fence has one
+ * at each end, a rule and a quote have theirs. Every one of those margins is a
+ * horizontal stripe of the page showing THROUGH a surface that is supposed to
+ * be continuous, which is what "some lines do not have the surface" is —
+ * the lines are painted, and the gaps between them are not.
+ *
+ * Those rules are Obsidian's `.markdown-source-view.mod-cm6 .HyperMD-…`, so
+ * this one is written long enough to outrank them rather than with
+ * `!important`. The run's own bottom margin — the gap to whatever follows the
+ * writing — is put back on the last line, because that one is the surface's
+ * and not a hole in it.
+ *
+ * ── AND THE MIDDLE OF A RUN IS SQUARE, SAID TWICE ───────────────────────
+ *
+ * `is-prose-first` / `is-prose-last` already land on the two ends and nowhere
+ * else, so the rounding is correct by construction — and it is restated here
+ * anyway, as `:not()`, because a line in Live Preview is a shared surface in a
+ * way a rendered block never is. `markSectionBodies` writes `is-first` on the
+ * same elements for the section run, Obsidian rounds the first and last line
+ * of a code fence, and either one draws a corner into the middle of the
+ * writing. headerbar.ts stops the first at its source (prose ends a section
+ * run — it is the note's own structure, not a widget a bar can swallow); this
+ * is the belt to that brace, and it is what squares the code fence a reader
+ * wrote three paragraphs into a prose block. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block {
+  margin-top: 0;
+  margin-bottom: 0;
+  /* AND THE SECOND HALF OF THE SAME HOLE, WHICH THE FIRST FIX EXPOSED. Zeroing
+     the line's own margins closed every gap above a heading and left three
+     open: the row holding a `---`, and the row at each end of a code fence.
+     Those are the rows where Obsidian puts a WIDGET inside the line — a real
+     `<hr>`, a fence marker it renders rather than shows — and the widget's
+     margin is not the line's. `display: flow-root` in the base rule says
+     exactly this: a member has no vertical padding of its own, so a child's
+     margin collapses straight through it and the seam lands OUTSIDE the
+     element painting the background. It is restated at this weight because a
+     `.cm-line` is Obsidian's element before it is ours and it arrives with a
+     `display` of its own. With the margin contained, the air the rule wanted
+     is still there — it is inside the card now instead of cutting it. */
+  display: flow-root;
+}
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.is-prose-last {
+  margin-bottom: var(--ca-widget-gap);
+}
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block:not(.is-prose-first) {
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  box-shadow: none;
+}
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block:not(.is-prose-last) {
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+
+/* ── AND THE ROWS LIVE PREVIEW NEVER HANDS US (1.0.38) ───────────────────
+ *
+ * Two fixes closed most of the holes and left exactly five. They were counted
+ * off the editor's own DOM in the end rather than guessed at from a render,
+ * and the count is the whole diagnosis: ONE horizontal rule, and TWO code
+ * fences with two marker rows each. Every row in that dump carried a computed
+ * margin of zero, so nothing here was ever a margin after the first fix.
+ *
+ * THE RULE IS NOT A LINE. Obsidian replaces the whole line with a block, so
+ * the row that arrives wears CodeMirror's line class and is not a line a LINE
+ * decoration can attach to. `proseSurface` can mark every line of the writing
+ * and still never reach that row, which is why it alone came back unpainted
+ * through two fixes.
+ *
+ * IT IS `.hr`, THE CLASS, AND NOT `hr`, THE ELEMENT — which is the reason this
+ * rule was written once already and did nothing. The console dump reads `hr
+ * cm-line` in the CLASS column, so the row is something wearing a class called
+ * `hr`, and a type selector never touched it. Both spellings are asked for
+ * here: the class is what the evidence says, and the element costs nothing and
+ * covers the day Obsidian changes its mind.
+ *
+ * So it is reached from the only side left — its neighbours.
+ * `:has(~ .cm-line.ca-prose-block)` is "there is painted prose after me" and
+ * the `~` before it is "there is painted prose before me", which together say
+ * STRICTLY INSIDE A RUN and nothing else. A row before the first line or after
+ * the last one matches neither half.
+ *
+ * IT IS NAMED AS ITS OWN SELECTOR, NOT `.cm-line` EXCLUDED, and that is the
+ * difference between this rule and a dangerous one. "Anything between two prose lines that is not
+ * painted" would also name the ordinary source lines BETWEEN TWO PROSE BLOCKS
+ * — a whole section of the note, painted as though it were writing. An `hr`
+ * cannot be anything but Obsidian's rendered rule, so it is asked for by name,
+ * and the other arm stays "not a line at all" for whatever else Obsidian
+ * decides to mount into `.cm-content`.
+ *
+ * `:not(.cm-embed-block)` IS THE OTHER EXCLUSION, and it is not a detail. That
+ * is the container Obsidian mounts a rendered block into — a ```chronoanvil
+ * fence in Live Preview is one, which `headerbar.ts` and `fence-cursor.ts`
+ * both say in as many words. Two prose blocks with a section between them are
+ * the ordinary shape of a journal note, and the element between those two runs
+ * is that fence: a card already. Painting a card's surface behind a card is
+ * the one way this rule could make something look worse than the gap it is
+ * closing, so it is written not to. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .hr:has(~ .cm-line.ca-prose-block),
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ hr:has(~ .cm-line.ca-prose-block),
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ :not(.cm-line):not(.cm-embed-block):has(~ .cm-line.ca-prose-block) {
+  background: var(--background-secondary);
+  border-left: 1px solid var(--ca-border-subtle);
+  border-right: 1px solid var(--ca-border-subtle);
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+
+/* ── AND THE FILL IS SAID AGAIN AT THE HOST'S WEIGHT (1.0.38) ────────────
+ *
+ * The rows that kept coming back unpainted were NOT unmarked. Read off the
+ * editor's own DOM, with the computed colour beside each row, every one of
+ * them carried `ca-prose-block` and computed a background of
+ * `rgba(0, 0, 0, 0)`: a code fence's two marker rows, and every row of a
+ * blockquote. Obsidian styles those rows itself, it does so from
+ * `.markdown-source-view.mod-cm6 .HyperMD-…`, and `.ca-prose-block` is one
+ * class against three. The surface was applied and painted over.
+ *
+ * THE LESSON IS WHY THIS IS GENERAL AND NOT A THIRD SPECIAL CASE. Quotes and
+ * fences are the two this note happened to contain; a table, a list, a callout
+ * and whatever Obsidian styles next are the same rule with a different class
+ * on it. So the fill is restated for every line of the writing at the weight
+ * the rest of this section already uses, and the exception is named instead:
+ * `HyperMD-codeblock-bg` is the code's own colour and stays the code's own
+ * colour. Its two MARKER rows are excluded from the exception rather than
+ * given a colour of their own — they are where Obsidian stops showing the
+ * three backticks and draws the block's top and bottom, so they belong to the
+ * card and not to the code.
+ *
+ * `--background-secondary` rather than `--ca-surface-card` because that is what
+ * the surface rule at the top of this file reads, and every preset redefines
+ * BOTH to its own card colour on the body — so the two are one value and these
+ * rows cannot drift from the rows around them. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block:not(.HyperMD-codeblock-bg),
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-begin,
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-end {
+  background: var(--background-secondary);
+}
+
+
+/* ── AND THE CODE INSIDE IT IS A PANEL, NOT A STRIPE (1.0.38) ────────────
+ *
+ * *"I want to know if the code blocks could be made a little neater in edit
+ * mode?"* — asked once the surface was continuous, which is when the one thing
+ * still crossing it edge to edge became the thing you look at.
+ *
+ * In reading mode a code block is a child of the card, so the card's padding
+ * holds it off both edges and it reads as a panel INSIDE the writing. In Live
+ * Preview it is the same rows as the writing, and a background painted on a
+ * row reaches the row's edges — so the identical block arrives as a full-bleed
+ * stripe butted against both borders of the card. Nothing was wrong with it;
+ * it simply said something the reading view does not.
+ *
+ * THE INSET IS DRAWN, NOT MEASURED, and that is deliberate. Painting two
+ * card-coloured strips over the ends of each code row with an inset shadow
+ * leaves Obsidian's own code colour exactly as Obsidian computed it — this
+ * file never has to name a token for it, never has to guess which of
+ * `--code-background` or a theme's own value is the live one, and cannot drift
+ * when either changes. A margin would have been the obvious way and is the
+ * wrong one: a horizontal margin on a `.cm-line` pulls the CARD's side borders
+ * in with it and notches the surface.
+ *
+ * The corners are the panel's own, so they go on the first and last row of the
+ * code rather than on the fence's marker rows — those two are where Obsidian
+ * draws its label, and they belong to the card. One rule for a block of a
+ * single line, which is both at once and would otherwise take only the second
+ * of the two. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-bg {
+  padding-left: calc(var(--ca-sec-pad-x) + 6px);
+  padding-right: calc(var(--ca-sec-pad-x) + 6px);
+  box-shadow:
+    inset 6px 0 0 0 var(--background-secondary),
+    inset -6px 0 0 0 var(--background-secondary);
+}
+.markdown-source-view.mod-cm6 .cm-content > .HyperMD-codeblock-begin-bg + .cm-line.ca-prose-block.HyperMD-codeblock-bg {
+  border-radius: var(--ca-radius-sm) var(--ca-radius-sm) 0 0;
+}
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-bg:has(+ .HyperMD-codeblock-end-bg) {
+  border-radius: 0 0 var(--ca-radius-sm) var(--ca-radius-sm);
+}
+.markdown-source-view.mod-cm6 .cm-content > .HyperMD-codeblock-begin-bg + .cm-line.ca-prose-block.HyperMD-codeblock-bg:has(+ .HyperMD-codeblock-end-bg) {
+  border-radius: var(--ca-radius-sm);
+}

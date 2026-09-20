@@ -291,7 +291,7 @@ export function plainSections(text: string, model: SectionModel): PlainSection[]
 // `<!--chronoanvil:…-->` REGIONS ARE CONSUMED BY THEIR DIRECTIVES above, so what is
 // left of one here is a duplicate; the spacer is an inert strip that exists to
 // give the cursor somewhere to land.
-function stripPluginMarkup(raw: string): string {
+export function stripPluginMarkup(raw: string): string {
   return (
     raw
       .replace(/<!--chronoanvil:[\s\S]*?-->/g, "")

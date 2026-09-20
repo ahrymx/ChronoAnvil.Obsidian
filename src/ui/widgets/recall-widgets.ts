@@ -346,8 +346,13 @@ export function buildRecall(
 
     // Only say where the grades land when it isn't this note — on an
     // unpromoted lesson the answer is "here", and saying so every time is
-    // chrome. On a page it is the one thing worth stating, because a page
-    // carries no rating of its own.
+    // chrome. On a page it is the one thing worth stating, and as of 1.0.38 it
+    // is worth stating MORE, not less: a page now carries a Confidence of its
+    // own and shows it in its tracker grid, so without this line a reader
+    // would reasonably expect the grade to land in the box they can see. It
+    // doesn't. `recallTarget` sends it to the note the page belongs to,
+    // because that is the note the review queue schedules — a page is outside
+    // the queue by its `type`, not by having nothing to write to.
     if ("file" in target && !target.isOwner) {
       foot.createSpan({ cls: "ca-jrc-target", text: `→ ${target.name}` });
     } else if ("reason" in target) {

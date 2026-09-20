@@ -1141,7 +1141,9 @@ describe("a commit that fails keeps the window open", () => {
 describe("borders are visible at 1x", () => {
   it("draws the section card's edge at a whole pixel", () => {
     const css = readCss();
-    const at = css.indexOf(".ca-journal-sec-block {");
+    // ONE RULE FOR TWO SURFACES SINCE 1.0.38: prose wears the section card,
+    // so the selector list names both — see the foot of 70-section-surface.css.
+    const at = css.indexOf(".ca-journal-sec-block,\n.ca-prose-block {");
     expect(at).toBeGreaterThan(0);
     // Declarations only. The rule's comment records what the value used to be
     // and why it changed, which is the record rather than the value.

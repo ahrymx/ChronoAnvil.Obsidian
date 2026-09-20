@@ -121,8 +121,13 @@ function portableOverrides(
     }
   }
 
-  // Prose skeletons are text. They may be wrong FOR the new journal, which is a
-  // matter of taste the reader can fix, rather than unresolvable.
+  // A prose block's headings are text. They may be wrong FOR the new journal,
+  // which is a matter of taste the reader can fix, rather than unresolvable.
+  //
+  // ONE LIST PER OVERRIDES ROW, WHICH IS ONE PER SECTION ID (1.0.36). A note
+  // may hold several prose blocks and each stores its own headings under its
+  // own id, so this arm runs once per block with nothing to say about the
+  // others — the transfer is per row and the repetition costs it nothing.
   if (from.headings) {
     kept.headings = from.headings.map((h) => ({
       title: h.title,

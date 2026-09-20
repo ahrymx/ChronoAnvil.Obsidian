@@ -23,7 +23,7 @@ button:study:new-page
 pages-table
 ```
 
-<!--chronoanvil-skeleton-->
+<!--chronoanvil-prose-->
 
 ## Related Lessons
 
@@ -44,7 +44,7 @@ pages-table
 - **Still tricky:** 
 - **Next challenge:** [[]]
 
-<!--/chronoanvil-skeleton-->
+<!--/chronoanvil-prose-->
 
 %% chronoanvil-graph %%
 %% [[Study|​]] %%

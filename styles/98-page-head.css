@@ -131,6 +131,45 @@
   font-weight: var(--ca-caps-weight);
   letter-spacing: var(--ca-caps-tracking);
   text-transform: uppercase;
+  /* ── AND IT CARRIES A NOTE'S NAME NOW (1.0.38) ──────────────────────────
+
+     A page's eyebrow reads PAGE OF <the note it belongs to>, and that second
+     half is whatever the reader called their note. `HTML ↔ CSS Pointers &
+     Syntax Cheatsheet` is a real one from the vault this was written for. At
+     0.7em in caps it is still wide enough to wrap the head's top line into two,
+     which is the line the whole head is measured from.
+
+     SO THE LINE HOLDS AND THE END OF IT GIVES, which is the whole of the rule:
+     the parent's name is always LAST, so clipping the line clips the name and
+     nothing else. `title` on the anchor carries the untruncated version.
+
+     ── AND IT IS NOT A FLEX ROW, WHICH COST A SPACE (1.0.38) ───────────────
+
+     It was `display: flex` with the anchor as a second item, and the vault
+     render read **PAGE OFHTML ↔ CSS…**. The lead text ends in the space before
+     the name, and a flex item's trailing whitespace is stripped at the end of
+     its line box — so the one character holding the two halves apart was the
+     one character flex layout removes. Nothing in the markup was wrong and
+     nothing in the markup could have shown it.
+
+     Plain inline content keeps the space, and `text-overflow` works on a block
+     with inline children exactly as it does on one with text. The flex row
+     bought the truncation a `min-width: 0` and an ellipsis rule; this buys it
+     with three lines and no way to lose a space. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The parent's name, as a link. Not a new colour: it inherits the eyebrow's,
+   and the underline on hover is what says it is a link. A second accent on the
+   head's top line would make the parent louder than the note the reader is
+   actually on. */
+.ca-journal-page-head .ca-jph-eyebrow .ca-jph-parent {
+  color: inherit;
+  text-decoration: none;
+}
+.ca-journal-page-head .ca-jph-eyebrow a.ca-jph-parent:hover {
+  text-decoration: underline;
 }
 /* ── THE LEVEL RAIL, WHERE THE EYEBROW WAS ────────────────────────────────
 
@@ -281,11 +320,13 @@
 .ca-journal-page-head .ca-jph-title-input:focus {
   box-shadow: none;
 }
-.ca-journal-page-head .ca-jph-sub {
-  color: var(--text-muted);
-  font-size: var(--ca-text-sm);
-  font-variant-numeric: tabular-nums;
-}
+/* `.ca-jph-sub` STOOD HERE AND IS DELETED (1.0.35), with the `sub` field that
+ * filled it. It printed the note's date under the name — on an index note with
+ * no date at all, a formatted epoch ("Mon 1 Jan 2001"), which is what named it.
+ * The reader's call was the wider one: a page banner has no business carrying a
+ * date line, correct or not, when the trail row's meta slot, a diary entry's
+ * title and a period dashboard's title each already say it on their own
+ * surface. `page-head.ts` holds the rest of the reasoning. */
 
 /* ── THE PAGE'S ACTION MENU (1.0.11) ──────────────────────────────────────
  *

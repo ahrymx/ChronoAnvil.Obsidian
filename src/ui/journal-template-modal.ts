@@ -32,6 +32,7 @@ import {
 import type { SectionContext } from "../journals/journal-sections";
 import type { JournalVariantConfig } from "../journals/custom-journal";
 import type { ReloadLoss } from "../core/reload-loss";
+import { INDEX } from "../core/vocabulary";
 
 export function openJournalTemplateWindow(
   app: App,
@@ -66,11 +67,16 @@ class JournalTemplateModal extends Modal {
     return this.plugin.journalTemplates;
   }
 
-  // What this note is, in the reader's words. "Lesson", "Subject front page",
+  // What this note is, in the reader's words. "Lesson", "Subject index",
   // "Page" — the noun they see on the note itself rather than a template key.
+  //
+  // THE NOUN COMES FROM `vocabulary.ts` (1.0.38). This composed the word inline
+  // and the layout target list composed its own copy, which is how one object
+  // came to be offered as "Front page" in one window and described as an "index
+  // note" in fifteen others. See `INDEX` for the collision that cost.
   private get noun(): string {
     const { ctx } = this;
-    if (ctx.noteKind === "index") return `${ctx.ownNoun} front page`;
+    if (ctx.noteKind === "index") return `${ctx.ownNoun} ${INDEX}`;
     if (ctx.noteKind === "page") return "Page";
     return ctx.kind?.label ?? "Note";
   }
@@ -122,7 +128,7 @@ class JournalTemplateModal extends Modal {
 
     const row = host.createDiv({ cls: "ca-tpl-actions" });
     const save = row.createEl("button", {
-      text: "Save this page as the default",
+      text: "Save this note as the default",
       cls: "mod-cta",
     });
     save.addEventListener("click", () => {
@@ -132,7 +138,7 @@ class JournalTemplateModal extends Modal {
         // below only touches the page in front of them, and shows a diff.
         const ok = await confirmAction(
           this.app,
-          "Save this page as the default?",
+          "Save this note as the default?",
           `Every new ${this.noun.toLowerCase()} in ${
             this.ctx.type.name
           } will be built from this page's sections, in this page's order. Notes you already have keep what they have.`,
@@ -145,7 +151,7 @@ class JournalTemplateModal extends Modal {
     });
 
     const asLayout = row.createEl("button", {
-      text: "Save this page as a layout…",
+      text: "Save this note as a layout…",
     });
     asLayout.addEventListener("click", () => {
       void (async () => {
@@ -161,7 +167,7 @@ class JournalTemplateModal extends Modal {
   // ── saved layouts, and reloading from one ────────────────────────────
 
   private drawLayouts(host: HTMLElement): void {
-    host.createDiv({ cls: "ca-tpl-band", text: "Reload this page" });
+    host.createDiv({ cls: "ca-tpl-band", text: "Reload this note" });
 
     // THE GATE, ASKED ONCE FOR THE WHOLE BAND. Every reload replaces the same
     // body, so what is in the way does not vary by which template is reloaded —
@@ -205,7 +211,7 @@ class JournalTemplateModal extends Modal {
         emptyCallout(
           "layout-template",
           "No saved layouts yet",
-          "“Save this page as a layout…” keeps this arrangement under a name you can reload onto a later note."
+          "“Save this note as a layout…” keeps this arrangement under a name you can reload onto a later note."
         )
       );
     }

@@ -815,3 +815,82 @@
 .ca-journal-pages-table .ca-empty-line {
   padding: 6px 4px;
 }
+
+/* ── THE PAGES LIST BECAME A CONTROL (1.0.38) ──────────────────────────────
+
+   Three things arrived on the row at once: two arrows that write the `order`
+   property, the `⋯` every other row in the plugin already has, and — for a page
+   of a page — an indent.
+
+   THE ARROWS ARE THE BAND'S, NOT THE PATH EDITOR'S. `.ca-tpl-arrow` is a ghost:
+   no border, no fill, muted until hovered. `.ca-journal-path-move` is a bordered
+   24px box, which is right in a settings editor where the buttons ARE the
+   content and wrong on a reading surface where a page's NAME is. A page index is
+   something a reader reads far more often than they reorder. */
+.ca-journal-pages-table .ca-jpt-moves {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.ca-journal-pages-table .ca-jpt-move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ca-journal-pages-table .ca-jpt-move:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+/* DIMMED, NOT HIDDEN. The top row's ↑ and the bottom row's ↓ are the two a
+   reader meets first, and a control that disappears at the ends makes the rows
+   different widths — which reads as a rendering fault rather than as an end. */
+.ca-journal-pages-table .ca-jpt-move:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* ── A PAGE OF A PAGE, INDENTED ───────────────────────────────────────────
+
+   FOUR STEPS AND THEN IT STOPS. The recursion has no depth cap — a folder tree
+   is finite and cannot cycle — but the INDENT must have one, or a reader eight
+   pages deep has their page names pushed off the card. Past the fourth step the
+   rows stop moving right and the dotted number (`1.1.1.1.1`) carries the depth
+   on its own, which is what it is for.
+
+   PADDING ON THE ROW, NOT A MARGIN. `.ca-list-row` draws its own hover ground;
+   a margin would inset that ground with it and the hover would stop lining up
+   with the rows above. */
+.ca-journal-pages-table .ca-jpt-nest-1 {
+  padding-left: var(--ca-space-3);
+}
+.ca-journal-pages-table .ca-jpt-nest-2 {
+  padding-left: var(--ca-space-6);
+}
+/* STEPS 3 AND 4 MULTIPLY THE UNIT DIRECTLY. The named scale stops at
+   `--ca-space-7`, on the argument that seven steps describe the sheet; an
+   eighth and a ninth token existing for one widget's indent would be the list
+   growing to fit a caller. The arithmetic is the scale's own — `--ca-space-N`
+   is N units — so 9 and 12 read as steps of it either way. */
+.ca-journal-pages-table .ca-jpt-nest-3 {
+  padding-left: calc(var(--ca-space-unit) * 9);
+}
+.ca-journal-pages-table .ca-jpt-nest-4 {
+  padding-left: calc(var(--ca-space-unit) * 12);
+}
+/* The hairline that makes the indent read as a NESTING rather than as a stray
+   margin. One line per step would be truer and would also be four pseudo
+   elements on a row that already has five children; the single rule on the
+   left edge says "this belongs to the one above" in one. */
+.ca-journal-pages-table [class*="ca-jpt-nest-"] {
+  border-left: 1px solid var(--background-modifier-border);
+}

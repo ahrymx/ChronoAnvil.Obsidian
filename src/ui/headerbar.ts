@@ -43,6 +43,7 @@
 
 import { MarkdownRenderChild, setIcon } from "obsidian";
 import { OBSIDIAN_DOM } from "../core/constants";
+import { PROSE_BLOCK_CLASS } from "./prose-surface";
 import type ChronoAnvilPlugin from "../main";
 
 // One shared timer rather than one per bar: folding three sections in a row
@@ -1148,6 +1149,25 @@ export class HeaderBar extends MarkdownRenderChild {
 
   private isSectionBoundary(block: HTMLElement): boolean {
     if (this.isHeadingBlock(block)) return true;
+    // ── AND THE READER'S OWN PROSE IS ONE (1.0.38) ────────────────────
+    //
+    // The same argument `computeFoldHidden` makes about a markdown heading,
+    // and it is stronger here: *a bar titles a WIDGET section; a heading is
+    // the note's own structure.* Prose is not merely the note's structure, it
+    // is the note — so a section cannot fold it away and cannot take it into
+    // its card.
+    //
+    // IT BECAME REPORTABLE THE DAY PROSE GAINED A SURFACE. The two paints are
+    // now the same card, so a run that swallowed a paragraph was invisible
+    // until its END classes landed: a `.cm-line` mid-prose wearing the section
+    // pass's `is-first` drew a rounded edge across the middle of the writing,
+    // which is what the reader saw and called jagged.
+    //
+    // `hasClass` RATHER THAN A DESCENDANT SEARCH, unlike every selector below
+    // it. `ui/prose-surface.ts` marks the block ITSELF in both modes — the
+    // rendered block in reading view, the `.cm-line` in Live Preview — because
+    // prose has no wrapper of its own to look inside for.
+    if (block.hasClass(PROSE_BLOCK_CLASS)) return true;
     return !!block.querySelector(
       ":scope .ca-journal-sec-fold, :scope .ca-journal-section-bar, :scope .ca-journal-overview-banner, :scope .ca-journal-entry-banner, :scope .ca-journal-study-banner, :scope .ca-journal-page-head, :scope .ca-journal-tracker-section, :scope .ca-journals-card, :scope .ca-journal-sec-l1"
     );

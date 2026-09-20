@@ -109,6 +109,40 @@ describe("the words it does use", () => {
     const editors = readSrc("settings-editors");
     expect(editors).toContain("folder level");
   });
+
+  // ── the noun a folder's own note has (1.0.38) ──────────────────────────
+  //
+  // The reader's report: *"pages, front page, and note-types, are all somewhat
+  // confusing to differentiate."* Two of those three were the SAME word, and
+  // this file's own registry had already declared it reserved for one of them.
+  it("calls a folder's own note an index, never a page of any kind", () => {
+    // Asked of the two windows that showed the word, because those are the two
+    // places a reader met it. Everywhere else in the tree already said "index
+    // note" — fifteen strings — which is why this rename is labels only.
+    const sections = readSrc("journal-sections");
+    expect(sections).toContain("INDEX_TITLE");
+    const modal = readSrc("journal-template-modal");
+    expect(modal).toContain("${ctx.ownNoun} ${INDEX}");
+  });
+
+  it("calls the panes of a widget group tabs, matching the directive", () => {
+    // `tab` is what the grammar has always called them. The labels said
+    // "Page 2 of 3" beside a `tab` line, which is one word meaning two things
+    // inside a single feature.
+    const row = readSrc("row");
+    expect(row).toContain("Tabs in this group");
+    expect(row).not.toContain("Pages in this group");
+  });
+
+  it("keeps the command ids that name the old word", () => {
+    // AN ID IS A HOTKEY BINDING. `note-group-next-page` is the string a reader
+    // bound a key to; renaming it to match the label would unbind them to tidy
+    // a word they never see. The label is reader-facing, the id is not — which
+    // is the same split `vocabulary.ts` makes for `JournalKind`.
+    const actions = readSrc("actions");
+    expect(actions).toContain("note-group-next-page");
+    expect(actions).toContain("Note: next tab in this widget group");
+  });
 });
 
 describe("the frontmatter key is untouched", () => {

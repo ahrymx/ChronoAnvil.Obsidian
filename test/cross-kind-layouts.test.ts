@@ -278,10 +278,20 @@ describe("the door a reader actually uses", () => {
   });
 
   // ── the two surfaces (4.33) ──────────────────────────────────────────
-  it("offers a front page and a page, in every journal there is", () => {
+  it("offers an index and a page, in every journal there is", () => {
     const study = layoutTargetsFor(STUDY_JOURNAL).map((t) => t.id);
     expect(study).toContain("surface:index");
     expect(study).toContain("surface:page");
+
+    // AND THE TWO ROWS NO LONGER SHARE A WORD (1.0.38). They read "Front page"
+    // and "Page" — one noun, two meanings, four pixels apart, in the one list
+    // where the distinction is the whole question being asked. The id is
+    // untouched; only the label moved. See `INDEX` in `core/vocabulary.ts`.
+    const labels = new Map(
+      layoutTargetsFor(STUDY_JOURNAL).map((t) => [t.id, t.label])
+    );
+    expect(labels.get("surface:index")).toBe("Index");
+    expect(labels.get("surface:page")).toBe("Page");
 
     // THE SECOND HALF OF THIS USED TO BE A REFUSAL. A journal whose kinds had
     // all left the pages tick unticked was not offered `Page`, because

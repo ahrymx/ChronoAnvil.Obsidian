@@ -117,6 +117,7 @@ import type {
 } from "../core/section-model";
 import { FLAG_OFF, FLAG_ON, SECTION_FORM, WIDGET_FORM } from "../core/section-model";
 import { ArgSuggest } from "./arg-suggest";
+import { notify } from "../core/notify";
 
 // The four panes, one at a time.
 //
@@ -942,7 +943,7 @@ export class SectionEditorModal extends EditorModal {
         noun === "stack"
           ? "Stack"
           : pages.length > 1
-            ? `Group — ${pages.length} pages`
+            ? `Group — ${pages.length} tabs`
             : "Group",
     });
     const split = bar.createEl("button", {
@@ -1003,7 +1004,7 @@ export class SectionEditorModal extends EditorModal {
       if (pages.length > 1) {
         body.createDiv({
           cls: "ca-tpl-page",
-          text: `Page ${n + 1}`,
+          text: `Tab ${n + 1}`,
         });
       }
       for (const id of page) {
@@ -1511,11 +1512,11 @@ export class SectionEditorModal extends EditorModal {
           const breaks = this.paged.has(section.id);
           const page = actions.createEl("button", {
             cls: "ca-tpl-move",
-            text: breaks ? "Join the page before" : "Start a page here",
+            text: breaks ? "Join the tab before" : "Start a tab here",
             attr: {
               title: breaks
-                ? "Put this section back beside the one before it, in the same page"
-                : "Begin a new page of this group at this section — the group draws a numbered strip to switch between its pages",
+                ? "Put this section back beside the one before it, in the same tab"
+                : "Begin a new tab of this group at this section — the group draws a numbered strip to switch between its tabs",
             },
           });
           // THE SAME REFUSAL THE SPLIT MAKES, AND FOR THE SAME REASON. Placing a
@@ -1525,7 +1526,7 @@ export class SectionEditorModal extends EditorModal {
           page.disabled = !this.loose.has(section.id);
           if (page.disabled) {
             page.title =
-              "This widget's lines can't be told apart from the others in its block, so a page can't be started at it.";
+              "This widget's lines can't be told apart from the others in its block, so a tab can't be started at it.";
           }
           page.addEventListener("click", () => {
             this.settle(setPage(this.arrangement, band, section.id, !breaks));
@@ -1564,7 +1565,7 @@ export class SectionEditorModal extends EditorModal {
           if (open.length > 1) {
             label = "Add to a group";
             title =
-              "Put this section in one of this page's groups, as another column — you'll be asked which";
+              "Put this section in one of this note's groups, as another column — you'll be asked which";
           } else if (target && target.length > 1) {
             label = "Add to group";
             title = `Put this section in the group with “${name(target)}”, as another column`;
@@ -1635,6 +1636,43 @@ export class SectionEditorModal extends EditorModal {
           });
         }
       }
+    }
+
+    // ── COPY, WHICH IS THE ONE ACTION A LOCKED ROW STILL GETS (1.0.36) ──
+    //
+    // Drawn ABOVE the `refusal` return, deliberately. Everything below that
+    // line is about changing the arrangement, and a row that cannot be removed
+    // has nothing to say there; taking a copy of what a block holds is not a
+    // change at all, so the reason the rest of the row is absent does not
+    // reach it. The first prose block of every journal leaf is locked, and it
+    // is the block a reader most wants out of the window.
+    //
+    // A PLAIN BUTTON RATHER THAN AN OVERFLOW MENU, on the row's own idiom:
+    // `overflowButton` earns its keep at two items and this is one.
+    //
+    // ASKED, NOT ASSUMED — `excerpt` is optional on the model and answers null
+    // for every section that is not a prose block with something in it, so the
+    // button appears exactly where it does something.
+    const excerpt = this.model.excerpt?.(section.id, this.spec.text) ?? null;
+    if (excerpt !== null) {
+      const copy = actions.createEl("button", {
+        cls: "ca-tpl-copy",
+        text: "Copy",
+      });
+      copy.title =
+        "Copy this block's markdown to the clipboard, without the plugin's markers.";
+      copy.addEventListener("click", () => {
+        void (async () => {
+          await navigator.clipboard.writeText(excerpt);
+          // SAYS HOW MUCH, in `copyAsPlainMarkdown`'s words and for its
+          // reason: a reader who copied the wrong block finds out here rather
+          // than in the paste.
+          const lines = excerpt.split("\n").filter((l) => l.trim() !== "").length;
+          notify.ok(
+            `Copied ${section.label} — ${lines} line${lines === 1 ? "" : "s"}.`
+          );
+        })();
+      });
     }
 
     if (refusal) return;

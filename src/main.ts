@@ -18,6 +18,7 @@ import { SectionInserter } from "./ui/section-insert";
 import { wantsReadingMode } from "./core/viewmode";
 import { fenceCursorGuard } from "./ui/fence-cursor";
 import { hiddenMarkers } from "./ui/marker-lines";
+import { paintProse, proseSurface } from "./ui/prose-surface";
 import { PathWatch, pruneCollapsedSections } from "./core/pathwatch";
 import { PageWidth } from "./ui/page-width";
 import { VaultBanner } from "./ui/vault-banner";
@@ -173,6 +174,23 @@ export default class ChronoAnvilPlugin extends Plugin {
     // mechanism — a replace decoration rather than a cursor rule — and the
     // decoration one has to come from a state field. See ui/marker-lines.ts.
     this.registerEditorExtension(hiddenMarkers());
+
+    // AND THE WRITING BETWEEN THEM READS AS A SECTION. 1.0.38, and the one
+    // section of a journal note that had no surface of its own: prose is the
+    // reader's own markdown with two invisible edges, so every other section
+    // sat on a card and the writing sat on the page.
+    //
+    // TWO REGISTRATIONS FOR ONE FEATURE, because the two modes can be told
+    // where the prose is by two different means and neither works in the other
+    // — ui/prose-surface.ts opens with which and why. Both derive from the same
+    // line arithmetic over the same file, so they cannot disagree about where a
+    // block begins.
+    //
+    // NOTHING IS WRITTEN TO A NOTE BY EITHER. That is the whole of the reader's
+    // second sentence: *"it is important that prose is not put into a code
+    // block so that standard markdown syntax still works."*
+    this.registerEditorExtension(proseSurface());
+    this.registerMarkdownPostProcessor((el, ctx) => paintProse(el, ctx));
 
     // A CHRONOANVIL PAGE OPENS IN READING MODE. 4.6, and the plugin's first
     // `file-open` hook.

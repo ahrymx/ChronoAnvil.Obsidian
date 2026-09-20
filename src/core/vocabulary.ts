@@ -9,9 +9,9 @@
 //
 // WHY THIS FILE EXISTS
 //
-// ChronoAnvil asks a reader to learn nine nouns before they can create one note —
-// journal, level, kind, layout, section, tracker, scope, event, page — and
-// three of them contradicted each other:
+// ChronoAnvil asks a reader to learn ten nouns before they can create one note —
+// journal, level, kind, layout, section, tracker, scope, event, index, page —
+// and three of them contradicted each other:
 //
 //   `type` meant two things, and the frontmatter said the wrong one. A
 //   JournalType was "Cook Book"; a JournalKind was "Recipe"; and the key on
@@ -24,6 +24,14 @@
 //   note. 2.54.4 needed a test forbidding the loose use in one confirmation
 //   window, and needing a test to stop a word drifting is the word telling you
 //   it is fighting you.
+//
+//   AND IT DRIFTED ANYWAY, INTO NINE MEANINGS (1.0.38). Reserving a word in a
+//   comment is not reserving it. A sweep of every string literal in `src/` found
+//   the sub-note, the folder's own note ("Front page"), the note you are looking
+//   at ("this page"), the tabs inside a widget group ("Page 2 of 3"), the width
+//   of the rendered sheet, its background texture, a chart range, a note the
+//   plugin ships, and the unit a reading tracker counts. Three of those are now
+//   registered below; the rest are the typographic sense and are left alone.
 //
 //   `level` and `section` were both "the parts of a thing". A level is a
 //   folder depth, a section is a block in a template, and in conversation both
@@ -94,6 +102,29 @@ export const LAYOUT_TITLE = "Layout";
 export const PAGE = "page";
 export const PAGES = "pages";
 
+// A note that holds other notes: a folder note. `noteKind === "index"` in code,
+// and the shape the whole plugin already describes in prose — "index note"
+// appears in fifteen reader-facing strings, "dashboard" in thirty-eight lines of
+// the in-vault documentation.
+//
+// ── IT WAS CALLED A "FRONT PAGE" IN TWO PLACES, AND THAT IS THE COLLISION (1.0.38) ──
+//
+// `PAGE` four lines up says the word is RESERVED and means one thing. Two labels
+// then spent it on the opposite thing: the layout target list offered "Front
+// page" beside "Page" — two rows, one word, two meanings — and the template
+// window's `h3` read "Template — Subject front page" over a window whose subject
+// was not a page at all.
+//
+// The reader's report is what this file predicted in its own header: *"pages,
+// front page, and note-types, are all somewhat confusing to differentiate."*
+// Three nouns, and the fix is to stop one of them being two.
+//
+// THE RULE, IN ONE LINE: an INDEX holds notes; a PAGE is held by a note; a NOTE
+// TYPE is what a note is. Nothing in the registry means more than one of those.
+export const INDEX = "index";
+export const INDEXES = "indexes";
+export const INDEX_TITLE = "Index";
+
 // A standing note that collects items belonging to the diary but not to one
 // date — a work log, what you are focused on, links to come back to, the
 // meetings in the week ahead. `LogbookDef` in code, and the argument of the
@@ -155,4 +186,26 @@ export const RETIRED_WORDS: { was: string; use: string }[] = [
   { was: "new review", use: "new monthly entry" },
   { was: "this month's review", use: "this month's entry" },
   { was: "review entry", use: "entry" },
+  // 1.0.38, and the word it frees is this file's own reserved one. See `INDEX`
+  // for why two labels spending "page" on a note that holds notes is the
+  // collision the reader reported rather than a wording preference.
+  { was: "front page", use: INDEX },
+  // THE LOOSE ENGLISH SENSE, REGISTERED AS A PHRASE. `kind-change.ts` has
+  // carried a standing comment about this since 2.54 — *"SAY 'NOTES', NOT
+  // 'PAGES'… using 'page' here for 'a note that gets created' would collide with
+  // the narrower meaning the reader has already been taught everywhere else"* —
+  // and the sweep found fifty-five strings doing it anyway, most of them the
+  // same two words.
+  //
+  // THE BARE WORD IS NOT BANNED, for the reason the five "review" entries above
+  // state at length: "page" is alive and correct for a sub-note, for the width
+  // of the rendered sheet ("Wide page"), for its texture ("Page ground") and for
+  // the unit a reading tracker counts. Banning it outright would take four
+  // legitimate meanings to catch one loose one.
+  { was: "this page", use: "this note" },
+  // The widget group's tabs called themselves pages — "Page 2 of 3", "Start a
+  // page here", two command names. The grammar already spells it `tab`; only the
+  // labels disagreed.
+  { was: "page of this group", use: "tab" },
+  { was: "page of its group", use: "tab" },
 ];

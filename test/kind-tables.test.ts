@@ -340,7 +340,7 @@ describe("the control that writes it", () => {
 
   it("names itself after the group, because a card carries several", () => {
     expect(readSrc("kind-options-menu")).toContain(
-      "`Options for ${plural(kind.label)} on this page`"
+      "`Options for ${plural(kind.label)} on this note`"
     );
   });
 });

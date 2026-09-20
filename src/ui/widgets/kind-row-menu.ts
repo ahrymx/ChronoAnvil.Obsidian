@@ -38,8 +38,9 @@
 import { Menu, TAbstractFile, TFile } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { overflowButton } from "../section-frame";
-import { promptAction } from "../modals";
-import { childFiles, frontmatterOf, getFile, plural } from "../../core/util";
+import { renameNote } from "../header-title";
+import { promptAction, promptText } from "../modals";
+import { filesUnder, frontmatterOf, getFile, plural } from "../../core/util";
 import {
   trashClause,
   trashDestination,
@@ -104,6 +105,100 @@ export function attachKindRowMenu(
   // `overflowButton` writes "More", and a table of ten of them would read out
   // as "More, More, More" to anybody not looking at the screen.
   button.setAttr("aria-label", `More about ${file.basename}`);
+}
+
+// ── THE SAME `⋯`, ON A PAGE'S ROW (1.0.38) ────────────────────────────────
+//
+// The pages list was a name, an ordinal and a link, and every act on a page —
+// renaming it, splitting it further, removing it — meant opening it first. The
+// row IS the page, which is this file's own argument for the control being here
+// and not somewhere else.
+//
+// ── THE ROWS IT DOES *NOT* HAVE ──────────────────────────────────────────
+//
+// No layout rows. `addPageLayoutRows` answers *"what are THIS note's pages built
+// from"*, and on a page that question is about its sub-pages — a real question,
+// and one the reader has not asked for. It is also stored on the note that HOLDS
+// the pages, so a page's answer would be read from a page, which is a second
+// place `pageLayoutOf` would have to be taught about. Left out until asked for,
+// rather than half-wired.
+//
+// THE THREE IT DOES HAVE ARE THE THREE THE READER NAMED: rename, a new page
+// inside this one, and the bin. The third is `addDeleteRows` unchanged — a
+// promoted page bins as its folder, so its own pages go with it by construction,
+// which is the rule `remove` already states and which nesting did not change.
+export function attachPageRowMenu(
+  table: KindRowContext,
+  actions: HTMLElement,
+  file: TFile
+): void {
+  // BY PATH, NEVER BY THE `TFile` — 4.50.2's rule, stated at length above
+  // `attachKindRowMenu`. It matters more here than there: **Rename** is the one
+  // row in this file that MOVES the note it acts on, so a menu holding the
+  // object would be holding a live handle to wherever the note went.
+  const path = file.path;
+  const button = overflowButton(actions, "ca-list-menu", (menu) => {
+    const live = getFile(table.plugin.app, path);
+    if (!live) {
+      menu.addItem((i) =>
+        i.setTitle("This note has moved — the list is out of date").setIsLabel(true)
+      );
+      return;
+    }
+    menu.addItem((item) =>
+      item
+        .setTitle("Rename…")
+        .setIcon("pencil")
+        .onClick(() => void renamePage(table, path))
+    );
+    menu.addItem((item) =>
+      item
+        // NAMED FOR WHAT IT MAKES, not for where it makes it. *New page* is the
+        // button on the card; *inside* is the only word that distinguishes this
+        // from it, and it is the whole of the reader's ask — *"add a sub-page
+        // without opening the parent"*.
+        .setTitle(`New ${table.kind.pages.label.toLowerCase()} inside`)
+        .setIcon("file-plus")
+        .onClick(() => void table.plugin.journals.newPage(table.type, path))
+    );
+    addDeleteRows(menu, table, path);
+  });
+  button.setAttr("aria-label", `More about ${file.basename}`);
+}
+
+// ── RENAMING A PAGE, THROUGH THE ONE RENAME (1.0.38) ──────────────────────
+//
+// `renameNote` in `header-title.ts` is the function the banner's own pencil
+// calls, and it carries the half that is easy to miss: a PROMOTED page is a
+// folder note, so its folder has to move first and the note follow it, or the
+// folder is left with no note of its own inside and every link derived from the
+// folder path breaks. Writing the rename again here would have been writing that
+// two-step move again, from somebody who had only ever seen a flat page.
+//
+// `fileManager.renameFile` underneath it, which is what rewrites every wikilink
+// in the vault pointing at the page — the same reason `promoteToDashboard` uses
+// it, and the reason a rename from this menu is safe to offer at all.
+async function renamePage(table: KindRowContext, path: string): Promise<void> {
+  const { plugin, kind } = table;
+  const file = getFile(plugin.app, path);
+  if (!file) {
+    notify.info("That note has already moved — this list is out of date.");
+    return;
+  }
+  const next = await promptText(
+    plugin.app,
+    `Rename ${kind.pages.label.toLowerCase()}`,
+    file.basename,
+    file.basename
+  );
+  // A CANCEL AND A NO-CHANGE ARE THE SAME ANSWER. `promptText` resolves null on
+  // Esc and on clicking away; an unchanged name is the reader saying no with the
+  // keyboard instead.
+  const title = next?.trim() ?? "";
+  if (!title || title === file.basename) return;
+
+  const failed = await renameNote(plugin.app, file, title);
+  if (failed) notify.fail(failed);
 }
 
 // ── What this title's pages are built from ───────────────────────────────
@@ -214,8 +309,23 @@ async function remove(table: KindRowContext, path: string): Promise<void> {
     return;
   }
 
-  const siblings = childFiles(file.parent).map((f) => f.path);
-  const pages = pagePathsOf(file.path, siblings);
+  // ── WHAT THE FOLDER TAKES, NOT WHAT SITS AT ITS TOP (1.0.38) ────────
+  //
+  // `childFiles(file.parent)` — the loose markdown beside the folder note — was
+  // the right list while pages were flat, because then that WAS everything in
+  // the folder. A page may now be promoted and hold pages of its own, and the
+  // bin does not stop at the first level: `whole` below is the FOLDER, so every
+  // note under it goes in one call. Counting only the top row told a reader
+  // "and its 1 page" while four notes left the vault.
+  //
+  // `filesUnder` IS THE WHOLE SUBTREE, which is the same thing `whole` is, so
+  // the sentence and the act now describe one set. `pagePathsOf` still drops
+  // the host and still answers nothing at all for an unpromoted note, where
+  // there is no folder of its own to empty.
+  const inside = file.parent
+    ? filesUnder(plugin.app, file.parent.path).map((f) => f.path)
+    : [];
+  const pages = pagePathsOf(file.path, inside);
   const pageLabel = kind.pages.label;
   const many = plural(pageLabel).toLowerCase();
   const promoted = isPromotedPath(file.path);

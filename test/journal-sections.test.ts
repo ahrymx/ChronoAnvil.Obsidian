@@ -154,13 +154,16 @@ describe("the section catalogue", () => {
 
       // Required, and its spacer is loose markdown besides.
       expect(sectionRemovable(findSection("banner")!, ctx)).toBe(false);
-      // THE PROSE SKELETON IS THE ONE THAT CHANGED SIDES (5.6), and it changed
-      // sides without this function being touched: its headings are the same
-      // `## ` markdown they always were, and they now sit between two markers,
-      // so "everything it wrote can be found again" is true of it. The claim
-      // this file makes is about the derivation, so the case that proves the
-      // derivation is honest is one that MOVED under it.
-      expect(sectionRemovable(findSection("headings")!, leaf)).toBe(true);
+      // PROSE IS THE ONE THAT CHANGED SIDES TWICE. 5.6 bracketed its headings,
+      // so "everything it wrote can be found again" became true of it and the
+      // derivation started allowing it without being touched. 1.0.36 made the
+      // section mandatory, so the FLAG refuses it again — and the derivation
+      // underneath still says yes, which is what lets the row scope the answer
+      // by ordinal rather than by a second catalogue entry.
+      const prose = findSection("headings")!;
+      expect(prose.locked).toBe(true);
+      expect(sectionRemovable(prose, leaf)).toBe(false);
+      expect(sectionRemovable({ ...prose, locked: false }, leaf)).toBe(true);
 
       // Everything else is fences and regions, both provable.
       expect(sectionRemovable(findSection("review")!, ctx)).toBe(true);
@@ -255,14 +258,23 @@ describe("the section catalogue", () => {
       }
     });
 
-    it("makes only the banner required", () => {
+    it("makes the banner and the prose required, and nothing else", () => {
       // A journal note with no `journal-header` has no title, no crumbs and
       // nowhere to render a tracker — the exact state 2.28 shipped to end, and
-      // the one thing the wizard must not let you re-create. Everything else
-      // is taste, and a catalogue that called more than one section mandatory
-      // would be deciding layout rather than offering it.
+      // the one thing the wizard must not let you re-create.
+      //
+      // AND PROSE JOINED IT IN 1.0.36, ON THE READER'S CALL: *"a mandatory
+      // section (cant be removed) which encompasses the plain markdown block a
+      // user writes"*. A leaf note with nowhere to write is a page that
+      // composes everything about a note except the note. It locks the FIRST
+      // block only — the flag is the catalogue's and the ordinal is the file's,
+      // and `journalRefusal` scopes it — so a reader who adds a second block
+      // can take it out again.
+      //
+      // Everything else is taste, and a catalogue that called a third section
+      // mandatory would be deciding layout rather than offering it.
       expect(JOURNAL_SECTIONS.filter((s) => s.locked).map((s) => s.id)).toEqual(
-        ["banner"]
+        ["banner", "headings"]
       );
     });
 
@@ -618,22 +630,41 @@ describe("the section catalogue", () => {
       // TWO, NOT THREE (5.20). `recall` was the third, and a page of a document
       // is exactly the surface the argument for it was made about — which is
       // why the section is still OFFERED here and is now off until asked for.
-      expect(defaultSectionIds(page)).toEqual(["banner", "headings"]);
+      // ── AND IT IS THE LEAF'S OWN LIST AS OF 1.0.38 ────────────────────
+      //
+      // This read `["banner", "headings"]`. The reader looked at a composed page
+      // and asked for *"the full stack banner (banner, trackers, pages)"* — the
+      // same stacked card a lesson opens with, because a page that is worth
+      // splitting out is a thing you come back to.
+      expect(defaultSectionIds(page)).toEqual([
+        "banner",
+        "trackers",
+        "pages",
+        "headings",
+      ]);
       expect(sectionsFor(page).map((s) => s.id)).toContain("recall");
-      // Its own pages table would list its siblings, and its own checklist
-      // would be counted separately from the note it is part of — and those two
-      // are absent from the OFFER, not merely unticked.
-      expect(sectionApplies(findSection("pages")!, page)).toBe(false);
+      // Its own checklist would be counted separately from the note it is part
+      // of, so it is absent from the OFFER rather than merely unticked. It is
+      // the one section left drawing that distinction on this surface.
       expect(defaultSectionIds(page)).not.toContain("checklist");
+      expect(sectionApplies(findSection("pages")!, page)).toBe(true);
     });
 
-    it("leaves a page out of the tracker grid entirely", () => {
-      // A per-page rating would mean the parent note's average counted its own
-      // parts as peers.
+    it("gives a page the same tracker grid a leaf gets", () => {
+      // WAS "leaves a page out of the tracker grid entirely", on the reason that
+      // *"a per-page rating would mean the parent note's average counted its own
+      // parts as peers."* That stopped being true in 2.36, when `confidenceKinds`
+      // narrowed an average to the kinds that CARRY the tracker and built the
+      // list from `type.kinds`. A page's `type:` is `kind.pages.id`, which is
+      // deliberately not a kind — so a page is outside every average and outside
+      // the review queue whatever property it holds, and the exclusion was doing
+      // nothing but keeping the grid off the page.
       const out = composeTemplate(sectionContext(paged, { page: paged.kinds[0] }));
       expect(out).toContain("journal-header");
-      expect(out).not.toContain("chronoanvil:trackers:start");
-      expect(out).not.toContain("tracker:");
+      expect(out).toContain("chronoanvil:trackers:start");
+      expect(out).toContain("tracker:status");
+      // Welded into the banner's fence, which is what makes the three one card.
+      expect(out).toContain("stack");
     });
 
     it("names the parent and the order rather than a date", () => {
@@ -641,8 +672,12 @@ describe("the section catalogue", () => {
       expect(out).toMatch(/^type: \{\{type\}\}$/m);
       expect(out).toMatch(/^parent: \{\{parent\}\}$/m);
       expect(out).toMatch(/^order: \{\{order\}\}$/m);
+      // THE DATE IS THE ONE HALF THAT STAYED (1.0.38). It belongs to the note the
+      // page is part of, which is the whole reason a long note splits into pages
+      // rather than into more notes — where the RATING half of that sentence was
+      // reversed with the tracker grid above.
       expect(out).not.toMatch(/^date:/m);
-      expect(out).not.toMatch(/^status:/m);
+      expect(out).toMatch(/^status: in-progress$/m);
     });
 
     it("gives every kind of the type the same leaf template", () => {

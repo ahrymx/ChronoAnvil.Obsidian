@@ -635,7 +635,7 @@ describe("the editor carries the second bit", () => {
     // THE CLAUSE MOVED INTO A STACK'S TERNARY IN 5.28 and is otherwise the same
     // one: a card that is not a stack still says how many pages it has, and only
     // where there is more than one.
-    expect(src()).toContain("`Group — ${pages.length} pages`");
+    expect(src()).toContain("`Group — ${pages.length} tabs`");
     expect(src()).toContain("pages.length > 1");
   });
 });

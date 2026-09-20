@@ -405,9 +405,21 @@ export const ACTIONS: Action[] = [
   //
   // AND THEY WRAP. `[3]` → next → `[1]`: a reader who binds one key is cycling,
   // and a switcher that stopped at the end would need the other key to get home.
+  //
+  // ── THE NAMES SAY "TAB"; THE IDS STILL SAY "PAGE" (1.0.38) ───────────────
+  //
+  // `vocabulary.ts` reserves "page" for a sub-note, and these two commands spent
+  // it on the panes of a widget group — which the grammar has called `tab` since
+  // it was written (`directive-grammar.ts`: *"`tab` divides a group into
+  // pages"*, one word disagreeing with itself in a single sentence). The labels
+  // now agree with the directive.
+  //
+  // AN ID IS A HOTKEY BINDING, so the ids do not move. A reader who bound a key
+  // to `note-group-next-page` bound it to that string, and renaming it would
+  // silently unbind them to tidy a word they cannot see.
   {
     id: "note-group-next-page",
-    name: "Note: next page in this widget group",
+    name: "Note: next tab in this widget group",
     icon: "chevron-right",
     group: "notes",
     when: hasTabbedGroup,
@@ -415,7 +427,7 @@ export const ACTIONS: Action[] = [
   },
   {
     id: "note-group-prev-page",
-    name: "Note: previous page in this widget group",
+    name: "Note: previous tab in this widget group",
     icon: "chevron-left",
     group: "notes",
     when: hasTabbedGroup,

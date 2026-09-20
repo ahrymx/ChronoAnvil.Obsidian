@@ -43,7 +43,9 @@ import {
   headingTitlesIn,
   sectionOverrides,
   sectionsFor,
-  skeletonTitles,
+  proseTitlesIn,
+  isProseId,
+  proseOrdinalOf,
 } from "./journal-sections";
 import type { SectionContext, SectionOverrides } from "./journal-sections";
 import { composedFromPresent, sectionsPresent } from "./journal-plan";
@@ -175,7 +177,6 @@ export function wantFromJournalNote(
   const options: Record<string, SectionOverrides> = {};
 
   const byId = new Map(sectionsFor(ctx).map((s) => [s.id, s]));
-  const pageHeadings = headingsOf(text);
 
   for (const id of sections) {
     const declared = sectionOverrides(ctx, id);
@@ -195,14 +196,24 @@ export function wantFromJournalNote(
     // made afterwards, from a gesture whose whole promise is "this is what the
     // shape should be". The body a heading already declares is kept, matched by
     // title, so a type that ships prompt text keeps it.
-    if (id === "headings" && pageHeadings.length) {
-      const declaredBody = new Map(
-        (declared?.headings ?? []).map((h) => [h.title, h.body])
-      );
-      next.headings = pageHeadings.map((title) => {
-        const body = declaredBody.get(title);
-        return body ? { title, body: [...body] } : { title };
-      });
+    //
+    // ── AND OFF THE BLOCK THIS ROW NAMES, NOT ALWAYS THE FIRST (1.0.36) ──
+    //
+    // A note may carry several prose blocks now, and each is its own row in
+    // the list this function is building. Reading block 1's titles for every
+    // one of them would store the same skeleton three times and lose the two
+    // the reader actually arranged.
+    if (isProseId(id)) {
+      const titles = headingsOf(text, proseOrdinalOf(id) ?? 1);
+      if (titles.length) {
+        const declaredBody = new Map(
+          (declared?.headings ?? []).map((h) => [h.title, h.body])
+        );
+        next.headings = titles.map((title) => {
+          const body = declaredBody.get(title);
+          return body ? { title, body: [...body] } : { title };
+        });
+      }
     }
 
     // ── A PAGE WIDGET'S ARGUMENT, READ BACK OFF ITS OWN LINE (5.26) ──
@@ -266,8 +277,16 @@ export function wantFromJournalNote(
 // note written before 5.6 — the same fallback the removal path takes, for the
 // same reason: an unmarked skeleton is a page the plugin can read and cannot
 // delimit, and reading it as it always did is better than reading nothing.
-function headingsOf(text: string): string[] {
-  return skeletonTitles(text) ?? headingTitlesIn(looseLines(text));
+//
+// AND IT TAKES AN ORDINAL AS OF 1.0.36, because prose repeats. The unmarked
+// fallback stays the FIRST block's alone: a note with no brackets has one
+// undelimited run of headings and reading it as the second block's would hand
+// the same list to every row.
+function headingsOf(text: string, nth = 1): string[] {
+  return (
+    proseTitlesIn(text, nth) ??
+    (nth === 1 ? headingTitlesIn(looseLines(text)) : [])
+  );
 }
 
 // A retitled header bar, or null when this section has none or never had one

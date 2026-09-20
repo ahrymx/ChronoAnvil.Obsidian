@@ -277,7 +277,7 @@ async function askForEntry(
           group: "Elsewhere",
         },
       ],
-      "Link this page to…"
+      "Link this note to…"
     );
     if (picked == null) return null;
     if (picked === ANOTHER_DATE) {
