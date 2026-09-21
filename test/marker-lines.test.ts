@@ -29,7 +29,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { fenceCursorGuard, fenceLinesIn } from "../src/ui/fence-cursor";
-import { hiddenMarkers, markerLinesIn } from "../src/ui/marker-lines";
+import { hiddenMarkers, markerLinesIn, proseLandings } from "../src/ui/marker-lines";
 import { redirectTyping } from "../src/ui/protected-lines";
 import { ROOT, readSrc } from "./sources";
 
@@ -889,9 +889,10 @@ describe("how it is wired", () => {
     // which `atomicRanges` alone never covered: it is consulted by the VIEW and
     // its whole answer is which endpoint to step to.
     expect(src).toContain("EditorState.transactionFilter");
-    // Only the `keepLine` runs are handed to the redirect, because they are the
-    // only ones whose resting point is inside marker text.
-    expect(src).toContain("typingGaps(state.doc, hidden.spans)");
+    // The redirect is handed the rows that take a keystroke elsewhere: the
+    // spacer, the region gap, and on a prose page every empty row outside a
+    // block.
+    expect(src).toContain("typingGaps(state.doc, hidden.spans, hidden.landings)");
   });
 
   it("keeps the change filter that 5.31.1 chose over a bouncing one", () => {
@@ -910,5 +911,181 @@ describe("how it is wired", () => {
     const store = readSrc("notestore");
     expect(store).not.toContain("Reading mode or Live Preview");
     expect(store).toContain("ui/marker-lines.ts");
+  });
+});
+
+// ── A PAGE'S WRITING STAYS INSIDE ITS PROSE BLOCK (1.0.39) ───────
+//
+// *"Currently if a user deletes all of the text from the prose block and a
+// empty line underneath the stack group, it will break the cursor
+// autopositioning so that text is put above the html prose fencing."*
+//
+// The reader's two calls: EMPTY rows outside a block send the cursor and the
+// keystroke into it, and a row outside that holds text is left alone.
+
+const PAGE_HEAD = ["`chronoanvil:spacer`", "```chronoanvil", "journal-header", "```"];
+const PAGE_TAIL = ["", "%% chronoanvil-graph %%", "%% [[Study|​]] %%", ""];
+const OPEN = "<!--chronoanvil-prose-->";
+const SHUT = "<!--/chronoanvil-prose-->";
+
+/** A page whose one prose block holds `inside`, `gap` rows under the card. */
+function page(inside: string[], gap = 1): string {
+  return [...PAGE_HEAD, ...Array(gap).fill(""), OPEN, ...inside, SHUT, ...PAGE_TAIL].join(
+    "\n"
+  );
+}
+
+/** The offset of line `n` (0-based), at its start or end. */
+function lineAt(doc: string, n: number, end = false): number {
+  const line = EditorState.create({ doc }).doc.line(n + 1);
+  return end ? line.to : line.from;
+}
+
+const WRITTEN = page(["", "## Notes", ""]);
+// What a select-all leaves of the block: its breaks are protected, so one
+// empty row survives between the markers.
+const EMPTIED = page([""]);
+// And with the row under the card deleted too — the reported shape.
+const BARE = page([""], 0);
+
+describe("an emptied prose block keeps its row", () => {
+  it("is what a select-all over the writing leaves", () => {
+    const from = lineAt(WRITTEN, 6);
+    const to = lineAt(WRITTEN, 8, true);
+    expect(afterEdit(WRITTEN, { from, to }, "delete.selection")).toBe(EMPTIED);
+  });
+
+  it("does not join the opener to its closer across the empty row", () => {
+    // THE DEFECT. The one-blank join hid the block's only row, and the row left
+    // to type on was the blank ABOVE the opener.
+    const spans = markerLinesIn(EMPTIED.split("\n"));
+    expect(spans.find((s) => s.from === 5)?.to).toBe(5);
+    expect(seen(EMPTIED)).toBe("\n```chronoanvil\njournal-header\n```\n\n");
+  });
+
+  it("still joins an opener and closer with nothing between them", () => {
+    // Two touching runs must be one, or their replace ranges overlap.
+    const note = [OPEN, SHUT, "b"];
+    expect(markerLinesIn(note)).toEqual([
+      { from: 0, to: 1, keepLine: false, opensRegion: false },
+    ]);
+  });
+});
+
+describe("a cursor outside the prose block", () => {
+  it("rests inside it from the row under the card", () => {
+    expect(restsAt(EMPTIED, lineAt(EMPTIED, 4))).toBe(lineAt(EMPTIED, 6));
+  });
+
+  it("rests inside it from the spacer, which is where a page opens", () => {
+    expect(restsAt(EMPTIED, 0)).toBe(lineAt(EMPTIED, 6));
+  });
+
+  it("rests inside it from the bottom of the note", () => {
+    expect(restsAt(EMPTIED, EMPTIED.length)).toBe(lineAt(EMPTIED, 6));
+  });
+
+  it("rests inside it from the card's last line once the row under it is gone", () => {
+    // The reported shape: the opener's resting point became the end of the
+    // closing ``` line, where every keystroke is refused.
+    expect(restsAt(BARE, lineAt(BARE, 3, true))).toBe(lineAt(BARE, 5));
+  });
+
+  it("goes to the start of the writing from above", () => {
+    expect(restsAt(WRITTEN, lineAt(WRITTEN, 4))).toBe(lineAt(WRITTEN, 6));
+  });
+
+  it("goes to the end of the block above when there is one", () => {
+    const doc = [...PAGE_HEAD, "", OPEN, "one", SHUT, "", "after", "", OPEN, "two", SHUT].join(
+      "\n"
+    );
+    // Row 8 is the empty row under the first block: it continues "one".
+    expect(restsAt(doc, lineAt(doc, 8))).toBe(lineAt(doc, 6, true));
+    // Row 10 is directly above the second opener, so it belongs to that block.
+    expect(restsAt(doc, lineAt(doc, 10))).toBe(lineAt(doc, 12));
+  });
+
+  it("is left alone on a line of the reader's own text", () => {
+    const doc = page(["", "## Notes", ""]).replace("```\n\n<!--", "```\nstray words\n\n<!--");
+    const at = lineAt(doc, 4) + 3;
+    expect(restsAt(doc, at)).toBe(at);
+  });
+
+  it("is left alone inside another plugin's fence", () => {
+    const doc = [...PAGE_HEAD, "```dataview", "", "LIST", "```", "", OPEN, "", SHUT].join("\n");
+    expect(restsAt(doc, lineAt(doc, 5))).toBe(lineAt(doc, 5));
+  });
+
+  it("is left alone in source mode", () => {
+    expect(restsAt(EMPTIED, lineAt(EMPTIED, 4), false)).toBe(lineAt(EMPTIED, 4));
+  });
+
+  it("is left alone on a note with no prose block", () => {
+    const doc = "`chronoanvil:spacer`\n\nprose";
+    expect(restsAt(doc, 21)).toBe(21);
+  });
+});
+
+describe("a keystroke outside the prose block", () => {
+  it("lands inside it from the row under the card", () => {
+    expect(afterEdit(EMPTIED, { from: lineAt(EMPTIED, 4), insert: "Hi" }, "input.type")).toBe(
+      page(["Hi"])
+    );
+  });
+
+  it("lands inside it from the spacer", () => {
+    expect(afterEdit(BARE, { from: 0, insert: "Hi" }, "input.type")).toBe(page(["Hi"], 0));
+  });
+
+  it("gets a line of its own beside the reader's writing", () => {
+    const doc = page(["", "text"]).replace("%% chronoanvil-graph", "after\n\n%% chronoanvil-graph");
+    // The empty row between the closer and "after" is outside the block.
+    const row = doc.split("\n").indexOf(SHUT) + 1;
+    expect(afterEdit(doc, { from: lineAt(doc, row), insert: "Hi" }, "input.type")).toBe(
+      doc.replace("text\n", "text\nHi\n")
+    );
+  });
+
+  it("opens a row in a block that has none", () => {
+    // Opener and closer on consecutive lines — only source mode writes that.
+    const doc = page([]);
+    expect(afterEdit(doc, { from: lineAt(doc, 4), insert: "Hi" }, "input.type")).toBe(
+      page(["Hi"])
+    );
+  });
+
+  it("is left alone on a line of the reader's own text", () => {
+    const doc = EMPTIED.replace("```\n\n<!--", "```\nstray\n\n<!--");
+    const at = lineAt(doc, 4, true);
+    expect(afterEdit(doc, { from: at, insert: "!" }, "input.type")).toBe(
+      doc.replace("stray", "stray!")
+    );
+  });
+
+  it("is left alone in source mode and for a programmatic write", () => {
+    const at = lineAt(EMPTIED, 4);
+    const typed = EMPTIED.slice(0, at) + "Hi" + EMPTIED.slice(at);
+    expect(afterEdit(EMPTIED, { from: at, insert: "Hi" }, "input.type", false)).toBe(typed);
+    expect(afterEdit(EMPTIED, { from: at, insert: "Hi" }, "set")).toBe(typed);
+  });
+});
+
+describe("which rows are taken into a prose block", () => {
+  it("none on a note without a complete block", () => {
+    const lone = ["`chronoanvil:spacer`", "", OPEN, "b"];
+    expect(proseLandings(lone, markerLinesIn(lone))).toEqual([]);
+  });
+
+  it("none for a block printed inside a fence", () => {
+    const doc = ["", "````md", OPEN, "", SHUT, "````", ""];
+    expect(proseLandings(doc, markerLinesIn(doc))).toEqual([]);
+  });
+
+  it("every empty row outside, and the card's last line above an opener", () => {
+    const lines = BARE.split("\n");
+    expect(proseLandings(lines, markerLinesIn(lines)).map((l) => [l.row, l.end, l.fence])).toEqual([
+      [0, false, false],
+      [3, false, true],
+    ]);
   });
 });

@@ -135,6 +135,13 @@ export function protectLines(
 // row was written to invite, and the old answer was to rewrite the spacer line
 // until the markup showed.
 //
+// AND A GAP MAY NAME WHERE ITS KEYSTROKE GOES (1.0.39). The default is
+// the line below the gap, which is right for the spacer and the region gap on a
+// note with no prose block. On a note WITH one, `marker-lines.ts` hands in every
+// empty row outside the blocks with a destination inside the nearest block, so
+// the reader's words land in the writing rather than above its opener. Same
+// move, a second place to move to.
+//
 // THE THREE NARROWINGS, EACH LOAD BEARING:
 //
 //   - `input` ONLY. A refused deletion stays refused. Redirecting one would
@@ -150,8 +157,22 @@ export function protectLines(
 // (`filterTransaction`, in @codemirror/state), and CodeMirror resolves what a
 // transaction filter returns with filtering OFF — so the moved insertion is not
 // re-examined and cannot be swallowed on its way back out.
+// Where a redirected keystroke lands: the offset to insert at, what to insert
+// there (the typed text, perhaps with a line break so it never welds onto a
+// line the reader already wrote), and where the cursor ends up. Offsets are in
+// the document BEFORE the keystroke.
+export interface Landing {
+  at: number;
+  insert: string;
+  cursor: number;
+}
+
+export interface TypingGap extends LineSpan {
+  land?: (text: string) => Landing;
+}
+
 export function redirectTyping(
-  spansFor: (state: EditorState) => readonly LineSpan[]
+  spansFor: (state: EditorState) => readonly TypingGap[]
 ): Extension {
   return EditorState.transactionFilter.of((tr) => {
     if (!tr.docChanged || !tr.isUserEvent("input")) return tr;
@@ -175,9 +196,14 @@ export function redirectTyping(
     if (!span) return tr;
 
     const below = tr.startState.doc.line(span.to + 1).to;
+    const land = span.land?.(text) ?? {
+      at: below,
+      insert: `\n${text}`,
+      cursor: below + 1 + text.length,
+    };
     return {
-      changes: { from: below, insert: `\n${text}` },
-      selection: EditorSelection.cursor(below + 1 + text.length),
+      changes: { from: land.at, insert: land.insert },
+      selection: EditorSelection.cursor(land.cursor),
       userEvent: "input.type",
     };
   });

@@ -5,6 +5,32 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.39] - 2026-09-21
+
+### Removed
+
+- **Dragging sections in *Edit sections…*.** Rows and group cards could still be
+  picked up and dropped, which looked like a way to drag one section onto
+  another and replace it — something that was never meant to be a feature.
+  Sections have been moved from this window's buttons for a long time; now the
+  **↑** and **↓** arrows on each row and on each group's bar are the only way
+  to reorder, and they are the way a keyboard can reach. Nothing is saved until
+  you press **Save**, as before. Dragging journal cards on the homepage, chart
+  tiles, and widgets between the cells of a row is unchanged.
+
+### Fixed
+
+- **What you type on a page stays inside its prose block.** Deleting everything
+  in a prose block — and then the empty line under the card above it — left the
+  block with no line you could see, and the next thing you typed went *above*
+  the block instead of into it, outside the part of the note the plugin treats
+  as your writing. An emptied block now keeps one empty line to type on, and in
+  Live Preview an empty line outside a prose block sends your cursor, and what
+  you type, into the nearest block. Opening a page puts the cursor straight into
+  the writing. Lines outside a block that already hold text stay editable where
+  they are, other plugins' code blocks are left alone, and Source mode still
+  lets you edit anything anywhere.
+
 ## [1.0.38] - 2026-09-20
 
 ### Changed

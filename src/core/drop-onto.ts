@@ -10,8 +10,9 @@
 // ── THE BUG THIS EXISTS BECAUSE OF ───────────────────────────────────────
 //
 // Three surfaces let a reader drag one thing onto another to reorder a list —
-// the chart grid, the journal cards, and the section editor's rows — and all
-// three had written the same four lines:
+// the chart grid, the journal cards, and the section editor's rows (a drag
+// removed in 1.0.39; that window reorders with arrows) — and all three had
+// written the same four lines:
 //
 //     const rest = items.filter((x) => x !== from);
 //     rest.splice(rest.indexOf(onto), 0, from);

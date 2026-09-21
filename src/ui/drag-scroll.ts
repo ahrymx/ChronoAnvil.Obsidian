@@ -18,8 +18,8 @@
 // ── WHY IT IS LOCKED, AND WHY THIS IS THE FIX RATHER THAN A SETTING ──
 //
 // ChronoAnvil drags with the HTML5 drag-and-drop API — `draggable`, `dragstart`,
-// `dataTransfer` — in all three places it drags at all: a widget on the page
-// (`block-drag.ts`), a row in the section editor, and a journal card. That
+// `dataTransfer` — in every place it drags at all: a widget on the page
+// (`block-drag.ts`), a journal card, and a chart tile. That
 // choice is load-bearing and is argued at each site: `dataTransfer.types` is
 // what lets a landing place accept or decline a drag BEFORE the reader commits,
 // which is the whole of "no slot lights up for a drop it would refuse".

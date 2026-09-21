@@ -44,8 +44,6 @@ import {
   breakUp,
   canMoveBlock,
   canMoveRow,
-  dropBlock,
-  dropCell,
   joinInto,
   joinables,
   keptPages,
@@ -394,38 +392,6 @@ describe("making a group, and what may be joined to what", () => {
   });
 });
 
-describe("dragging", () => {
-  it("moves a block past a group without entering it", () => {
-    // Dropped downward onto a cell of the group, so `dropOnto`'s rule puts it
-    // after the whole block the cell belongs to.
-    expect(shape(dropBlock(at(), BAND, "banner", "tasks"))).toEqual([
-      GROUP,
-      ["banner"],
-      ["journals"],
-      ["charts"],
-    ]);
-  });
-
-  it("reorders cells inside one group", () => {
-    expect(shape(dropCell(at(), BAND, "upcoming", "launcher"))).toEqual([
-      ["banner"],
-      ["diary", "upcoming", "launcher", "tasks"],
-      ["journals"],
-      ["charts"],
-    ]);
-  });
-
-  it("refuses a cell drop that would cross out of the group", () => {
-    expect(dropCell(at(), BAND, "tasks", "journals")).toBeNull();
-    expect(dropCell(at(), BAND, "journals", "tasks")).toBeNull();
-  });
-
-  it("says nothing changed for a drop on itself", () => {
-    expect(dropBlock(at(), BAND, "journals", "journals")).toBeNull();
-    expect(dropCell(at(), BAND, "tasks", "tasks")).toBeNull();
-  });
-});
-
 describe("the bits stay describable", () => {
   it("drops a bit on a row with nothing above it", () => {
     // One bit says "this row is with the one above it", so a bit on the first
@@ -643,7 +609,7 @@ describe("the window is thin over it", () => {
     const src = editor();
     expect(src).toContain("private settle(next: NextArrangement | null): void");
     expect(src).toContain("this.stacked = next.stacked;");
-    expect(src.match(/this\.settle\(/g) ?? []).toHaveLength(9);
+    expect(src.match(/this\.settle\(/g) ?? []).toHaveLength(8);
   });
 
   it("asks what a move will do before drawing the arrow, not after", () => {

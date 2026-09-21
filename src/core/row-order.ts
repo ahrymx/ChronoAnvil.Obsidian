@@ -58,8 +58,6 @@
 // rule above checkable at all: `test/row-order.test.ts` presses the buttons by
 // calling them.
 
-import { dropOnto } from "./drop-onto";
-
 // An arrangement, as the editor holds it: the rows in display order and the two
 // bits that cut them into groups and pages.
 //
@@ -306,49 +304,6 @@ export function moveBlock(
   const next = [...blocks];
   [next[at], next[to]] = [next[to], next[at]];
   return settle(arr, band, next.flat());
-}
-
-// A cell dropped on another cell of the same group.
-export function dropCell(
-  arr: Arrangement,
-  band: readonly string[],
-  from: string,
-  onto: string
-): NextArrangement | null {
-  const blocks = blocksOf(band, arr.joined);
-  const at = blocks.findIndex((b) => b.includes(from));
-  if (at < 0 || blocks[at].length < 2) return null;
-  if (!blocks[at].includes(onto)) return null;
-  const cells = dropOnto(blocks[at], from, onto);
-  if (!cells) return null;
-  return settle(arr, band, flatten(blocks, at, cells));
-}
-
-// A block dropped on another block — the one carrying `onto`, whichever of its
-// rows that is.
-//
-// DROPPING ON A GROUP PUTS THE BLOCK BESIDE THE GROUP, NOT IN IT. `dropOnto`'s
-// rule decides which side: the thing you dropped on moves aside towards where
-// you dragged from. A drag has meant "reorder" since 3.0 and teaching it to
-// join would make the outcome depend on where inside a card the pointer let go
-// — the ambiguity 4.7 removed from the page.
-export function dropBlock(
-  arr: Arrangement,
-  band: readonly string[],
-  from: string,
-  onto: string
-): NextArrangement | null {
-  const blocks = blocksOf(band, arr.joined);
-  const at = blocks.findIndex((b) => b.includes(from));
-  const target = blocks.findIndex((b) => b.includes(onto));
-  if (at < 0 || target < 0 || at === target) return null;
-  const order = dropOnto(
-    blocks.map((_, i) => i),
-    at,
-    target
-  );
-  if (!order) return null;
-  return settle(arr, band, order.flatMap((i) => blocks[i]));
 }
 
 // ── changing what is in what ──────────────────────────────────────────
@@ -636,11 +591,11 @@ export function keptPages(
 // ── THE ONE BIT, AND THE ONE ARRANGEMENT IT CANNOT DESCRIBE ──────────────
 //
 // A block is a run of consecutive rows, so one bit per row says the whole of it,
-// and the bit "survives a reorder for free": drag a row out of the middle of a
+// and the bit "survives a reorder for free": move a row out of the middle of a
 // block and it takes its flag with it.
 //
 // That is true of every row of a block EXCEPT THE ONE THAT OPENS IT, and the
-// exception is not a corner: the opener is the row a reader drags when they want
+// exception is not a corner: the opener is the row a reader moves when they want
 // their group to start with something else. Its bit is the ABSENCE of a bit, and
 // absence does not travel.
 //

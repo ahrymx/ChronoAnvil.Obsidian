@@ -88,8 +88,6 @@ import {
   breakUp,
   canMoveBlock,
   canMoveRow,
-  dropBlock,
-  dropCell,
   joinables,
   joinInto,
   moveBlock,
@@ -102,7 +100,6 @@ import {
 } from "../core/row-order";
 import type { Arrangement, MoveUnit, NextArrangement } from "../core/row-order";
 import { categoryLabel, categoryRank } from "../core/sections";
-import { panDuringDrag } from "./drag-scroll";
 import type {
   FlagQuestion,
   FolderQuestion,
@@ -218,7 +215,7 @@ export class SectionEditorModal extends EditorModal {
   // A FOURTH PIECE OF STATE RATHER THAN A RICHER `rows`, for the reason `rows`
   // and `removed` are two things rather than one: an id is what every other
   // part of this window is written in terms of — `view(id)`, `bandOf(id)`,
-  // `swap(a, b)`, the drag payload — and threading a record through all of them
+  // `swap(a, b)`, `want` — and threading a record through all of them
   // to carry a field four of them would ignore is how a list of ids becomes a
   // list of objects nobody remembers the shape of. `want` composes the three at
   // the one place that needs them composed.
@@ -237,26 +234,17 @@ export class SectionEditorModal extends EditorModal {
   // it was the half you could not see. Now it is a pane like the others and the
   // reader came here to arrange, so that is what the window opens on.
   private pane: Pane = "sections";
-  // What a drag is carrying, and which list it is moving inside.
-  //
-  // THE SCOPE TRAVELS WITH THE DRAG (4.53.0). A cell of a group and a block of
-  // the list are two different things to move, so they are two different drags:
-  // a cell may land only on another cell of its own group, and a block only on
-  // another block. Recording it at `dragstart` is what lets `accepts` answer
-  // both of dragover's and drop's questions with one predicate, rather than
-  // each one re-deriving what was picked up.
-  private dragging: { id: string; scope: MoveUnit } | null = null;
   // Which rows share a block with the row above them. 4.8 §2.
   //
   // A FLAG PER ROW RATHER THAN A LIST OF BLOCKS, and the reason is `rows`
   // itself: every other part of this window is written in terms of a flat list
-  // of ids — `swap`, `bandOf`, the drag payload, `want` — and a list of lists
+  // of ids — `swap`, `bandOf`, `want` — and a list of lists
   // would have to be unpacked and repacked by all of them. A block is a RUN of
   // consecutive rows, which is exactly what the catalogue means by one
   // (`FlatSection.row`: "consecutive members only"), so "this one is with the
   // one before it" says the whole of it with one bit.
   //
-  // It also survives a reorder for free. Drag a row out of the middle of a
+  // It also survives a reorder for free. Move a row out of the middle of a
   // block and it takes its flag with it; the row that followed it keeps a flag
   // that now points at whatever is above it, which is the same answer the file
   // would give.
@@ -492,7 +480,7 @@ export class SectionEditorModal extends EditorModal {
   // And what comes back, taken in one go.
   //
   // NULL IS A MOVE THAT CHANGES NOTHING and is not a repaint: pressing a
-  // disabled-looking arrow, dropping a row on itself, joining a block that is
+  // disabled-looking arrow, joining a block that is
   // already where it would go. `row-order.ts` answers that way for the same
   // reason `applyFlatSections` does, and the window's part of the bargain is not
   // to redraw a list to leave it identical.
@@ -546,7 +534,7 @@ export class SectionEditorModal extends EditorModal {
 
   // Every row the write should weld, read back through the blocks it will
   // actually make — `pageBreaks`' twin, one bit along, and for its reason. A
-  // row dragged out of a stack would otherwise arrive at the write still
+  // row moved out of a stack would otherwise arrive at the write still
   // claiming to be welded under a section it is no longer under.
   private welds(ids: readonly string[]): string[] {
     return this.groupsOf(ids).flatMap((group) =>
@@ -601,7 +589,7 @@ export class SectionEditorModal extends EditorModal {
   // FILTERED THROUGH `groupsOf`, so a row that stopped being part of a group
   // stops being a page break with it. The bit survives a reorder for free (it
   // is one bit on one row) and that is exactly why it has to be read back
-  // through the current grouping rather than trusted on its own: a row dragged
+  // through the current grouping rather than trusted on its own: a row moved
   // out of a group would otherwise arrive at the write still claiming to open a
   // page of a group it is no longer in.
   private pageBreaks(ids: readonly string[]): string[] {
@@ -700,7 +688,7 @@ export class SectionEditorModal extends EditorModal {
     // section in", so two cells of one row trading places is invisible to it —
     // and `regroup`'s phase three had been settling exactly that since 4.8,
     // unnamed and therefore uncounted. The footer disables Save at zero, so the
-    // reader dragged, watched the list re-draw, and was told "No changes".
+    // reader moved a row, watched the list re-draw, and was told "No changes".
     //
     // WHAT IT SKIPS AND HOW IT MATCHES ARE `cellMoveOps`' TO SAY, beside the
     // `moveOps` it is built out of — so the sentence a reorder gets here is the
@@ -802,7 +790,7 @@ export class SectionEditorModal extends EditorModal {
     };
     tab("sections", "In this file");
     // THE COUNT IS ON THE TAB, because the pane that would show it is now
-    // hidden most of the time. A reader who drags three rows and never opens
+    // hidden most of the time. A reader who moves three rows and never opens
     // Changes should still be able to see that three things are pending — the
     // footer says so too, and saying it twice is right here: the footer is what
     // they press and the tab is where they would go to check.
@@ -915,14 +903,6 @@ export class SectionEditorModal extends EditorModal {
     };
     shift(-1, `Move the ${noun} up`, "chevron-up");
     shift(1, `Move the ${noun} down`, "chevron-down");
-    // PICKED UP BY THE BAR, DROPPED ON THE CARD. The bar is the handle because
-    // the rows inside the card are drag sources of their own and a handle has to
-    // be somewhere that is not one; the target is the whole card because a thin
-    // strip is a bad thing to have to hit, and because what lands beside a group
-    // lands beside all of it. A cell drop inside the card is refused here by
-    // scope and handled by the row it was let go on.
-    this.attachDrag(bar, group[0], "block", card);
-    this.attachDrop(card, group[0], "block");
 
     bar.createSpan({
       cls: "ca-tpl-block-title",
@@ -1192,15 +1172,14 @@ export class SectionEditorModal extends EditorModal {
   // THE WHOLE OF THE REORDERING RULE, and it is one sentence with no surface
   // test in it. On a surface with one band it is every other row, which is what
   // the journal editor has always done. On a diary entry it is the rows on the
-  // same side of the rule — so a section cannot be dragged from the structural
-  // half into the personal one, because there is nowhere in that band to drop
+  // same side of the rule — so a section cannot be moved from the structural
+  // half into the personal one, because there is nowhere in that band to put
   // it, rather than because a check said no.
   // AND AN IMMOVABLE ROW IS NOT IN ANY BAND. 3.2 §4 fixes navigation to the top
   // row of every diary surface, and the cheapest way to say so is the way the
-  // rule above already works: not a check that refuses the drop, but a band it
-  // was never a member of. A fixed row is therefore not a drag source, not a
-  // drop target, and gets no arrows — three behaviours from one omission, and
-  // none of them asks what surface this is.
+  // rule above already works: not a check that refuses the move, but a band it
+  // was never a member of. A fixed row therefore gets no arrows, from one
+  // omission, and nothing asks what surface this is.
   //
   // It still RENDERS, with its refusal in the subtitle. A row that vanished
   // would take the explanation with it, and "navigation is fixed" is exactly
@@ -1236,8 +1215,7 @@ export class SectionEditorModal extends EditorModal {
   // A SECOND ACCESSOR RATHER THAN A FLAG ON THE FIRST, because the two answer
   // different questions and only one of them is about moving. `bandOf` is the
   // list a row is REARRANGED inside, and everything above is the argument for
-  // leaving a fixed row out of it: not in the band, so not a drag source, not a
-  // drop target, and no arrows. This one is the list a row is WELDED inside,
+  // leaving a fixed row out of it: not in the band, so no arrows. This one is the list a row is WELDED inside,
   // and a weld does not move anything past anything — it puts one section into
   // the fence of another, which is a thing a fixed row can perfectly well be
   // the host of.
@@ -1296,7 +1274,7 @@ export class SectionEditorModal extends EditorModal {
               ? [{ text: "fixed", tone: "muted" }]
               : [];
 
-    const { row, lead, actions } = createListRow(host, {
+    const { lead, actions } = createListRow(host, {
       // THE ACTIONS GET A LINE OF THEIR OWN (4.15 §2). This is the caller the
       // flag was added for: a row here carries a dropdown or a text field
       // alongside a group button and a Remove button, and until now all four
@@ -1326,17 +1304,17 @@ export class SectionEditorModal extends EditorModal {
     // arrangement rather than from where this row happens to be being drawn, so
     // the card and the mover cannot disagree about what a group is.
     const unit = unitOf(band, this.joined, section.id);
-    this.attachDrag(row, section.id, unit);
-    this.attachDrop(row, section.id, unit);
 
-    // ARROWS AS WELL AS DRAG, not instead of it.
+    // ARROWS, AND NO DRAG (1.0.39).
     //
-    // §3 of the plan assumes drag, and the row this replaces argued for arrows:
-    // "the list is short, the rows are a fixed height, and a button is
-    // keyboard-reachable in a way a handle is not". Both are right, and they
-    // are not in conflict — the argument against drag was never that it is a
-    // bad gesture, it was that it is the only one. So the gesture is added and
-    // the affordance is kept, and the keyboard path survives.
+    // 4.8.1 settled that a section is moved from this window and nowhere else,
+    // and this window's own case for arrows — "the list is short, the rows are
+    // a fixed height, and a button is keyboard-reachable in a way a handle is
+    // not" — never needed the gesture beside it. The rows and group bars were
+    // still draggable, though, and a row that lifts under the pointer reads as
+    // an invitation to drag one section onto another: the reader took it for a
+    // drag-and-replace feature that was never meant to exist. So the gesture is
+    // gone from both levels, and the arrows are the one way to reorder.
     //
     // In `lead` rather than beside the toggle: "move this up" next to "remove
     // this" is a pairing one slip away from being expensive.
@@ -1367,12 +1345,10 @@ export class SectionEditorModal extends EditorModal {
 
     // ── which block this row is in (4.8 §2.2) ──────────────────────────
     //
-    // A BUTTON RATHER THAN A SECOND MEANING FOR THE DRAG. The drag reorders,
-    // and it has meant exactly that since 3.0; teaching a drop to sometimes
-    // join instead would make the outcome depend on where inside a row the
-    // pointer let go — which is the ambiguity 4.7 removed from the page and has
-    // no more business here. It is also the argument the arrows already won: a
-    // button is keyboard-reachable and a gesture is not.
+    // A BUTTON, BECAUSE THE ARROWS ARE BUTTONS. Joining a block is an
+    // arrangement change like any reorder, and it is made the same way: a
+    // control a keyboard can reach, not a gesture whose outcome depends on
+    // where the pointer let go — the ambiguity 4.7 removed from the page.
     //
     // `movable !== false` CAME OUT IN 4.12 §A, and it was doing two jobs badly.
     // It was the whole of the head's exclusion — and the head is now excluded in
@@ -2289,116 +2265,6 @@ export class SectionEditorModal extends EditorModal {
     if (past && past.length > 1) return `Move ${where} past the group`;
     const label = past ? this.view(past[0])?.label : undefined;
     return label ? `Move ${where} past ${label}` : `Move ${where}`;
-  }
-
-  // Drag to reorder — direct manipulation, and STILL PLANNED MANIPULATION.
-  //
-  // §3 of the plan says this explicitly and it is the thing most easily lost:
-  // drag-and-drop that writes on drop is the natural thing to build and it
-  // removes the preview. Nothing here writes. A drag reorders a list in the
-  // modal, the summary re-reads, and the reader can drag six times and change
-  // their mind before pressing Save.
-  //
-  // AND IT CARRIES ITS SCOPE (4.53.0). A cell of a group and a block of the list
-  // are two different things to pick up, so they are two different drags: the
-  // group's bar lifts the group, a cell lifts itself, and a cell may land only
-  // among its own group's cells. Until this release every drag was over the flat
-  // list of rows, so dropping anything anywhere could land it in the middle of
-  // somebody's group — and the arrangement that came back was whatever the
-  // leftover bits happened to describe.
-  private attachDrag(
-    el: HTMLElement,
-    id: string,
-    scope: MoveUnit,
-    // WHAT LIGHTS UP, where that is not what you grabbed. A group is picked up
-    // by its bar and it is the CARD that should fade — the object being moved is
-    // the whole block, and a bar that dimmed on its own would say the reader was
-    // dragging a title.
-    mark: HTMLElement = el
-  ): void {
-    // `bandOf` already makes a fixed row an impossible drop, so the drag would
-    // fail on release rather than be accepted. That is one failure too late:
-    // `draggable = true` is a promise the cursor makes before the reader has
-    // committed to anything, and letting them lift a row that cannot land is
-    // the same class of lie as a refusal that offers a move (3.2 §4).
-    //
-    // ASKED AS "IS IT IN ITS OWN BAND" (4.53.0), which is one question covering
-    // both rows that are not: the immovable one and the one being removed. A
-    // second test beside this one would be a second place to forget.
-    if (!this.bandOf(id).includes(id)) return;
-    el.draggable = true;
-    // AND THE LIST SCROLLS WHILE A ROW IS IN THE AIR (4.57). A page with a
-    // dozen sections and four groups is taller than the window this draws in,
-    // and a native drag stops the scroller dead — so the rows a reader could
-    // reach were the ones already on screen. `drag-scroll.ts` reads the same
-    // `dragover` the drop targets read and pans the modal's own scroller.
-    let stopPan: (() => void) | null = null;
-    el.addEventListener("dragstart", (e) => {
-      this.dragging = { id, scope };
-      mark.addClass("is-dragging");
-      e.dataTransfer?.setData("text/plain", id);
-      stopPan = panDuringDrag(el);
-    });
-    el.addEventListener("dragend", () => {
-      stopPan?.();
-      stopPan = null;
-      this.dragging = null;
-      mark.removeClass("is-dragging");
-    });
-  }
-
-  // And where it may land.
-  //
-  // ONE PREDICATE, ASKED TWICE. `dragover` decides whether this is a drop target
-  // at all — no `preventDefault`, no drop, so the gesture reports "no" the way
-  // every other drag does rather than accepting the drop and then explaining
-  // itself — and `drop` asks again rather than trusting that dragover ran. A
-  // rule enforced in one of two paths is a rule with a way round it.
-  private attachDrop(
-    el: HTMLElement,
-    id: string,
-    scope: MoveUnit,
-    mark: HTMLElement = el
-  ): void {
-    if (!this.bandOf(id).includes(id)) return;
-    el.addEventListener("dragover", (e) => {
-      if (!this.accepts(id, scope)) return;
-      e.preventDefault();
-      mark.addClass("is-drop-target");
-    });
-    el.addEventListener("dragleave", () => mark.removeClass("is-drop-target"));
-    el.addEventListener("drop", (e) => {
-      e.preventDefault();
-      mark.removeClass("is-drop-target");
-      const drag = this.dragging;
-      this.dragging = null;
-      if (!drag || !this.accepts(id, scope)) return;
-      const band = this.bandOf(id);
-      // Lifted out and re-inserted at the target's slot, so dragging three
-      // places up moves it three places rather than swapping it with whatever
-      // happened to be there — `dropOnto`'s rule, over cells or over blocks
-      // depending on what was picked up.
-      this.settle(
-        scope === "cell"
-          ? dropCell(this.arrangement, band, drag.id, id)
-          : dropBlock(this.arrangement, band, drag.id, id)
-      );
-    });
-  }
-
-  // Whether what is being dragged may land here.
-  //
-  // THREE QUESTIONS, AND THE BAND IS STILL THE FIRST OF THEM. A row in another
-  // band is not a target, which is the rule 3.2 §4 states and the one an
-  // immovable row is excluded by. What 4.53.0 adds is the other two: a drag
-  // knows what it picked up, and a cell drop must stay inside the group it
-  // started in.
-  private accepts(onto: string, scope: MoveUnit): boolean {
-    const drag = this.dragging;
-    if (!drag || drag.id === onto || drag.scope !== scope) return false;
-    if (!this.bandOf(onto).includes(drag.id)) return false;
-    if (scope !== "cell") return true;
-    return blockOf(this.bandOf(onto), this.joined, onto).includes(drag.id);
   }
 
   private renderAdd(host: HTMLElement): void {

@@ -2971,10 +2971,10 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   color: var(--text-accent);
 }
 
-/* ── The section editor's bands and drag states (3.0) ────────────────────
+/* ── The section editor's bands (3.0) ────────────────────────────────────
    A diary entry has two bands — the structural fences above the horizontal
    rule and the reader's own widgets below it — and a section may not be
-   dragged between them. The heading is drawn only where there is more than
+   moved between them. The heading is drawn only where there is more than
    one, so a journal note and a dashboard render the flat list they always
    did. */
 .ca-tpl-band {
@@ -3013,22 +3013,6 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
   font-size: var(--ca-text-sm);
-}
-
-/* Drag reorders the list; nothing is written until Save. The cursor says the
-   row is draggable, and only rows inside the same band ever light up as a
-   drop target — a row in the other band is not a target at all, so the
-   gesture refuses the way every other drag does rather than accepting the
-   drop and then explaining itself. */
-.ca-tpl-list .ca-list-row[draggable="true"] {
-  cursor: grab;
-}
-.ca-tpl-list .ca-list-row.is-dragging {
-  opacity: 0.45;
-  cursor: grabbing;
-}
-.ca-tpl-list .ca-list-row.is-drop-target {
-  box-shadow: inset 0 2px 0 0 var(--text-accent);
 }
 
 /* ── A block that holds more than one section (4.8 §2.2) ─────────────────
@@ -3094,28 +3078,6 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   gap: 8px;
   padding: 5px 10px;
   border-bottom: var(--ca-rule) solid var(--background-modifier-border);
-}
-/* ── The bar is the handle for the whole group (4.53.0) ──────────────────
-   A card has drawn a group since 4.8 and there was no way to move one: the
-   arrows inside it move a COLUMN within the group, so a reader who wanted the
-   group further down the page pressed them on each member in turn and watched
-   it come apart. The bar now carries the group's own two arrows and is the
-   thing you pick up — one level of the list, one place to reach it, the same
-   grab/grabbing cursor the rows have had since 3.0. */
-.ca-tpl-block-bar[draggable="true"] {
-  cursor: grab;
-}
-.ca-tpl-block-bar.is-dragging {
-  cursor: grabbing;
-}
-/* The states go on the CARD, not on the bar, because what is being moved is the
-   whole block — the same fade and the same inset rule a row wears, drawn round
-   the object they are actually describing. */
-.ca-tpl-block.is-dragging {
-  opacity: 0.45;
-}
-.ca-tpl-block.is-drop-target {
-  box-shadow: inset 0 2px 0 0 var(--text-accent);
 }
 .ca-tpl-block-title {
   flex: 1 1 auto;

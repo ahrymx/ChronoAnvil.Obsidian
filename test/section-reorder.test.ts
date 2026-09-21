@@ -358,9 +358,9 @@ describe("the one bit a reorder could not survive", () => {
 describe("the window asks both of them", () => {
   const src = readSrc("section-editor");
 
-  it("restores the boundaries after an arrow and after a drop", () => {
-    // Two reorder paths, one rule. A fix in one of them is a window where the
-    // arrows are safe and the drag is not.
+  it("restores the boundaries after every move", () => {
+    // One rule for every reorder path. A fix in one of them is a window where
+    // one control is safe and another is not.
     //
     // ASSERTED OF THE MODULE THAT OWNS THE RULE, AS OF 4.53.0. The window used
     // to carry two hand-written reorders with a `keptBlocks` call bolted to the
@@ -372,12 +372,7 @@ describe("the window asks both of them", () => {
     expect(order).toContain("keptBlocks(before, rows, arr.joined)");
     expect(order).toContain("keptPages(before, rows, arr.paged)");
     expect(src).not.toContain("keptBlocks(");
-    for (const mover of [
-      "moveCell(",
-      "moveBlock(",
-      "dropCell(",
-      "dropBlock(",
-    ]) {
+    for (const mover of ["moveCell(", "moveBlock("]) {
       const at = order.indexOf(`export function ${mover}`);
       expect(at, mover).toBeGreaterThan(-1);
       expect(order.slice(at, order.indexOf("\n}", at)), mover).toContain(

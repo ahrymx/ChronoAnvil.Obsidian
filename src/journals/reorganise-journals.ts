@@ -23,10 +23,10 @@
 //
 // ── ARROWS, NOT DRAG, AND THAT IS THE READER'S CALL ──────────────────────
 //
-// *"Drag is for cards only."* The section editor pairs drag with arrows and its
-// note argues both are right — *"a button is keyboard-reachable in a way a
-// handle is not"* — so what is dropped here is the half that surface already
-// has, not the half that carries the keyboard. A list of four rows with ↑ and ↓
+// *"Drag is for cards only."* The section editor reached the same answer in
+// 1.0.39 and reorders with arrows alone — *"a button is keyboard-reachable in a
+// way a handle is not"* — so this window and that one offer the same control,
+// and it is the half that carries the keyboard. A list of four rows with ↑ and ↓
 // is not a lesser control at this size; it is the one the reader asked for and
 // the only one a keyboard can reach.
 //

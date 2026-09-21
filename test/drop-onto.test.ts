@@ -93,18 +93,14 @@ describe("the moves that are not moves", () => {
   });
 });
 
-describe("the three surfaces ask it rather than writing it again", () => {
-  it("is called by the chart grid, the journal cards and the section editor", () => {
+describe("the surfaces that drag ask it rather than writing it again", () => {
+  it("is called by the chart grid and the journal cards", () => {
     expect(readCode("charts")).toContain("dropOnto(specs.map((s) => s.key), fromKey, ontoKey)");
     expect(readCode("journal-order")).toContain("dropOnto(journalOrder(plugin), fromId, ontoId)");
-    // THE SECTION EDITOR ASKS IT THROUGH `row-order` AS OF 4.53.0, and twice —
-    // once over the cells of a group and once over the blocks of a band. The
-    // editor's own drop used to splice the flat list of rows, which is how a
-    // drop could land in the middle of somebody's group; the module that owns
-    // the arrangement makes the same call, on the list the drag was picked up
-    // from.
-    expect(readCode("row-order")).toContain("dropOnto(blocks[at], from, onto)");
-    expect(readCode("row-order")).toContain("dropOnto(");
+    // THE SECTION EDITOR WAS THE THIRD, until its drag was removed in
+    // 1.0.39: it reorders with arrows alone, so neither it nor `row-order`
+    // has a drop to resolve.
+    expect(readCode("row-order")).not.toContain("dropOnto(");
     expect(readCode("section-editor")).not.toContain("dropOnto(");
   });
 

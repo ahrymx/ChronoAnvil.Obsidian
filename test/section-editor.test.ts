@@ -9,7 +9,7 @@
 //
 // The modal itself is DOM and Obsidian's Modal base, which the stub does not
 // render. What IS testable is every decision it makes before touching the
-// screen — which rows can be dragged where, what the footer counts, what Save
+// screen — which rows can be moved where, what the footer counts, what Save
 // writes, and what it refuses to write — and those are the parts that can lose
 // somebody's file.
 //
@@ -193,13 +193,25 @@ describe("what a row offers", () => {
     }
   });
 
-  it("arrows as well as drag, so the keyboard path survives", () => {
-    // The row this replaced argued for arrows over drag: "the list is short,
-    // the rows are a fixed height, and a button is keyboard-reachable in a way
-    // a handle is not". §3 assumes drag. Both are right and they are not in
-    // conflict — the gesture is added, the affordance is kept.
-    const body = editor();
-    expect(body).toContain("draggable");
+  it("arrows, and no drag", () => {
+    // 1.0.39. The rows and group bars were still draggable, and a row
+    // that lifts under the pointer read as a drag-and-replace feature that was
+    // never meant to exist — 4.8.1 had already said a section moves from this
+    // window's controls. The arrows are the one way to reorder, and the one a
+    // keyboard can reach.
+    const body = readCode("section-editor");
+    for (const gone of [
+      "draggable",
+      '"dragstart"',
+      '"dragover"',
+      '"drop"',
+      "dataTransfer",
+      "panDuringDrag",
+      "dropCell(",
+      "dropBlock(",
+    ]) {
+      expect(body, gone).not.toContain(gone);
+    }
     expect(body).toContain('setIcon(b, icon)');
     expect(body).toContain('"Move up"');
     expect(body).toContain('"Move down"');
@@ -209,20 +221,6 @@ describe("what a row offers", () => {
 // ── direct manipulation is still planned manipulation ─────────────────
 
 describe("nothing is written until Save", () => {
-  it("no drop handler writes", () => {
-    // §3, and the thing most easily lost: "drag-and-drop that writes on drop is
-    // the natural thing to build and it removes the preview". The drag handlers
-    // touch `this.rows` and call refreshFrame, and nothing else.
-    const drop = readCode("section-editor");
-    const from = drop.indexOf('addEventListener("drop"');
-    const to = drop.indexOf("private renderAdd");
-    const body = drop.slice(from, to);
-    expect(from).toBeGreaterThan(0);
-    for (const write of ["vault.modify", "vault.create", "await "]) {
-      expect(body, write).not.toContain(write);
-    }
-  });
-
   it("the only write is in commit, behind a re-read", () => {
     const body = readCode("section-editor");
     expect(body.match(/vault\.modify/g) ?? []).toHaveLength(1);
@@ -239,25 +237,14 @@ describe("nothing is written until Save", () => {
   });
 });
 
-// ── the rule a drag may not cross ─────────────────────────────────────
+// ── the rule a move may not cross ─────────────────────────────────────
 
-describe("a section cannot be dragged across the rule", () => {
+describe("a section cannot be moved across the rule", () => {
   it("because the band is the only list a row can move inside", () => {
     const body = editor();
     expect(body).toContain("private bandOf(");
-    // Both gestures consult it. A rule enforced in one of two paths is a rule
-    // with a way round it.
+    // The arrows read it, so a row can only ever be moved among its own band.
     expect(body).toContain("this.bandOf(section.id)");
-    // Twice: the drag source and the drop target each refuse a row that is not
-    // in its own band before the gesture begins.
-    expect(body.match(/this\.bandOf\(id\)\.includes\(/g) ?? []).toHaveLength(2);
-    // AND THE LANDING IS CHECKED AGAINST THE DRAG (4.53.0). `accepts` asks
-    // whether what was picked up may go where it is being let go, and both
-    // `dragover` and `drop` ask it — the second because a drop that trusted the
-    // first would be a rule with one path round it.
-    expect(body).toContain("private accepts(onto: string, scope: MoveUnit)");
-    expect(body).toContain("this.bandOf(onto).includes(drag.id)");
-    expect(body.match(/this\.accepts\(id, scope\)/g) ?? []).toHaveLength(2);
   });
 
   it("and an entry really does report two bands", () => {
@@ -267,8 +254,8 @@ describe("a section cannot be dragged across the rule", () => {
       bands.set(s.group, [...(bands.get(s.group) ?? []), s.id]);
     }
     // TWO AS OF 1.0.10, WHERE IT WAS THREE. 4.20 gave the grid a band of its own
-    // so it could not be dragged back into the card it had just left, and the
-    // drag is still refused — the banner is pinned and the grid is alone among
+    // so it could not be moved back into the card it had just left, and the
+    // move is still refused — the banner is pinned and the grid is alone among
     // the movable rows of the group, so there is no slot and no arrow. What one
     // group buys is the weld: a block cannot span two of these strings, and the
     // whole of the arrangement this surface gained is a block holding both.
@@ -380,7 +367,7 @@ describe("the window is tabbed, not columned", () => {
   });
 
   it("puts the pending count on the tab, since the pane is usually hidden", () => {
-    // A reader who drags three rows and never opens Changes should still be
+    // A reader who moves three rows and never opens Changes should still be
     // able to see that three things are pending.
     expect(editor()).toContain("`Changes (${n})`");
   });
@@ -471,34 +458,10 @@ describe("one editor, not two", () => {
 // ── 3.2 §4: a fixed row is inert, not refusing ────────────────────────
 
 describe("what a fixed row offers", () => {
-  it("is not a drag source", () => {
-    // `draggable = true` is a promise the cursor makes before the reader has
-    // committed to anything. Letting them lift a row that cannot land, and
-    // failing on release, is the same class of lie as a refusal that offers a
-    // move — so the guard sits before the flag rather than after it.
-    //
-    // ASKED AS "IS IT IN ITS OWN BAND" SINCE 4.53.0, which is one question
-    // covering both rows that are not: the immovable one, whose band is empty,
-    // and the one being removed, which its band no longer contains. The
-    // `movable` test it replaces answered only the first, so a struck-through
-    // row could still be lifted and could never land.
-    const body = editor();
-    const guard = body.indexOf("if (!this.bandOf(id).includes(id)) return;");
-    expect(guard).toBeGreaterThan(0);
-    expect(guard).toBeLessThan(body.indexOf("el.draggable = true"));
-    // And the drop side asks it too, rather than trusting the source guard: a
-    // rule enforced in one of two paths is a rule with a way round it.
-    expect(
-      body.match(/if \(!this\.bandOf\(id\)\.includes\(id\)\) return;/g) ?? []
-    ).toHaveLength(2);
-  });
-
-  it("is not in any band, which is what makes it inert three ways", () => {
-    // Drag source, drop target and arrow bounds all read `bandOf`, so an empty
-    // band disables all three from one omission — the same shape `group`
-    // already uses, where a rule is data the model supplies rather than a check
-    // the editor performs. A `movable` test at each of the three sites would be
-    // three places to forget.
+  it("is not in any band, which is what makes it inert", () => {
+    // The arrow bounds read `bandOf`, so an empty band disables them from one
+    // omission — the same shape `group` already uses, where a rule is data the
+    // model supplies rather than a check the editor performs.
     expect(editor()).toContain(
       "if (this.view(id)?.movable === false) return [];"
     );

@@ -93,7 +93,18 @@ import {
 } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 
-import { protectLines, redirectTyping, type LineSpan } from "./protected-lines";
+import {
+  LEGACY_PROSE_KEY,
+  PROSE_KEY,
+  bracketOpen,
+  proseSpansIn,
+} from "../journals/journal-sections";
+import {
+  protectLines,
+  redirectTyping,
+  type Landing,
+  type TypingGap,
+} from "./protected-lines";
 
 // One run of lines this plugin wrote, 0-based and inclusive.
 //
@@ -145,6 +156,24 @@ const SPACERS = ["`chronoanvil:spacer`", "`almanac:spacer`"];
 const FENCE_OPEN = /^(`{3,})/;
 const FENCE_SHUT = /^(`{3,})\s*$/;
 
+// Where the backtick fence opening at line `i` closes: null when line `i`
+// opens no fence, -1 when the fence is never closed. Any language — a
+// reader's ```dataview block is as literal to this file as a printed example.
+function fenceCloseAt(lines: readonly string[], i: number): number | null {
+  const run = lines[i].trim().match(FENCE_OPEN);
+  if (!run) return null;
+  const ticks = run[1].length;
+  for (let j = i + 1; j < lines.length; j++) {
+    const shut = lines[j].trim().match(FENCE_SHUT);
+    if (shut && shut[1].length >= ticks) return j;
+  }
+  return -1;
+}
+
+// The two spellings of a prose block's opener — the second is 5.6's skeleton,
+// which `proseSpansIn` still reads.
+const PROSE_OPENERS = new Set([bracketOpen(PROSE_KEY), bracketOpen(LEGACY_PROSE_KEY)]);
+
 // Which lines of this note are markers.
 //
 // FENCE-AWARE, AND FOR ONE CONCRETE REASON. `assets/documentation.md` prints
@@ -158,17 +187,8 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
   while (i < lines.length) {
     const t = lines[i].trim();
 
-    const run = t.match(FENCE_OPEN);
-    if (run) {
-      const ticks = run[1].length;
-      let close = -1;
-      for (let j = i + 1; j < lines.length; j++) {
-        const shut = lines[j].trim().match(FENCE_SHUT);
-        if (shut && shut[1].length >= ticks) {
-          close = j;
-          break;
-        }
-      }
+    const close = fenceCloseAt(lines, i);
+    if (close !== null) {
       // An unterminated fence is not a fence, the same call `segment` makes:
       // the note is malformed and guessing where it ends is how a walk eats the
       // rest of the file. The ``` line is prose, and prose is never a marker.
@@ -227,9 +247,11 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
   return merged(out, lines);
 }
 
-// Adjacent, or with one blank line between them.
+// Adjacent, or with one blank line between them — unless that blank line is
+// the inside of a prose block.
 function joins(last: MarkerSpan, span: MarkerSpan, lines: readonly string[]): boolean {
   if (last.to + 1 === span.from) return true;
+  if (PROSE_OPENERS.has(lines[last.to].trim())) return false;
   return last.to + 2 === span.from && lines[last.to + 1].trim() === "";
 }
 
@@ -255,10 +277,20 @@ function joins(last: MarkerSpan, span: MarkerSpan, lines: readonly string[]): bo
 // THE BLANK HAS TO BE BLANK, AND THAT IS THE SAFETY ARGUMENT. The moment a
 // reader types on one of those separators the line stops matching and the two
 // runs stay apart, so their words are painted like any other prose. This can
-// never swallow something that was written. It is also why the skeleton's
-// headings are safe on both sides: the bracket's opener joins the regions above
-// it and its closer joins the graph block below, and the lines between the two
-// brackets are not blank.
+// never swallow something that was written. The skeleton's headings are safe
+// on both sides for the same reason: the bracket's opener joins the regions
+// above it and its closer joins the graph block below, and the lines between
+// the two brackets are not blank.
+//
+// EXCEPT WHEN THE READER HAS EMPTIED THE BLOCK (1.0.39). The select-all
+// guard keeps the breaks at both ends of a bracket, so an emptied prose block
+// is its opener, ONE blank line and its closer — and this rule joined the two
+// across it. The block's only row went dark, the only row left to type on was
+// the blank ABOVE the opener, and the reader's next sentence landed outside
+// the bracket. So a prose opener never takes the blank line after it: that
+// line is the inside of the block and it stays a row. A closer directly after
+// its opener still joins — there is no row between them to keep, and two runs
+// that touch must be one (below).
 //
 // NOTHING DOWNSTREAM HAD TO MOVE. A joined span is still one run, so
 // `hiddenRanges` takes it through the same case B it took each half through, and
@@ -366,14 +398,23 @@ interface Hidden {
   // is hidden — `protected-lines.ts` argues why — and parsing once is what
   // stops the two answers drifting apart.
   spans: MarkerSpan[];
+  // The rows outside every prose block that a cursor is taken from, on a note
+  // that has a prose block. Empty on every other note.
+  landings: ProseLanding[];
   deco: DecorationSet;
 }
 
 function stateOf(state: EditorState): Hidden {
   const live = state.field(editorLivePreviewField, false) === true;
-  if (!live) return { live, spans: [], deco: Decoration.none };
-  const spans = markerLinesIn(state.doc.toString().split("\n"));
-  return { live, spans, deco: hiddenIn(state.doc, spans) };
+  if (!live) return { live, spans: [], landings: [], deco: Decoration.none };
+  const lines = state.doc.toString().split("\n");
+  const spans = markerLinesIn(lines);
+  return {
+    live,
+    spans,
+    landings: proseLandings(lines, spans),
+    deco: hiddenIn(state.doc, spans),
+  };
 }
 
 // SOURCE MODE IS THE ESCAPE HATCH, and it is the whole permission this feature
@@ -413,11 +454,19 @@ function cursorRest(): Extension {
     const hidden = tr.startState.field(markers, false);
     if (!hidden?.live || !hidden.spans.length) return tr;
 
-    const ranges = hiddenRanges(tr.startState.doc, hidden.spans);
+    const doc = tr.startState.doc;
+    const ranges = hiddenRanges(doc, hidden.spans);
     let moved = false;
     const next = sel.ranges.map((r) => {
       if (!r.empty) return r;
-      const at = restingAt(r.head, ranges);
+      let at = restingAt(r.head, ranges);
+      // AND THEN INTO THE PROSE, on a note that has some (1.0.39). The
+      // resting point above may itself be a row outside every block — the
+      // opener's is the row above it — so this runs second, over its answer.
+      const row = doc.lineAt(at).number - 1;
+      const landing = hidden.landings.find((l) => l.row === row);
+      const into = landing ? landingCursor(doc, landing) : null;
+      if (into !== null) at = into;
       if (at === r.head) return r;
       moved = true;
       return EditorSelection.cursor(at);
@@ -459,8 +508,20 @@ function cursorRest(): Extension {
 // CLOSING bracket is the reader's own paragraph break — they are writing inside
 // the skeleton, and moving that keystroke to the bottom of the note would be the
 // rudest thing this file could do.
-function typingGaps(doc: Text, spans: readonly MarkerSpan[]): LineSpan[] {
-  const out: LineSpan[] = [];
+//
+// AND ON A NOTE WITH A PROSE BLOCK, EVERY EMPTY ROW OUTSIDE ONE (1.0.39)
+// goes INTO the nearest block — the spacer's row and the region gap
+// included, which is why these come first and win `spans.find`. A row outside
+// the blocks that already holds text is not in the list: it is the reader's,
+// and it stays editable where it is.
+function typingGaps(
+  doc: Text,
+  spans: readonly MarkerSpan[],
+  landings: readonly ProseLanding[]
+): TypingGap[] {
+  const out: TypingGap[] = landings
+    .filter((l) => !l.fence)
+    .map((l) => ({ from: l.row, to: l.row, land: (text) => landingText(doc, l, text) }));
   for (const span of spans) {
     if (span.keepLine) {
       out.push({ from: span.from, to: span.to });
@@ -469,6 +530,115 @@ function typingGaps(doc: Text, spans: readonly MarkerSpan[]): LineSpan[] {
     }
   }
   return out;
+}
+
+// ── A PAGE'S WRITING GOES INSIDE ITS PROSE BLOCK (1.0.39) ──────────
+//
+// *"fix needed on pages to ensure a user can't enter prose outside of the html
+// fenced prose blocks (except for source mode editing)."* A sentence typed
+// above an opener or below a closer is outside the section model: no surface,
+// no Copy, and loose text for the next *Edit sections…* write to step around.
+//
+// EMPTY ROWS ONLY, which was the reader's call. On a note with a prose block,
+// an empty row outside every block — a blank line, or the spacer's — takes a
+// resting cursor and a keystroke into the nearest block. A row outside that
+// already holds text is left alone: prose written before this rule, or another
+// plugin's hand-written code block, stays editable. And a blank line INSIDE a
+// fence of any language is the fence's, never a row of ours.
+//
+// NEAREST MEANS THE BLOCK JUST ABOVE, ELSE THE ONE BELOW. A row under a block
+// continues it; a row over the first block starts it. The row directly above
+// an opener is the exception and goes to the block below it, because on
+// screen that row IS the top of that block — the opener is hidden into it.
+//
+// AND THE FENCE THAT A DELETED BLANK LEAVES BEHIND. When the reader deletes
+// the blank between a card and the block, the opener's resting point becomes
+// the end of the card's closing ``` line, where the change filter refuses
+// every keystroke. That line is taken to the block below too (`fence: true`)
+// — for the cursor only, since nothing typed there survives to be moved.
+export interface ProseLanding {
+  /** The row taken from, 0-based. */
+  row: number;
+  /** The block it goes to: its opener and closer lines, 0-based. */
+  open: number;
+  close: number;
+  /** Into the block's end (true) or its start. */
+  end: boolean;
+  /** The row is a fence's closing line, not an empty row. */
+  fence: boolean;
+}
+
+export function proseLandings(
+  lines: readonly string[],
+  spans: readonly MarkerSpan[]
+): ProseLanding[] {
+  const fenced = new Array<boolean>(lines.length).fill(false);
+  const shuts = new Set<number>();
+  for (let i = 0; i < lines.length; i++) {
+    const close = fenceCloseAt(lines, i);
+    if (close === null || close === -1) continue;
+    for (let j = i; j <= close; j++) fenced[j] = true;
+    shuts.add(close);
+    i = close;
+  }
+
+  // A bracket PRINTED inside a fence is an example, not a block.
+  const blocks = proseSpansIn(lines).filter((b) => !fenced[b.open]);
+  if (!blocks.length) return [];
+
+  const taken = new Array<boolean>(lines.length).fill(false);
+  for (const b of blocks) for (let j = b.open; j <= b.close; j++) taken[j] = true;
+  for (const s of spans) {
+    if (s.keepLine) continue;
+    for (let j = s.from; j <= s.to; j++) taken[j] = true;
+    // The note's last, empty line goes with a run that ends the note — the
+    // same test `endsNote` makes — so it is not a row either.
+    if (s.to + 2 === lines.length && lines[s.to + 1] === "") taken[s.to + 1] = true;
+  }
+
+  const out: ProseLanding[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const below = blocks.find((b) => b.open === i + 1);
+    if (fenced[i]) {
+      if (shuts.has(i) && below) {
+        out.push({ row: i, open: below.open, close: below.close, end: false, fence: true });
+      }
+      continue;
+    }
+    if (taken[i]) continue;
+    const t = lines[i].trim();
+    if (t !== "" && !SPACERS.includes(t)) continue;
+    const above = [...blocks].reverse().find((b) => b.close < i);
+    const next = blocks.find((b) => b.open > i);
+    const to = below ?? above ?? next;
+    if (!to) continue;
+    out.push({ row: i, open: to.open, close: to.close, end: to === above && !below, fence: false });
+  }
+  return out;
+}
+
+// Where a cursor taken from this row rests, or null for a block with no row
+// inside it — opener and closer on consecutive lines, which only source mode
+// can write, since the change filter keeps the last break inside a block.
+function landingCursor(doc: Text, l: ProseLanding): number | null {
+  if (l.close - l.open < 2) return null;
+  return l.end ? doc.line(l.close).to : doc.line(l.open + 2).from;
+}
+
+// Where a keystroke typed on this row goes. Never welded onto a line the
+// reader already wrote: onto the landing row when it is empty, else a line of
+// its own beside it.
+function landingText(doc: Text, l: ProseLanding, text: string): Landing {
+  if (l.close - l.open < 2) {
+    const at = doc.line(l.open + 1).to;
+    return { at, insert: `\n${text}`, cursor: at + 1 + text.length };
+  }
+  const line = l.end ? doc.line(l.close) : doc.line(l.open + 2);
+  if (line.length === 0) {
+    return { at: line.from, insert: text, cursor: line.from + text.length };
+  }
+  if (l.end) return { at: line.to, insert: `\n${text}`, cursor: line.to + 1 + text.length };
+  return { at: line.from, insert: `${text}\n`, cursor: line.from + text.length };
 }
 
 export function hiddenMarkers(): Extension {
@@ -480,7 +650,7 @@ export function hiddenMarkers(): Extension {
     cursorRest(),
     redirectTyping((state) => {
       const hidden = state.field(markers, false);
-      return hidden?.live ? typingGaps(state.doc, hidden.spans) : [];
+      return hidden?.live ? typingGaps(state.doc, hidden.spans, hidden.landings) : [];
     }),
     // AND WHAT IS HIDDEN DOES NOT GO WITH A SELECT-ALL. 5.31.1, and the sharper
     // half of that rule here than on a fence: a fence is recomposed by *Set up
