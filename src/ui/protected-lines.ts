@@ -80,6 +80,13 @@ import { EditorSelection, EditorState, type Extension, type Text } from "@codemi
 export interface LineSpan {
   from: number;
   to: number;
+  // Kept apart from the span before it when the two only TOUCH — which they do
+  // across exactly one empty line, whose one position is the end of the first
+  // range and the start of this one. Joined, that position is inside a
+  // protected range and every keystroke on the line is refused; apart, an
+  // insertion there goes through while a deletion still reaches into one range
+  // or the other and is refused. 1.0.39: an emptied prose block's only row.
+  apart?: boolean;
 }
 
 // The spans as the flat start/end pairs `changeFilter` is specified to take.
@@ -98,7 +105,8 @@ export function protectedRanges(doc: Text, spans: readonly LineSpan[]): number[]
     const last = doc.line(span.to + 1);
     const from = span.from > 0 ? doc.line(span.from).to : first.from;
     const to = Math.min(last.to + 1, doc.length);
-    if (out.length && out[out.length - 1] >= from) {
+    const end = out.length ? out[out.length - 1] : -1;
+    if (out.length && (end > from || (end === from && !span.apart))) {
       if (out[out.length - 1] < to) out[out.length - 1] = to;
     } else {
       out.push(from, to);

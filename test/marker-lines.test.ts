@@ -972,6 +972,29 @@ describe("an emptied prose block keeps its row", () => {
   });
 });
 
+describe("typing on an emptied block's only row", () => {
+  // 1.0.39's first cut moved the cursor there and the change filter then
+  // refused every keystroke: the opener's protected range ends where the row
+  // starts and the closer's begins where it ends, and on an EMPTY row those are
+  // one position — joined, it was inside a protected range.
+  const row = lineAt(EMPTIED, 6);
+
+  it("takes what is typed", () => {
+    expect(afterEdit(EMPTIED, { from: row, insert: "Hi" }, "input.type")).toBe(page(["Hi"]));
+  });
+
+  it("still refuses a Backspace or a Delete into the markers", () => {
+    expect(afterEdit(EMPTIED, { from: row - 1, to: row }, "delete.backward")).toBe(EMPTIED);
+    expect(afterEdit(EMPTIED, { from: row, to: row + 1 }, "delete.forward")).toBe(EMPTIED);
+  });
+
+  it("still leaves the markers standing after a select-all", () => {
+    expect(afterEdit(EMPTIED, { from: 0, to: EMPTIED.length }, "delete.selection")).toContain(
+      `${OPEN}\n\n${SHUT}`
+    );
+  });
+});
+
 describe("a cursor outside the prose block", () => {
   it("rests inside it from the row under the card", () => {
     expect(restsAt(EMPTIED, lineAt(EMPTIED, 4))).toBe(lineAt(EMPTIED, 6));

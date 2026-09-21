@@ -531,6 +531,38 @@
   margin-bottom: 0;
 }
 
+/* ── PROSE BREATHES MORE THAN A SECTION DOES (1.0.39) ────────────────────
+ *
+ * *"give the prose block surface increased padding and margin so that the
+ * text is not right at the borders."*
+ *
+ * The PAINT stays the section's — the rules above are still one selector list,
+ * so a background, a border or a radius cannot come apart. The SPACING is
+ * prose's own, and that is the one difference the two are allowed: a section's
+ * inset is sized for widgets, which draw their own padding inside it, and 12px
+ * with 2px above was reading text straight off the edge of the card. Nothing
+ * but padding, margin and the inset variable goes in these rules;
+ * `test/prose-surface.test.ts` holds that line.
+ *
+ * AFTER THE SHARED PHONE RULE, SO THIS ONE SETS BOTH WIDTHS. The shared
+ * `@container` rule above sets 8px for both surfaces; a same-weight rule later
+ * in the file wins, so prose restates its own phone inset below. */
+.ca-prose-block {
+  --ca-sec-pad-x: 20px;
+}
+.ca-prose-block.is-prose-first {
+  padding-top: 14px;
+  margin-top: var(--ca-widget-gap);
+}
+.ca-prose-block.is-prose-last {
+  padding-bottom: 16px;
+}
+@container (max-width: 460px) {
+  .ca-prose-block {
+    --ca-sec-pad-x: 14px;
+  }
+}
+
 
 /* ── LIVE PREVIEW: A RUN OF LINES, NOT A RUN OF BLOCKS (1.0.38) ──────────
  *
@@ -587,6 +619,19 @@
 }
 .markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.is-prose-last {
   margin-bottom: var(--ca-widget-gap);
+  padding-bottom: 16px;
+}
+/* THE INSET, RESTATED AT THIS WEIGHT (1.0.39), because a `.cm-line` arrives
+   with CodeMirror's own padding and the base rule's one class loses to it.
+   Only the ends of the run get vertical padding — a middle line padded top and
+   bottom would open the writing up line by line. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block {
+  padding-left: var(--ca-sec-pad-x);
+  padding-right: var(--ca-sec-pad-x);
+}
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.is-prose-first {
+  padding-top: 14px;
+  margin-top: var(--ca-widget-gap);
 }
 .markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block:not(.is-prose-first) {
   border-top: 0;

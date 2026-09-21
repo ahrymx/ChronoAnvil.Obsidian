@@ -243,11 +243,42 @@ describe("the prose surface is the section surface, not a copy of it", () => {
     // without minding the ones inside a `:not(…)`, so the widget-card rule in
     // 05-inline-widgets — which EXCLUDES `.ca-journal-sec-block` — reads as a
     // rule that names it. Prose is not in that exclusion list and should not be.
+    //
+    // EXCEPT SPACING, AS OF 1.0.39. *"give the prose block surface increased
+    // padding and margin so that the text is not right at the borders."* A
+    // section's inset is sized for widgets, which pad themselves; prose is text
+    // and needs more. So a rule of prose's own may exist — and may hold nothing
+    // but padding, margin and the inset variable. A colour, a border or a
+    // radius in one fails here, which is the half of "exactly the same" that
+    // still stands.
+    const spacing = /^(?:padding(?:-[a-z]+)?|margin(?:-[a-z]+)?|--ca-sec-pad-x)$/;
     for (const [section, prose] of paired) {
       const ours = cssRules(prose);
       expect(ours, `${prose} has no rule`).not.toHaveLength(0);
-      for (const body of ours) expect(cssRules(section)).toContain(body);
+      const shared = cssRules(section);
+      expect(ours.some((body) => shared.includes(body)), prose).toBe(true);
+      for (const body of ours) {
+        if (shared.includes(body)) continue;
+        for (const decl of body.split(";").map((d) => d.trim()).filter(Boolean)) {
+          expect(decl.split(":")[0].trim(), `${prose}: ${decl}`).toMatch(spacing);
+        }
+      }
     }
+  });
+
+  it("sits further in from its border than a section does (1.0.39)", () => {
+    const css = sheet("70-section-surface.css");
+    expect(css).toContain(".ca-prose-block {\n  --ca-sec-pad-x: 20px;\n}");
+    expect(css).toContain("  .ca-prose-block {\n    --ca-sec-pad-x: 14px;\n  }");
+    // And its own phone inset comes AFTER the shared one, or the shared 8px wins.
+    expect(css.indexOf("--ca-sec-pad-x: 14px")).toBeGreaterThan(
+      css.indexOf("--ca-sec-pad-x: 8px")
+    );
+    // Live Preview restates the inset, since a `.cm-line` carries CodeMirror's.
+    const LP = ".markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block";
+    expect(cssRules(LP).join("\n")).toContain("padding-left: var(--ca-sec-pad-x)");
+    expect(cssRule(`${LP}.is-prose-first`)).toContain("padding-top: 14px");
+    expect(cssRule(`${LP}.is-prose-last`)).toContain("padding-bottom: 16px");
   });
 
   it("is a card, with the corners the reader asked for", () => {
@@ -268,9 +299,9 @@ describe("the prose surface is the section surface, not a copy of it", () => {
   });
 
   it("gives up the same inset on a phone", () => {
-    // A card costs its horizontal padding twice on a ~360px column. A prose
-    // block that kept 12px beside sections that dropped to 8px would be the
-    // stagger §1.6 is about, at the one width where it costs the most.
+    // A card costs its horizontal padding twice on a ~360px column, so prose
+    // narrows at the same breakpoint — to its own value (14px, below) since
+    // 1.0.39, rather than a section's 8px.
     expect(sheet("70-section-surface.css")).toContain(
       "  .ca-journal-sec-block,\n  .ca-prose-block {\n    --ca-sec-pad-x: 8px;"
     );

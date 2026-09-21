@@ -220,6 +220,24 @@ describe("what a row offers", () => {
 
 // ── direct manipulation is still planned manipulation ─────────────────
 
+describe("a question gated on another (1.0.39)", () => {
+  it("is not drawn while the other says otherwise", () => {
+    const body = readCode("section-editor");
+    const loop = body.indexOf("for (const q of questions) {");
+    expect(body.indexOf("if (!this.shows(section, q)) continue;", loop)).toBeGreaterThan(loop);
+    // Read the way the tick itself is read, so the two cannot disagree.
+    expect(body).toContain("value === FLAG_OFF ? FLAG_OFF : FLAG_ON");
+  });
+
+  it("drops its answer when the tick hides it, so Save never writes a hidden box", () => {
+    // The planner writes a Headings answer on an unticked block, so a reader who
+    // ticked, typed and unticked again would have had the invisible list saved.
+    const body = readCode("section-editor");
+    expect(body).toContain("dep.shownWhen?.key === q.key && !this.shows(section, dep)");
+    expect(body).toContain("this.answer(section.id, dep.key, undefined)");
+  });
+});
+
 describe("nothing is written until Save", () => {
   it("the only write is in commit, behind a re-read", () => {
     const body = readCode("section-editor");

@@ -1778,6 +1778,9 @@ export class SectionEditorModal extends EditorModal {
     };
 
     for (const q of questions) {
+      // A QUESTION THE MODEL GATES ON ANOTHER ONE is not drawn while that one
+      // says otherwise (1.0.39) — see `shownWhen`.
+      if (!this.shows(section, q)) continue;
       // A settled section whose answer cannot be read back keeps the wording it
       // has had since 3.8. The route it names still works.
       if (settled && !this.readable(section, q)) {
@@ -2082,8 +2085,29 @@ export class SectionEditorModal extends EditorModal {
     box.setAttribute("aria-label", q.on);
     box.addEventListener("change", () => {
       this.answer(section.id, q.key, box.checked ? FLAG_ON : FLAG_OFF);
+      // A QUESTION THIS TICK HIDES TAKES ITS ANSWER WITH IT. Otherwise a reader
+      // who ticks, types headings and unticks again would have Save write a box
+      // they can no longer see.
+      for (const dep of section.questions ?? []) {
+        if (dep.shownWhen?.key === q.key && !this.shows(section, dep)) {
+          this.answer(section.id, dep.key, undefined);
+        }
+      }
       this.refreshFrame();
     });
+  }
+
+  // Whether `q` is drawn, given what its section's other answers say now.
+  private shows(section: SectionView, q: SectionQuestion): boolean {
+    const gate = q.shownWhen;
+    if (!gate) return true;
+    const by = (section.questions ?? []).find((x) => x.key === gate.key);
+    if (!by) return true;
+    const value = this.shownAnswer(section, by);
+    // A flag reads as on unless it says off — the same reading the box above
+    // gives it, so the box and the field it gates cannot disagree.
+    const now = by.kind === "flag" ? (value === FLAG_OFF ? FLAG_OFF : FLAG_ON) : value;
+    return now === gate.is;
   }
 
   private renderFolderQuestion(

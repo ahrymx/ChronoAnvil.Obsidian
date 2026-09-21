@@ -421,6 +421,17 @@ interface SectionQuestionCommon {
   // title is, what a header is, or which catalogue asked. Absent keeps the
   // wording every existing question already gets.
   settled?: { text: string; hint: string };
+  // DRAWN ONLY WHILE ANOTHER QUESTION OF THE SAME SECTION HOLDS THIS ANSWER
+  // (1.0.39). Prose's **Headings** box says WHICH default headings a block
+  // opens with, and with **Add default headings** unticked there are none for
+  // it to name — a box offered there reads as a second way to add them. A
+  // flag's value is `FLAG_ON` or `FLAG_OFF`. Absent: always drawn.
+  //
+  // DATA RATHER THAN A CASE IN THE EDITOR, on this interface's usual rule: the
+  // window draws what the model describes and never learns which catalogue
+  // asked. And a hidden question's answer is dropped when it hides, so a box
+  // nobody can see never writes anything.
+  shownWhen?: { key: string; is: string };
 }
 
 // A question with a fixed list of answers, drawn as a `<select>`. The shape

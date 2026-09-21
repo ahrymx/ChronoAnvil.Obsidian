@@ -20,6 +20,7 @@ import { JOURNAL_CHARTS_FENCE } from "../charts/journal-charts";
 import { plural } from "../core/util";
 import type { SectionQuestion } from "../core/section-model";
 import {
+  FLAG_ON,
   SECTION_FORM,
   WIDGET_FORM,
   formQuestion,
@@ -2611,6 +2612,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         kind: "lines",
         key: "headings",
         label: "the headings this note opens with",
+        shownWhen: { key: "defaults", is: FLAG_ON },
         placeholder: (
           sectionOverrides(ctx, "headings")?.headings ?? defaultHeadings(ctx)
         )

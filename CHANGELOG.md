@@ -18,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you press **Save**, as before. Dragging journal cards on the homepage, chart
   tiles, and widgets between the cells of a row is unchanged.
 
+### Changed
+
+- **The Headings box on a Prose row only shows while *Add default headings* is
+  ticked.** With the tick off there are no default headings for the box to
+  name, and leaving it on screen read as a second way to add them. Unticking
+  also discards anything typed into the box in that session, so a box you can
+  no longer see is never saved.
+
+- **Prose blocks have more room inside their card.** Writing sat almost on the
+  card's edge — the same narrow inset a section uses, which is sized for widgets
+  that pad themselves. A prose block now has more space at its sides, top and
+  bottom, and a little more distance from the card above it, in both Reading
+  view and Live Preview. The card itself still looks exactly like a section's.
+
 ### Fixed
 
 - **What you type on a page stays inside its prose block.** Deleting everything

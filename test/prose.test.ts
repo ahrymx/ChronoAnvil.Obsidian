@@ -812,6 +812,15 @@ describe("the tick and the list", () => {
     expect(question("lines").key).toBe("headings");
   });
 
+  it("draws the list only while the tick is on (1.0.39)", () => {
+    // Unticked, there are no default headings for the box to name, and a box
+    // left on screen read as a second way to add them.
+    expect(question("lines").shownWhen).toEqual({
+      key: question("flag").key,
+      is: FLAG_ON,
+    });
+  });
+
   it("hands the row the headings the note already has, and the tick on", () => {
     const row = journalSectionModel(lessonCtx)
       .sections(lesson())

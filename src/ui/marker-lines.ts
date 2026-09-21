@@ -128,6 +128,10 @@ export interface MarkerSpan {
   // THE RUN'S FIRST LINE, not its contents, because a merge only ever extends
   // `to` and the gap in question is above `from`.
   opensRegion: boolean;
+  // Set on the run after a prose opener when one empty line separates them —
+  // the block's only row, which the change filter must leave typeable. See
+  // `LineSpan.apart`.
+  apart?: boolean;
 }
 
 // A region opener, on a line of its own — `notestore.ts`'s two prefixes, and
@@ -307,7 +311,9 @@ function merged(spans: MarkerSpan[], lines: readonly string[]): MarkerSpan[] {
       last.to = span.to;
       continue;
     }
-    out.push({ ...span });
+    const row = last && last.to + 2 === span.from && lines[last.to + 1].trim() === "";
+    if (row && PROSE_OPENERS.has(lines[last.to].trim())) out.push({ ...span, apart: true });
+    else out.push({ ...span });
   }
   return out;
 }
