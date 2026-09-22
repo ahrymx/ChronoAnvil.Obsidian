@@ -700,6 +700,62 @@
 }
 
 
+/* ── AND A TABLE IS A BLOCK OBSIDIAN MOUNTS, SO IT IS NAMED (1.0.40) ─────
+ *
+ * *"tables break the prose block surface in live preview."* A rendered table
+ * is not a line either: Obsidian replaces the table's source with a
+ * `.cm-embed-block.cm-table-widget`, which is exactly the container the rule
+ * above declines to paint — so the card stopped above every table and started
+ * again below it, with the table's own margins showing the page through.
+ *
+ * The exclusion above stays as it is, because it is what keeps a card from
+ * being painted behind a ```chronoanvil card. A table is asked for BY NAME
+ * instead, the same way the rule is: `cm-table-widget` is Obsidian's table
+ * and nothing else, and a ```chronoanvil fence is never one. Strictly inside a
+ * run, by the same two halves as above.
+ *
+ * It gets the whole of a member line and not only the fill: the side borders,
+ * the horizontal inset the writing has (so the table lines up with the text
+ * around it instead of sitting on the border), no margin of its own, and
+ * `flow-root` so the table's margins land inside the card rather than cutting
+ * it — the same containment the base rule gives a line. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block) {
+  background: var(--background-secondary);
+  border-left: 1px solid var(--ca-border-subtle);
+  border-right: 1px solid var(--ca-border-subtle);
+  border-radius: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  /* WIDER THAN EVERY LINE, TWICE (1.0.40). Obsidian hangs the table widget
+     out past the text column on both sides — room for its row and column
+     handles — and a plain `margin: 0` did not take at this weight: the
+     reader's screenshots showed the card 16px proud on each side after it.
+     Said with `!important`, which fixed the width; `width: auto` too, so a
+     widened width cannot survive the margins going. */
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: auto !important;
+  padding-left: var(--ca-sec-pad-x);
+  padding-right: var(--ca-sec-pad-x);
+  display: flow-root;
+}
+/* THE INSET HAS TO BE SET HERE, NOT JUST READ HERE. `--ca-sec-pad-x` is set on
+   `.ca-prose-block`, and the table widget is a SIBLING of those lines, not a
+   child — so it inherited nothing, the `var()` was invalid, and the padding
+   computed to `0px` under any weight. Read off the reader's console, after two
+   rounds spent treating it as a specificity fight: the rule matched,
+   `display: flow-root` applied, and both paddings said 0. The widget carries
+   the prose value itself, phone width included. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block) {
+  --ca-sec-pad-x: 20px;
+}
+@container (max-width: 460px) {
+  .markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block) {
+    --ca-sec-pad-x: 14px;
+  }
+}
+
+
 /* ── AND THE FILL IS SAID AGAIN AT THE HOST'S WEIGHT (1.0.38) ────────────
  *
  * The rows that kept coming back unpainted were NOT unmarked. Read off the
@@ -716,18 +772,14 @@
  * on it. So the fill is restated for every line of the writing at the weight
  * the rest of this section already uses, and the exception is named instead:
  * `HyperMD-codeblock-bg` is the code's own colour and stays the code's own
- * colour. Its two MARKER rows are excluded from the exception rather than
- * given a colour of their own — they are where Obsidian stops showing the
- * three backticks and draws the block's top and bottom, so they belong to the
- * card and not to the code.
+ * colour, and so do the fence's two MARKER rows — as of 1.0.40 they belong to
+ * the code panel, not the card (see the panel rule below).
  *
  * `--background-secondary` rather than `--ca-surface-card` because that is what
  * the surface rule at the top of this file reads, and every preset redefines
  * BOTH to its own card colour on the body — so the two are one value and these
  * rows cannot drift from the rows around them. */
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block:not(.HyperMD-codeblock-bg),
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-begin,
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-end {
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block:not(.HyperMD-codeblock-bg):not(.HyperMD-codeblock-begin):not(.HyperMD-codeblock-end) {
   background: var(--background-secondary);
 }
 
@@ -754,24 +806,47 @@
  * wrong one: a horizontal margin on a `.cm-line` pulls the CARD's side borders
  * in with it and notches the surface.
  *
- * The corners are the panel's own, so they go on the first and last row of the
- * code rather than on the fence's marker rows — those two are where Obsidian
- * draws its label, and they belong to the card. One rule for a block of a
- * single line, which is both at once and would otherwise take only the second
- * of the two. */
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-bg {
+ * ── AND THE FENCE ROWS ARE THE PANEL'S, AND THE BORDERS ARE THE CARD'S
+ *    (1.0.40) ────────────────────────────────────────────────────────────
+ *
+ * *"fix border disappearing; and dark shade the backtick lines as well as the
+ * content."* Two things, read off the render rather than guessed at: every row
+ * of a fence — the code AND its two marker rows — lost the card's side borders,
+ * and the marker rows wore the card's colour, so the panel was a shaded middle
+ * with two card-coloured bands at its ends.
+ *
+ * THE BORDERS. The card's side borders come from the one-class surface rule at
+ * the top of this file, and Obsidian's code-row styling is heavier than one
+ * class, so on those rows it won. They are restated here at this weight for
+ * every fence row, which is the same move the fill restatement made.
+ *
+ * THE MARKER ROWS. 1.0.38 gave them to the card, on the argument that they are
+ * where Obsidian draws the block's top and bottom. Seen in a note, that reads
+ * as a panel with a lid and a floor in the wrong colour — so they join the
+ * panel: the code shade and the same inset strips. They are
+ * painted with `--code-background`, Obsidian's own variable for the code
+ * shade, because Obsidian paints these two rows transparent (the 1.0.38 dump
+ * computed `rgba(0, 0, 0, 0)` on both) — there is no colour of theirs to keep.
+ * A fence with the cursor in it shows its backticks on those rows; they sit on
+ * the code shade too, which is where they belong. That is the one place this
+ * file names the code token, and only because there is nothing to inherit.
+ *
+ * THE PANEL IS SQUARE NOW. Its corners were a `border-radius` on the first and
+ * last code row, which cost nothing while those rows had lost their borders —
+ * with the card's borders back on them, a radius would bend the CARD's edge
+ * inward at both ends of every fence. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-bg,
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-begin,
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-end {
   padding-left: calc(var(--ca-sec-pad-x) + 6px);
   padding-right: calc(var(--ca-sec-pad-x) + 6px);
+  border-left: 1px solid var(--ca-border-subtle);
+  border-right: 1px solid var(--ca-border-subtle);
   box-shadow:
     inset 6px 0 0 0 var(--background-secondary),
     inset -6px 0 0 0 var(--background-secondary);
 }
-.markdown-source-view.mod-cm6 .cm-content > .HyperMD-codeblock-begin-bg + .cm-line.ca-prose-block.HyperMD-codeblock-bg {
-  border-radius: var(--ca-radius-sm) var(--ca-radius-sm) 0 0;
-}
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-bg:has(+ .HyperMD-codeblock-end-bg) {
-  border-radius: 0 0 var(--ca-radius-sm) var(--ca-radius-sm);
-}
-.markdown-source-view.mod-cm6 .cm-content > .HyperMD-codeblock-begin-bg + .cm-line.ca-prose-block.HyperMD-codeblock-bg:has(+ .HyperMD-codeblock-end-bg) {
-  border-radius: var(--ca-radius-sm);
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-begin,
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block.HyperMD-codeblock-end {
+  background: var(--code-background);
 }

@@ -144,9 +144,40 @@ export function paintProse(
 // from the same document at the same moment, and one of them being a frame
 // behind the other is exactly the kind of flicker that gets reported as
 // "sometimes the background is one line short".
+// ── A TABLE AT EITHER END TAKES THE BLANK BESIDE IT (1.0.40) ────────────
+//
+// *"if a table is at the bottom of the prose block no surface exists until a
+// new line with text is created below it."* The span stops at its last
+// non-blank line, and in Live Preview that line is a table row — which
+// Obsidian replaces with a widget, and a line decoration on a replaced line is
+// never drawn. So the run had no last line at all: nothing carried
+// `is-prose-last`, and the stylesheet's "painted prose after me" half, which
+// is how a table is reached, had nothing to find either.
+//
+// The answer is to end the run on a row that IS drawn: the blank line between
+// the table and the closer, which the composer writes and the select-all guard
+// keeps. It is inside the bracket by construction — the span was trimmed to
+// the last non-blank line, so the next line is either blank or the closer.
+// The top is the same case upside down. Reading mode is untouched: there a
+// table is a block of its own and carries the classes itself.
+const TABLE_ROW = /^\s*\|/;
+
+export function livePreviewSpans(
+  lines: readonly string[]
+): { from: number; to: number }[] {
+  return proseSurfaceSpans(lines).map(({ from, to }) => ({
+    from:
+      TABLE_ROW.test(lines[from]) && lines[from - 1]?.trim() === ""
+        ? from - 1
+        : from,
+    to:
+      TABLE_ROW.test(lines[to]) && lines[to + 1]?.trim() === "" ? to + 1 : to,
+  }));
+}
+
 function proseIn(doc: Text): DecorationSet {
   const out: Range<Decoration>[] = [];
-  for (const span of proseSurfaceSpans(doc.toString().split("\n"))) {
+  for (const span of livePreviewSpans(doc.toString().split("\n"))) {
     for (let n = span.from; n <= span.to && n < doc.lines; n++) {
       const cls = [PROSE_BLOCK_CLASS];
       if (n === span.from) cls.push(PROSE_FIRST_CLASS);

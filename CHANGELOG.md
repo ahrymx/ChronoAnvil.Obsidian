@@ -5,6 +5,23 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.40] - 2026-09-22
+
+### Fixed
+
+- **Tables no longer break a prose block's card in Live Preview.** A table
+  inside the writing sat outside the card, so the card stopped above it and
+  started again below it. The table now sits inside the card, the same width as
+  the lines around it, including when it is the first or last thing in the
+  block.
+
+- **Code blocks inside prose look right in Live Preview.** The card's side
+  borders vanished beside every line of a code block; they now run straight
+  past it. The lines holding the opening and closing backticks are now the same
+  dark shade as the code, so the block reads as one panel instead of a dark
+  middle with two light bands. The panel's corners are square, so its edges
+  line up with the card's.
+
 ## [1.0.39] - 2026-09-21
 
 ### Removed

@@ -74,8 +74,13 @@ const ALLOWED = new Set([
   // paints every line of the writing and names `-bg` as the one exception, so
   // all three words are load-bearing. They are not in `OBSIDIAN_DOM` because
   // nothing in `src/` reads them; this is the only file that needs the words.
+  // (`-begin-bg`/`-end-bg` left with the panel's rounded corners in 1.0.40.)
   "HyperMD-codeblock-bg", "HyperMD-codeblock-begin", "HyperMD-codeblock-end",
-  "HyperMD-codeblock-begin-bg", "HyperMD-codeblock-end-bg",
+  // `cm-table-widget` is the `.cm-embed-block` Obsidian renders a markdown
+  // table into in Live Preview. It is named so a table inside the writing is
+  // painted as part of the prose card while every other embed — a
+  // ```chronoanvil card above all — stays excluded (1.0.40).
+  "cm-table-widget",
   // And `hr` is a CLASS on the row Obsidian puts a horizontal rule in —
   // `hr cm-line`, per the editor's own DOM — not the element it looks like.
   "hr",

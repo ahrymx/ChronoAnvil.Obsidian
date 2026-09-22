@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { cssRule, cssRules, readCode, readSrc, styleSheets } from "./sources";
 import { proseSurfaceSpans } from "../src/journals/journal-sections";
-import { proseMarkFor } from "../src/ui/prose-surface";
+import { livePreviewSpans, proseMarkFor } from "../src/ui/prose-surface";
 
 const OPEN = "<!--chronoanvil-prose-->";
 const SHUT = "<!--/chronoanvil-prose-->";
@@ -456,15 +456,15 @@ describe("the surface survives Live Preview, where a block is a line", () => {
     // GENERAL, NOT A THIRD SPECIAL CASE. Quotes and fences are what that note
     // happened to contain; a table, a list and a callout are the same rule
     // with a different class on it.
-    const fill = cssRule(`${LP}:not(.HyperMD-codeblock-bg)`);
+    const fill = cssRule(
+      `${LP}:not(.HyperMD-codeblock-bg):not(.HyperMD-codeblock-begin):not(.HyperMD-codeblock-end)`
+    );
     expect(fill).toContain("background: var(--background-secondary)");
 
-    // AND THE EXCEPTION IS NAMED RATHER THAN THE CASES. The code keeps the
-    // code's own colour; its two MARKER rows are excluded from the exception,
-    // because that is where Obsidian draws the block's top and bottom and they
-    // belong to the card.
+    // AND THE EXCEPTION IS NAMED RATHER THAN THE CASES — the code, and as of
+    // 1.0.40 the fence's two marker rows with it. They are the panel's now.
     for (const end of ["begin", "end"]) {
-      expect(cssRules(`${LP}.HyperMD-codeblock-${end}`), end).toEqual([fill]);
+      expect(cssRules(`${LP}.HyperMD-codeblock-${end}`), end).not.toContainEqual(fill);
     }
   });
 
@@ -475,29 +475,101 @@ describe("the surface survives Live Preview, where a block is a line", () => {
     //
     // THE INSET IS DRAWN, NOT MEASURED: two card-coloured strips over the ends
     // of the row leave Obsidian's own code colour exactly as Obsidian computed
-    // it, so this file never names a token for it and cannot drift when a
-    // theme changes one. A margin would pull the CARD's side borders in with
-    // it and notch the surface.
+    // it. A margin would pull the CARD's side borders in with it and notch the
+    // surface.
     const row = cssRule(`${LP}.HyperMD-codeblock-bg`);
     expect(row).toContain("inset 6px 0 0 0 var(--background-secondary)");
     expect(row).toContain("inset -6px 0 0 0 var(--background-secondary)");
     expect(row).not.toContain("--code-background");
     expect(row).not.toContain("margin-left");
 
-    // The corners belong to the code, so they go on its first and last row and
-    // not on the fence's marker rows — those are where Obsidian draws its
-    // label, and they belong to the card. The third rule is a block of ONE
-    // line, which is both ends at once and would otherwise take only the last.
-    const head = `${LP.replace(" > ", " > .HyperMD-codeblock-begin-bg + ")}.HyperMD-codeblock-bg`;
-    expect(cssRule(head)).toContain(
-      "border-radius: var(--ca-radius-sm) var(--ca-radius-sm) 0 0"
+    // THE FENCE ROWS ARE THE PANEL'S (1.0.40): *"dark shade the backtick lines
+    // as well as the content."* Same rule as the code rows — inset and all —
+    // plus the code shade, because Obsidian leaves these two transparent.
+    for (const end of ["begin", "end"]) {
+      const rules = cssRules(`${LP}.HyperMD-codeblock-${end}`);
+      expect(rules, end).toContain(row);
+      expect(rules.join("\n"), end).toContain("background: var(--code-background)");
+    }
+
+    // AND THE CARD'S BORDERS SURVIVE EVERY FENCE ROW (1.0.40): *"fix border
+    // disappearing"*. Obsidian's code-row styling outranks the one-class
+    // surface rule, so the borders are said again at this weight.
+    expect(row).toContain("border-left: 1px solid var(--ca-border-subtle)");
+    expect(row).toContain("border-right: 1px solid var(--ca-border-subtle)");
+
+    // SO THE PANEL IS SQUARE. A radius on a row that carries the card's side
+    // borders bends the card's edge in at both ends of every fence.
+    const css = styleSheets()
+      .map((f) => f.css)
+      .join("\n")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    const codeRules = css.split("}").filter((r) => r.includes("HyperMD-codeblock"));
+    expect(codeRules.length).toBeGreaterThan(0);
+    for (const r of codeRules) expect(r).not.toMatch(/border-radius:\s*var/);
+  });
+
+  it("paints a table as part of the card, not a hole in it (1.0.40)", () => {
+    // *"tables break the prose block surface in live preview."* A rendered
+    // table is a `.cm-embed-block.cm-table-widget`, which the in-between rule
+    // above declines to paint — rightly, since a ```chronoanvil card is one
+    // too. So a table is asked for by name, strictly inside a run.
+    const table = cssRule(
+      `${LP} ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block)`
     );
-    expect(
-      cssRule(`${LP}.HyperMD-codeblock-bg:has(+ .HyperMD-codeblock-end-bg)`)
-    ).toContain("border-radius: 0 0 var(--ca-radius-sm) var(--ca-radius-sm)");
-    expect(
-      cssRule(`${head}:has(+ .HyperMD-codeblock-end-bg)`)
-    ).toContain("border-radius: var(--ca-radius-sm)");
+    expect(table).toContain("background: var(--background-secondary)");
+    expect(table).toContain("border-left: 1px solid var(--ca-border-subtle)");
+    expect(table).toContain("border-right: 1px solid var(--ca-border-subtle)");
+    // Its own margins were the gap; flow-root keeps the table's inside.
+    expect(table).toContain("margin-top: 0");
+    expect(table).toContain("margin-bottom: 0");
+    // And not wider than the lines around it: Obsidian hangs the widget out
+    // past the text column with negative side margins.
+    // Obsidian's own geometry beat these at weight alone, so they are said
+    // with `!important`.
+    expect(table).toContain("margin-left: 0 !important");
+    expect(table).toContain("margin-right: 0 !important");
+    expect(table).toContain("width: auto !important");
+    expect(table).toContain("display: flow-root");
+    // And it sits in from the border by the writing's own inset.
+    expect(table).toContain("padding-left: var(--ca-sec-pad-x)");
+    expect(table).toContain("padding-right: var(--ca-sec-pad-x)");
+    // AND THE WIDGET SETS THE INSET, because it is a sibling of the prose
+    // lines and inherits nothing from them: read-only, the `var()` was invalid
+    // and the padding computed to 0px under any weight.
+    const own = cssRules(
+      `${LP} ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block)`
+    ).join("\n");
+    expect(own).toContain("--ca-sec-pad-x: 20px");
+    expect(own).toContain("--ca-sec-pad-x: 14px");
+  });
+
+  it("ends a Live Preview run on a drawn row when a table is at an end (1.0.40)", () => {
+    // A table's rows are replaced by a widget, and a line decoration on a
+    // replaced line is never drawn — a run ending on one had no last line.
+    const lines = [
+      "<!--chronoanvil-prose-->",
+      "",
+      "| a | b |",
+      "|---|---|",
+      "| 1 | 2 |",
+      "",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5 }]);
+    // Writing at the ends keeps the trimmed span it always had.
+    const written = [...lines];
+    written.splice(2, 0, "Intro.");
+    written.splice(6, 0, "Outro.");
+    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 6 }]);
+    // No blank to take: the span is left alone rather than stepping onto the
+    // bracket.
+    const tight = lines.filter((l) => l !== "");
+    expect(livePreviewSpans(tight)).toEqual([{ from: 1, to: 3 }]);
+    // And the painter reads it.
+    expect(readCode("ui/prose-surface.ts")).toContain(
+      "for (const span of livePreviewSpans(doc.toString().split(\"\\n\")))"
+    );
   });
 
   it("ends a section run rather than being taken into one", () => {
