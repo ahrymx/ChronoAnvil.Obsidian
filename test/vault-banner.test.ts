@@ -1195,7 +1195,7 @@ describe("what the Banner section became", () => {
     expect(rule).not.toContain("border-radius");
     expect(rule).not.toContain("box-shadow");
     expect(rule).not.toContain("var(--background-secondary)");
-    expect(rule).toContain("border-left: var(--ca-head-spine)");
+    expect(rule).toContain("border-left: calc(var(--ca-head-spine)");
   });
 
   it("sets the name at the size Obsidian's own title had", () => {
@@ -1207,7 +1207,7 @@ describe("what the Banner section became", () => {
     // One step above it since 5.31.2, and a token of its own rather than
     // `--ca-text-xl` widened — that one is also the entry header's title, which
     // is a band inside a card and did not move.
-    expect(rule).toContain("font-size: var(--ca-head-title-size)");
+    expect(rule).toContain("font-size: calc(var(--ca-head-title-size)");
     expect(rule).toContain("cursor: text");
   });
 

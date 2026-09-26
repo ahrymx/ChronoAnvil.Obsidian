@@ -18,12 +18,13 @@ import {
 } from "./journal";
 import { JOURNAL_CHARTS_FENCE } from "../charts/journal-charts";
 import { plural } from "../core/util";
-import type { SectionQuestion } from "../core/section-model";
+import type { FlagQuestion, SectionQuestion } from "../core/section-model";
 import {
   FLAG_ON,
   SECTION_FORM,
   WIDGET_FORM,
   formQuestion,
+  withFlagToken,
 } from "../core/section-model";
 import {
   SCOPE_ALL,
@@ -1080,12 +1081,59 @@ export function sectionBlocks(
   ctx: SectionContext,
   opts?: SectionOverrides
 ): SectionBlock[] {
-  const blocks = section.render(ctx, opts);
+  // ── AND THE FLAGS ON A SECTION'S OWN LINE, FIRST (1.0.42) ───────────
+  //
+  // THE SAME HALF OF THE SAME PROBLEM, one question kind along. `withAnswers`
+  // writes `#compact` onto a `tasks:` line that EXISTS; a Tasks section ticked
+  // Compact in the Save that ADDS it would otherwise arrive roomy, and the tick
+  // would be gone from the window by the time the reader noticed.
+  //
+  // HERE RATHER THAN IN THE ADD PATH, because this is where the form answer is
+  // already acted on and because a section can be composed three ways — added,
+  // welded into a run by `composeSectionRuns`, or written into a template from
+  // a layout's declared overrides. One of those routes honouring the answer and
+  // two dropping it is the asymmetry `questionsOf` exists to end.
+  const blocks = withTokenFlags(section.render(ctx, opts), section, ctx, opts);
   if (opts?.form !== WIDGET_FORM) return blocks;
   const bar = widgetFormBar(section, ctx, opts);
   const only = blocks[0];
   if (!bar || only?.kind !== "fence") return blocks;
   return [{ ...only, lines: only.lines.filter((l) => l !== bar) }];
+}
+
+// A composed section's fences, carrying whatever `#token` flags it was answered
+// with. See `FlagQuestion.token` and `tasksDensityQuestion`.
+//
+// FENCES ONLY, AND EVERY FENCE. A flag sits on a directive and a directive is a
+// line in a fence, so a markdown block has nothing to carry one; `withFlagToken`
+// refuses any fence that does not hold exactly one line with the keyword, which
+// is what makes "every fence" safe to write rather than a guess about which one.
+function withTokenFlags(
+  blocks: SectionBlock[],
+  section: JournalSection,
+  ctx: SectionContext,
+  opts?: SectionOverrides
+): SectionBlock[] {
+  if (!opts) return blocks;
+  const answers = opts as Record<string, unknown>;
+  const flags = questionsOf(section, ctx, opts).filter(
+    (q): q is FlagQuestion => q.kind === "flag" && q.token !== undefined
+  );
+  if (!flags.length) return blocks;
+  return blocks.map((b) =>
+    b.kind !== "fence"
+      ? b
+      : {
+          ...b,
+          lines: flags.reduce(
+            (lines, flag) =>
+              typeof answers[flag.key] === "string"
+                ? withFlagToken(lines, flag, answers[flag.key] === FLAG_ON)
+                : lines,
+            b.lines as string[]
+          ),
+        }
+  );
 }
 
 export function composeSectionRuns(
@@ -2463,6 +2511,10 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     claims: ["header", "tasks"],
     locate: (t) => probe(t, /^tasks:/m),
     render: () => [headerBar("✅ Tasks", "tasks:tasks"), region("tasks")],
+    // AND NO QUESTIONS (1.0.42). It had one for part of this release — how the
+    // list is drawn — and there is one shape of task list now, so the box is
+    // gone with the shape it chose between. See the note where
+    // `tasksDensityQuestion` was, in `core/note-sections.ts`.
   },
 
   {

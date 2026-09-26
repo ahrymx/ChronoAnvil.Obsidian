@@ -177,3 +177,43 @@ export function moveTask(
   next.splice(to, 0, moved);
   return next;
 }
+
+// ── WHAT A ROW SAYS ABOUT ITSELF WITHOUT BEING ASKED (1.0.42) ──────────
+//
+// *"add a small font eyebrow for the chosen properties."*
+//
+// A task row is one line now — a box, its text and a `…` — and everything that
+// used to be a control on it is behind that button. The cost of putting a
+// property behind a window is that the row stops showing it, and a list where
+// you have to open three windows to find which task is due tomorrow is worse
+// than the two-line row it replaced. So the row prints the properties it has,
+// small, under its text: not controls, just what is true.
+//
+// ONLY WHAT WAS CHOSEN. A normal priority is the absence of a choice — it is
+// what `serializeTaskLine` omits from the line for exactly that reason — so
+// printing "Normal" on every row would be an eyebrow that says nothing on the
+// rows that have nothing to say, and a list of identical grey words down the
+// left of every card.
+//
+// AND THE HOUR ONLY WITH THE DAY, which is `ChronoAnvilTask.at`'s own rule
+// restated where a reader can see it: an hour on no day is not a time, and
+// `parseTaskLine` drops one on the next read. A row that printed it would be
+// showing a property the file does not hold.
+//
+// THE DAY IS FORMATTED BY THE CALLER, so this module stays what its header
+// promises — pure string↔model transforms that unit-test without a vault.
+// Obsidian's `moment` is the renderer's to import, not this file's.
+export function taskTags(
+  task: ChronoAnvilTask,
+  day: (iso: string) => string
+): string[] {
+  const out: string[] = [];
+  if (task.priority !== "normal") {
+    out.push(task.priority === "high" ? "High" : "Low");
+  }
+  if (task.due) {
+    out.push(day(task.due));
+    if (task.at) out.push(task.at);
+  }
+  return out;
+}

@@ -83,6 +83,20 @@ const SET_FROM_TS = new Set([
   // time-grid-view.ts and read by the three rows' templates, so a number that
   // belongs to one week's rendering is not a design constant in the token file.
   "--ca-tg-cols",
+  // 1.0.42: which rung of its journal a note is, as a fraction — 0 at the
+  // journal's own note, 1 at a page — set on the head and on the leaf by
+  // `journal.ts::paintJournalRung`. It is a fact about the open note and not a
+  // design constant, and it is absent on every page that is not in a journal:
+  // a diary entry, the Homepage, a stray note under a journal root. The reads
+  // carry a fallback of 0, which lands the three tokens it drives on the values
+  // `00-tokens.css` already holds, so an absent rung is not a special case.
+  "--ca-tier-t",
+  // 1.0.42: the kind's glyph as a tiled SVG data URI, built per note by
+  // `journal.ts::journalGlyphTile`. `--ca-tex-grain` is the same shape of value
+  // and IS in the token file, correctly — it never varies. This one is a
+  // different emoji per note, so it cannot be. Read with a fallback of `none`,
+  // which is a legal `background-image` that paints nothing.
+  "--ca-head-glyph",
 ]);
 
 describe("a token reference resolves to a token", () => {

@@ -5,6 +5,280 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.42] - 2026-09-26
+
+### Changed
+
+- **A journal note's banner now says which rung of the journal it is.** Every note
+  in a journal drew the same head — the same stripe colour, the same title size,
+  the same wash — so `Study`, a Subject, a Topic, a Lesson and a page were
+  distinguishable only by reading the breadcrumb, and *"easy to lose which index
+  table you're looking at"*. Two channels answer it, because colour alone is never
+  this plugin's only cue:
+
+  - **Tone.** The journal's hue is still its identity and does not move; saturation
+    and lightness step along the rungs, from a bright outer note to a quiet page.
+    Rotating the hue was ruled out by arithmetic — twenty degrees a rung puts a
+    Study page on the diary's quarterly amber — and the ramp is computed from the
+    journal's own level and kind counts, so a three-level journal gets thirds.
+  - **Mass.** The spine thins, the title shrinks and the wash fades down the same
+    ramp. It survives the Monochrome grain setting, where there is no colour left
+    to read.
+
+  The rung is indexed over KINDS, not folder depth, so a Lesson and a Cheatsheet
+  in the same Topic no longer look identical.
+
+- **And the diary dashboards ramp the same way.** A year, a quarter, a month, a
+  week and a day were already five hand-tuned colours; what they lacked was the
+  depth channel, so five dashboards wore one weight. They now sit on the same
+  ramp as a journal's rungs — the year at the bold end, the day at the quiet one
+  — positioned by the containment table the diary already had, and each carrying
+  its own glyph. The colours are untouched.
+
+- **The kind's own glyph, tiled faintly behind the banner's words.** Each level,
+  each note type, a page and each of the five diary grains carry a glyph — mostly
+  ones the model has always held and the banner had never read. It is greyscaled and blended into the wash rather than
+  drawn in its own colour — the same bargain `--ca-tex-grain` makes, so one set of
+  bytes works on both themes — and masked away from the left so the title stays
+  the first thing read. It fades with depth alongside everything else.
+
+- **A grab handle now appears only under the pointer, on every section and every
+  widget.** *"The drag icons always show and there is no fold-down title
+  header."* *"The grab icon is only supposed to appear with the mouse near once
+  the header pulls down."* *"Ensure the grip icons only appear when the mouse is
+  hovering-over."* Three reports of one rule being written three ways. A handle
+  was revealed by a hover of the thing it drags — which is right for a title
+  bar, and wrong for a card, a table or a field, because a reader's pointer is
+  inside one of those the whole time they are reading it. Cards were taken out
+  of that rule in 5.16 and a diary entry's fields earlier in this release; the
+  surfaces nobody had reported — a widget that draws its own banner, a fence
+  with a single widget in it, a group — went on lighting their dots from
+  anywhere inside, hundreds of pixels from the dots themselves.
+
+  There is one rule now, and it holds everywhere: a handle appears when the
+  pointer is on the strip along the top of what it drags — its own dots, the
+  band a widget opens over its top edge, a field's title bar, a section's
+  header bar — and at no other time. Six of the nine rules it replaces said the
+  same thing twice; three of them said the wrong thing. A group's handle used
+  to light from anywhere in the group and now waits on the group's own title
+  strip, which is the one deliberate exception this removes.
+
+- **A field drawn as a widget wears its name on a hover, like the homepage's.**
+  *"The title header should appear with the mouse at the top-middle of
+  widgets."* **Show as widget** drew no title at all on a diary entry, so
+  Captured and Tasks were nameless boxes with a grab handle over them, while
+  the homepage's Open tasks pulls its name down over its own top edge. They now
+  wear the same band: nothing at rest, the name and the handle together when
+  the pointer reaches the top strip. The two forms of a field are two heads now
+  — a section's permanent bar with its chevron and fold, a widget's band that
+  opens where the hand already is.
+
+  The answer moved with it. Ticking the box used to **delete the field's
+  title**, which is why there was no name left to show — and which quietly
+  replaced a field you had renamed with the built-in wording the moment you
+  drew it as a widget. The title stays on the line now and the answer is a
+  `#widget` mark beside it, so your own wording survives both forms and a Save
+  puts back any title the earlier build cut.
+
+- **A row's Section / Widget pill follows the toggle now, on every surface.**
+  It was decided by arrangement — is this fence a column, is it welded into
+  another block — which happens to be the same answer on a homepage, where a
+  section drawn as a widget loses its bar and becomes one. On a diary entry it
+  is not: the band is one fence whichever way its fields are drawn, so a row
+  could sit there saying **Section** with **Show as widget** ticked directly
+  beneath it. The pill asks the toggle where there is one, and falls back to the
+  arrangement only for rows that have no toggle to ask.
+
+- **The Tasks card's Compact button is a section option now.** *"I do not think
+  that `tasks` needs its special action row just for the compact button."* — and
+  it did not: a field head's controls sit in a full-width strip under the title,
+  so one button cost every Tasks card a hairline and a row of its own, on every
+  diary entry and every note that has one. **Show a compact list** is a tick in
+  *Edit sections…* beside everything else about how that section is drawn, and
+  the answer is remembered with the note instead of resetting every time it is
+  opened. The progress count keeps the strip only while there are tasks to
+  count, so a fresh Tasks card is a title and a box to type in.
+
+- **A diary entry's sections get the section/widget toggle the other four
+  catalogues have had.** *"I think the diary sections should have the widget
+  toggle"*: Today's focus, Highlights, Challenges, Notes, Attachments, Tasks and
+  Captured each wore a title and a card, and Edit sections offered no way to make
+  one a bare widget — every row simply said *Section*. They now carry the same
+  **Show as section / Show as widget** control as a journal's or a dashboard's.
+  Where the answer is written is what had blocked this: those seven live in one
+  shared fence, so the bar that answers it everywhere else would have spoken for
+  all seven at once. The answer is the section's own title instead — kept, it
+  draws a head; taken off, the block renders bare — which means one line changes,
+  the other six keep their heads, and the notes under them are untouched. A title
+  you have renamed yourself is left exactly as you wrote it. One field needed
+  fixing to be able to obey it: the task list supplied itself the title "Tasks"
+  whenever a line had none, so ticking **Show as widget** on it changed the file
+  and nothing on the page. It now draws what its line says, like the six beside
+  it — which also means a hand-written `tasks:` with no `|Title` after it renders
+  bare rather than captioned.
+
+- **The banner's reveal chevrons are chips, not pills.** The row of outlined
+  capsules under a note's name was a toolbar in everything but name, which is the
+  one thing a strip that exists to remove chrome should not be. Each control is a
+  soft-cornered chip bounded by a faint ground instead of a hairline, and the
+  ground is the only thing that changes as you use it — a shade on hover, a
+  further shade while the section is open, and one more when you hover an open
+  one. Open and hovered-shut used to look identical; they no longer do. They are
+  also the height their padding says: they had been silently drawn at Obsidian's
+  app-control height of 30px all along.
+
+- **The icon picker offers 240 icons instead of 32.** Two categories became
+  fifteen — study, writing, planning, data, work, tech, nature, weather, health,
+  food, travel, arts, play, marks and flags — and the grids now scroll inside the
+  window, so the field for typing any emoji you like stays put above them. It
+  opens scrolled to the icon you are already using. Every icon it used to offer is
+  still there, and no icon appears in two categories. The same window serves a
+  section bar's glyph, a logbook's, a journal's and a page's.
+
+### Added
+
+- **A diary entry's fields can be grouped, side by side.** *"Unable to group
+  tasks and captured log even though they're widgets?"* They are — and until now
+  **Make a group** was disabled on every field of an entry, wearing a sentence
+  that said the section *draws its own title bar*, which of Tasks and Captured,
+  drawn as widgets with no bar at all, is false twice over. The real reason was
+  that the seven fields below the rule share one fence, and the editor was told
+  to leave that fence alone.
+
+  It is not left alone any more. Press **Make a group** on a field in *Edit
+  sections…* and it joins the one above it as a row — two columns of one card,
+  side by side, each keeping its own title, its own chevron and its own writing.
+  **Take out of the group** puts one back on its own, and the file it returns to
+  is byte for byte the one it started from.
+  Tabs work inside a group here as they do anywhere else. What is never moved is
+  the writing: a field's text lives in its own region further down the note and
+  stays exactly where you left it, retitled headings and all — a group is a change
+  to the chrome and nothing else.
+
+  Where a group genuinely cannot be written the button still says why, and now it
+  says the true reason: a band holding a directive this window did not write, or a
+  line it has no control for, is refused whole rather than rearranged around.
+
+- **A field's controls stay in the field.** *"0/1 done from tasks widget in a
+  group behaves oddly?"* — with the readout sitting on a titled group's own
+  head, above both columns, still there after flipping to the page the task list
+  is not on. A field that draws no head of its own puts its controls in the bar
+  above it, which is right when that bar names the field and wrong when it names
+  a group of them; it now lends its slot only in the first case, and a field
+  under a group's bar keeps its readout inside its own column. The strip it
+  builds instead had never been given a shape, which is the other half of the
+  same report: on an untitled group the count was a full-width band across the
+  top of the Tasks card rather than a pill in its corner. It is a pill now,
+  anchored where the bar's own controls sit.
+
+- **A group takes widgets only.** *"Sections are being allowed to be placed into
+  groups… they're not rendering as widgets."* A group is columns side by side,
+  and a field still wearing its permanent title bar and chevron brings a head the
+  row has no room for — which is why the rest of the plugin has refused it since
+  4.12. A diary entry's band was the one place the question was never asked, so
+  **Make a group** offered the join and the row came out crooked. It is asked
+  now: the link icon is disabled on a field that draws its own bar, the sentence
+  says so and points at the tick that fixes it, and the write refuses to compose
+  such a fence however it is asked. A cell already in a group has its **Show as
+  widget** box locked on, so a group cannot be broken from the other direction
+  either — and a note that already holds one keeps **Take out of the group** live
+  on every cell, which is the way back out.
+
+- **And a diary group can be given a name.** *"Diary groups do not have the
+  choice for Title Header, and it is missing the eyebrow header."* Both halves
+  are fixed. The eyebrow — the faint caption that names a group's columns when
+  it has no title bar — was coming out blank on an entry, because it is built
+  from the catalogue's names and a field carries its title on its own line
+  instead; it now reads the field's own words, and a group of Tasks and Captured
+  captions itself *Tasks · Captured*.
+
+  And **Title header** is on the card, as it is everywhere else — but here it is
+  a tick *and a box*. On every other surface a group's head is the opening
+  section's own bar, so the words come from the catalogue; a diary entry's
+  fields each name themselves, so the bar over a group of them is a line nobody
+  composes and it is yours to write. Tick it and the box arrives filled with the
+  caption you were already looking at; type over it, or clear the tick to go
+  back to the caption. The cells keep their own heads underneath either way — the
+  bar names the group, the cards name themselves.
+
+- **A task is one line now, with one button for everything else.** *"I think we
+  can enforce compact mode and remove the larger format… actually, make it one
+  button (…) to open a edit task window which is similar to the event window
+  editor."* A task used to be drawn on two lines: a checkbox and the words on the
+  first, and on the second a priority pill, a date box, a time box and a delete
+  button — four controls on every task in every list, whether or not any of them
+  had ever been used. Ticking something off a list is the common act and it cost
+  twice the height for chrome that is not part of it.
+
+  So the row is the compact one, for everybody: a box, the words, and a `…` at
+  the end that opens an **Edit task** window on the same frame the event editor
+  uses — the priority as a segmented bar, a date, an hour that appears once there
+  is a day to hang it on, and **Delete**. Below the words, a small eyebrow states
+  what has actually been chosen: `HIGH · 1 OCT · 09:30`, and nothing at all for a
+  plain task, since an eyebrow reading "NORMAL" on every row carries no
+  information. The priority tint on the row itself is unchanged — a high task
+  still reads as urgent from across the page.
+
+  The card's own top is tidier with it: the count moved off the section's head
+  and onto the same line as the **Add a task…** box, with a rule under the pair
+  closing it off from the list, and the `➕` before the box is gone — it was never
+  pressable and the placeholder already said the word. The count in the head was
+  the cause of two separate faults in this release, both of them the same shape:
+  a head can belong to something larger than the field, so what a field says
+  about itself now stays inside it.
+
+  The **Compact** tick that arrived earlier in this release is gone with the
+  larger format it folded away: with one row shape left it was a box that chose
+  between one thing and the same thing. A `#compact` already written on a
+  `tasks:` line is left where it is and read past, so nothing rewrites your
+  notes over it.
+
+- **Banner actions → Change the page icon.** The glyph behind a banner comes from
+  the note's type — a level, a note type, or a diary period — which is the right
+  answer for *every* Cheatsheet and the wrong one for a single page. The action
+  opens the emoji picker on whatever the page draws now and stores your choice in
+  its frontmatter as `pageicon`; picking the glyph it already had clears the
+  override rather than recording it, so the page goes back to following its type.
+  A page that draws no icon says so instead of opening a picker. Like the other
+  two actions it ships on, and has its own toggle in Settings → Page actions.
+
+- **Settings → Appearance → Tint the page ground.** The note's background now
+  carries a wash of its own accent — a journal's rung or a diary period's colour —
+  which is what makes the distinction visible after you have scrolled past the
+  banner. It fades with depth alongside the banner. On by default; the toggle turns
+  it off without touching the banner or the ground texture, and it is independent
+  of the ground texture being set to *Off*.
+
+### Fixed
+
+- **A stacked card's left edge is the card's own border again.** It was drawn by a
+  pseudo-element on the page head, which cost the head its position and both of its
+  pseudo-elements — so the new glyph film had nowhere to go inside a `stack`, which
+  is where a journal page actually lives. The head paints the card with the note's
+  grain now, so the card can resolve the colour itself, and the edge scales with
+  the rung like the head's own spine.
+
+- A dead selector in the preset stylesheet (`[data-ca-quarterly]`, which nothing
+  has ever set) removed.
+
+## [1.0.41] - 2026-09-25
+
+### Fixed
+
+- **LaTeX inside a prose block.** A `$$` equation block is one of the two
+  things Live Preview draws as a mounted block rather than as lines of text —
+  tables being the other, fixed in 1.0.40 — so it came back through the same
+  hole: the card stopped above the equation and started again below it, and a
+  block that *ended* on an equation lost its bottom edge entirely. An equation
+  is now painted as part of the card, the same width as the writing around it,
+  wherever in the block it sits.
+
+- **An equation wider than the card stays inside it.** A long
+  `\begin{aligned}` block left the card at the right-hand border and carried
+  on across the page behind it, past the note's own text column. MathJax cannot
+  be asked to wrap a line, so a wide equation now scrolls sideways inside the
+  card instead of escaping it — in prose blocks and in section cards alike.
+
 ## [1.0.40] - 2026-09-22
 
 ### Fixed

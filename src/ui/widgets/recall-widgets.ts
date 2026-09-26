@@ -22,7 +22,7 @@
 
 import { MarkdownPostProcessorContext, TFile, Notice, setIcon } from "obsidian";
 import { frontmatterOf, getFile, noteTypeOf, today as todayIso } from "../../core/util";
-import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
+import { isValidNoteKey, noteKeyOf, readNoteRegion } from "../../core/notestore";
 import { pageTypeIds, registeredJournalTypes } from "../../journals/journal";
 import { ratingPropertyOf, reviewProperties } from "../../review/review-queue";
 import {
@@ -116,7 +116,12 @@ export function buildRecall(
   titled = false,
   barActions: HTMLElement | null = null
 ): HTMLElement {
-  const key = rest.split(":")[0].trim();
+  // THROUGH `noteKeyOf`, WHICH IS THE ONE PARSE OF A REGION KEY (1.0.42). This
+  // read was `rest.split(":")[0]`, which is right up to the moment a `#token`
+  // appears on the head — and two of them do now, `#compact` and `#widget`. An
+  // unparsed one is a region key of `capture#widget`: a field pointed at a span
+  // nothing writes, which renders empty, loses nothing and says nothing either.
+  const key = noteKeyOf(rest);
   const wrap = createDiv({ cls: "ca-journal-recall" });
 
   // ── NO HEAD OF ITS OWN, AND NOW NO PRIVATE ONE EITHER (5.10, 5.14) ────

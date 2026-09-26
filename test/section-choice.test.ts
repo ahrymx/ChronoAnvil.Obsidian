@@ -25,6 +25,7 @@ import {
   fieldLabelOf,
   idsOf,
   optionsFor,
+  questionIsRequired,
 } from "../src/core/section-model";
 import {
   ENTRY_SECTIONS,
@@ -456,16 +457,50 @@ describe("patch 8: From the journals", () => {
     // an unlabelled `choice`, and the banner is locked, so there is no "addable"
     // state for an unanswered flag to hold back. It is on EVERY grain, including
     // yearly, because every grain's banner composes the line.
+    //
+    // AND THE FIELDS JOINED THEM IN 1.0.42, WHICH IS WHY THIS NOW ASKS TWICE.
+    // *"I think the diary sections should have the widget toggle"*: every field
+    // on an entry is offered the `form` question, derived from its own directive
+    // by `formToggleFor`. That is seven or eight rows per grain, so a list of
+    // every section that asks ANYTHING no longer says what this test was written
+    // to say. What it was written to say is about the rule it names — a row that
+    // can stop being addable — and `questionIsRequired` answers true for exactly
+    // one kind, an unlabelled `choice`. So the exact list is asserted of the
+    // REQUIRED questions, where the rule bites, and the derived toggle is
+    // asserted to reach every field and nothing else.
     for (const grain of TRACKER_CLASSES) {
-      const asking = entrySectionModel({ grain })
+      const model = entrySectionModel({ grain });
+      const required = model
         .sections()
-        .filter((s) => s.questions?.length)
+        .filter((s) => (s.questions ?? []).some(questionIsRequired))
         .map((s) => s.id);
       // The bridge is not offered on a yearly entry at all, so there is nothing
-      // to ask it; the banner is on every entry there is.
-      expect(asking, grain).toEqual(
-        grain === "yearly" ? ["banner"] : ["banner", "bridge"]
-      );
+      // to ask it, and it is the only section on any grain whose answer a row
+      // cannot be added without.
+      expect(required, grain).toEqual(grain === "yearly" ? [] : ["bridge"]);
+
+      const toggling = model
+        .sections()
+        .filter((s) => (s.questions ?? []).some((q) => q.kind === "form"))
+        .map((s) => s.id);
+      // THE FIELDS, IN CATALOGUE ORDER, INCLUDING `capture` ON EVERY GRAIN.
+      // `sections()` is what the editor may OFFER, not what the grain ships, and
+      // Captured is offered on all five — a weekly entry borrows the daily's
+      // wording through `directiveFor`, and a section offered over borrowed
+      // wording must be offered the toggle over that same wording, or the row
+      // the reader adds arrives with a control the six beside it have. The
+      // banner, the tracker grid and the bridge are the three that compose a
+      // line and are still not here: the first two carry no label at all, and
+      // the third's is not a field's, so `SECTION_TITLES` would title it anyway.
+      expect(toggling, grain).toEqual([
+        "focus",
+        "highlights",
+        "challenges",
+        "log",
+        "attachments",
+        "todo",
+        "capture",
+      ]);
     }
   });
 

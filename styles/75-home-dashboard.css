@@ -771,39 +771,27 @@
 .ca-journal-tasks:focus-within {
   border-color: var(--interactive-accent);
 }
-.ca-journal-tasks-compact-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  background: transparent;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--ca-radius-pill);
-  color: var(--text-muted);
-  font-size: var(--ca-text-2xs);
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: none;
-  transition: all 0.15s ease;
-}
-.ca-journal-tasks-compact-toggle:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
-}
-.ca-journal-tasks-compact-toggle.is-active {
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
-  color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
-}
-.ca-journal-tasks-compact-icon {
-  display: inline-flex;
-}
-.ca-journal-tasks-compact-icon .svg-icon {
-  width: 12px;
-  height: 12px;
-}
+/* ── THE COMPACT TOGGLE'S RULES ARE GONE (1.0.42) ──────────────────────
+ *
+ * Four of them: the pill, its hover, its `.is-active` fill and the 12px icon
+ * inside it. *"I do not think that `tasks` needs its special action row just
+ * for the compact button."* — and it did not: a field head's actions slot is a
+ * full-width strip under the title, so one control cost every Tasks card a
+ * hairline and a row. The answer moved into *Edit sections…* as a `#compact`
+ * flag on the `tasks:` line, which the renderer reads at build time.
+ *
+ * AND THEN THE FLAG WENT TOO, one round later — *"I think we can enforce
+ * compact mode and remove the larger format."* The `.is-compact` family that
+ * stood below this comment is gone with it: once the roomy row is deleted the
+ * flag chooses between one shape and the same shape, so there is nothing left
+ * for it to say. The row that survives is the compact one. */
+/* The count, now the last thing on the add row. It keeps the pill it wore in the
+   head's action slot — it is still a readout rather than a label, and the shape
+   is how it reads as one beside a field that is a box. `flex-shrink: 0` is the
+   one addition: on the row it is competing with an input that wants the width,
+   and "3/12 done" wrapping to two lines inside a pill is the failure. */
 .ca-journal-tasks-progress {
+  flex: 0 0 auto;
   font-size: var(--ca-text-2xs);
   color: var(--text-muted);
   background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
@@ -813,23 +801,41 @@
   font-weight: 600;
   white-space: nowrap;
 }
+/* ── THE ADD ROW CARRIES THE COUNT, AND CLOSES THE HEADER (1.0.42) ─────
+ *
+ * *"push the count onto the same line as the input field, and place a divider
+ * below the input row. Remove the ➕ icon."*
+ *
+ * THE DIVIDER IS WHAT MAKES THIS A HEADER. A box to type in and a count of what
+ * is below it are one thing — what you do to the list — and the rule under them
+ * says where that stops and the list starts. Without it the input floated above
+ * the rows with only whitespace between, which is why the count had gone looking
+ * for the field's own head in the first place.
+ *
+ * `margin-bottom` BECAME `padding-bottom` PLUS THE RULE, because a margin puts
+ * the gap outside the border and the rule would have sat tight under the input.
+ * Both halves are `--ca-space-4` — *"increase margins of the divider to space out
+ * the content above and below slightly more"* — which is the same 8px either
+ * side, so the line reads as centred in its own band rather than as belonging to
+ * whichever side is nearer.
+ *
+ * AND 8px IS THE STEP BECAUSE THE LIST'S RHYTHM IS 4. `.ca-journal-tasks-list`
+ * sets `gap: var(--ca-space-2)`, so a divider with `space-2` around it is spaced
+ * exactly like the gap between two task rows and reads as one more row boundary.
+ * Twice the list's own gap is the smallest value that says "this is not part of
+ * the list".
+ *
+ * AND THE `➕` IS GONE. It was a `circle-plus` `setIcon` on a span, so it was
+ * never pressable; the placeholder says "Add a task…" and Enter or a blur is the
+ * act. A glyph that looks like a button and is not is worse than no glyph. */
 .ca-journal-tasks-add {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: var(--ca-space-2);
+  padding: 0 0 var(--ca-space-4);
+  margin-bottom: var(--ca-space-4);
+  border-bottom: 1px solid var(--ca-border-subtle);
   background: transparent;
-  border: none;
-  padding: 0;
-}
-.ca-journal-tasks-add-icon {
-  color: var(--text-muted);
-  display: inline-flex;
-  flex-shrink: 0;
-}
-.ca-journal-tasks-add-icon .svg-icon {
-  width: 1.1em;
-  height: 1.1em;
 }
 .ca-journal-tasks-add-input {
   flex: 1;
@@ -876,9 +882,9 @@
 }
 .ca-journal-task-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 10px;
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
   border-left: 3px solid color-mix(in srgb, var(--interactive-accent) 60%, var(--background-modifier-border));
   border-radius: var(--ca-radius-md);
@@ -919,13 +925,28 @@
   background: color-mix(in srgb, var(--interactive-accent) 9%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border-hover));
 }
-/* Top line: checkbox + full task title */
-.ca-journal-task-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
+/* ── THE ROW: A BOX, ITS WORDS, AND A `…` (1.0.42) ──────────────────────
+ *
+ * *"now improve the tasks section/widget. I think we can enforce compact mode
+ * and remove the larger format… actually, make it one button (…) to open a edit
+ * task window."*
+ *
+ * WHAT IS GONE FROM THIS FILE, and it is most of what was here: the priority
+ * pill and its three tints, the date wrap and its hidden input, the time wrap
+ * and its hidden input, the delete button, the whole `.is-compact` family and
+ * the two mobile copies of it. A hundred and eighty lines for four controls on
+ * a second line of every row, plus a flag to fold that line away, plus two
+ * phone variants of the folded form.
+ *
+ * WHAT REPLACES THEM IS A FLEX ROW AND AN EYEBROW. The controls live in a modal
+ * now (`ca-task-modal`, below) and a modal is styled once rather than once per
+ * viewport — which is the real saving here, and the reason the phone rules did
+ * not need rewriting so much as deleting.
+ *
+ * THE PRIORITY TINTS STAY. They are on the row itself — the spine's colour and
+ * the card's wash — and they were never the pill: a high task reads as urgent
+ * from across the page without anything having to be spelled, which is the one
+ * thing the removed chip did that the eyebrow alone would not. */
 .ca-journal-task-check {
   flex: 0 0 auto;
   cursor: pointer;
@@ -935,8 +956,18 @@
   margin: 0;
   border-radius: var(--ca-radius-xs);
 }
-.ca-journal-task-text {
+/* The words and their eyebrow, as one column — so the box and the `…` centre
+   against the pair rather than against the first of them. */
+.ca-journal-task-main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
   flex: 1 1 auto;
+  min-width: 0;
+}
+.ca-journal-task-text {
+  width: 100%;
   min-width: 0;
   border: 1px solid transparent;
   background: transparent;
@@ -964,148 +995,68 @@
   text-decoration: line-through;
   color: var(--text-faint);
 }
-/* Bottom line: metadata chips & action buttons */
-.ca-journal-task-meta {
+
+/* ── THE EYEBROW: WHAT WAS CHOSEN, NOT WHAT CAN BE (1.0.42) ─────────────
+ *
+ * *"add a small font eyebrow for the chosen properties."*
+ *
+ * NOT CONTROLS. Nothing here is clickable and nothing here has a box around it,
+ * which is the whole distinction from the chips it replaces: this is the row
+ * stating what is true about itself, and the `…` is where it is changed. Giving
+ * it a border would make it look like the pill it is not.
+ *
+ * ALIGNED WITH THE TEXT, not with the row — `padding-left` matches the text
+ * input's, so the eyebrow starts under the first letter rather than under the
+ * input's invisible border.
+ *
+ * TRACKED AND UPPER-CASE, which is the plugin's small-label voice everywhere
+ * else (`.ca-journal-group-head`, the banner's rung). A word set that small
+ * without tracking reads as a smudge.
+ *
+ * NOT `-tag`, WHICH IS TAKEN. `.ca-journal-task-tag` is the Open-tasks TABLE's
+ * `#hashtag` chip — a monospace bordered pill pulled out of the task's own text
+ * (`buildTaskRow` in `src/ui/tables.ts`) — and it means something else entirely.
+ * Two meanings for one class survive only as long as both rules stay scoped, so
+ * this one is a `fact` instead. */
+.ca-journal-task-eyebrow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-left: 28px;
   flex-wrap: wrap;
-}
-.ca-journal-task-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-/* Priority chip button */
-.ca-journal-task-prio {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
-  color: var(--text-muted);
-  border-radius: var(--ca-radius-pill);
-  cursor: pointer;
-  box-shadow: none;
+  align-items: baseline;
+  gap: 0 5px;
+  padding-left: 5px;
   font-size: var(--ca-text-2xs);
-  font-weight: 600;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.ca-journal-task-prio:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
-  color: var(--text-normal);
-  border-color: var(--interactive-accent);
-}
-.ca-journal-task-prio-icon {
-  display: inline-flex;
-}
-.ca-journal-task-prio-icon .svg-icon {
-  width: 0.95em;
-  height: 0.95em;
-}
-.ca-journal-task-high .ca-journal-task-prio {
-  color: var(--color-red, #e05561);
-  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.14);
-  border-color: rgba(var(--color-red-rgb, 224, 85, 97), 0.35);
-  font-weight: 700;
-}
-.ca-journal-task-low .ca-journal-task-prio {
-  color: var(--ca-ev-teal);
-  background: rgba(63, 163, 163, 0.14);
-  border-color: rgba(63, 163, 163, 0.35);
-}
-.ca-journal-task-normal .ca-journal-task-prio {
+  line-height: 1.3;
   color: var(--text-faint);
-  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
 }
-/* Due date pill */
-.ca-journal-task-due-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
-  border-radius: var(--ca-radius-pill);
-  font-size: var(--ca-text-2xs);
-  color: var(--text-muted);
-  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+/* The first part is the priority wherever there is one, so a high task's
+   eyebrow leads with the word its spine is already coloured for. */
+.ca-journal-task-high .ca-journal-task-eyebrow .ca-journal-task-fact:first-child {
+  color: var(--color-red, #e05561);
 }
-.ca-journal-task-due-wrap:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
-  border-color: var(--interactive-accent);
-  color: var(--text-normal);
+.ca-journal-task-low .ca-journal-task-eyebrow .ca-journal-task-fact:first-child {
+  color: var(--ca-ev-teal);
 }
-.ca-journal-task-due-icon {
-  display: inline-flex;
+.ca-journal-task-fact-sep {
+  color: var(--text-faint);
+  opacity: 0.55;
 }
-.ca-journal-task-due-icon .svg-icon {
-  width: 0.95em;
-  height: 0.95em;
-}
-.ca-journal-task-due {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: inherit;
-  font-family: inherit;
-  padding: 0;
-  cursor: pointer;
-  outline: none;
-}
-.ca-journal-task-due:not([value=""]) {
-  color: var(--text-normal);
-  font-weight: 500;
-}
-/* Time pill */
-.ca-journal-task-at-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
-  border-radius: var(--ca-radius-pill);
-  font-size: var(--ca-text-2xs);
-  color: var(--text-muted);
-  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
-}
-.ca-journal-task-at-wrap:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-secondary));
-  border-color: var(--interactive-accent);
-  color: var(--text-normal);
-}
-.ca-journal-task-at-wrap.is-hidden {
-  display: none;
-}
-.ca-journal-task-at-icon {
-  display: inline-flex;
-}
-.ca-journal-task-at-icon .svg-icon {
-  width: 0.95em;
-  height: 0.95em;
-}
-.ca-journal-task-at {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: inherit;
-  font-family: inherit;
-  padding: 0;
-  cursor: pointer;
-  outline: none;
-}
-.ca-journal-task-at:not([value=""]) {
-  color: var(--text-normal);
-  font-weight: 500;
-}
-/* Delete button */
-.ca-journal-task-del {
+
+/* ── THE ONE CONTROL (1.0.42) ───────────────────────────────────────────
+ *
+ * `ca-journal-task-del`'s RULE, INHERITED RATHER THAN REWRITTEN — the resting
+ * fade, the hover fill, the 22px square. That button was the only row control
+ * that had its placement right: at the end of the line, quiet until the pointer
+ * is on the row. What changes is what it opens.
+ *
+ * VISIBLE ON TOUCH, AND THAT IS NOT A PHONE RULE. `@media (hover: none)` is the
+ * question — a pointer that cannot hover can never reveal this, and unlike the
+ * old delete button there is no second route to what is behind it: priority,
+ * due date, time and Delete are ALL here now. Faint-but-drawn is the same
+ * answer `.ca-journal-attach-menu` gives one block down, for the same reason. */
+.ca-journal-task-edit {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -1119,182 +1070,124 @@
   border-radius: var(--ca-radius-sm);
   cursor: pointer;
   box-shadow: none;
-  opacity: 0.55;
+  opacity: 0.45;
   transition: opacity 0.15s ease, background 0.12s ease, color 0.12s ease;
 }
-.ca-journal-task-row:hover .ca-journal-task-del {
+.ca-journal-task-row:hover .ca-journal-task-edit {
   opacity: 1;
 }
-.ca-journal-task-del:hover {
+.ca-journal-task-edit:hover,
+.ca-journal-task-edit:focus-visible {
+  opacity: 1;
   background: var(--background-modifier-hover);
-  color: var(--text-error, #e05561);
+  color: var(--text-normal);
 }
-.ca-journal-task-del .svg-icon {
+.ca-journal-task-edit .svg-icon {
   width: 1em;
   height: 1em;
 }
-
-/* Compact mode: collapses row to single line, inlining meta chips */
-.ca-journal-tasks.is-compact .ca-journal-tasks-list {
-  gap: 4px;
-}
-.ca-journal-tasks.is-compact .ca-journal-task-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 8px 4px 10px;
-  min-height: 32px;
-}
-.ca-journal-tasks.is-compact .ca-journal-task-main {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.ca-journal-tasks.is-compact .ca-journal-task-meta {
-  padding-left: 0;
-  flex-shrink: 0;
-  flex-wrap: nowrap;
-  gap: 6px;
-}
-.ca-journal-tasks.is-compact .ca-journal-task-chips {
-  flex-shrink: 0;
-  flex-wrap: nowrap;
-  gap: 4px;
-}
-/* Priority tag and delete button are hidden in compact mode */
-.ca-journal-tasks.is-compact .ca-journal-task-prio,
-.ca-journal-tasks.is-compact .ca-journal-task-del {
-  display: none;
-}
-.ca-journal-tasks.is-compact .ca-journal-task-due-wrap,
-.ca-journal-tasks.is-compact .ca-journal-task-at-wrap {
-  padding: 1px 6px;
-  font-size: var(--ca-text-2xs);
-}
-.ca-journal-tasks.is-compact .ca-journal-task-text {
-  font-size: var(--ca-text-sm);
+@media (hover: none) {
+  .ca-journal-task-edit {
+    opacity: 0.7;
+  }
 }
 
-/* Touch targets & responsive layout for mobile */
+/* Touch targets. One block, where there were three — the compact variants are
+   gone with the mode, and the row they described is the row everyone gets. */
 @media (max-width: 520px) {
   .ca-journal-task-row {
-    padding: 10px 12px;
+    padding: 6px 6px 6px 8px;
     gap: 8px;
   }
-  .ca-journal-task-meta {
-    padding-left: 28px;
-    gap: 8px;
-  }
-  .ca-journal-task-del {
-    opacity: 0.85;
-  }
-
-  /* In compact mode on mobile: date & time become icon-only trigger buttons */
-  .ca-journal-tasks.is-compact .ca-journal-task-row {
-    padding: 4px 6px 4px 8px;
-    gap: 6px;
-  }
-  .ca-journal-tasks.is-compact .ca-journal-task-due-wrap {
-    position: relative;
-    padding: 4px 6px;
-    min-width: 24px;
-    justify-content: center;
-  }
-  .ca-journal-tasks.is-compact .ca-journal-task-due {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-  }
-  .ca-journal-tasks.is-compact .ca-journal-task-due-wrap.has-due {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
-    border-color: var(--interactive-accent);
-  }
-  .ca-journal-tasks.is-compact .ca-journal-task-at-wrap {
-    position: relative;
-    padding: 4px 6px;
-    min-width: 24px;
-    justify-content: center;
-  }
-  .ca-journal-tasks.is-compact .ca-journal-task-at {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-  }
-  .ca-journal-tasks.is-compact .ca-journal-task-at-wrap.has-at {
-    color: var(--interactive-accent);
-    background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
-    border-color: var(--interactive-accent);
-  }
-}
-
-body.is-mobile .ca-journal-task-row {
-  padding: 10px 12px;
 }
 body.is-mobile .ca-journal-task-check {
   width: 22px;
   height: 22px;
 }
-body.is-mobile .ca-journal-task-prio,
-body.is-mobile .ca-journal-task-due-wrap,
-body.is-mobile .ca-journal-task-at-wrap {
-  min-height: calc(var(--ca-control-min) * 0.75);
-  padding: 4px 10px;
-}
-body.is-mobile .ca-journal-task-del {
+body.is-mobile .ca-journal-task-edit {
   min-height: calc(var(--ca-control-min) * 0.75);
   min-width: calc(var(--ca-control-min) * 0.75);
   opacity: 0.85;
 }
 
-/* On mobile devices in compact mode */
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-row {
-  padding: 4px 6px 4px 8px;
-  gap: 6px;
+/* ── THE TASK EDITOR (1.0.42) ───────────────────────────────────────────
+ *
+ * *"make it one button (…) to open a edit task window which is similar to the
+ * event window editor."*
+ *
+ * SIMILAR TO, AND THEREFORE MOSTLY NOT HERE. `EditorModal` already owns the
+ * shell — `.ca-editor-modal`, `-head`, `-subtitle`, `-body`, `-footer`, the
+ * error line — in 85-tracker-controls.css, and `TaskEditModal` extends it, so
+ * the resemblance the reader asked for is inheritance rather than a copy. What
+ * this block adds is the four things a task has that an event does not.
+ *
+ * THE WIDTH IS THE EVENT MODAL'S, and deliberately narrower than that: four
+ * fields, one of them a checkbox's worth of choices. A modal sized for its
+ * content reads as a dialogue; one sized for the widest modal in the plugin
+ * reads as a form with something missing.
+ *
+ * THE PRIORITY BAR IS `.ca-event-kind-bar` WITH A DIFFERENT NAME, and that is
+ * a duplication I am choosing: the two live in different feature files, and
+ * hoisting a shared `.ca-segment-bar` would be a third change to a release that
+ * is already three deep in this file. If a fourth segmented control appears,
+ * hoist all four then — not before, and not after. */
+.ca-task-modal {
+  max-width: 460px;
 }
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-due-wrap {
-  position: relative;
-  padding: 4px 8px;
-  min-width: 28px;
-  justify-content: center;
+.ca-task-modal .ca-editor-body {
+  padding: 14px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ca-space-2);
 }
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-due {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+.ca-task-prio-bar {
+  display: flex;
+  gap: 3px;
+  background: var(--background-secondary);
+  padding: 3px;
+  border-radius: var(--ca-radius-sm);
+  border: var(--ca-rule) solid var(--background-modifier-border);
   width: 100%;
-  height: 100%;
+}
+.ca-task-prio-btn {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: var(--ca-text-xs);
+  font-weight: 500;
+  border-radius: var(--ca-radius-xs);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
   cursor: pointer;
+  box-shadow: none;
+  text-align: center;
+  transition: background 0.12s, color 0.12s;
 }
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-due-wrap.has-due {
-  color: var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
-  border-color: var(--interactive-accent);
+.ca-task-prio-btn:hover {
+  color: var(--text-normal);
 }
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at-wrap {
-  position: relative;
-  padding: 4px 8px;
-  min-width: 28px;
-  justify-content: center;
+.ca-task-prio-btn.is-active {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+  box-shadow: var(--ca-shadow-sm);
 }
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
+/* The active button carries the row's own tint, so the choice made here and the
+   spine it will paint out there are the same colour. */
+.ca-task-prio-btn.is-active[data-ca-prio="high"] {
+  color: var(--color-red, #e05561);
 }
-body.is-mobile .ca-journal-tasks.is-compact .ca-journal-task-at-wrap.has-at {
-  color: var(--interactive-accent);
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-secondary));
-  border-color: var(--interactive-accent);
+.ca-task-prio-btn.is-active[data-ca-prio="low"] {
+  color: var(--ca-ev-teal);
+}
+/* A native date and a native time control. Obsidian gives `input` in a Setting
+   no width of its own, and a `date` input that shrink-wraps its text cuts the
+   picker glyph off — hence the floor rather than a `width`. */
+.ca-task-modal input.ca-task-date,
+.ca-task-modal input.ca-task-time {
+  min-width: 9em;
+  font-family: inherit;
+  font-size: var(--ca-text-sm);
 }
 
 /* Touch has no hover to reveal this with — and on a wall of thumbnails this is

@@ -126,6 +126,60 @@ describe("the action table", () => {
     const copy = PAGE_ACTIONS.find((a) => a.id === "page-copy-plain")!;
     expect(copy.when).toBeUndefined();
   });
+
+  // ── CHANGE THE PAGE ICON (1.0.42) ─────────────────────────────────────
+  //
+  // *"add a entry to the banner actions menu to change the icon"* — the
+  // counterpart to the glyph 1.0.42 put behind every banner, which comes from
+  // the MODEL and so answers "every Cheatsheet" rather than "this page".
+  it("offers the icon on every surface and refuses in the handler instead", () => {
+    const icon = PAGE_ACTIONS.find((a) => a.id === "page-icon")!;
+    // NO `when`, deliberately. Whether a page draws a glyph at all is a question
+    // about its RUNG, and `PageActionContext` is the surface and nothing else —
+    // that interface says why, and widening it to reach frontmatter would make
+    // every item's availability something the renderer re-asks on every
+    // metadata change. So the refusal moved to `changePageIcon`, which resolves
+    // the glyph the page would draw and says there is none.
+    expect(icon.when).toBeUndefined();
+    expect(readSrc("ui/page-icon")).toContain("pageGlyphOf(plugin, file)");
+    expect(readSrc("ui/page-icon")).toContain("if (!fallback)");
+  });
+
+  it("stores nothing when the reader picks the glyph the page already had", () => {
+    // 1.0.32's rule, and it is the same one: a value equal to its default is not
+    // written, or the note ends up carrying a record of the reader agreeing with
+    // us — which then stops following the kind if the kind's glyph is changed.
+    const src = readSrc("ui/page-icon");
+    expect(src).toContain("picked.trim() === fallback ? null : picked.trim()");
+    expect(src).toContain("delete fm[PAGE_ICON_KEY]");
+    // AND NOTHING IS WRITTEN WHEN NOTHING WOULD CHANGE — `header-title.ts`' rule:
+    // a `processFrontMatter` that leaves a file identical still moves its
+    // modified time, which sync then propagates as a lie about the vault.
+    expect(src).toContain("if (next === before) return;");
+  });
+
+  it("overrides the glyph and nothing else about the rung", () => {
+    // The step, the ramp, the mass and the tone stay the rung's. A reader
+    // changing the picture on a page is not telling us it is a different depth,
+    // and letting an icon move the ramp would make the one obvious control
+    // silently rewrite the channel the ramp exists to carry.
+    const rung = readSrc("ui/rung");
+    expect(rung).toContain('glyphTile(icon ?? rung.emoji)');
+    expect(rung).toContain('"--ca-tier-t", String(Math.round(rung.t');
+    // ONE FLAT WORD, this plugin's frontmatter convention — and not `icon`,
+    // which belongs to a widely-installed icon plugin a reader may also run.
+    expect(rung).toContain('PAGE_ICON_KEY = "pageicon"');
+    expect(rung).not.toContain('PAGE_ICON_KEY = "icon"');
+  });
+
+  it("reaches all three painters, so the banner and the leaf agree", () => {
+    // The head paints one element, the vault banner paints the leaf as well, and
+    // the journal painter serves both. An override read in two of the three is
+    // a note whose banner and whose ground disagree about what it is.
+    for (const name of ["ui/widgets/page-head", "ui/vault-banner", "journals/journal"]) {
+      expect(readSrc(name), name).toContain("pageIconOf(");
+    }
+  });
 });
 
 describe("which actions a reader is left with", () => {
@@ -637,7 +691,7 @@ describe("the control", () => {
     // builds it, and the flag rather than the node is what crosses the boundary.
     const head = readSrc("ui/widgets/page-head.ts");
     expect(head).toContain("withActions = false");
-    expect(head).toContain("buildPageHead(plugin, ctx, withActions)");
+    expect(head).toContain("buildPageHead(plugin, ctx, withActions, stackCardOf(host))");
     expect(head).toContain("if (withActions) addPageActionsControl(");
   });
 });

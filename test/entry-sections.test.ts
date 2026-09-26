@@ -950,25 +950,79 @@ describe("the widget door, on an entry (5.26)", () => {
 describe("an entry's blocks and the weld that changes them", () => {
   const model = (grain: TrackerClass = "daily") => entrySectionModel({ grain });
 
-  it("reports the banner and the grid as two blocks, and the page below as none", () => {
+  // The band's fields, in file order — what a composed entry has below the rule.
+  const fieldsOf = (grain: TrackerClass): string[] =>
+    offerableEntrySections({ grain })
+      .filter((s) => s.band === "shared")
+      .map((s) => s.id)
+      .filter((id) => detectEntrySections(composeEntryTemplate(grain), { grain }).includes(id));
+
+  it("reports the banner and the grid as two blocks, and the band a field at a time", () => {
+    // ── WHAT THIS ASSERTED UNTIL 1.0.42 ──────────────────────────────
+    //
+    // *"and the page below as none"* — the seven fields were withheld from
+    // `blocks()` on purpose, so the window could not offer a column of them.
+    // A vault asked for the column — *"unable to group tasks and captured log
+    // even though they're widgets?"* — and got the wrong refusal on the way,
+    // because a capability withheld at its source leaves the window guessing at
+    // the reason. The band is read as an arrangement now; see `bandBlocks`.
+    //
+    // ONE BLOCK PER FIELD, because a composed daily band is ONE UNROWED FENCE
+    // and an unrowed fence's members are each their own block. That is
+    // `rowRuns(weld: true)` read backwards: an unrowed member joins the run
+    // before it, so the fence they happen to share is not a fact about their
+    // arrangement.
     const blocks = model().blocks!(composeEntryTemplate("daily"));
-    expect(blocks.map((b) => b.ids)).toEqual([["banner"], ["trackers"]]);
+    expect(blocks.map((b) => b.ids)).toEqual([
+      ["banner"],
+      ["trackers"],
+      ...fieldsOf("daily").map((id) => [id]),
+    ]);
     expect(blocks.every((b) => b.stack)).toBe(false);
+    expect(blocks.every((b) => b.pages.length === 0)).toBe(true);
   });
 
-  it("never reports a section below the rule, on any grain", () => {
-    // THE REFUSAL, EXPRESSED WHERE CAPABILITY IS READ RATHER THAN AT A BUTTON.
-    // The seven field sections share one fence, and splitting it is a judgement
-    // about the reader's writing. Withholding them here withholds `loose` and
-    // `column` for all seven at once — the window draws no split and no Save
-    // can ask for one.
+  it("offers every field as loose, and only a widget as a column, on every grain", () => {
+    // ── WHAT THIS ASSERTED FOR ONE BUILD OF 1.0.42 ────────────────────
+    //
+    // *"loose AND a column together, which is the one place those two answers
+    // are one answer"* — and the vault said otherwise: *"Sections are being
+    // allowed to be placed into groups. As you can see they're not rendering as
+    // widgets."* The half that was right is `loose`: `parseEntry` attributes
+    // exactly one line to each field, so there is no extent to guess and nothing
+    // a split could take by mistake, on any grain and in any form.
+    //
+    // A COLUMN IS THE OTHER QUESTION, and it is 4.12 §A's — a section that draws
+    // its own title bar is not one. A composed entry's fields are all sections,
+    // so a fresh entry offers no columns at all; ticking **Show as widget** is
+    // what makes one. See `fieldIsWidget`.
     for (const grain of TRACKER_CLASSES) {
-      const ids = model(grain)
-        .blocks!(composeEntryTemplate(grain))
-        .flatMap((b) => b.ids);
-      expect(ids, grain).not.toContain("focus");
-      expect(ids, grain).not.toContain("log");
-      expect(ids.every((id) => id === "banner" || id === "trackers"), grain).toBe(true);
+      const blocks = model(grain).blocks!(composeEntryTemplate(grain));
+      const fields = fieldsOf(grain);
+      expect(fields.length, grain).toBeGreaterThan(1);
+      for (const id of fields) {
+        const block = blocks.find((b) => b.ids.includes(id));
+        expect(block?.column, `${grain}: ${id}`).toEqual([]);
+        expect(block?.loose, `${grain}: ${id}`).toContain(id);
+      }
+      // AND THE SAME FIELD, DRAWN AS A WIDGET, IS ONE.
+      const shown = applyEntrySections(
+        composeEntryTemplate(grain),
+        { grain },
+        detectEntrySections(composeEntryTemplate(grain), { grain }).map((id) =>
+          fields.includes(id) ? { id, options: { form: "widget" } } : id
+        )
+      )!;
+      for (const id of fields) {
+        const block = model(grain).blocks!(shown).find((b) => b.ids.includes(id));
+        expect(block?.column, `${grain}: ${id} as a widget`).toContain(id);
+      }
+      // AND THE TWO ABOVE THE RULE ARE STILL NOT COLUMNS. The banner draws the
+      // page head and the grid is a region between two markers; neither is the
+      // kind of thing a column is, and `flatBlocks` says so for both.
+      for (const id of ["banner", "trackers"]) {
+        expect(blocks.find((b) => b.ids.includes(id))?.column, `${grain}: ${id}`).toEqual([]);
+      }
     }
   });
 
@@ -979,6 +1033,7 @@ describe("an entry's blocks and the weld that changes them", () => {
       expect(out, grain).toBe(weldEntryFences(text));
       expect(model(grain).blocks!(out!).map((b) => b.ids), grain).toEqual([
         ["banner", "trackers"],
+        ...fieldsOf(grain).map((id) => [id]),
       ]);
       expect(model(grain).blocks!(out!)[0].stack, grain).toBe(true);
     }
@@ -1035,5 +1090,462 @@ describe("an entry's blocks and the weld that changes them", () => {
     // written before stacks existed must not have this note taken apart.
     const welded = weldEntryFences(composeEntryTemplate("daily"))!;
     expect(model().regroup!(welded, [["banner"], ["trackers"]], [])).toBeNull();
+  });
+});
+
+// ── grouping a diary entry's fields (1.0.42) ──────────────────────────────
+//
+// *"Unable to group tasks and captured log even though they're widgets?"* They
+// are: a field drawn as a widget is the same kind of thing the homepage groups
+// freely. 1.0.10 withheld the whole band from `blocks()` on the argument that
+// splitting its fence is a judgement about the reader's writing — and the
+// distinction that argument missed is that a field's REGION is their writing and
+// its DIRECTIVE is its chrome. So the regions never move, a directive line is
+// copied VERBATIM into whichever fence it lands in, and a band holding anything
+// this could not re-emit is refused whole rather than rearranged around.
+describe("grouping a diary entry's fields (1.0.42)", () => {
+  const ctx = { grain: "daily" as TrackerClass };
+  const model = entrySectionModel(ctx);
+
+  // The fields of a composed daily entry, in file order. Stated once here and
+  // reused, so a change to the daily catalogue fails in one place with a
+  // readable diff rather than in nine.
+  const fields = ["focus", "highlights", "challenges", "log", "attachments", "todo", "capture"];
+
+  // ── AND THEY ARE ALL DRAWN AS WIDGETS (1.0.42) ──────────────────────
+  //
+  // *"Sections are being allowed to be placed into groups. As you can see
+  // they're not rendering as widgets."* A group takes columns and a field
+  // wearing a permanent title bar is not one (4.12 §A), so the entry these
+  // cases group is one whose fields have been ticked **Show as widget** — which
+  // is the state the reader is in when they reach for the link icon. The
+  // refusal for the other state has its own cases at the end.
+  const shown = (t: string): string =>
+    applyEntrySections(
+      t,
+      ctx,
+      detectEntrySections(t, ctx).map((id) =>
+        fields.includes(id) ? { id, options: { form: "widget" } } : id
+      )
+    ) ?? t;
+  const text = shown(composeEntryTemplate("daily"));
+  const apart = fields.map((id) => [id]);
+  // A whole-note partition: the two blocks above the rule, then the band's.
+  const partition = (...groups: string[][]): string[][] => [
+    ["banner"],
+    ["trackers"],
+    ...groups,
+  ];
+  // The band's fences, as their non-blank lines. The first two fences of an
+  // entry are the banner's and the grid's.
+  const bandFences = (out: string): string[][] =>
+    out
+      .split("```chronoanvil\n")
+      .slice(3)
+      .map((f) => f.split("\n```")[0].split("\n").filter((l) => l.trim() !== ""));
+
+  it("composes them one fence, one block each", () => {
+    expect(bandFences(text).length).toBe(1);
+    expect(model.blocks!(text).map((b) => b.ids)).toEqual(partition(...apart));
+  });
+
+  it("puts two fields in one fence, opened by a `row` line", () => {
+    const out = model.regroup!(
+      text,
+      partition(...apart.slice(0, 5), ["todo", "capture"]),
+      [],
+      []
+    );
+    expect(out).not.toBeNull();
+    const band = bandFences(out!);
+    expect(band.length).toBe(2);
+    expect(band[0].length).toBe(5);
+    expect(band[0]).not.toContain("row");
+    expect(band[1][0]).toBe("row");
+    expect(band[1].length).toBe(3);
+    expect(band[1][1]).toContain("tasks:todo");
+    expect(band[1][2]).toContain("note:capture");
+    // AND NOT ONE LINE OF THE READER'S WRITING MOVED. Everything from the first
+    // region on is byte-identical: a group is a change to the chrome, and the
+    // regions are the note.
+    const from = (t: string): string => t.slice(t.indexOf("<!--chronoanvil:focus"));
+    expect(from(out!)).toBe(from(text));
+  });
+
+  it("reads the group back, and takes it apart byte for byte", () => {
+    const want = partition(...apart.slice(0, 5), ["todo", "capture"]);
+    const out = model.regroup!(text, want, [], [])!;
+    // THE ROUND TRIP IS THE WHOLE SAFETY ARGUMENT. `bandBlocks` and
+    // `regroupBand` are two halves of one rule — one fence per block, opened by
+    // `row` where the block has more than one member — so what the window reads
+    // back is the group the reader made, and ungrouping returns the file it
+    // started from rather than something equivalent to it.
+    expect(model.blocks!(out).map((b) => b.ids)).toEqual(want);
+    expect(model.regroup!(out, partition(...apart), [], [])).toBe(text);
+  });
+
+  it("starts a new fence after a row rather than welding a field into it", () => {
+    // `rowRuns`' clause, in the writer: an unrowed member joins the run before
+    // it only when that run is also unrowed. Without it the first field under a
+    // two-cell row becomes its third column — a column nobody asked for, in a
+    // fence whose shape the reader cannot see.
+    const want = partition(["focus", "highlights"], ...apart.slice(2));
+    const out = model.regroup!(text, want, [], [])!;
+    const band = bandFences(out);
+    expect(band.length).toBe(2);
+    expect(band[0][0]).toBe("row");
+    expect(band[0].length).toBe(3);
+    expect(band[1].length).toBe(5);
+    expect(band[1]).not.toContain("row");
+    expect(model.blocks!(out).map((b) => b.ids)).toEqual(want);
+  });
+
+  it("carries a tab inside a group, and reads it back as a page", () => {
+    const want = partition(...apart.slice(0, 4), ["attachments", "todo", "capture"]);
+    const out = model.regroup!(text, want, ["capture"], [])!;
+    const band = bandFences(out);
+    expect(band[1][0]).toBe("row");
+    expect(band[1][3]).toBe("tab");
+    expect(band[1][4]).toContain("note:capture");
+    expect(
+      model.blocks!(out).find((b) => b.ids.includes("capture"))!.pages
+    ).toEqual(["capture"]);
+    // AND THE BOUNDARY GOES WHEN THE READER TAKES IT AWAY, which is what makes
+    // the control a toggle rather than a one-way write.
+    const flat = model.regroup!(out, want, [], [])!;
+    expect(bandFences(flat)[1]).not.toContain("tab");
+  });
+
+  it("refuses a band holding a line the catalogue did not write", () => {
+    // NO BLOCKS AT ALL, which is how the refusal reaches the reader: the window
+    // never learns those ids, `placed` is false for every one of them, and the
+    // disabled button says the sentence `whyNotColumn` keeps for this case.
+    const foreign = text.replace(
+      "attach:attachments#widget|Attachments",
+      "attach:attachments#widget|Attachments\nmystery:mine"
+    );
+    expect(foreign).not.toBe(text);
+    expect(model.blocks!(foreign).flatMap((b) => b.ids)).toEqual(["banner", "trackers"]);
+    expect(
+      model.regroup!(foreign, partition(...apart.slice(0, 5), ["todo", "capture"]), [], [])
+    ).toBeNull();
+  });
+
+  it("refuses a band holding a modifier it cannot carry", () => {
+    // A `height:` belongs to the line UNDER it, and a `cell` divides two
+    // columns of one row — neither survives a re-emit built out of directive
+    // lines alone, so a band carrying either is left exactly as it is. Nothing
+    // on this surface composes a `cell`: no entry section declares one, so
+    // `rowRuns`' `divided` set is empty for every grain.
+    for (const line of ["height:240", "cell", "frame"]) {
+      const odd = text.replace(
+        "tasks:todo#widget|Tasks",
+        `${line}\ntasks:todo#widget|Tasks`
+      );
+      expect(odd, line).not.toBe(text);
+      expect(model.blocks!(odd).flatMap((b) => b.ids), line).toEqual(["banner", "trackers"]);
+      expect(
+        model.regroup!(odd, partition(...apart.slice(0, 5), ["todo", "capture"]), [], []),
+        line
+      ).toBeNull();
+    }
+  });
+
+  it("refuses a band with a paragraph between two of its fences", () => {
+    // The rewrite replaces the span from the first opener to the last closer, so
+    // a reader who wrote between two of their rows keeps that writing by keeping
+    // their arrangement.
+    const split = model.regroup!(
+      text,
+      partition(...apart.slice(0, 5), ["todo", "capture"]),
+      [],
+      []
+    )!;
+    const between = split.replace("```\n\n```chronoanvil\nrow", "```\n\nA note to self.\n\n```chronoanvil\nrow");
+    expect(between).not.toBe(split);
+    expect(model.blocks!(between).flatMap((b) => b.ids)).toEqual(["banner", "trackers"]);
+    expect(model.regroup!(between, partition(...apart), [], [])).toBeNull();
+  });
+
+  it("refuses a partition that straddles the rule, loses a field, or names one twice", () => {
+    expect(
+      model.regroup!(text, [["banner"], ["trackers", "focus"], ...apart.slice(1)], [], [])
+    ).toBeNull();
+    expect(model.regroup!(text, partition(...apart.slice(0, 6)), [], [])).toBeNull();
+    // NAMED TWICE AND ONE LOST, which counts right and is still wrong: without
+    // the second check this would write `todo` out twice and drop `capture`,
+    // giving two widgets one region.
+    expect(
+      model.regroup!(text, partition(...apart.slice(0, 6), ["todo"]), [], [])
+    ).toBeNull();
+  });
+
+  it("keeps a retitled field's own words, inside the group", () => {
+    const mine = text.replace("|Highlights", "|The good bits");
+    const out = model.regroup!(
+      mine,
+      partition(apart[0], ["highlights", "challenges"], ...apart.slice(3)),
+      [],
+      []
+    )!;
+    expect(out).toContain("|The good bits");
+    expect(out).not.toContain("|Highlights");
+  });
+
+  it("gives a field added afterwards a block of its own beside the group", () => {
+    // THE SAVE PATH, IN ITS OWN ORDER (see `SectionEditor.save`): `apply`
+    // decides which sections the note has, and `regroup` decides which of them
+    // share a fence. `apply` appends an added directive to the LAST fence of the
+    // band — which after a group is the row — so the regroup that runs after it
+    // is what keeps the newcomer out of the reader's group. This is the round
+    // trip the feature was most likely to get wrong.
+    const grouped = model.regroup!(
+      text,
+      partition(...apart.slice(0, 5), ["todo", "capture"]),
+      [],
+      []
+    )!;
+    const added = "w:tasks-table#1";
+    const applied = applyEntrySections(grouped, ctx, [
+      ...detectEntrySections(grouped, ctx),
+      added,
+    ]);
+    expect(applied).not.toBeNull();
+    const want = partition(...apart.slice(0, 5), ["todo", "capture"], [added]);
+    const final = model.regroup!(applied!, want, [], [])!;
+    const band = bandFences(final);
+    expect(band.length).toBe(3);
+    expect(band[1][0]).toBe("row");
+    expect(band[1].length).toBe(3);
+    expect(band[2].length).toBe(1);
+    expect(band[2][0]).toContain("tasks-table");
+    expect(model.blocks!(final).map((b) => b.ids)).toEqual(want);
+    // AND THE PLUGIN CAN STILL FIND IT. A fence with no field in it has nothing
+    // to CHOOSE it as part of the band — `sharesCatalogue` gives the widget tail
+    // no vote, on purpose — so without the abutting rule this write would have
+    // put a widget somewhere `detect` could not see: the editor would offer to
+    // add a second one and the first would sit there rendering.
+    expect(detectEntrySections(final, ctx)).toContain(added);
+    // …and it can be grouped like anything else, and let go of again.
+    const withField = model.regroup!(
+      final,
+      partition(...apart.slice(0, 4), ["attachments", added], ["todo", "capture"]),
+      [],
+      []
+    )!;
+    expect(bandFences(withField).length).toBe(3);
+    expect(bandFences(withField)[1][0]).toBe("row");
+    expect(bandFences(withField)[1][2]).toContain("tasks-table");
+    expect(model.regroup!(withField, want, [], [])).toBe(final);
+  });
+
+  it("does not adopt a fence that abuts the band and holds the reader's own words", () => {
+    // The other half of the abutting rule, and the one that keeps 3.0 §9's
+    // narrowing: a fence joins the band only when every line in it is the
+    // catalogue's. A pasted example has the reader's own words in it, so it
+    // stays theirs however close to the band it sits.
+    const pasted = text.replace(
+      "\n\n<!--chronoanvil:focus",
+      "\n\n```chronoanvil\ntasks-table\nsome example I pasted\n```\n\n<!--chronoanvil:focus"
+    );
+    expect(pasted).not.toBe(text);
+    expect(model.blocks!(pasted).map((b) => b.ids)).toEqual(partition(...apart));
+    // AND THE REGROUP LEAVES IT WHERE IT IS, because the band's span stops at
+    // the last fence that is the band's.
+    const out = model.regroup!(
+      pasted,
+      partition(...apart.slice(0, 5), ["todo", "capture"]),
+      [],
+      []
+    )!;
+    expect(out).toContain("```chronoanvil\ntasks-table\nsome example I pasted\n```");
+    expect(detectEntrySections(pasted, ctx)).not.toContain("w:tasks-table#1");
+  });
+
+  it("does not adopt a widget fence with a paragraph between it and the band", () => {
+    // Blank lines only. A reader who wrote between the band and their own fence
+    // has put something there that this must not rewrite around.
+    const apartFence = text.replace(
+      "\n\n<!--chronoanvil:focus",
+      "\n\nSomething I wrote.\n\n```chronoanvil\ntasks-table\n```\n\n<!--chronoanvil:focus"
+    );
+    expect(apartFence).not.toBe(text);
+    expect(detectEntrySections(apartFence, ctx)).not.toContain("w:tasks-table#1");
+    expect(model.blocks!(apartFence).map((b) => b.ids)).toEqual(partition(...apart));
+  });
+
+  // ── AND WHAT THE GROUP IS CALLED (1.0.42) ──────────────────────────────
+  //
+  // *"Diary groups do not have the choice for Title Header."* Every other
+  // surface titles a group with the opening SECTION'S bar; a band's fields
+  // title themselves on their own directives, so the bar over a group of them
+  // is a line nobody's form composes and it travels as `regroup`'s fifth
+  // argument instead.
+  const group = partition(...apart.slice(0, 5), ["todo", "capture"]);
+
+  it("writes a typed name as a `header:` bar under the row line", () => {
+    const out = model.regroup!(
+      text,
+      group,
+      [],
+      [],
+      new Map([["todo", "Evening review"]])
+    );
+    expect(out).not.toBeNull();
+    const band = bandFences(out!);
+    expect(band[1][0]).toBe("row");
+    // DIRECTLY UNDER THE `row` LINE, which is where `rowRuns` composes a titled
+    // row and where `readBand` will look for it.
+    expect(band[1][1]).toBe("header:Evening review");
+    expect(band[1][2]).toContain("tasks:todo");
+    expect(band[1][3]).toContain("note:capture");
+    // AND THE CELLS KEEP THEIR OWN NAMES. `fenceTitled && soleField` takes a
+    // field's head away only where it is ALONE under the bar, and a group has
+    // two by definition — the bar names the group, the cards name themselves.
+    expect(band[1][2]).toContain("|Tasks");
+    // AND NOT ONE LINE OF THE READER'S WRITING MOVED.
+    const from = (t: string): string => t.slice(t.indexOf("<!--chronoanvil:focus"));
+    expect(from(out!)).toBe(from(text));
+  });
+
+  it("reads the name back on the block, and takes it away again", () => {
+    const named = model.regroup!(
+      text,
+      group,
+      [],
+      [],
+      new Map([["todo", "Evening review"]])
+    )!;
+    const blocks = model.blocks!(named);
+    expect(blocks.map((b) => b.ids)).toEqual(group);
+    expect(blocks[blocks.length - 1].title).toBe("Evening review");
+    // ABSENT IS NOT AN EMPTY TITLE. Every other block reports no `title` at all
+    // rather than "", so a caller can tell *has no bar* from *has a blank one*.
+    expect(blocks[0].title).toBeUndefined();
+    // AND AN EMPTY MAP CLEARS IT, which is how the tick unticks: `regroupBand`
+    // is handed the whole map, so omitting a key removes the bar.
+    const bare = model.regroup!(named, group, [], [], new Map())!;
+    expect(bandFences(bare)[1]).not.toContain("header:Evening review");
+    expect(model.blocks!(bare)[model.blocks!(bare).length - 1].title).toBeUndefined();
+  });
+
+  it("leaves a written name alone when nobody asks about titles", () => {
+    // `pages`' CONVENTION: absent means *leave it*, not *clear it*. Every caller
+    // that only rearranges — `layoutOps` before the control existed, a weld —
+    // would otherwise strip a bar the reader typed.
+    const named = model.regroup!(
+      text,
+      group,
+      [],
+      [],
+      new Map([["todo", "Evening review"]])
+    )!;
+    // The same partition, no titles argument at all: nothing to do, so null.
+    expect(model.regroup!(named, group, [], [])).toBeNull();
+  });
+
+  it("gives no name to a block of one, and refuses a blank one", () => {
+    // A ROW OF ONE IS NOT A ROW, so it is not a group and has no name — and a
+    // `header:` over a single field would be read by `fenceTitled && soleField`
+    // as that FIELD'S title, taking its own head away.
+    expect(
+      model.regroup!(text, partition(...apart), [], [], new Map([["todo", "Evening"]]))
+    ).toBeNull();
+    // AND TICKED-AND-EMPTY IS NOT AN ANSWER. A blank writes no bar, which is
+    // what `blockNames` in the editor agrees with by leaving the key out.
+    const blank = model.regroup!(text, group, [], [], new Map([["todo", "   "]]))!;
+    expect(bandFences(blank)[1].some((l) => l.startsWith("header:"))).toBe(false);
+  });
+
+  it("carries the name through an ungroup and back", () => {
+    const named = model.regroup!(
+      text,
+      group,
+      [],
+      [],
+      new Map([["todo", "Evening review"]])
+    )!;
+    // Broken up, the bar goes with the group — and the file is the one the
+    // composer wrote, byte for byte, exactly as the untitled round trip is.
+    const back = model.regroup!(named, partition(...apart), [], [])!;
+    expect(back).toBe(text);
+  });
+
+  // ── AND A GROUP TAKES WIDGETS ONLY (1.0.42) ────────────────────────
+  //
+  // *"Sections are being allowed to be placed into groups. As you can see
+  // they're not rendering as widgets. Disable the link icons and reject cards
+  // with the section flag, only allow widgets."* The screenshot is a row whose
+  // first cell wears a full title bar and a chevron, with the cell under it
+  // shoved out of shape. 4.12 §A has said a section that draws its own title bar
+  // is not a column since 4.12; this surface was the one place it was not asked.
+  const plain = composeEntryTemplate("daily");
+
+  it("offers no column on an entry whose fields all draw their own bars", () => {
+    // WHICH IS WHAT DISABLES THE LINK ICON, and with the right sentence: the
+    // window reads `column` off the file and `whyNotColumn` says *draws its own
+    // title bar* for a field that is `placed` and not a column.
+    for (const b of model.blocks!(plain)) expect(b.column).toEqual([]);
+    // AND `loose` IS UNTOUCHED. Take out of the group is the control that
+    // repairs a note already holding such a row, so it must stay live.
+    for (const id of fields) {
+      expect(model.blocks!(plain).find((b) => b.ids.includes(id))?.loose).toContain(id);
+    }
+  });
+
+  it("refuses to write a group holding a field that draws its own bar", () => {
+    // THE SAME RULE WHERE THE WRITE CAN SEE IT. The editor refuses the join
+    // already; a fence composed with a titled field in it is a file the renderer
+    // draws wrong, so the model must not compose one however it is asked.
+    expect(
+      model.regroup!(plain, partition(...apart.slice(0, 5), ["todo", "capture"]), [], [])
+    ).toBeNull();
+    // ONE IS ENOUGH TO REFUSE THE ROW. A group is columns side by side and the
+    // one wearing a head is the one with no room for it.
+    const half = shown(plain).replace(
+      "note:capture#collapse#widget:",
+      "note:capture#collapse:"
+    );
+    expect(half).not.toBe(shown(plain));
+    expect(
+      model.regroup!(half, partition(...apart.slice(0, 5), ["todo", "capture"]), [], [])
+    ).toBeNull();
+  });
+
+  it("still takes a hand-written one apart", () => {
+    // THE WAY OUT OF THE SCREENSHOT. A row already holding a titled field is
+    // refused as a group and is still READ as one — so the window draws the card,
+    // **Take out of the group** is live on every cell, and the partition that
+    // ungroups it is written.
+    const grouped = model.regroup!(
+      text,
+      partition(...apart.slice(0, 5), ["todo", "capture"]),
+      [],
+      []
+    )!;
+    const bad = grouped.replace("tasks:todo#widget|Tasks", "tasks:todo|Tasks");
+    expect(bad).not.toBe(grouped);
+    expect(model.blocks!(bad).map((b) => b.ids)).toEqual(
+      partition(...apart.slice(0, 5), ["todo", "capture"])
+    );
+    // It cannot be kept as a group…
+    expect(
+      model.regroup!(bad, partition(...apart.slice(0, 5), ["todo", "capture"]), [], [])
+    ).toBeNull();
+    // …and it comes apart into blocks of one.
+    const out = model.regroup!(bad, partition(...apart), [], [])!;
+    expect(model.blocks!(out).map((b) => b.ids)).toEqual(partition(...apart));
+  });
+
+  it("refuses a `header:` written anywhere but under a row line", () => {
+    // Over the WHOLE band it would title all seven fields at once, which is the
+    // head `fieldBand` exists to keep off one. Left alone rather than rewritten.
+    const over = text.replace(
+      "```chronoanvil\nnote:focus",
+      "```chronoanvil\nheader:Today\nnote:focus"
+    );
+    expect(over).not.toBe(text);
+    expect(model.blocks!(over).map((b) => b.ids)).toEqual(partition());
+    expect(model.regroup!(over, partition(...apart), [], [])).toBeNull();
   });
 });

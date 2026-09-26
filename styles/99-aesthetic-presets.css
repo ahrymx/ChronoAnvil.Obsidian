@@ -40,7 +40,6 @@
   --ca-grain-spine: var(--ca-grain-monthly);
 }
 
-[data-ca-quarterly="quarterly"],
 [data-ca-grain="quarterly"],
 .ca-journal-page-head[data-ca-grain="quarterly"],
 .ca-vault-banner[data-ca-grain="quarterly"] {
@@ -66,6 +65,48 @@
   --ca-grain-accent-rgb: var(--ca-journal-accent-rgb);
   --ca-grain-tint: rgba(var(--ca-journal-accent-rgb), 0.08);
   --ca-grain-spine: var(--ca-journal-accent);
+}
+
+/* ── WHICH RUNG OF THE JOURNAL (1.0.42) ───────────────────────────────────
+
+   The block above binds a JOURNAL'S accent; this binds a RUNG'S mass. Same
+   file, same job — *"binding the tokens the head reads"* — and nothing here
+   paints.
+
+   ONE ATTRIBUTE, DELIBERATELY, AND THE SPECIFICITY IS THE POINT. `[data-ca-tier]`
+   weighs (0,1,0), and both intensity modifiers below weigh (0,1,1) because they
+   are a class on `body`. So Subtle and Monochrome keep winning over a rung's
+   tint exactly as they already win over a journal's — a reader who asked for
+   quiet does not get it undone by the note they opened. That is also why the
+   tint alpha is bound HERE and not set inline by `paintJournalRung` beside the
+   accent it is computed from: an inline style beats a class, and Monochrome
+   resets `--ca-journal-accent` for precisely that reason.
+
+   `--ca-grain-accent-rgb` AND NOT `--ca-journal-accent-rgb`, WHICH IS WHAT MADE
+   THIS ONE RULE SERVE BOTH DOMAINS (1.0.42). The diary carry-over is where that
+   mattered: a period dashboard has a rung and no journal accent, so reading the
+   journal token here resolved to nothing, and `--ca-grain-tint` became the
+   guaranteed-invalid value — every dashboard would have lost its wash outright.
+   The grain token is set by all six binding blocks above AND by Monochrome, so
+   it is the one every page that can reach this rule already has. The first
+   spelling was the journal round's blind spot, not a preference.
+
+   THE TWO FACTORS AND THE TINT, AND NOTHING ELSE. The film's density and the
+   glyph are unconditional in `98-page-head.css`, gated only by whether there is
+   a glyph — same rule, one file over.
+
+   `--ca-tier-t` IS READ WITH A FALLBACK BECAUSE IT IS SET FROM TYPESCRIPT, and
+   `tokens.test.ts` requires the pair: not in `00-tokens.css`, always read with a
+   fallback. A head with no rung reads 0, which lands every one of these three on
+   the value the token file already holds — so a diary entry, the Homepage and a
+   stray note under a journal root are unchanged to the pixel. */
+[data-ca-tier] {
+  --ca-head-spine-k: calc(1 - 0.5 * var(--ca-tier-t, 0));
+  --ca-head-title-k: calc(1 - 0.3 * var(--ca-tier-t, 0));
+  --ca-grain-tint: rgba(
+    var(--ca-grain-accent-rgb),
+    calc(0.1 - 0.07 * var(--ca-tier-t, 0))
+  );
 }
 
 /* --- Grain Intensity Modifiers ------------------------------- */

@@ -718,8 +718,24 @@
  * the horizontal inset the writing has (so the table lines up with the text
  * around it instead of sitting on the border), no margin of its own, and
  * `flow-root` so the table's margins land inside the card rather than cutting
- * it — the same containment the base rule gives a line. */
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block) {
+ * it — the same containment the base rule gives a line.
+ *
+ * ── AND DISPLAY MATHS IS THE SECOND ONE (1.0.41) ───────────────────────
+ *
+ * *"ChronoAnvil's Prose blocks need to support LaTeX."* A `$$` block is
+ * mounted exactly as a table is — `div.math.math-block.cm-embed-block`, per
+ * the editor's own DOM — so it came back through the same hole, and a cheat
+ * sheet that is mostly equations was mostly hole.
+ *
+ * IT JOINS THE TABLE'S SELECTOR LIST RATHER THAN RESTATING IT, which is this
+ * file's standing rule about "exactly the same" (see the prose surface above):
+ * two rules with matching declarations is how a card stops matching a card, at
+ * the first change to a border colour that only one of them gets. Everything
+ * the table asks for, a `$$` block wants for the same reason — the side
+ * borders, the writing's own inset, no margin of its own, and `flow-root` so
+ * MathJax's margins land inside the card instead of cutting it. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block),
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.math-block:has(~ .cm-line.ca-prose-block) {
   background: var(--background-secondary);
   border-left: 1px solid var(--ca-border-subtle);
   border-right: 1px solid var(--ca-border-subtle);
@@ -746,13 +762,63 @@
    rounds spent treating it as a specificity fight: the rule matched,
    `display: flow-root` applied, and both paddings said 0. The widget carries
    the prose value itself, phone width included. */
-.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block) {
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block),
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.math-block:has(~ .cm-line.ca-prose-block) {
   --ca-sec-pad-x: 20px;
 }
 @container (max-width: 460px) {
-  .markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block) {
+  .markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block),
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.math-block:has(~ .cm-line.ca-prose-block) {
     --ca-sec-pad-x: 14px;
   }
+}
+
+
+/* ── AN EQUATION WIDER THAN THE CARD SCROLLS INSIDE IT (1.0.41) ──────────
+ *
+ * *"ChronoAnvil's Prose blocks need to support LaTeX."* The report came with a
+ * reading-mode screenshot of a `\begin{aligned}` block leaving the card at the
+ * right border and carrying on across the page behind it — past the side
+ * border, past the note's own text column, off the window.
+ *
+ * MATHJAX DOES NOT WRAP, and cannot be asked to: line breaking is a MathJax
+ * configuration Obsidian does not expose, so an equation is one unbreakable
+ * box as wide as it needs to be. Nothing about that is the surface's fault.
+ * What IS the surface's fault is that the box escaped it: a card is a claim
+ * that what is inside it is inside it, and one with a row of algebra hanging
+ * out of the side is the claim failing in the one place a reader is looking.
+ *
+ * SO WIDE CONTENT SCROLLS INSIDE ITSELF, which is 99-time-grid.css's rule for
+ * the week grid arriving at the one other widget in this plugin that cannot be
+ * made narrower. BOTH AXES ARE NAMED, for that file's reason: `overflow-x`
+ * alone makes the other axis scroll by accident, at whatever height the
+ * content happens to be. A maths box's height IS its content's — MathJax
+ * measures it — so the vertical answer is `hidden` rather than a cap.
+ *
+ * ON THE MATHS BLOCK AND NOT ON THE SURFACE, which is the difference between
+ * scrolling an equation and scrolling the card. `overflow` on a member block
+ * would also clip what is allowed to leave it: the section frame's hover
+ * controls sit outside their block, and a card that scrolled would take the
+ * whole run's writing with it.
+ *
+ * BOTH SURFACES, BECAUSE A `note:` FIELD HOLDS THE READER'S MARKDOWN TOO. This
+ * is not prose's problem wearing a wider hat — a field region renders the same
+ * `$$` the same way, inside a section card with the same borders.
+ *
+ * AND THREE SPELLINGS OF ONE ELEMENT, because the class lands somewhere
+ * different in each mode. Reading mode hands the post-processor the block
+ * Obsidian wrapped the maths in, so the surface class is on the PARENT of
+ * `.math-block` on a note whose equation shares a block, and ON it where the
+ * equation is the block. Live Preview mounts it as a sibling widget of the
+ * lines — the same container the rule above paints — so it is named there by
+ * the selector that already reaches it. */
+.ca-journal-sec-block .math-block,
+.ca-journal-sec-block.math-block,
+.ca-prose-block .math-block,
+.ca-prose-block.math-block,
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.ca-prose-block ~ .cm-embed-block.math-block:has(~ .cm-line.ca-prose-block) {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 

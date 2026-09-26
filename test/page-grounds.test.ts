@@ -16,7 +16,7 @@
 // way: dead CSS nobody can reach.
 
 import { describe, expect, it } from "vitest";
-import { readSrc, styleSheets } from "./sources";
+import { cssRule, readSrc, styleSheets } from "./sources";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import {
   PAGE_GROUNDS,
@@ -161,12 +161,68 @@ describe("the shared film, which is what makes a pattern a surface", () => {
     // Obsidian paints the reading view, the editor and the scroller, and each
     // of the three presets paints one as well. Any one left opaque hides the
     // ground completely.
+    // ── AND THE TINT NEEDS IT TOO (1.0.42) ───────────────────────────────
+    //
+    // The accent wash is the leaf's own `background-image`, so an opaque reading
+    // view above it hides it exactly as it hid the films. `:is()` was the one
+    // edit that keeps this a single list — and the specificity note in the test
+    // below is why it is safe: both arguments are a single class, so every
+    // selector stays at the (0,4,1) that out-weighs the presets.
+    const gate = `body:is(.${PAGE_GROUND_MARKER}, .ca-tinted-ground)`;
     for (const surface of SURFACES) {
-      expect(css, surface).toContain(
-        `body.${PAGE_GROUND_MARKER} ${LEAF} ${surface}`
-      );
+      expect(css, surface).toContain(`${gate} ${LEAF} ${surface}`);
     }
     expect(css).toContain("background-color: transparent");
+  });
+
+  // ── THE ACCENT WASH (1.0.42) ──────────────────────────────────────────
+  //
+  // *"same banner style and background theme make it difficult to quickly gather
+  // what kind of page you're on."* The wash is the background half of that
+  // report, and it is the half that needed no new plumbing: `vault-banner.ts`
+  // already stamps the rung on the leaf, and a custom property inherits.
+
+  it("washes the ground with the note's own accent, on its own switch", () => {
+    const rule = cssRule(
+      `body.ca-tinted-ground ${LEAF}[data-ca-surface]`
+    );
+    expect(rule).toContain("var(--ca-grain-accent-rgb)");
+    // ITS OWN CLASS, NOT A `ca-ground-*` NAME. `PAGE_GROUND_CLASSES` is built
+    // from the ground and strength tables, so a class inside that family is
+    // removed by nothing until a texture called "tint" is added and it is
+    // removed by everything.
+    expect(PAGE_GROUND_CLASSES).not.toContain("ca-tinted-ground");
+    // GATED ON `[data-ca-surface]`, which is the attribute that means "this
+    // plugin recognised this note". A markdown leaf holding somebody else's note
+    // has no accent to read and must not be tinted with the vault's.
+    expect(rule).not.toBe("");
+    // AND IT FADES WITH DEPTH, off the same `--ca-tier-t` the head reads. This is
+    // the half of the report that was about scrolling PAST the banner, so the
+    // depth channel cannot stop at the banner. Fallback 0, so a recognised note
+    // with no rung keeps the flat value.
+    expect(rule).toContain("var(--ca-tier-t, 0)");
+    // `--ca-grain-accent-rgb` IS WHY THE DIARY NEEDED NOTHING HERE: all six
+    // binding blocks set it, so a dashboard's amber and a Topic's magenta arrive
+    // by one token.
+    expect(rule).not.toContain("--ca-journal-accent");
+  });
+
+  it("is independent of the texture being on at all", () => {
+    // Two questions, two settings: whether there is a pattern behind a note, and
+    // whether a note's background says which note it is. A reader with the
+    // ground Off still gets the wash, which is why the class is applied outside
+    // the `ground !== "off"` branch.
+    const src = readSrc("ui/appearance");
+    const off = src.indexOf('if (ground !== "off")');
+    const add = src.indexOf("body.addClass(TINT_CLASS)");
+    expect(off).toBeGreaterThan(0);
+    // OUTSIDE that branch, not inside it — which is what the ordering shows,
+    // since the branch is one statement and closes before this.
+    expect(add).toBeGreaterThan(off);
+    expect(src).toContain("body.removeClass(TINT_CLASS)");
+    expect(src).toContain('const TINT_CLASS = "ca-tinted-ground"');
+    // And it is cleared on unload with the rest of the body classes.
+    expect(src.slice(src.indexOf("unload()"))).toContain("TINT_CLASS");
   });
 
   it("out-weighs every preset rule that paints the same surface", () => {

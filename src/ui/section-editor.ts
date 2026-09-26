@@ -74,6 +74,7 @@ import {
   fieldLabelOf,
   cellMoveOps,
   idsOf,
+  blockTitleOps,
   pageBreakOps,
   questionIsRequired,
 } from "../core/section-model";
@@ -198,6 +199,64 @@ export interface SectionEditorSpec {
   arrangement?: ArrangementSink;
 }
 
+// ── WHETHER A ROW IS A SECTION OR A WIDGET, IN ONE PLACE (1.0.42) ────
+//
+// THE PILL, THE TWO ROW CLASSES AND NOTHING ELSE — but those three had drifted
+// from the control that decides the same thing, which is what makes this worth
+// being a function with a name rather than three lines inside a render method.
+//
+// THE ORDER IS THE ARGUMENT:
+//
+//   A FIXED ROW IS NEITHER. `movable: false` is a banner or a grid welded into
+//   one: not a thing a reader arranges, so a word about how it is arranged is a
+//   word about something they cannot act on.
+//
+//   AN ANSWERED FORM QUESTION WINS. *Show as widget* is the reader saying which
+//   of these two words applies, and a pill that disagreed with the box six
+//   pixels below it is the report this came from.
+//
+//   OTHERWISE THE FILE ANSWERS. A section with no form question still has a
+//   shape: a fence `widgetRun` calls a column, or one welded inside another
+//   block, has no head of its own — which is the same question the form asks,
+//   read off the arrangement rather than off a control. This is what every
+//   surface used to use for every row, and it is right for the rows that have
+//   nothing else to say.
+export function rowForm(row: {
+  fixed: boolean;
+  // The form answer, or null where the section has no form question.
+  widgetForm: boolean | null;
+  column: boolean;
+  joined: boolean;
+}): "Section" | "Widget" | null {
+  if (row.fixed) return null;
+  if (row.widgetForm !== null) return row.widgetForm ? "Widget" : "Section";
+  return row.column || row.joined ? "Widget" : "Section";
+}
+
+// Whether the cells of a group SHARE ONE BAR, which is the premise behind every
+// rule this window has about a group's title. 1.0.42.
+//
+// A row fence carries exactly one bar and the OPENING cell composes it, so on
+// every surface that titles a section with a `header:` line the opener's form
+// answer is the group's — which is why the opener's box moves to the card, why
+// the cells after it are ticked and disabled, and why the pill over them reads
+// *Widget* whatever the file says.
+//
+// A TITLED FORM BREAKS THAT PREMISE RATHER THAN BENDING IT (see
+// `FormQuestion.titled`). A diary entry's fields each carry their own title on
+// their own directive, so a row of two fields is two heads inside two cells and
+// every cell answers for itself. Left at the fence rule, the second field of a
+// group the reader had just made showed a ticked, disabled **Show as widget**
+// over a file that says section, and its pill agreed with the box rather than
+// with the note.
+//
+// ONE FUNCTION FOR THE THREE PLACES THAT ASK, because a row's box, a card's box
+// and a row's pill disagreeing is the defect this replaces rather than a risk it
+// runs.
+export function sharesOneBar(q: FormQuestion): boolean {
+  return q.titled !== true;
+}
+
 export class SectionEditorModal extends EditorModal {
   // What the file had when the window opened, the display order now, and which
   // of those rows the reader actually wants.
@@ -272,6 +331,30 @@ export class SectionEditorModal extends EditorModal {
   // asks one question, disables one button and says one sentence.
   private column = new Set<string>();
 
+  // Which rows the surface hands the editor an ARRANGEMENT for at all (1.0.42).
+  //
+  // `column`'s SIBLING AND NOT ITS SYNONYM. That one says "the file's blocks
+  // were read and this section is not the kind of thing a column is"; this says
+  // "the model put this section in no block, so there is no question to ask".
+  //
+  // WHY IT EXISTS RATHER THAN THE WINDOW GUESSING. `column` being false was made
+  // to carry one sentence, and the sentence names the FIRST of the refusals
+  // `BlockView.column` collapses: *"this section draws its own title bar"*. Of a
+  // diary entry's Tasks and Captured — drawn as widgets, wearing no bar at all —
+  // it was false twice over, and a vault asked the obvious question: *"unable to
+  // group tasks and captured log even though they're widgets?"* The same false
+  // sentence was shown to a staged row in 4.53.0 and fixed by re-reading the
+  // caps; this is the other half of it, where the caps are right and the reason
+  // is a different one.
+  //
+  // WHAT ANSWERS NO HERE, NOW THAT THE ENTRY'S BAND IS BOUND. The band is read
+  // as blocks since the release that found this (`bandBlocks`), so a field is
+  // normally placed and normally groupable. It falls out of every block when the
+  // band holds something the model cannot re-emit — the reader's own directive, a
+  // `height:` line, a paragraph between two of the rows — which `readBand` states
+  // in full and refuses whole rather than rearranging around.
+  private placed = new Set<string>();
+
   // Which rows begin a PAGE of their group rather than a column of the page
   // before it — 4.34.2, and the `tab` lines the fence already carries.
   //
@@ -307,6 +390,26 @@ export class SectionEditorModal extends EditorModal {
   //
   // READ WHERE `joined` AND `paged` ARE READ, from the file the window opened.
   private stacked = new Set<string>();
+
+  // What each group is CALLED, where the reader typed it — 1.0.42.
+  //
+  // THE FOURTH THING AN ARRANGEMENT CARRIES, and the first that is not a bit.
+  // *"Diary groups do not have the choice for Title Header."* Every other
+  // surface titles a group with the OPENING SECTION'S own bar, so the answer
+  // travels as that section's form answer and this window stores nothing; a
+  // diary entry's fields each title themselves on their own directive, so a bar
+  // over the group is a line no form composes and the words have to be kept
+  // here.
+  //
+  // KEYED BY OPENER, WHERE THE OTHER THREE ARE KEYED BY MEMBER, because this is
+  // a fact about the BLOCK rather than about a row in it. It is read back
+  // through `groupsOf` at the write for exactly the reason `pageBreaks` is: a
+  // group broken up has no name, and a key left in this map would otherwise
+  // hand it to whatever opens there next.
+  //
+  // ABSENT IS NOT EMPTY. No key means this group has no bar; `regroupBand` is
+  // handed the whole map, so omitting a key is how a reader unticks one.
+  private blockTitles = new Map<string, string>();
 
   constructor(app: App, plugin: ChronoAnvilPlugin, private spec: SectionEditorSpec) {
     super(
@@ -355,6 +458,10 @@ export class SectionEditorModal extends EditorModal {
       // would open on a paged group showing one undivided list, and the first
       // Save would flatten every page the reader had made.
       for (const id of block.pages ?? []) this.paged.add(id);
+      // AND WHAT THE READER ALREADY CALLED IT (1.0.42). The same reason as the
+      // pages above: opened on a titled group and left unread, the first Save
+      // would take the bar away.
+      if (block.title) this.blockTitles.set(block.ids[0], block.title);
     }
   }
 
@@ -598,6 +705,29 @@ export class SectionEditorModal extends EditorModal {
     );
   }
 
+  // What each group is called, across the whole arrangement — what `regroup` is
+  // handed. 1.0.42.
+  //
+  // `pageBreaks`' SHAPE EXACTLY, FILTERED THROUGH THE SAME WALK. A row that
+  // stopped being part of a group stops being a page break with it, and a group
+  // that stopped being a group stops having a name with it: the map is rebuilt
+  // from the blocks the write will make, so a key for a card the reader broke up
+  // is simply never asked for.
+  //
+  // AND A BLOCK OF ONE IS NOT A GROUP. `regroupBand` refuses a bar over a single
+  // field on its own account — the fence would read as that field's title and
+  // take its head away — and leaving the key out here is how the pane's dry run
+  // agrees with it rather than reporting a title the write declines to make.
+  private blockNames(ids: readonly string[]): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const group of this.groupsOf(ids)) {
+      if (group.length < 2) continue;
+      const title = this.blockTitles.get(group[0]);
+      if (title && title.trim()) out.set(group[0], title.trim());
+    }
+    return out;
+  }
+
   // What the file this arrangement would write can be asked to do — read fresh,
   // once per draw. 4.53.0.
   //
@@ -621,11 +751,16 @@ export class SectionEditorModal extends EditorModal {
   private readCaps(): void {
     this.loose = new Set();
     this.column = new Set();
+    this.placed = new Set();
     if (!this.model.blocks) return;
     const base = this.model.apply(this.spec.text, this.want) ?? this.spec.text;
     for (const block of this.model.blocks(base)) {
       for (const id of block.loose) this.loose.add(id);
       for (const id of block.column) this.column.add(id);
+      // EVERY MEMBER, NOT EVERY CAPABLE MEMBER — see `placed`. A section listed
+      // in a block has been given an arrangement and may still refuse a column;
+      // one that is in no block was never offered the question.
+      for (const id of block.ids) this.placed.add(id);
     }
   }
 
@@ -652,7 +787,8 @@ export class SectionEditorModal extends EditorModal {
       base,
       want,
       this.pageBreaks(idsOf(this.want)),
-      this.welds(idsOf(this.want))
+      this.welds(idsOf(this.want)),
+      this.blockNames(idsOf(this.want))
     );
     if (!next) return [];
     const openerIn = (text: string): Map<string, string> =>
@@ -712,6 +848,11 @@ export class SectionEditorModal extends EditorModal {
     // the reader had just pressed. `BlockView.pages` has carried the answer
     // since 4.34.2; nothing was asking it.
     ops.push(...pageBreakOps(was, now, label));
+    // AND WHAT THE GROUP IS CALLED, WHICH IS THE FIFTH (1.0.42) — same lesson,
+    // one control further on. A `header:` bar moves no section, no column and no
+    // page, so without this the reader ticks *Title header*, types a name, and
+    // the footer says "No changes".
+    ops.push(...blockTitleOps(was, now, label));
     return ops;
   }
 
@@ -1133,6 +1274,18 @@ export class SectionEditorModal extends EditorModal {
       (x): x is FormQuestion => x.kind === "form"
     );
     if (!q) return;
+    // AND NOT WHERE THE OPENER'S ANSWER IS ONLY ITS OWN (1.0.42). This control
+    // exists because a row fence's single bar is the opener's; a titled form
+    // writes a token on the opener's own directive, so a box here called *Title
+    // header* would promise a head over the group and deliver one field's.
+    //
+    // WHICH IS WHY THE OTHER BRANCH IS A DIFFERENT CONTROL AND NOT AN ABSENCE.
+    // A titled form means a diary entry's shared band, where the bar belongs to
+    // nobody and the reader has to supply the words — `renderTypedBlockTitle`.
+    if (!sharesOneBar(q)) {
+      this.renderTypedBlockTitle(bar, kept);
+      return;
+    }
 
     const wrap = bar.createDiv({ cls: "ca-tpl-form ca-tpl-block-form" });
     const box = wrap.createEl("input", {
@@ -1164,6 +1317,103 @@ export class SectionEditorModal extends EditorModal {
       );
       this.refreshFrame();
     });
+  }
+
+  // The same question where no section can answer it: a tick and a box of words.
+  // 1.0.42.
+  //
+  // *"Diary groups do not have the choice for Title Header, and it is missing
+  // the eyebrow header."* The eyebrow was a bug (see `widgets/index.ts`); this
+  // is the other half, and it is not a bug but a control that could not exist
+  // yet. Everywhere else a group's head is the OPENING SECTION'S bar, so the
+  // control above is a tick and the words come from the catalogue. A diary
+  // entry's fields each carry their title on their own directive, so the bar
+  // over a group of them is a line nobody's form composes — there is no
+  // catalogue wording to fall back on, and no section whose answer it could be.
+  //
+  // SO THE READER TYPES IT, AND THE TICK IS PRE-FILLED WITH THE CAPTION. Ticked
+  // and empty is not an answer: `regroupBand` writes no bar for a blank one, and
+  // the pane's dry run agrees by leaving the key out (`blockNames`). So ticking
+  // seeds the box with the words the card is ALREADY captioned with — the cells'
+  // own names joined by ` · `, which is what `layOutRow` builds — and a reader
+  // who wants that and nothing else is done in one press.
+  //
+  // THE CELLS KEEP THEIR OWN HEADS UNDER IT. A titled fence takes a field's head
+  // away only when that field is alone in it (`fenceTitled && soleField`), and a
+  // group has two or more by definition — so the bar names the group and the
+  // cards go on naming themselves, which is the look this was asked for.
+  private renderTypedBlockTitle(
+    bar: HTMLElement,
+    kept: readonly string[]
+  ): void {
+    // A BLOCK OF ONE IS NOT A GROUP, and this control is only ever drawn on a
+    // card's bar — but the bar is drawn for a run the list is showing, which can
+    // come down to one kept row while a struck-through one sits in it. `blockNames`
+    // refuses the same case at the write; refusing it here is what keeps the two
+    // from disagreeing on screen.
+    if (kept.length < 2) return;
+    const opener = kept[0];
+    const wrap = bar.createDiv({ cls: "ca-tpl-form ca-tpl-block-form" });
+    const box = wrap.createEl("input", {
+      type: "checkbox",
+      cls: "ca-tpl-form-box",
+    });
+    box.id = `ca-block-name-${opener.replace(/[^a-z0-9]+/gi, "-")}`;
+    const label = wrap.createEl("label", {
+      cls: "ca-tpl-form-label",
+      text: "Title header",
+    });
+    label.htmlFor = box.id;
+    const explanation = `Name this group. Untick to caption it from its cells instead.`;
+    box.title = explanation;
+    label.title = explanation;
+    box.setAttribute("aria-label", `Title header (${explanation})`);
+
+    const current = this.blockTitles.get(opener) ?? "";
+    box.checked = current.trim().length > 0;
+    const input = wrap.createEl("input", {
+      cls: "ca-tpl-block-name",
+      type: "text",
+    });
+    input.value = current;
+    input.placeholder = this.captionOf(kept);
+    input.hidden = !box.checked;
+    input.title = `What the bar over this group says`;
+    input.setAttribute("aria-label", `Group title`);
+
+    box.addEventListener("change", () => {
+      if (box.checked) {
+        // SEEDED, NOT LEFT BLANK. See above: a blank answer writes nothing, so a
+        // tick that left the box empty would be a control that did nothing until
+        // the reader typed — and the caption is what they were looking at.
+        this.blockTitles.set(opener, this.captionOf(kept));
+      } else {
+        this.blockTitles.delete(opener);
+      }
+      this.refreshFrame();
+    });
+    // ON `change`, NOT ON `input` — `renderFolderQuestion`'s rule, for its
+    // reason: every keystroke is not an answer, and repainting the frame under a
+    // cursor moves the field being typed into. Blur and Enter both fire this.
+    input.addEventListener("change", () => {
+      const said = input.value.trim();
+      if (said) this.blockTitles.set(opener, said);
+      else this.blockTitles.delete(opener);
+      this.refreshFrame();
+    });
+  }
+
+  // What this group is called when nobody named it: its cells' own names, in
+  // order, joined the way the card itself joins them.
+  //
+  // ` · ` BECAUSE THE PARTS ARE PEERS — `layOutRow`'s wording and `layOutRow`'s
+  // separator, quoted here rather than re-decided, so the placeholder a reader
+  // is offered is the caption they are looking at.
+  private captionOf(kept: readonly string[]): string {
+    return kept
+      .map((id) => this.view(id)?.label ?? "")
+      .filter((t) => t.length > 0)
+      .join(" · ");
   }
 
   // Which rows this one may trade places with: the ones in its own band, in
@@ -1241,6 +1491,27 @@ export class SectionEditorModal extends EditorModal {
     );
   }
 
+  // Whether this row is drawn WITHOUT a head of its own, as its form question
+  // has been answered in this window or in the file — or null where it has no
+  // form question to answer. 1.0.42.
+  //
+  // `renderFormQuestion`'s OWN TWO BRANCHES, IN ITS ORDER, because the pill and
+  // the box must never disagree and the only way to guarantee that is to make
+  // the same decision rather than a matching one. The opener of a group is not
+  // a special case here, though it is there: its box moves to the card, and its
+  // ANSWER is still its own.
+  private drawnAsWidget(section: SectionView): boolean | null {
+    const q = (section.questions ?? []).find(
+      (x): x is FormQuestion => x.kind === "form"
+    );
+    if (!q) return null;
+    const block = blockOf(this.bandOf(section.id), this.joined, section.id);
+    if (sharesOneBar(q) && block.length > 1 && block[0] !== section.id) {
+      return true;
+    }
+    return this.shownAnswer(section, q) === WIDGET_FORM;
+  }
+
   private renderRow(host: HTMLElement, section: SectionView): void {
     const gone = this.removed.has(section.id);
     const isNew = !this.original.includes(section.id);
@@ -1253,14 +1524,44 @@ export class SectionEditorModal extends EditorModal {
     // discover on Save.
     const waiting = gone ? [] : this.unanswered(section.id);
 
-    const isSection = section.movable !== false && !this.column.has(section.id) && !this.joined.has(section.id);
-    const isWidget = !isSection && section.movable !== false;
+    // ── WHAT THE PILL SAYS, AND WHAT IT IS ASKING (1.0.42) ─────────────
+    //
+    // *"make the pill follow the form answer. Homepage already does this, make
+    // this standard"* — and the homepage did, by accident of arrangement rather
+    // than by asking: a flat note's widget-form section is barless, a barless
+    // fence is what `widgetRun` calls a column, and the column test below then
+    // reported "Widget". On a diary entry nothing about the FENCE changes when a
+    // field is drawn bare — the band is one fence either way — so the same test
+    // went on saying "Section" over a ticked **Show as widget**.
+    //
+    // SO THE ANSWER IS ASKED FOR DIRECTLY WHERE THERE IS ONE, and the column
+    // test is what answers for a section with no form question — which is the
+    // same question read off the file rather than off a control: a fence that is
+    // a column, or a section welded inside somebody else's block, has no head of
+    // its own either.
+    //
+    // AND IT AGREES WITH THE BOX BESIDE IT BY CONSTRUCTION. `drawnAsWidget`
+    // makes `renderFormQuestion`'s two decisions in the same order — a cell
+    // after the opener is always a widget, everything else is `shownAnswer` —
+    // so a row cannot show a pill its own control contradicts.
+    const drawn = rowForm({
+      fixed: section.movable === false,
+      widgetForm: this.drawnAsWidget(section),
+      column: this.column.has(section.id),
+      joined: this.joined.has(section.id),
+    });
+    const isSection = drawn === "Section";
+    const isWidget = drawn === "Widget";
 
-    const typePills: NonNullable<ListRowOptions["pills"]> = isSection
-      ? [{ text: "Section", tone: "accent" }]
-      : isWidget
-        ? [{ text: "Widget", tone: "muted" }]
-        : [];
+    const typePills: NonNullable<ListRowOptions["pills"]> =
+      drawn === null
+        ? []
+        : [
+            {
+              text: drawn,
+              tone: drawn === "Section" ? "accent" : "muted",
+            },
+          ];
 
     const statusPills: NonNullable<ListRowOptions["pills"]> = gone
       ? [{ text: "removing", tone: "off" }]
@@ -1591,8 +1892,7 @@ export class SectionEditorModal extends EditorModal {
           if (waiting.length > 0) {
             make.title = `Choose ${waiting[0].label} first — this section isn't being added yet, so there is nothing to group.`;
           } else if (!this.column.has(section.id)) {
-            make.title =
-              "This section draws its own title bar, so it can't be a column of a group — a group's columns each carry their own head. Add the widget on its own instead.";
+            make.title = this.whyNotColumn(section.id, "This section");
           } else if (open.length === 0) {
             // NAMED, AND THE NAME COMES FROM THE NEAREST ONE. With several
             // destinations all refusing, one example plus "every" is the
@@ -1602,10 +1902,13 @@ export class SectionEditorModal extends EditorModal {
               b.filter((x) => !this.column.has(x))
             );
             const who = this.view(stuck[0])?.label ?? stuck[0];
+            // NAMED, AND NAMED WITH THE RIGHT REASON. The "every" form used to
+            // state the title-bar refusal as a fact about a section it had only
+            // counted; both forms now ask the same helper the row itself asks.
             make.title =
               near.length > 1
-                ? `Every group here has a section that draws its own title bar — “${who}” is one — so none of them can hold a column beside it.`
-                : `“${who}” draws its own title bar, so it can't hold a column beside it. Move this section under a plain widget instead.`;
+                ? `Every group here has a section that can't be a column, so none of them can take one. ${this.whyNotColumn(stuck[0], `“${who}”`, true)}`
+                : this.whyNotColumn(stuck[0], `“${who}”`, true);
           }
           make.addEventListener("click", () => {
             void this.askJoin(band, section.id, open);
@@ -1680,6 +1983,47 @@ export class SectionEditorModal extends EditorModal {
   // NOTHING IS WRITTEN BY THIS. It settles an arrangement like every other
   // control here; Save is still the only thing that touches the file, so a
   // reader who picks the wrong group has the same undo they had before — Cancel.
+  // WHY A SECTION CANNOT BE A COLUMN, in the reader's words (1.0.42).
+  //
+  // `BlockView.column` collapses several refusals into one boolean, on the
+  // argument that the window "asks one question, disables one button and says
+  // one sentence". That holds while every section HAS a block — the sentence is
+  // then one of three true things and names the commonest. It stops holding
+  // where the model withholds the arrangement itself: a diary entry's seven
+  // fields are in no block at all, and the sentence told a reader their Tasks
+  // section drew a title bar it does not have. Two cases, two sentences, one
+  // place they are chosen.
+  //
+  // `dest` IS THE OTHER SIDE OF THE SAME FACT — this row cannot go in, or that
+  // block cannot take it — and the advice differs with it, so it is a parameter
+  // rather than a second pair of strings to keep in step.
+  private whyNotColumn(id: string, who: string, dest = false): string {
+    if (!this.placed.has(id)) {
+      return dest
+        ? `${who} shares its fence with lines this window did not write, so it can't hold a column beside it.`
+        : `${who} shares its fence with lines this window did not write — its own directive, or a modifier this window has no control for — so it can't be a column of a group. Rearranging around them would rewrite lines of the note by guesswork.`;
+    }
+    // ── AND WHERE A TICK WOULD FIX IT, SAY SO (1.0.42) ────────────────
+    //
+    // *"Disable the link icons and reject cards with the section flag, only
+    // allow widgets."* Disabling it is half a control: the reader is looking at
+    // a field they can turn into a column with one box on its own row, and the
+    // sentence below sends them to a widget they would have to go and find. A
+    // `titled` form is exactly the case where the bar is the section's OWN line,
+    // so the fix is on the row rather than elsewhere on the page.
+    const own = (this.view(id)?.questions ?? []).some(
+      (x) => x.kind === "form" && !sharesOneBar(x)
+    );
+    if (own) {
+      return dest
+        ? `${who} draws its own title bar, so it can't hold a column beside it. Tick “Show as widget” on it first.`
+        : `${who} draws its own title bar, so it can't be a column of a group — a group's columns each carry their own head. Tick “Show as widget” on it first.`;
+    }
+    return dest
+      ? `${who} draws its own title bar, so it can't hold a column beside it. Move this section under a plain widget instead.`
+      : `${who} draws its own title bar, so it can't be a column of a group — a group's columns each carry their own head. Add the widget on its own instead.`;
+  }
+
   private async askJoin(
     band: string[],
     id: string,
@@ -1999,9 +2343,47 @@ export class SectionEditorModal extends EditorModal {
     // is the answer to "does this group draw a head". It is drawn where the
     // object is, which is the card, and drawing it here as well would be two
     // controls writing one line.
-    if (block.length > 1 && block[0] === section.id) return;
+    // ── AND NEITHER BRANCH APPLIES TO A TITLED FORM (1.0.42) ────────────
+    //
+    // Both of them are about the one bar a row fence carries — see
+    // `sharesOneBar`. A field of a diary entry wears its own, on its own line,
+    // inside its own cell, so it answers for itself in a group exactly as it
+    // does out of one.
+    if (sharesOneBar(q) && block.length > 1 && block[0] === section.id) return;
 
-    if (block.length > 1) {
+    // ── AND A CELL OF A GROUP IS A WIDGET, WHICHEVER BAR IT WEARS (1.0.42) ──
+    //
+    // *"Sections are being allowed to be placed into groups. As you can see
+    // they're not rendering as widgets."* The other direction of the same
+    // defect: `bandBlocks` now keeps a titled field out of `column`, so the link
+    // icon refuses to make such a group — and a reader who groups two widgets
+    // and then unticks one of them would have arrived at the same row by the
+    // back door.
+    //
+    // ONE-WAY, AND THAT IS THE DESIGN RATHER THAN A LIMIT OF A CHECKBOX. Ticked
+    // is locked because untick is the move that breaks the row; UNTICKED IS LEFT
+    // LIVE, because a note that already holds such a row — hand-written, or
+    // written by the build this fixes — needs one control that repairs it, and
+    // ticking this is that control. Showing it ticked over a file that says
+    // section is the defect `sharesOneBar` was written for: the box would agree
+    // with the window and not with the note.
+    if (
+      !sharesOneBar(q) &&
+      block.length > 1 &&
+      this.shownAnswer(section, q) === WIDGET_FORM
+    ) {
+      box.checked = true;
+      box.disabled = true;
+      wrap.addClass("is-disabled");
+      const explanation =
+        "A group's columns are widgets — take this out of the group to give it a title bar again";
+      box.title = explanation;
+      label.title = explanation;
+      box.setAttribute("aria-label", `${q.widget} (${explanation})`);
+      return;
+    }
+
+    if (sharesOneBar(q) && block.length > 1) {
       box.checked = true;
       box.disabled = true;
       wrap.addClass("is-disabled");
@@ -2592,7 +2974,8 @@ export class SectionEditorModal extends EditorModal {
           base,
           this.groupsOf(idsOf(this.want)),
           this.pageBreaks(idsOf(this.want)),
-          this.welds(idsOf(this.want))
+          this.welds(idsOf(this.want)),
+          this.blockNames(idsOf(this.want))
         ) ?? null
       : null;
     const final = regrouped ?? next;

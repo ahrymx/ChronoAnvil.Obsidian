@@ -192,6 +192,9 @@ import {
   parseStack,
   parseTabs,
   parseWide,
+  FIELD_KEYWORDS,
+  hasToken,
+  WIDGET_TOKEN,
 } from "../../core/directive-grammar";
 import type { FrameValue } from "../../core/directive-grammar";
 import { layOutRow } from "./row";
@@ -200,6 +203,7 @@ import { tabHandle } from "./group-tabs";
 import {
   applyCardHeights,
   attachBlockHead,
+  buildHead,
   cardWidget,
   carryStamp,
   clearStamp,
@@ -528,7 +532,14 @@ const SECTION_TITLES: Record<string, string> = {
 //
 // MOVED ABOVE `blockTitle` IN 5.26.1, unchanged, because the head's own rule
 // now depends on it — see `fieldBand` directly below.
-const FIELD_KINDS = new Set(["note", "list", "path", "tasks", "attach", "recall"]);
+//
+// AND THE LIST ITSELF MOVED TO THE GRAMMAR IN 1.0.42, where its second reader
+// is: the diary's entry catalogue offers the section/widget toggle on exactly
+// these keywords, because a label is the whole of that question for a field and
+// for nothing else. `FIELD_KEYWORDS` states why it cannot be a table here with a
+// copy over there. The two predicates below are still this file's — they are
+// about a FENCE, which only the dispatcher can see.
+const FIELD_KINDS = FIELD_KEYWORDS;
 
 // ── IS THIS FENCE A BAND? (5.26.1) ────────────────────────────────────
 //
@@ -1233,7 +1244,29 @@ export class Widgets implements
       // in hand: the element and the directive `kind` that produced it. A pass
       // afterwards would be reading classes to guess at directives, which is the
       // shape `blockTitle` exists to avoid one level up.
-      const named: { el: HTMLElement; title: string }[] = [];
+      const named: {
+        el: HTMLElement;
+        title: string;
+        // ── AND WHETHER IT HAS ALREADY SAID IT (1.0.42) ───────────────
+        //
+        // A FIELD NAMES ITSELF, AND IS STILL A NAME THE GROUP'S CAPTION WANTS.
+        // `SECTION_TITLES` answers *what should the bar over this block say*
+        // and deliberately has no entry for a field — `fieldBand` says why —
+        // so a group of two fields walked this list, found nothing, and drew
+        // an empty strip where the homepage draws `TODAY · OPEN TASKS`. That
+        // was the whole of the report: *"it is missing the eyebrow header."*
+        //
+        // ONE LIST, BECAUSE THE CAPTION WANTS DOM ORDER. A second list beside
+        // this one would have to be interleaved with it to caption a row in
+        // reading order, which is the thing this list already is.
+        //
+        // AND THE FLAG IS WHAT KEEPS THE TWO OTHER READERS OFF IT. `cardWidget`
+        // hands a widget a card with a head on it, and the band branch below
+        // hangs a `fieldFrame` over one — both would be a second head on
+        // something that drew its own, which is the defect 5.14 removed and
+        // 5.26.1 removed again by the other door.
+        selfTitled?: true;
+      }[] = [];
 
       // The live hosts that drew a journal's note rows, for the foot's edit mode.
       //
@@ -1659,6 +1692,16 @@ export class Widgets implements
             container.appendChild(widget);
             if (SECTION_TITLES[kind]) {
               named.push({ el: widget, title: SECTION_TITLES[kind] });
+            } else if (FIELD_KINDS.has(kind)) {
+              // A FIELD'S NAME IS ITS OWN `|Title` — see `selfTitled` above and
+              // `fieldBand` for why there is nowhere else to read it from. Off
+              // the LINE rather than off `title` one function down: this loop
+              // is where the element and the directive are both in hand, which
+              // is the rule the whole list is kept by.
+              const own = line.slice(line.indexOf("|") + 1).trim();
+              if (line.includes("|") && own) {
+                named.push({ el: widget, title: own, selfTitled: true });
+              }
             }
           }
         } else {
@@ -1935,7 +1978,9 @@ export class Widgets implements
       // would have to find them again — the same sentence the comment above
       // already makes about `cardWidget` itself.
       if (rowSpec.row) {
-        for (const { el, title } of named) cardWidget(el, title);
+        for (const { el, title, selfTitled } of named) {
+          if (!selfTitled) cardWidget(el, title);
+        }
         applyCardHeights(container, rawLines);
         // AND WHERE THE READER LEFT IT, on a group that has pages (4.34 §4).
         //
@@ -2019,7 +2064,10 @@ export class Widgets implements
         // the stamp is taken against the children as they stand, and this moves
         // one into a wrapper. The stamp goes with it, so the block still knows
         // which line the thing a reader is looking at came from.
-        for (const { el, title } of named) {
+        for (const { el, title, selfTitled } of named) {
+          // A FIELD HAS ITS OWN FRAME ALREADY — see `selfTitled`. It is in this
+          // list for the group's caption and for nothing else.
+          if (selfTitled) continue;
           // ONLY THE BLOCK'S OWN CHILDREN. `nameTrackerGrid` already makes this
           // check for its own reason, and it is the same one: a widget drawn
           // into a period card or a header's actions slot is inside something
@@ -2755,12 +2803,41 @@ export class Widgets implements
     wearsActions = false
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
-    const label = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
+    const title = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
     const body = barIdx === -1 ? spec : spec.slice(0, barIdx);
 
     const colon = body.indexOf(":");
     const kind = colon === -1 ? body : body.slice(0, colon);
     const rest = colon === -1 ? "" : body.slice(colon + 1);
+
+    // ── A FIELD DRAWN AS A WIDGET WEARS ITS NAME ON A HOVER (1.0.42) ──
+    //
+    // *"The title header should appear with the mouse at the top-middle of
+    // widgets"*, with a screenshot of the homepage's Open tasks beside one of a
+    // diary entry's Captured: one pulls its name down over its top edge, the
+    // other drew the drag dots and nothing else.
+    //
+    // THE TWO FORMS OF A FIELD ARE TWO HEADS, NOT A HEAD AND NOTHING. A section
+    // wears a permanent bar with a chevron and a fold — `fieldHead`'s frame. A
+    // widget wears the band every widget on a dashboard wears: absolute, inert,
+    // opening on a hover of the top strip, with the grip. What made this look
+    // like an absence is that a field's name lives on its own line and the
+    // answer used to be written by CUTTING it, so by the time anything could
+    // draw a head there was no name left. `withFormTitle` keeps it now.
+    //
+    // HERE RATHER THAN IN `fieldHead`, and the seam is worth naming: that
+    // function builds a head INSIDE the field's own box — which is what a
+    // frame is — while this one is laid OVER that box's top edge, which is the
+    // box's business rather than the field's. Six renderers would have had to
+    // be told; the dispatcher already holds the line and the label.
+    //
+    // `label` GOES NULL FOR THE RENDERER, which is how it already draws no
+    // frame, so nothing below this changes and no renderer learns a new word.
+    const hood =
+      FIELD_KINDS.has(kind) && hasToken(spec, WIDGET_TOKEN)
+        ? title || null
+        : null;
+    const label = hood ? null : title;
 
     // `tracker:<id>` carries no inline args — its label defaults to the
     // one set in Settings → Trackers unless the note overrides it with
@@ -3216,6 +3293,16 @@ export class Widgets implements
         return buildBridgeReadingsRegion(this.plugin, rest, label, ctx);
       default:
         return null;
+    }
+
+    // THE HOVER HEAD, ON THE BOX THE FIELD BUILT. See `hood`, above — and
+    // note the order: this is the last thing done to the element and the first
+    // thing a reader meets on it, because `attachBlockHead` runs later still
+    // and 5.16's pairing needs the head to be there when the grip arrives.
+    if (widget && hood) {
+      buildHead(widget, hood);
+      widget.addClass("has-head");
+      widget.addClass("ca-journal-widget-field");
     }
 
     // Widgets that draw their own label are skipped here, or they'd get a

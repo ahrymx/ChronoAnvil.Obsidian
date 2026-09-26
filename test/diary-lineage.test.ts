@@ -16,12 +16,13 @@ import {
   entryPath,
   legacyEntryPath,
   grainFallbackName,
+  grainRung,
   graphParentName,
   periodStart,
 } from "../src/diary/lineage";
 import type { ContainingPeriod } from "../src/diary/lineage";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../src/trackers/trackers";
-import { DEFAULT_PATHS } from "../src/core/constants";
+import { DEFAULT_PATHS, DEFAULT_PAGE_EMOJI } from "../src/core/constants";
 import { graphLinksSection, setGraphLinks } from "../src/core/note-sections";
 import { composeEntryTemplate } from "../src/diary/entry-sections";
 import { moment } from "../src/core/util";
@@ -73,6 +74,55 @@ describe("what contains what", () => {
       g = CONTAINING_GRAIN[g];
     }
     expect(walked).toEqual(TRACKER_CLASSES);
+  });
+
+  // ── THE BANNER'S DEPTH RAMP (1.0.42) ──────────────────────────────────
+  //
+  // *"After it is done for Journals, it would make sense to also implement the
+  // same choice for the diary dashboards."* The journal half indexes a note over
+  // the journal's own levels and kinds; the diary's ladder is the table above,
+  // so `grainRung` walks it rather than restating it.
+  it("puts the year at the top of the ramp and the day at the bottom", () => {
+    expect(grainRung("yearly").step).toBe(0);
+    expect(grainRung("daily").step).toBe(TRACKER_CLASSES.length - 1);
+    // t is what the stylesheet ramps on, and it spans the full range so the
+    // outermost page is the boldest and the innermost the quietest.
+    expect(grainRung("yearly").t).toBe(0);
+    expect(grainRung("daily").t).toBe(1);
+    expect(grainRung("monthly").t).toBeCloseTo(0.5, 5);
+  });
+
+  it("orders the ramp by containment and not by TRACKER_CLASSES", () => {
+    // That list is ordered "shortest period first" FOR A DROPDOWN, which the
+    // comment above the table warns about by name. Reading an index into it
+    // would make a presentation choice load-bearing, so the rung counts
+    // containers instead — and this asserts the two orders are opposite, which
+    // is the shape a walk gets right and an index read gets backwards.
+    const steps = TRACKER_CLASSES.map((g) => grainRung(g).step);
+    expect(steps).toEqual([...steps].sort((a, b) => b - a));
+    // Every grain gets its own rung: five pages, five distinct marks.
+    expect(new Set(steps).size).toBe(TRACKER_CLASSES.length);
+  });
+
+  it("computes the ramp's length, so a sixth grain cannot land on a fifth", () => {
+    for (const grain of TRACKER_CLASSES) {
+      expect(grainRung(grain).of, grain).toBe(TRACKER_CLASSES.length);
+      // And the step is always inside it, which is what `t` being 0..1 needs.
+      expect(grainRung(grain).step).toBeLessThan(grainRung(grain).of);
+    }
+  });
+
+  it("carries the grain's own glyph, distinct from every other", () => {
+    const glyphs = TRACKER_CLASSES.map((g) => grainRung(g).emoji);
+    expect(new Set(glyphs).size).toBe(TRACKER_CLASSES.length);
+    for (const [i, grain] of TRACKER_CLASSES.entries()) {
+      expect(glyphs[i], grain).toBe(CLASS_DEFS[grain].emoji);
+      expect(glyphs[i], grain).not.toBe("");
+    }
+    // AND NOT THE JOURNAL PAGE'S GLYPH. One mark for two things three folders
+    // apart is the defect the whole feature exists to fix, and a week reading as
+    // a page of a journal would be exactly that.
+    expect(glyphs).not.toContain(DEFAULT_PAGE_EMOJI);
   });
 
   it("hands each period the date its own creator takes", () => {

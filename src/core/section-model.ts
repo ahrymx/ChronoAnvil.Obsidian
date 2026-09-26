@@ -57,7 +57,11 @@ import {
   renameSoleKeyword,
   soleArgSpanIn,
   spliceArg,
+  splitDirective,
   withFlagLine,
+  withLabel,
+  withToken,
+  WIDGET_TOKEN,
 } from "./directive-grammar";
 
 // ── operations ────────────────────────────────────────────────────────
@@ -578,6 +582,31 @@ export interface FormQuestion extends SectionQuestionCommon {
   // control is a checkbox, so `widget` is what ticking it means.
   section: string;
   widget: string;
+  // ── A FORM WHOSE BAR IS THE DIRECTIVE'S OWN LABEL (1.0.42) ──────────
+  //
+  // Everything above assumes the bar is a LINE in the section's fence, which is
+  // what a dashboard, a journal note and a flat note all compose: one section
+  // per fence, titled by a `header:` line above it.
+  //
+  // A DIARY ENTRY IS NEITHER, and the difference is structural rather than a
+  // spelling. Its shared band is ONE fence holding one directive per section —
+  // `note:focus…|Today's focus`, `list:highlights…|Highlights`, seven of them —
+  // and each titles itself from the `|Title` after it. So there is no line to
+  // add or remove: the fence's bar would title all seven, and `formOf`, which
+  // asks whether the FENCE carries a bar, answers for all seven at once.
+  //
+  // With this set, the form is read and written on the section's OWN LINE, and
+  // `bar` holds the title rather than a whole line. `FIELD_KEYWORDS` is the list
+  // of keywords this may be offered on and states why it is only those.
+  //
+  // THE ANSWER IS A `#widget` TOKEN ON THAT LINE, NOT THE ABSENCE OF THE TITLE.
+  // It was the absence for one build, and the vault report that ended it is in
+  // `withFormTitle`: a widget draws its name on a hover of its top edge
+  // everywhere else in the plugin, and a field's `|Title` is the only copy of
+  // that name there is. So both forms keep the title and differ by the token —
+  // the section wears it on a permanent bar, the widget on a band that opens
+  // where the hand already is.
+  titled?: true;
 }
 
 // A question answered with a LIST — one item per line — that is written into the
@@ -712,6 +741,24 @@ export interface FlagQuestion extends SectionQuestionCommon {
   // describe one that must not — and an empty string is only reachable behind
   // this field, which is the thing that is checked.
   derived?: true;
+  // ── A FLAG WHOSE ANSWER IS A `#token` ON ONE LINE (1.0.42) ──────────
+  //
+  // THE SAME WALL `FormQuestion.titled` HIT, ONE QUESTION ALONG. A modifier
+  // line is a fact about a FENCE, and a diary entry's shared band is one fence
+  // holding seven sections — so the Tasks field's *Compact* answer, written as
+  // a line, would have been written for Highlights and Captured too. The answer
+  // is a flag on the section's own directive instead, which is where the
+  // renderer reads it from and the only place that means this section.
+  //
+  // `after` NAMES THE LINE, which is the field it already means — "the keyword
+  // this answer is anchored to" — read here as the line that CARRIES the flag
+  // rather than the line it is written under. `line` is `""` and unreachable,
+  // on `derived`'s rule and for its reason.
+  //
+  // AND IT IS NOT A `choice` SPLICED INTO THE ARGUMENT. That argument is the
+  // body region the field owns; a question that wrote into it would be
+  // repointing the field at another region every time the box was ticked.
+  token?: string;
 }
 
 // The two answers a `FlagQuestion` takes, spelled as strings for
@@ -742,6 +789,110 @@ export function formQuestion(
     section: "Show as section",
     widget: "Show as widget",
   };
+}
+
+// The same question for a section that titles itself on its own line. 1.0.42.
+//
+// `directive` IS THE KEYWORD THE ANSWER IS WRITTEN ON, which for a field is the
+// section's own — `note`, `list`, `tasks`, `attach`. The ordinary builder above
+// names a SECOND directive (`header`) because the answer is a line beside the
+// section's; here the answer is part of the section's own line, so the two
+// meanings of the field coincide.
+//
+// `bar` IS THE TITLE, not a line — see `FormQuestion.titled`.
+export function titledFormQuestion(
+  keyword: string,
+  title: string
+): FormQuestion {
+  return {
+    kind: "form",
+    key: "form",
+    label: "how this is drawn",
+    directive: keyword,
+    bar: title,
+    titled: true,
+    section: "Show as section",
+    widget: "Show as widget",
+  };
+}
+
+// A titled form's write: the section's own line, with its label or without it.
+//
+// EXPORTED BECAUSE THE ADD PATH NEEDS IT TOO. `withAnswers` rewrites a line that
+// is already in the file; a section being ADDED has its line composed by its
+// catalogue, which knows nothing of this answer — so a reader who adds a field
+// and unticks it in the same Save would have the tick dropped in silence, which
+// is the failure `reconfigure` exists to end arriving by the other door.
+//
+// EXACTLY ONE LINE, OR NONE AT ALL. Two `note:` lines in one chunk are two
+// sections of the diary's shared band, and this cannot tell which one was asked
+// about — the entry write path hands over a single line, so the ambiguous case
+// is unreachable rather than handled. `renameSoleKeyword` refuses on the same
+// grounds: a write onto a guess is worse than no write.
+export function withFormTitle(
+  lines: readonly string[],
+  form: FormQuestion,
+  want: string
+): string[] {
+  if (!form.directive) return [...lines];
+  const at: number[] = [];
+  lines.forEach((l, i) => {
+    if (splitDirective(l).keyword === form.directive) at.push(i);
+  });
+  if (at.length !== 1) return [...lines];
+  const out = [...lines];
+  // ── THE TITLE STAYS ON DISK, WHICHEVER FORM IS ASKED FOR (1.0.42) ──
+  //
+  // THE FIRST ANSWER TO THIS WAS TO CUT THE LABEL, and a vault's screenshots
+  // said why that cannot be the whole of it: *"the title header should appear
+  // with the mouse at the top-middle of widgets."* A widget is not a nameless
+  // box anywhere else in this plugin — the homepage's cards pull their name
+  // down over their top edge, and `SECTION_TITLES` is where that name comes
+  // from. A field has no entry there; the `|Title` on its own line IS its
+  // catalogue name, instantiated. Cutting it is deleting the only copy.
+  //
+  // IT ALSO ATE THE READER'S OWN WORDING. A field retitled "The good bits" and
+  // then drawn as a widget came back as "Highlights" — the catalogue's word
+  // over the reader's — because the restore had nothing left to restore from.
+  //
+  // SO THE ANSWER IS A `#widget` TOKEN and the label is left alone: the same
+  // `#` grammar the Compact flag writes one function below, on the same head of
+  // the same argument, read back by `hasToken`. `withLabel` puts the
+  // catalogue's title back only where there is none — which is a line written
+  // by the build that did cut it, repaired on the next Save either way.
+  out[at[0]] = withToken(
+    withLabel(out[at[0]], form.bar),
+    WIDGET_TOKEN,
+    want === WIDGET_FORM
+  );
+  return out;
+}
+
+// A token flag's write: the section's own line, with the flag on or off.
+//
+// `withFormTitle`'s WALK, ITS REFUSAL AND ITS REASON. One line in the chunk
+// carries this section's keyword; two is the diary's band handed over whole,
+// and neither this nor the read can tell which of them was asked about. The
+// entry write path hands over a single line, so the ambiguous case is a guess
+// nobody has asked for rather than a case with an answer.
+//
+// THE READ IS `hasToken` ON THE SAME LINE, in `answersOn`, which is what makes
+// the round trip hold: the two agree because they ask the same line the same
+// question, not because two walks were written to match.
+export function withFlagToken(
+  lines: readonly string[],
+  flag: FlagQuestion,
+  on: boolean
+): string[] {
+  if (!flag.token || !flag.after) return [...lines];
+  const at: number[] = [];
+  lines.forEach((l, i) => {
+    if (splitDirective(l).keyword === flag.after) at.push(i);
+  });
+  if (at.length !== 1) return [...lines];
+  const out = [...lines];
+  out[at[0]] = withToken(out[at[0]], flag.token, on);
+  return out;
 }
 
 // Which form a fence is written in: it is a section if it titles itself.
@@ -1124,11 +1275,32 @@ export interface SectionModel {
   // the difference is not derivable from either file. Optional on `pages`' own
   // terms and for its reason: absent means "leave the arrangement alone", which
   // is not the same as an empty list, and a model with no stacks never sees it.
+  // `titles` NAMES THE BLOCKS THAT DRAW A HEAD OF THEIR OWN, keyed by the id
+  // that OPENS each one — 1.0.42, and the fifth thing a block can be asked.
+  //
+  // KEYED RATHER THAN POSITIONAL, which `pages` and `stacks` are not because
+  // they are per-SECTION facts and this is a per-BLOCK one. An index into
+  // `blocks` would be read against a partition the caller has just rewritten;
+  // the opener is what the window itself keys a group by, and it survives a
+  // reorder the way `paged`'s bit does.
+  //
+  // WHY IT EXISTS AT ALL, WHEN EVERY OTHER SURFACE ALREADY HAS GROUP TITLES.
+  // Theirs is the OPENING SECTION'S own `header:` bar, so the answer travels as
+  // that section's form answer and needs no channel — see `FormQuestion.bar`. A
+  // diary entry's fields carry their titles on their own directives (`titled`),
+  // so a bar over the group is a line nobody's form composes and there was
+  // nowhere for the reader's answer to go. *"Diary groups do not have the
+  // choice for Title Header."*
+  //
+  // Optional on `pages`' terms and for its reason: absent means "leave the
+  // titles alone", which is not the same as an empty map ("no block here has
+  // one"), and a model with no titles to write never reads it.
   regroup?(
     text: string,
     blocks: readonly (readonly string[])[],
     pages?: readonly string[],
-    stacks?: readonly string[]
+    stacks?: readonly string[],
+    titles?: ReadonlyMap<string, string>
   ): string | null;
 
   // ── WHAT THIS SECTION SAYS, AS PLAIN MARKDOWN (1.0.36) ────────────────
@@ -1208,6 +1380,19 @@ export interface BlockView {
   // a question about the FILE. The `stack` line is what a stack says about
   // itself, and a reader who typed one by hand has said it too.
   stack: boolean;
+  // What this block's own head says, where it draws one the window can change
+  // — 1.0.42, and `regroup`'s `titles` is the write to this read.
+  //
+  // ABSENT IS NOT AN EMPTY TITLE, and the distinction is the same one `pages`
+  // makes: absent means this surface does not offer a block a title of its own,
+  // so the window draws no control; an empty string never appears, because a
+  // `header:` with nothing after it titles nothing and is not a title.
+  //
+  // ONLY A DIARY ENTRY ANSWERS SO FAR. Everywhere else a group's head is the
+  // opening section's own bar and the window already reaches it through that
+  // section's form question — see `regroup`'s note, which is where the whole
+  // argument for this pair lives.
+  title?: string;
 }
 
 // ── answers, in the note ──────────────────────────────────────────────
@@ -1305,7 +1490,15 @@ export function withAnswers(
   const form = questions.find((q): q is FormQuestion => q.kind === "form");
   if (form && typeof options[form.key] === "string") {
     const want = options[form.key] as string;
-    if (want === WIDGET_FORM) {
+    // ── AND A TITLED FORM IS THE SAME ANSWER ON ONE LINE (1.0.42) ──────
+    //
+    // Taken first and returning, because everything below this branch is about
+    // a line BESIDE the section's: a fence's bar titles every directive under
+    // it, and the diary's shared band puts seven sections in one fence. See
+    // `FormQuestion.titled`.
+    if (form.titled) {
+      out = withFormTitle(out, form, want);
+    } else if (want === WIDGET_FORM) {
       out = out.filter(
         (l) =>
           !isHeaderLine(l) &&
@@ -1347,6 +1540,13 @@ export function withAnswers(
     if (flag.kind !== "flag" || flag.derived) continue;
     const want = options[flag.key];
     if (typeof want !== "string") continue;
+    // AND EXCEPT ONE WHOSE ANSWER IS A `#token` ON A LINE (1.0.42), which is a
+    // write to a line that is already there rather than a line in or out of the
+    // fence. See `FlagQuestion.token`.
+    if (flag.token) {
+      out = withFlagToken(out, flag, want === FLAG_ON);
+      continue;
+    }
     out = withFlagLine(out, flag.line, flag.after, want === FLAG_ON);
   }
   // A DIRECTIVE IS WRITTEN ONCE, HOWEVER MANY QUESTIONS ANSWER IT (4.16). Two
@@ -1705,6 +1905,48 @@ export function pageBreakOps(
           : `${name} joins the tab before it`,
       });
     }
+  }
+  return out;
+}
+
+// The group names an arrangement changes. 1.0.42.
+//
+// `pageBreakOps`' SIBLING, AND THE FIFTH PHASE OF `regroup` TO NEED ONE. The
+// footer disables Save at zero ops, so every write this pane can make has to be
+// visible to the dry run or the reader is told "No changes" over a control they
+// just used — the lesson 4.44.1 learned twice. A `header:` bar over a group
+// changes neither which block a section is in, nor which column, nor which page
+// opens where, so all four of the walks above return nothing for it.
+//
+// MATCHED BY MEMBERS, as its two siblings match, and for their reason: the row
+// that opens a block can move, so a block found under its own first id would not
+// find itself. A block whose MEMBERSHIP changed is a regroup and is named as one.
+//
+// REPORTED AGAINST THE OPENER, because the bar is one line over the whole card
+// and the opener is what the window keys a group by. Three transitions, since
+// the control is a tick and a box: named, renamed, and cleared.
+export function blockTitleOps(
+  before: readonly { ids: readonly string[]; title?: string }[],
+  after: readonly { ids: readonly string[]; title?: string }[],
+  label: (id: string) => string | undefined
+): SectionOp[] {
+  const key = (ids: readonly string[]): string => [...ids].sort().join("\u0000");
+  const was = new Map(before.map((b) => [key(b.ids), b.title]));
+  const out: SectionOp[] = [];
+  for (const block of after) {
+    if (!was.has(key(block.ids))) continue;
+    const prior = was.get(key(block.ids));
+    if ((prior ?? "") === (block.title ?? "")) continue;
+    const name = label(block.ids[0]);
+    if (name === undefined) continue;
+    out.push({
+      kind: "regroup",
+      sectionId: block.ids[0],
+      label: name,
+      detail: block.title
+        ? `${name}'s group is titled "${block.title}"`
+        : `${name}'s group loses its title bar`,
+    });
   }
   return out;
 }

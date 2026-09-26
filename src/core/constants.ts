@@ -419,6 +419,13 @@ export const HEADER_PREFIX = "header:";
 export const DEFAULT_SUBJECT_EMOJI = "📚";
 export const DEFAULT_TOPIC_EMOJI = "📂";
 
+// The glyph a PAGE carries, which is the one rung of a journal with no emoji of
+// its own: `JournalPages` holds an id, a label and a template and nothing to
+// draw with. Stated here beside the two level fallbacks rather than inline in
+// `journalRungOf`, because it is the same kind of fact and `📄 Pages` is already
+// the label the widget registry and the section catalogue print.
+export const DEFAULT_PAGE_EMOJI = "📄";
+
 // ── Trackers ───────────────────────────────────────────────────────────
 // Marker lines used to delimit the plugin-managed region inside the daily
 // template's frontmatter block and its ```chronoanvil widget block. Both are

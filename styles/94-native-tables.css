@@ -438,6 +438,51 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+/* ── THE THREE RULES THAT MOVED HERE (1.0.42) ──────────────────────────
+ *
+ * `ca-journal-task-prio-icon` and `ca-journal-task-at-wrap` were base rules in
+ * 75-home-dashboard.css, shared between the per-note task WIDGET and this table.
+ * *"make it one button (…) to open a edit task window"* deleted the widget's
+ * second line, and with it every chip on it — so this table is the only thing
+ * left that draws a priority glyph or an hour pill, and the rules belong to the
+ * thing that draws them.
+ *
+ * SCOPED, NOW THAT THEY HAVE ONE OWNER. Both were unscoped because two surfaces
+ * shared them, and an unscoped `.ca-journal-task-at-wrap` sitting in the
+ * dashboard file for one consumer in another file is how a rule outlives the
+ * element it was written for.
+ *
+ * `.ca-jtt-at-icon` GETS A SIZE FOR THE FIRST TIME. The clock glyph beside an
+ * hour was only ever inside `.ca-journal-task-at-wrap`, whose `inline-flex` laid
+ * it out but never sized it — so it drew at Lucide's default while its `-due`
+ * sibling two rules up has been 0.9em since 5.2. Found by moving the rules
+ * rather than by looking at the table. */
+.ca-journal-tasks-table .ca-journal-task-prio-icon {
+  display: inline-flex;
+}
+.ca-journal-tasks-table .ca-journal-task-prio-icon .svg-icon {
+  width: 0.95em;
+  height: 0.95em;
+}
+.ca-journal-tasks-table .ca-journal-task-at-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
+  border-radius: var(--ca-radius-pill);
+  font-size: var(--ca-text-2xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ca-journal-tasks-table .ca-jtt-at-icon {
+  display: inline-flex;
+}
+.ca-journal-tasks-table .ca-jtt-at-icon .svg-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
 .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-prio {
   flex: 0 0 auto;
   display: inline-flex;

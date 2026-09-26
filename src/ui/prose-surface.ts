@@ -160,18 +160,77 @@ export function paintProse(
 // the last non-blank line, so the next line is either blank or the closer.
 // The top is the same case upside down. Reading mode is untouched: there a
 // table is a block of its own and carries the classes itself.
+//
+// ── AND A `$$` BLOCK IS THE SAME ROW (1.0.41) ───────────────────────────
+//
+// *"ChronoAnvil's Prose blocks need to support LaTeX."* Display maths is the
+// second thing Live Preview mounts instead of drawing, and it arrived at this
+// function as the table's bug word for word: a cheat sheet that ends on an
+// equation had no last line, so nothing carried `is-prose-last` and the card
+// stopped above the maths. So the rule is not "a table row" any more, it is
+// A ROW LIVE PREVIEW DOES NOT DRAW — one predicate, two shapes, and the next
+// one Obsidian mounts is a line in `mountedLines` rather than a third arm on
+// an expression.
+//
+// EVERY LINE OF THE BLOCK, whether or not Obsidian replaces a one-line
+// `$$ x $$` (it draws that one inside the row, and the multi-line form as a
+// widget). Both answers are safe: where the row is replaced this is the fix,
+// and where it is drawn the run merely ends on the blank line below it — the
+// same pixel of air the table rule has already accepted since 1.0.40. Guessing
+// which of the two Obsidian will do next release is what is not safe.
 const TABLE_ROW = /^\s*\|/;
+const MATH_EDGE = /^\s*\$\$/;
+const FENCE = /^\s*(`{3,}|~{3,})/;
+
+// Which lines of a prose block Live Preview mounts a block into rather than
+// drawing as a `.cm-line`.
+//
+// FENCE-AWARE, for `marker-linesIn`'s reason one file over: a reader writing
+// about LaTeX puts `$$` inside a ```` ``` ```` block, and a code fence's rows
+// ARE drawn — they are the `HyperMD-codeblock-bg` rows the stylesheet paints.
+// Counting one as mounted would step the run's end off a row that was working.
+function mountedLines(lines: readonly string[]): Set<number> {
+  const out = new Set<number>();
+  let fence = "";
+  let math = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (fence) {
+      if (line.startsWith(fence)) fence = "";
+      continue;
+    }
+    const opens = math === -1 ? line.match(FENCE) : null;
+    if (opens) {
+      fence = opens[1];
+      continue;
+    }
+    if (TABLE_ROW.test(lines[i])) out.add(i);
+    if (math === -1) {
+      // An opener that also closes on its own row — `$$ x $$` — is one line of
+      // maths and not the start of a block. `$$` alone is an opener.
+      if (!MATH_EDGE.test(lines[i])) continue;
+      out.add(i);
+      if (!/\$\$\s*$/.test(line) || line === "$$") math = i;
+      continue;
+    }
+    out.add(i);
+    // AN UNCLOSED `$$` NEVER ENDS THE FILE'S WORTH OF LINES, which is the same
+    // conservative half `proseSpansIn` states: the block is bounded by the
+    // bracket the caller sliced, so a missing closer costs the run its rounding
+    // and nothing else.
+    if (/\$\$\s*$/.test(line)) math = -1;
+  }
+  return out;
+}
 
 export function livePreviewSpans(
   lines: readonly string[]
 ): { from: number; to: number }[] {
+  const mounted = mountedLines(lines);
   return proseSurfaceSpans(lines).map(({ from, to }) => ({
     from:
-      TABLE_ROW.test(lines[from]) && lines[from - 1]?.trim() === ""
-        ? from - 1
-        : from,
-    to:
-      TABLE_ROW.test(lines[to]) && lines[to + 1]?.trim() === "" ? to + 1 : to,
+      mounted.has(from) && lines[from - 1]?.trim() === "" ? from - 1 : from,
+    to: mounted.has(to) && lines[to + 1]?.trim() === "" ? to + 1 : to,
   }));
 }
 

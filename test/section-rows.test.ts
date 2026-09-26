@@ -325,6 +325,64 @@ describe("the window over it", () => {
     expect(editor).toContain("private renderBlock(");
   });
 
+  it("says why a column is refused, and not the other reason (1.0.42)", () => {
+    // `BlockView.column` collapses several refusals into one boolean and the
+    // window says one sentence for it: *"this section draws its own title
+    // bar"*. That is one of three true things while every section HAS a block.
+    // A diary entry's seven fields had none — `structuralFlats` withheld every
+    // `band: "shared"` section from `blocks()` on purpose (1.0.10) — so the
+    // sentence was shown about sections that draw no bar at all, and a vault
+    // asked the obvious question: *"unable to group tasks and captured log even
+    // though they're widgets?"*
+    //
+    // BOTH HALVES OF THAT ARE ANSWERED IN THE SAME RELEASE: the band is read as
+    // an arrangement (`bandBlocks`), so those seven are placed and groupable,
+    // and this set is what keeps the sentence honest for the case that is left
+    // — a band holding something the model cannot re-emit, which falls out of
+    // `blocks()` whole. See `readBand` for the list.
+    //
+    // THE SET IS THE FIX, AND IT IS FILLED FROM `ids` RATHER THAN FROM
+    // `column`. Being in a block and being able to be a column are the two
+    // different answers the sentence was conflating; a set built from the
+    // capability would say the same thing twice.
+    expect(editor).toContain("private placed = new Set<string>()");
+    const caps = editor.slice(editor.indexOf("private readCaps("));
+    const fn = caps.slice(0, caps.indexOf("\n  }"));
+    expect(fn).toContain("this.placed = new Set()");
+    expect(fn).toContain("for (const id of block.ids) this.placed.add(id)");
+    // ONE PLACE CHOOSES THE SENTENCE, for the row itself and for a destination
+    // that cannot take it — the second used to state the title-bar reason as a
+    // fact about a section it had only counted.
+    const why = editor.slice(editor.indexOf("private whyNotColumn("));
+    const body = why.slice(0, why.indexOf("\n  }"));
+    expect(body).toContain("if (!this.placed.has(id)) {");
+    expect(body).toContain("draws its own title bar");
+    expect(body).toContain("shares its fence with lines this window did not write");
+    // AND NOT THE SENTENCE THE WITHHOLDING WORE. It described a band that is no
+    // longer withheld, so leaving it would be the same defect with the other
+    // reason: a true-sounding no about something else.
+    expect(editor).not.toContain("written into one fence with the rest of its band");
+    expect(editor).toContain(
+      'make.title = this.whyNotColumn(section.id, "This section");'
+    );
+    expect(editor).toContain("this.whyNotColumn(stuck[0], `\u201C${who}\u201D`, true)");
+    // AND THE OLD SENTENCE IS NOWHERE ELSE. Left inline at either site, it
+    // would go on being shown for the reason it does not describe.
+    //
+    // FOUR, NOT TWO, AS OF 1.0.42's SECOND ROUND: the refusal names the fix, and
+    // where the bar is the section's OWN line that fix is a tick on this row
+    // rather than a widget elsewhere on the page. Two voices × two endings, all
+    // four inside `whyNotColumn` — which is what this count is really asserting.
+    expect(
+      editor.split("draws its own title bar, so it can't").length - 1
+    ).toBe(4);
+    expect(
+      body.split("draws its own title bar, so it can't").length - 1
+    ).toBe(4);
+    expect(body).toContain('Tick “Show as widget” on it first.');
+    expect(body).toContain("(x) => x.kind === \"form\" && !sharesOneBar(x)");
+  });
+
   it("keeps a block to one run of consecutive rows", () => {
     // Which is what the catalogue means by a row (`FlatSection.row`:
     // "consecutive members only"), and what makes one bit per row enough.
@@ -1032,10 +1090,136 @@ describe("whether the group draws a head — 5.21", () => {
     const editor = readCode("section-editor");
     expect(editor).toContain("private renderBlockTitle(");
     expect(editor).toContain("this.renderBlockTitle(bar, group);");
-    expect(editor).toContain('if (block.length > 1 && block[0] === section.id) return;');
+    // GUARDED BY THE PREMISE IT RESTS ON, as of 1.0.42: a group's cells share
+    // one bar only where the form is a line in the fence. See `sharesOneBar`,
+    // which is asked here, on the card, and by the pill — the three places that
+    // must never disagree about who owns a group's head.
+    expect(editor).toContain(
+      "if (sharesOneBar(q) && block.length > 1 && block[0] === section.id) return;"
+    );
+    expect(editor).toContain("export function sharesOneBar(q: FormQuestion): boolean {");
+    expect(editor).toContain("  return q.titled !== true;");
+    // The card's box, and the pill, ask the same question — and as of 1.0.42
+    // the card's NO answer is a different control rather than nothing: a band
+    // whose fields title themselves has a bar nobody's form composes, so the
+    // reader types it. *"Diary groups do not have the choice for Title
+    // Header."*
+    expect(editor).toContain("if (!sharesOneBar(q)) {");
+    expect(editor).toContain("      this.renderTypedBlockTitle(bar, kept);");
+    expect(editor).toContain("private renderTypedBlockTitle(");
+    // SEVEN, AS OF 1.0.42's SECOND ROUND: `whyNotColumn` asks it to choose which
+    // fix to name, and `renderFormQuestion` asks it to lock a group's cell into
+    // its widget form. The count is here so a sixth reader cannot be added
+    // without someone checking it agrees with the other five.
+    expect(
+      editor.split("sharesOneBar(").length - 1
+    ).toBe(7);
     // TICKED IS THE HEAD, which is the opposite sense to the row's box — that
     // one asks "draw this as a widget" and this asks for a title.
     expect(editor).toContain("box.checked = this.shownAnswer(opener, q) !== WIDGET_FORM;");
+  });
+
+  // ── AND A GROUP'S COLUMNS ARE WIDGETS (1.0.42) ─────────────────────
+  //
+  // *"Sections are being allowed to be placed into groups. As you can see
+  // they're not rendering as widgets. Disable the link icons and reject cards
+  // with the section flag, only allow widgets."*
+  it("locks a group's cell into its widget form, one way", () => {
+    const editor = readCode("section-editor");
+    // TICKED IS LOCKED, because unticking is the move that breaks the row: a
+    // reader could otherwise group two widgets and then give one of them a
+    // title bar back, arriving at the screenshot by the back door.
+    for (const line of [
+      "      !sharesOneBar(q) &&",
+      "      block.length > 1 &&",
+      "      this.shownAnswer(section, q) === WIDGET_FORM",
+    ]) {
+      expect(editor, line).toContain(line);
+    }
+    expect(editor).toContain(
+      "A group's columns are widgets — take this out of the group to give it a title bar again"
+    );
+    // AND UNTICKED IS LEFT LIVE, which is the control that repairs a note that
+    // already holds such a row. A box shown ticked over a file that says section
+    // is the defect `sharesOneBar` was written for.
+    const form = editor.slice(editor.indexOf("private renderFormQuestion("));
+    const body = form.slice(0, form.indexOf("private renderFlagQuestion("));
+    expect(body).toContain(
+      "box.checked = this.shownAnswer(section, q) === WIDGET_FORM;"
+    );
+  });
+
+  it("reads the column rule off the field's own line", () => {
+    // THE LINK ICON IS DISABLED BY `column`, which the window reads off the file
+    // rather than deciding — so the fix is in the model that answers it.
+    const entry = readCode("entry-sections");
+    expect(entry).toContain("const fieldIsWidget = (line: string): boolean =>");
+    expect(entry).toContain("  hasToken(line, WIDGET_TOKEN) || !labelOf(line);");
+    expect(entry).toContain(
+      'column: ids.filter((id) => fieldIsWidget(band.lineOf.get(id) ?? "")),'
+    );
+    // READ THE WAY THE ANSWER IS READ. The tick box and the link icon must
+    // agree, and they do only by asking one question rather than two walks
+    // written to match.
+    expect(readCode("note-sections")).toContain(
+      'hasToken(lines[line] ?? "", WIDGET_TOKEN) || !labelOf(lines[line] ?? "")'
+    );
+    // AND `loose` IS UNTOUCHED, so **Take out of the group** stays live on a row
+    // that already holds one — the one control that repairs the note.
+    expect(entry).toContain("    loose: [...ids],");
+    // AND THE WRITE SAYS IT TOO, so a fence the renderer draws wrong cannot be
+    // composed however the model is asked.
+    expect(entry).toContain("      mine.length > 1 &&");
+    expect(entry).toContain(
+      '      !mine.every((id) => fieldIsWidget(band.lineOf.get(id) ?? ""))'
+    );
+  });
+
+  // ── AND THE GROUP NOBODY'S FORM CAN NAME (1.0.42) ──────────────────
+  //
+  // *"Diary groups do not have the choice for Title Header."* The control above
+  // is a tick because the words come from the opening SECTION'S catalogue entry.
+  // A diary entry's fields each title themselves on their own directive, so the
+  // bar over a group of them is a line no form composes — no catalogue wording
+  // to fall back on, and no section whose answer it could be. The reader types
+  // it, and the answer travels as `regroup`'s fifth argument.
+  it("gives a band's group a tick and a box of words instead", () => {
+    const editor = readCode("section-editor");
+    expect(editor).toContain("private renderTypedBlockTitle(");
+    expect(editor).toContain('cls: "ca-tpl-block-name",');
+    // SEEDED WITH THE CAPTION IT ALREADY HAS. Ticked and empty is not an answer
+    // — a blank writes no bar — so a tick that left the box empty would be a
+    // control that did nothing until the reader typed.
+    expect(editor).toContain(
+      "this.blockTitles.set(opener, this.captionOf(kept));"
+    );
+    expect(editor).toContain("input.placeholder = this.captionOf(kept);");
+    // ` · ` BECAUSE THE PARTS ARE PEERS — `layOutRow`'s separator, quoted rather
+    // than re-decided, so the placeholder is the caption the reader is looking at.
+    expect(editor).toContain('.join(" · ");');
+    expect(readCode("row")).toContain('.join(" · ");');
+    // A BLOCK OF ONE IS NOT A GROUP, refused here as well as at the write, so
+    // the card and the file cannot disagree on screen.
+    expect(editor).toContain("if (kept.length < 2) return;");
+  });
+
+  it("carries the name to the write through the blocks the write will make", () => {
+    const editor = readCode("section-editor");
+    // `pageBreaks`' RULE, ONE ANSWER ALONG: a group that stopped being a group
+    // stops having a name with it, because the map is rebuilt from the walk
+    // rather than trusted on its own.
+    expect(editor).toContain("private blockNames(ids: readonly string[]): Map<string, string> {");
+    expect(editor).toContain("    for (const group of this.groupsOf(ids)) {");
+    expect(editor).toContain("      if (group.length < 2) continue;");
+    // BOTH CALLERS. The dry run and the Save ask `regroup` the same question, and
+    // a fifth argument passed to one of them is a footer that disagrees with the
+    // file it wrote.
+    expect(
+      editor.split("this.blockNames(idsOf(this.want))").length - 1
+    ).toBe(2);
+    // AND WHAT THE FILE ALREADY SAYS, or the first Save takes the bar away — the
+    // lesson `paged` learned in 4.34.2.
+    expect(editor).toContain("if (block.title) this.blockTitles.set(block.ids[0], block.title);");
   });
 
   it("says the narrower sentence to the cells that are still always widgets", () => {

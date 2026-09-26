@@ -81,6 +81,13 @@ const ALLOWED = new Set([
   // painted as part of the prose card while every other embed — a
   // ```chronoanvil card above all — stays excluded (1.0.40).
   "cm-table-widget",
+  // `math-block` is Obsidian's own class on a `$$` block, in every mode it has
+  // one — `div.math.math-block.is-loaded` in reading mode and
+  // `div.math.math-block.cm-embed-block` as the widget Live Preview mounts. It
+  // is named for the table's two reasons at once: so an equation inside the
+  // writing is painted as part of the card, and so one wider than the card
+  // scrolls inside it instead of leaving it (1.0.41).
+  "math-block",
   // And `hr` is a CLASS on the row Obsidian puts a horizontal rule in —
   // `hr cm-line`, per the editor's own DOM — not the element it looks like.
   "hr",

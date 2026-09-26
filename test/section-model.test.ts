@@ -595,6 +595,22 @@ describe("the editor cannot learn which surface it is on", () => {
       "journal index/resources",
       "journal leaf/banner",
       "journal leaf/resources",
+      // AND `journal leaf/checklist` WAS HERE FOR ONE ROUND. The Compact flag
+      // arrived in 1.0.42 — *"I do not think that `tasks` needs its special
+      // action row just for the compact button. Make it a option on the sections
+      // card via the section editor instead."* — and left in the same release:
+      // *"I think we can enforce compact mode and remove the larger format."*
+      // With the roomy row deleted the flag chose between one shape and the same
+      // shape, so `checklist` is back to declaring no question at all and the
+      // row is gone rather than re-worded.
+      //
+      // WHAT THE ROUND LEFT BEHIND IS THE MECHANISM, and it is in use: a flag
+      // whose answer is a `#token` on the section's OWN line rather than a
+      // modifier line in the fence is what lets a diary entry be asked at all —
+      // that surface's band is one fence holding seven sections, so a modifier
+      // written into it answers for all seven. `formToggleFor` is that path's
+      // only remaining caller, and `diary entry/todo` below is on this list
+      // through it.
       // A SIXTH KIND IN 5.6, AND THE FIRST WHOSE ANSWER IS NOT A DIRECTIVE'S
       // ARGUMENT AT ALL. `lines` asks for the note's opening headings, which
       // are plain `## ` markdown between two invisible markers, so the read is
@@ -618,7 +634,37 @@ describe("the editor cannot learn which surface it is on", () => {
       "diary dashboard/open-tasks",
       "diary dashboard/tags",
       "diary entry/banner",
+      // AND SEVEN MORE ON THE ENTRY IN 1.0.42 — *"I think the diary sections
+      // should have the widget toggle"* — which are `form` questions arriving by
+      // a second mechanism rather than an eighth kind. The other three
+      // catalogues put one section in one fence, so the toggle writes a
+      // `header:` line in or out of it; an entry's shared band is ONE fence
+      // holding one directive per section, each titling itself from the `|Title`
+      // after it, and a bar written there would title all seven at once. So
+      // `FormQuestion.titled` reads and writes the answer on the section's OWN
+      // LINE, and `formToggleFor` derives it — which is why these are in
+      // catalogue order among the declared questions rather than appended.
+      //
+      // EVERY FIELD AND NOTHING ELSE. `FIELD_KEYWORDS` is the gate and it is the
+      // honest one: a field's label is its only head, so cutting it renders the
+      // thing bare. `bridge` is the case that proves the gate is doing work —
+      // it carries a `|From the journals` and is NOT a field, so a `bridge-notes`
+      // line stripped of its label would still take a head from `SECTION_TITLES`
+      // and the tick would be a control that changes nothing. It is on this list
+      // for its `choice`, as it was before.
+      //
+      // `banner` AND `trackers` ARE THE OTHER TWO THAT DO NOT QUALIFY, by the
+      // same rule reaching a different way: neither composes a label at all —
+      // one is `entry-header` and the other a marker line — so there is no title
+      // for an answer to take off or put back.
+      "diary entry/focus",
+      "diary entry/highlights",
+      "diary entry/challenges",
+      "diary entry/log",
+      "diary entry/attachments",
       "diary entry/bridge",
+      "diary entry/todo",
+      "diary entry/capture",
     ]);
 
     const required = surfaces().flatMap(({ name, model }) =>

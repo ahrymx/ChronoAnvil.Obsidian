@@ -19,6 +19,26 @@ import { blockTitle, fieldBand } from "../src/ui/widgets/index";
 import { readCode, readCss, readSrc } from "./sources";
 import { stampLines, stampedWithin } from "../src/ui/widgets/block-drag";
 
+// Where the rule that declares `must` on `arm` sits in the sheet.
+//
+// BY ARM RATHER THAN BY THE WHOLE SELECTOR, which is the lesson of the edit
+// that broke four of these at once: a rule here is a GROUP, and every host that
+// joins one adds an arm to it. A lookup keyed on the exact string "this rule's
+// selector is this one selector" asserts the group's membership as a side
+// effect of asking where it is, and fails the day a fourth host wears the same
+// head — which is a true thing about the stylesheet reported as a false one
+// about the rule. What these tests are actually about is order and content:
+// which rule comes first, and what it declares.
+function ruleWith(css: string, arm: string, must: string): number {
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (m[1].trim().startsWith("@")) continue;
+    const arms = m[1].split(",").map((x) => x.replace(/\s+/g, " ").trim());
+    if (!arms.includes(arm) || !m[2].includes(must)) continue;
+    return m.index ?? -1;
+  }
+  return -1;
+}
+
 // ── A DOM SMALL ENOUGH TO RUN `stampLines` AGAINST ──────────────────────
 //
 // The suite has no jsdom (see `vitest.config.ts`, which sets no environment),
@@ -278,6 +298,10 @@ describe("what a block's head calls it", () => {
     const branch = widgets.slice(at, at + 700);
     expect(branch).toContain("fieldFrame(");
     expect(branch).not.toContain("cardWidget(");
+    // AND IT PASSES OVER A FIELD, which is in `named` for the group caption and
+    // wears its own frame already (1.0.42). Without this, adding a field's name
+    // to that list would hang a second head over every field of every band.
+    expect(branch).toContain("if (selfTitled) continue;");
     // THE STAMP GOES WITH THE WIDGET INTO THE WRAPPER, which is the one thing a
     // wrapper put around a stamped child must not forget — and it is the row
     // card's own operation rather than a second spelling of it.
@@ -520,7 +544,12 @@ describe("the gesture around it", () => {
     // three of them would have to name all three or say nothing, and each of
     // them can name itself.
     const widgets = readCode("widgets");
-    expect(widgets).toContain("for (const { el, title } of named) cardWidget(el, title)");
+    // EXCEPT ONE THAT NAMED ITSELF (1.0.42). A diary entry's fields are in
+    // `named` for the group's caption — they are the only name there is — and a
+    // card with a head over a field that drew its own head is the two-heads
+    // defect arriving by a third door. See `selfTitled`.
+    expect(widgets).toContain("if (!selfTitled) cardWidget(el, title);");
+    expect(widgets).toContain("named.push({ el: widget, title: own, selfTitled: true });");
     // Recorded at the append, where the element and the directive that produced
     // it are both in hand. A pass afterwards would be reading classes to guess
     // at directives.
@@ -834,16 +863,16 @@ describe("the gesture around it", () => {
     // rule. Asserted as a pair rather than as two values, because either one
     // alone is the defect.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf("\n.ca-journal-widget-card > .ca-journal-block-head {");
+    const ARM = ".ca-journal-widget-card > .ca-journal-block-head";
+    const at = ruleWith(rules, ARM, "position: absolute");
     expect(at, "the card head rule is gone").toBeGreaterThan(-1);
     const desktop = rules.slice(at, rules.indexOf("}", at));
     expect(desktop).toContain("position: absolute");
     expect(desktop).not.toContain("-12px");
     // The touch branch, where the head is a band in flow again.
-    const touch = rules.indexOf("  .ca-journal-widget-card > .ca-journal-block-head {");
+    const touch = ruleWith(rules, ARM, "margin: -12px -14px 12px");
     expect(touch, "touch keeps the head in flow").toBeGreaterThan(-1);
-    const flowed = rules.slice(touch, rules.indexOf("}", touch));
-    expect(flowed).toContain("margin: -12px -14px 12px");
+    expect(touch).not.toBe(at);
     // And it is NOT on the head itself, where it would reach the block too.
     const base = rules.indexOf("\n.ca-journal-block-head {");
     expect(rules.slice(base, rules.indexOf("}", base))).not.toContain(
@@ -953,45 +982,32 @@ describe("the gesture around it", () => {
   });
 
   it("shows a widget's grip only where its head shows too (5.16)", () => {
-    // ONE CONTROL, ONE TRIGGER. The reveal list below answers a hover of the
-    // whole host, which is right for a section bar or a table — there is
-    // nothing else on those to say a drag is possible. A widget with a head has
-    // something else: the band over the dots, which opens on a hover of the
-    // dots alone. So a card said "drag me" to a pointer crossing it and said
-    // WHAT could be dragged only to a pointer that had already found the 44px
-    // it was hiding in. A vault read the result as grab icons appearing without
-    // their headers.
+    // ONE CONTROL, ONE TRIGGER. A widget with a head answers two questions —
+    // "can this be dragged" and "what is it" — and 5.16 made them one gesture,
+    // because a card that said the first to any pointer crossing it and the
+    // second only to a pointer that had found the 44px the dots hide in left a
+    // reader collecting grab icons that named nothing.
     //
-    // The hide is one rule keyed on `.has-head`, and every re-reveal carries
-    // that class too, so each outranks it on specificity rather than on where
-    // it happens to sit in the file.
+    // WRITTEN AS A HIDE AND FOUR RE-REVEALS UNTIL 1.0.42, over a host-wide
+    // reveal that no longer exists. What is asserted now is the half that was
+    // ever about the head: the band is a trigger for the grip of whatever host
+    // wears it — a card, a bare block, a field drawn as a widget — in one arm
+    // rather than one per host, and the states where the head is open with no
+    // pointer to ask keep the dots with it.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const hide = rules.indexOf(
-      "\n.ca-journal-widget-card.has-head > .ca-jbd-handle,"
-    );
-    expect(hide, "a head's grip is still revealed by the host").toBeGreaterThan(
-      -1
-    );
-    const sel = rules.slice(hide, rules.indexOf("{", hide));
-    expect(sel).toContain(".ca-journal-widget-block.has-head > .ca-jbd-handle");
-    expect(rules.slice(rules.indexOf("{", hide), rules.indexOf("}", hide))).toContain(
-      "opacity: 0"
-    );
-    // The three ways it comes back: the grip's own hover, the band's once the
-    // pointer has walked onto it, and the states where the head is open with no
-    // pointer on it at all.
     for (const back of [
-      ".ca-journal-widget-card.has-head:has(> .ca-jbd-handle:hover) > .ca-jbd-handle",
-      ".ca-journal-widget-card.has-head:has(> .ca-journal-block-head:hover) > .ca-jbd-handle",
-      ".ca-journal-widget-card.has-head.is-dragging > .ca-jbd-handle",
-      ".ca-journal-widget-block.is-slotting .ca-journal-widget-card.has-head > .ca-jbd-handle",
+      ".ca-jbd-host:has(> .ca-journal-block-head:hover) > .ca-jbd-handle",
+      ".ca-jbd-host.is-dragging > .ca-jbd-handle",
+      ".ca-jbd-host.is-resizing > .ca-jbd-handle",
+      ".ca-journal-widget-block.is-slotting .ca-jbd-host > .ca-jbd-handle",
     ]) {
-      const at = rules.indexOf(back);
-      expect(at, `no way back for ${back}`).toBeGreaterThan(-1);
-      expect(
-        rules.slice(rules.indexOf("{", at), rules.indexOf("}", at))
-      ).toContain("opacity: 1");
+      expect(ruleWith(rules, back, "opacity: 1"), `no way back for ${back}`).toBeGreaterThan(-1);
     }
+    // AND THE HIDE IS GONE WITH THE REVEAL IT OVERRODE. `.has-head` had to take
+    // a card's grip back from `.ca-jbd-host:hover`; with that rule deleted the
+    // hide overrides nothing, and a rule kept after its premise is the kind
+    // nobody can re-derive and nobody dares delete.
+    expect(rules).not.toContain(".ca-journal-widget-card.has-head > .ca-jbd-handle");
     // AND A `:has()` ARM NEVER SHARES A RULE WITH ONE THAT DOES NOT — the
     // policy this stylesheet follows everywhere: an unsupported selector takes
     // down the whole group it is written in, and the grip would be gone with
@@ -1024,8 +1040,10 @@ describe("the gesture around it", () => {
     // 10px — so hovering the top of a widget opens the name and lights the grip
     // together, and hovering its body still does neither.
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(
-      "\n.ca-journal-widget-card.has-head > .ca-journal-block-head,"
+    const at = ruleWith(
+      rules,
+      ".ca-journal-widget-card.has-head > .ca-journal-block-head",
+      "pointer-events: auto"
     );
     expect(at, "the head is still inert on a card that has a grip").toBeGreaterThan(-1);
     const sel = rules.slice(at, rules.indexOf("{", at));
@@ -1041,9 +1059,15 @@ describe("the gesture around it", () => {
     // AND IT SITS AFTER BOTH REST RULES. The card's is less specific and would
     // lose anywhere; the block's weighs exactly the same, so file order is the
     // whole of what decides it.
-    const cardRest = rules.indexOf("\n.ca-journal-widget-card > .ca-journal-block-head {");
-    const blockRest = rules.indexOf(
-      "\n.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head {"
+    const cardRest = ruleWith(
+      rules,
+      ".ca-journal-widget-card > .ca-journal-block-head",
+      "position: absolute"
+    );
+    const blockRest = ruleWith(
+      rules,
+      ".ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head",
+      "position: absolute"
     );
     expect(cardRest).toBeGreaterThan(-1);
     expect(blockRest).toBeGreaterThan(-1);
@@ -1057,21 +1081,93 @@ describe("the gesture around it", () => {
     expect(rules.slice(at).includes(".ca-jbd-handle")).toBe(true);
   });
 
-  it("reveals grabber icon on hover across section blocks, review queue, tables, and folded fields", () => {
+  it("reveals a grip from the top of what it drags, and from nothing else (1.0.42)", () => {
+    // THE RULE THIS FILE HAS STATED SINCE 4.8.3 — *"a grip appears where the
+    // hand already is"* — asserted instead of narrated, and asserted for every
+    // host rather than for the two that had been reported.
+    //
+    // WHAT WAS HERE. `.ca-jbd-host:hover > .ca-jbd-handle`: hover the thing
+    // that is dragged and its dots appear. Right for a host that is a STRIP,
+    // wrong for one that is a BOX — which is most of them, and a reader's
+    // pointer is inside a box the whole time they are reading it. 5.16 took a
+    // card back out of it, 1.0.42 took a loose widget back out of it, and the
+    // hosts in between — a widget that draws its own band and so takes no card,
+    // a fence whose grip falls back to the container — went on lighting their
+    // dots from anywhere inside. The vault said so a third time: *"ensure the
+    // grip icons only appear when the mouse is hovering-over. This should be
+    // true for all sections or widgets."*
+    //
+    // THE SWEEP IS THE HALF THAT BITES. Each named arm below could be restored
+    // by hand; what cannot be restored by hand is the absence of a host-wide
+    // reveal somewhere else in a 2,000-line sheet, and that is the failure a
+    // reader meets as "the drag icons always show".
+    const grip = readCode("block-drag");
+    const body = grip.slice(grip.indexOf("function attachGrip("));
+    const fn = body.slice(0, body.indexOf("\n}"));
+    // ONE SELECTOR CAN SAY THIS ONLY BECAUSE OF THESE TWO LINES: the dots are
+    // created ON the host and the class is added to it in the same breath, so
+    // every grip in the plugin is a direct child of a `.ca-jbd-host`.
+    expect(fn).toContain('host.addClass("ca-jbd-host")');
+    expect(fn).toContain("host.createDiv(");
+
     const rules = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
-    const at = rules.indexOf(".ca-jbd-host:hover > .ca-jbd-handle");
-    expect(at, "grip hover selector missing").toBeGreaterThan(-1);
-    const sel = rules.slice(at, rules.indexOf("{", at));
-    expect(sel).toContain(".ca-journal-sec-block:hover .ca-jbd-handle");
-    expect(sel).toContain(".ca-journal-sec-fold:hover > .ca-jbd-handle");
-    expect(sel).toContain(".ca-journal-widget-block:hover > .ca-jbd-handle");
-    expect(sel).toContain(".ca-journal-widget-card:hover > .ca-jbd-handle");
-    expect(sel).toContain(".ca-journal-table:hover .ca-jbd-handle");
-    // `.ca-journal-note--collapsible` was named here until 5.14 — the class a
-    // `note:key#collapse` field wore, and the only field that could fold. Every
-    // field is a `.ca-journal-sec-fold` now, so the two selectors already
-    // asserted above cover what this one used to reach, and a sixth selector
-    // for a class nothing builds would be a rule kept alive by its own test.
-    expect(sel).not.toContain("ca-journal-note--collapsible");
+    expect(ruleWith(rules, ".ca-jbd-handle", "opacity: 0")).toBeGreaterThan(-1);
+    for (const arm of [
+      // Its own 44x10 hit area over the top edge, hoverable at `opacity: 0`.
+      ".ca-jbd-handle:hover",
+      // The strip its host wears at that edge: the band a card or a field
+      // opens, a field's permanent bar as a child or a grandchild through the
+      // fold, and a fence's own `header:` bar.
+      ".ca-jbd-host:has(> .ca-journal-block-head:hover) > .ca-jbd-handle",
+      ".ca-jbd-host:has(> .ca-journal-sec:hover) > .ca-jbd-handle",
+      ".ca-jbd-host:has(> .ca-journal-sec-fold > .ca-journal-sec:hover) > .ca-jbd-handle",
+      ".ca-jbd-host:has(> .ca-journal-header-bar:hover) > .ca-jbd-handle",
+      // And a host that IS that strip, which is what `head ?? bar ?? container`
+      // leaves for a fence with a `header:` line and for a group.
+      ".ca-journal-header-bar.ca-jbd-host:hover > .ca-jbd-handle",
+      ".ca-journal-group-head.ca-jbd-host:hover > .ca-jbd-handle",
+    ]) {
+      expect(ruleWith(rules, arm, "opacity: 1"), `no trigger: ${arm}`).toBeGreaterThan(-1);
+    }
+    // AND THE MARKER IS GONE FROM BOTH SIDES. `.ca-jbd-loose` marked the
+    // widgets a bare fence handed its places out to, so the sheet could withhold
+    // a reveal it no longer performs. A class applied for rules that stopped
+    // naming it is dead wiring; the obituary in either file is the record.
+    expect(rules).not.toContain(".ca-jbd-loose");
+    expect(grip).not.toContain("const LOOSE_CLASS");
+
+    // NOTHING ELSE IN THE SHEET REVEALS ONE FROM A BOX. Every arm whose subject
+    // is the grip and whose trigger is a hover must be one of three shapes: the
+    // grip itself, a `:has(> ...)` on the host — which asks whether the pointer
+    // is on a strip the host owns, never on something its body drew — or one of
+    // the two hosts that are a title strip in their own right.
+    const STRIP =
+      /^\.(ca-journal-header-bar|ca-journal-group-head)\.ca-jbd-host:hover > \.ca-jbd-handle$/;
+    for (const m of rules.matchAll(/([^{}]+)\{/g)) {
+      if (m[1].trim().startsWith("@")) continue;
+      for (const raw of m[1].split(",")) {
+        const one = raw.replace(/\s+/g, " ").trim();
+        const outside = one.replace(/:has\([^()]*\)/g, "");
+        const last = outside.split(/[\s>]+/).filter(Boolean).pop() ?? "";
+        if (!last.includes(".ca-jbd-handle") || !one.includes(":hover")) continue;
+        // A `:has()` ARGUMENT IS A DIRECT CHILD OR IT IS THE BODY. A widget's
+        // body can hold a bar of its own — a nested fence, a table with a title
+        // — and a descendant `:has()` would light the grip from one of those,
+        // which is the hover this whole family withholds, arriving from inside.
+        for (const a of one.match(/:has\(([^()]*)\)/g) ?? []) {
+          expect(
+            a.slice(5, -1).trim().startsWith(">"),
+            `a grip revealed from inside the body: ${one}`
+          ).toBe(true);
+        }
+        // The hover inside a `:has()` is the host's own strip; what is left
+        // outside it, if anything, is what the pointer must be on.
+        if (!outside.includes(":hover")) continue;
+        expect(
+          outside === ".ca-jbd-handle:hover" || STRIP.test(outside),
+          `a grip revealed from a hover of a box: ${one}`
+        ).toBe(true);
+      }
+    }
   });
 });

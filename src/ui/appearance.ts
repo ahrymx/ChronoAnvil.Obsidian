@@ -13,6 +13,9 @@ import {
   strengthClass,
 } from "../core/page-grounds";
 
+/** The class the accent wash is drawn by. Not a `ca-ground-*` name — see apply(). */
+const TINT_CLASS = "ca-tinted-ground";
+
 export class AppearanceManager {
   private readonly plugin: ChronoAnvilPlugin;
 
@@ -65,6 +68,23 @@ export class AppearanceManager {
       body.addClass(groundClass(ground));
       body.addClass(strengthClass(s.pageGroundStrength ?? "standard"));
     }
+
+    // ── The accent wash (1.0.42) ──────────────────────────────────────────
+    //
+    // OUTSIDE THE `ca-ground-*` FAMILY ON PURPOSE. `PAGE_GROUND_CLASSES` is
+    // generated from the ground and strength tables, so a class spelled
+    // `ca-ground-tint` would sit next to nineteen names that are ids from a
+    // table and be removed by nothing — until somebody adds a texture called
+    // "tint" and it is removed by everything. `ca-tinted-ground` cannot collide
+    // with either generated name.
+    //
+    // AND IT IS NOT GATED ON THE GROUND BEING ON. A reader with the texture set
+    // to Off still gets the wash, because the two answer different questions —
+    // "is there a pattern behind my notes" and "does a note's background say
+    // which note it is". `12-grounds.css` clears the opaque surfaces above it
+    // for either class, which is what makes the second one work alone.
+    body.removeClass(TINT_CLASS);
+    if (s.groundTint ?? true) body.addClass(TINT_CLASS);
   }
 
   unload(): void {
@@ -74,7 +94,8 @@ export class AppearanceManager {
       "ca-preset-technical",
       "ca-grain-vibrant",
       "ca-grain-subtle",
-      "ca-grain-monochrome"
+      "ca-grain-monochrome",
+      TINT_CLASS
     );
     document.body.removeClasses(PAGE_GROUND_CLASSES);
   }

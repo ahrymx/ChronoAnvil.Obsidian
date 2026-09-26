@@ -48,7 +48,9 @@ import { BannerSurface, bannerSurfaceOf, titleTargetFor } from "../../core/banne
 import { bannerScopeOf } from "../vault-banner";
 import { attachNoteRename, attachPropertyRename } from "../header-title";
 import { TITLE_PROP, entryDateLabel } from "../../diary/entryheader";
-import { journalAccent, journalNounOf, journalTypeAtPath } from "../../journals/journal";
+import { paintJournalRung, journalRungFor, journalNounOf, journalTypeAtPath } from "../../journals/journal";
+import { paintRung, pageIconOf } from "../rung";
+import { grainRung } from "../../diary/lineage";
 import type { JournalType } from "../../journals/journal";
 import { CLASS_DEFS, noteKindOf, TrackerClass } from "../../trackers/trackers";
 import { OVERVIEW_LABELS, OverviewUnit } from "../../diary/calendar";
@@ -66,6 +68,8 @@ import { addPageActionsControl } from "./actions-menu";
 
 /** The class the head carries. Named once — `headerbar.ts` reads it too. */
 export const PAGE_HEAD_CLASS = "ca-journal-page-head";
+/** The tiled glyph layer behind a journal head's words (1.0.42). */
+export const PAGE_HEAD_FILM_CLASS = "ca-jph-film";
 
 // The head, repainting on the note's own frontmatter. 4.51.7.
 //
@@ -101,6 +105,20 @@ export const PAGE_HEAD_CLASS = "ca-journal-page-head";
 // write to the note's frontmatter, so a control docked in from outside would
 // survive until the reader's next property edit and then silently vanish. What
 // the head draws, the head redraws.
+//
+// ── `carry` IS THE STACK'S CARD (1.0.42) ────────────────────────────────
+//
+// A stack's card wears the note's left edge — `30-header-bars.css` has the
+// argument — and until this release it could not see the colour to draw it in,
+// because `page-head.ts` wrote the grain on the HEAD and a custom property
+// reaches descendants and never an ancestor. So the head painted the edge with
+// a pseudo-element instead, which cost the head its `position` and, when the
+// glyph film arrived, cost the film the only pseudo it could have used.
+//
+// Handing the card in is the shorter answer to the same question, and it is
+// handed in THROUGH THIS WRAPPER rather than set once by the caller because
+// `LiveWidget` rebuilds on every frontmatter write: a card painted once would
+// keep the tone of the rung the note used to be.
 export function livePageHead(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
@@ -109,8 +127,20 @@ export function livePageHead(
   return liveFrontmatterWidget(
     plugin,
     ctx,
-    () => buildPageHead(plugin, ctx, withActions) ?? createDiv()
+    (host) => buildPageHead(plugin, ctx, withActions, stackCardOf(host)) ?? createDiv()
   );
+}
+
+// The stack card this head is the top band of, where there is one.
+//
+// THE LITERAL, NOT AN IMPORT, because the class is pushed by `chromeClasses` in
+// `widgets/index.ts` and that module imports this one — naming it there and
+// reading it here closes a cycle for one string. `test/journal-stack.test.ts`
+// holds the two spellings equal instead, which is the check that would actually
+// catch a rename.
+function stackCardOf(host: HTMLElement): HTMLElement[] {
+  const card = host.closest(".ca-journal-stack");
+  return card instanceof HTMLElement ? [card] : [];
 }
 
 // ── WHAT THE HEAD SAYS, ASKED WITHOUT DRAWING IT (4.51.7) ───────────────
@@ -321,6 +351,73 @@ export function pageHeadSays(
   });
 }
 
+// ── WHICH GRAIN A DIARY PAGE IS COLOURED AND WEIGHTED BY ────────────────
+//
+// Lifted out of `buildPageHead` when the banner's *Change the page icon* action
+// needed the same answer (1.0.42). Every diary page has a grain; the three
+// branches differ only in where it comes from.
+function diaryGrainOf(
+  plugin: ChronoAnvilPlugin,
+  file: TFile
+): TrackerClass {
+  const role = diaryRoleOf(plugin, file);
+  if (role.role === "overview") {
+    return role.unit === "week"
+      ? "weekly"
+      : role.unit === "month"
+        ? "monthly"
+        : role.unit === "quarter"
+          ? "quarterly"
+          : "yearly";
+  }
+  if (role.role === "entry") return grainOf(plugin, file);
+  // ── THE TWO DIARY ROLES THAT ARE NEITHER A PERIOD NOR AN ENTRY (5.31.2)
+  //
+  // They took no grain, and until that release that meant no SPINE either: the
+  // Diary folder note and every Logbook page drew **DIARY** and
+  // **DIARY · LOGBOOK** in the theme's own accent, over folders of amber
+  // entries. `98-page-head.css` gives every head a spine now, so all that is
+  // left to decide here is its COLOUR — and a dashboard is coloured like the
+  // thing it is a dashboard for.
+  //
+  // DAILY FOR THE DIARY'S OWN NOTE, AND IT IS THE ARGUABLE HALF. That page is
+  // about all five grains rather than the first of them. What settles it is the
+  // OTHER file this role covers: `diaryRoleOf` returns `dashboard` for the
+  // Daily folder's own note too, because `OVERVIEW_UNIT` has no entry for the
+  // daily grain — and that page is daily in the plainest sense. One role cannot
+  // hold two colours, and amber is the colour a reader already associates with
+  // the diary, because the entries they open every day are amber.
+  //
+  // YEARLY FOR A LOGBOOK. It is the widest window the palette has, and a
+  // logbook is the diary's longest-running page: `LOGBOOK_TITLE` names the one
+  // that is about a whole run of them.
+  return role.role === "logbook" ? "yearly" : "daily";
+}
+
+// ── THE GLYPH THIS NOTE WOULD DRAW WITH NO OVERRIDE (1.0.42) ────────────
+//
+// What *Change the page icon* seeds its picker with, and what it compares a
+// reader's choice against: choosing the glyph the note already had stores
+// nothing, which is `kind-columns.ts`' rule — a value equal to its default is
+// not written, or a reader's frontmatter fills up with records of them agreeing
+// with us.
+//
+// NULL WHERE THERE IS NO FILM TO CHANGE, which is a real case and not a
+// failure: a note under a journal root whose `type:` names no rung draws no
+// glyph, and the action says so rather than writing a key that does nothing.
+export function pageGlyphOf(
+  plugin: ChronoAnvilPlugin,
+  file: TFile
+): string | null {
+  const said = pageHeadText(plugin, file);
+  if (!said) return null;
+  if (said.surface === "diary") return CLASS_DEFS[diaryGrainOf(plugin, file)].emoji;
+  if (said.surface !== "journal") return null;
+  const type = journalTypeAtPath(plugin, file.path);
+  if (!type) return null;
+  return journalRungFor(plugin.app, file, type)?.emoji ?? null;
+}
+
 // The head, or null on a note the bar does not reach.
 //
 // NULL IS NOT A FAILURE HERE and the caller must not draw an error for it: the
@@ -329,7 +426,8 @@ export function pageHeadSays(
 export function buildPageHead(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
-  withActions = false
+  withActions = false,
+  carry: readonly HTMLElement[] = []
 ): HTMLElement | null {
   const app = plugin.app;
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
@@ -340,59 +438,40 @@ export function buildPageHead(
   const root = createDiv({ cls: PAGE_HEAD_CLASS });
   root.setAttr("data-surface", said.surface);
   root.setAttr("data-ca-surface", said.surface);
+  // THE IDENTITY GOES ON BOTH; THE HEAD'S OWN CHROME GOES ON THE HEAD. Which
+  // note this is — its grain, its journal, its rung — is what an ancestor needs
+  // and is carried; `data-surface`, `data-ca-surface` and `data-ca-role` say
+  // what this ELEMENT is and stay where they are.
+  const identity = [root, ...carry];
 
   if (said.surface === "diary") {
     const role = diaryRoleOf(plugin, file);
     root.setAttr("data-ca-role", role.role);
-    if (role.role === "overview") {
-      const g =
-        role.unit === "week"
-          ? "weekly"
-          : role.unit === "month"
-            ? "monthly"
-            : role.unit === "quarter"
-              ? "quarterly"
-              : "yearly";
-      root.setAttr("data-ca-grain", g);
-    } else if (role.role === "entry") {
-      root.setAttr("data-ca-grain", grainOf(plugin, file));
-    } else {
-      // ── THE TWO DIARY ROLES THAT ARE NEITHER A PERIOD NOR AN ENTRY (5.31.2)
-      //
-      // They took no grain, and until this release that meant no SPINE either:
-      // the Diary folder note and every Logbook page drew **DIARY** and
-      // **DIARY · LOGBOOK** in the theme's own accent, over folders of amber
-      // entries. `98-page-head.css` gives every head a spine now, so all that
-      // is left to decide here is its COLOUR — and a dashboard is coloured like
-      // the thing it is a dashboard for.
-      //
-      // DAILY FOR THE DIARY'S OWN NOTE, AND IT IS THE ARGUABLE HALF. That page
-      // is about all five grains rather than the first of them. What settles it
-      // is the OTHER file this role covers: `diaryRoleOf` returns `dashboard`
-      // for the Daily folder's own note too, because `OVERVIEW_UNIT` has no
-      // entry for the daily grain — and that page is daily in the plainest
-      // sense. One role cannot hold two colours, and amber is the colour a
-      // reader already associates with the diary, because the entries they open
-      // every day are amber.
-      //
-      // YEARLY FOR A LOGBOOK. It is the widest window the palette has, and a
-      // logbook is the diary's longest-running page: `LOGBOOK_TITLE` names the
-      // one that is about a whole run of them.
-      root.setAttr("data-ca-grain", role.role === "logbook" ? "yearly" : "daily");
-    }
+    const grain = diaryGrainOf(plugin, file);
+    for (const el of identity) el.setAttr("data-ca-grain", grain);
+    paintRung(identity, grainRung(grain), pageIconOf(frontmatterOf(app, file)));
+    root.createDiv({ cls: PAGE_HEAD_FILM_CLASS });
   } else if (said.surface === "journal") {
     const type = journalTypeAtPath(plugin, file.path);
-    if (type) {
-      root.setAttr("data-ca-journal", type.id);
-      // BOTH HALVES, AND THE SECOND ONE WAS MISSING. `--ca-journal-accent-rgb`
-      // is what `--ca-grain-tint` is computed from, so setting only the first
-      // left the spine and the label taking the journal's own hue while the
-      // WASH behind them fell through to the vault accent — every journal in
-      // the vault washing the same purple, on the surface whose whole job is to
-      // say which journal this is.
-      const accent = journalAccent(type.id);
-      root.style.setProperty("--ca-journal-accent", accent.css);
-      root.style.setProperty("--ca-journal-accent-rgb", accent.rgb);
+    // ── AND THE ACCENT IS PER RUNG NOW (1.0.42) ──────────────────────────
+    //
+    // This wrote the two accent properties by hand, and `vault-banner.ts` wrote
+    // the same two. Both now go through `paintJournalRung`, which also stamps
+    // `data-ca-tier`, `--ca-tier-t` and `--ca-head-glyph` — the four facts
+    // `98-page-head.css` needs to step a head's mass and tile its glyph.
+    //
+    // BOTH HALVES OF THE ACCENT ARE STILL SET, which is what that comment was
+    // here to say: `--ca-journal-accent-rgb` is what `--ca-grain-tint` is
+    // computed from, and setting only the colour left every journal in the vault
+    // washing the same purple on the one surface whose job is to say which
+    // journal this is.
+    // THE FILM IS A CHILD, AND IT IS DRAWN ONLY WHERE THERE IS A RUNG. See
+    // `paintJournalRung` for why it is not the head's `::before` — the stack
+    // owns that pseudo. Empty and decorative: everything it shows comes from
+    // `--ca-head-glyph`, so there is nothing here for a screen reader to read
+    // and nothing to hide from one.
+    if (type && paintJournalRung(app, file, type, identity)) {
+      root.createDiv({ cls: PAGE_HEAD_FILM_CLASS });
     }
   }
 

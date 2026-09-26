@@ -1350,7 +1350,8 @@
   pointer-events: auto;
 }
 @media (hover: none) {
-  .ca-journal-widget-card > .ca-journal-block-head {
+  .ca-journal-widget-card > .ca-journal-block-head,
+  .ca-journal-widget-field.has-head > .ca-journal-block-head {
     position: static;
     height: auto;
     z-index: auto;
@@ -1397,10 +1398,12 @@
    happened to be positioned, which on a note is the whole pane. A card needs no
    such line because `.ca-journal-widget-card` has been `position: relative` since
    its seam was drawn. */
-.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) {
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card),
+.ca-journal-widget-field.has-head {
   position: relative;
 }
-.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head {
+.ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head,
+.ca-journal-widget-field.has-head > .ca-journal-block-head {
   position: absolute;
   top: 0;
   left: 0;
@@ -1425,6 +1428,8 @@
 }
 .ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head:hover,
 .ca-journal-widget-block.has-head:not(.ca-journal-widget-card) > .ca-journal-block-head:focus-within,
+.ca-journal-widget-field.has-head > .ca-journal-block-head:hover,
+.ca-journal-widget-field.has-head > .ca-journal-block-head:focus-within,
 .ca-journal-widget-block.is-slotting .ca-journal-block-head {
   height: auto;
   padding: 6px 14px 5px;
@@ -1437,6 +1442,16 @@
 }
 /* Its own rule, for the reason given at the card's. */
 .ca-journal-widget-block.has-head:not(.ca-journal-widget-card):has(> .ca-jbd-handle:hover)
+  > .ca-journal-block-head,
+.ca-journal-widget-field.has-head:has(> .ca-jbd-handle:hover) > .ca-journal-block-head,
+/* AND THE BLOCK'S OWN GRIP OPENS A SOLE FIELD'S BAND. A fence holding one
+   widget hands out no per-widget grips — the block IS that widget — so the only
+   dots over this field's top edge belong to the block. Without this arm the
+   name would be drawn on a hand-written `note:key#widget|Title` and never seen,
+   which is 5.26.1's objection to `cardWidget` on a band, still true and now
+   answered rather than avoided. */
+.ca-journal-widget-block:has(> .ca-jbd-handle:hover)
+  > .ca-journal-widget-field.has-head
   > .ca-journal-block-head {
   height: auto;
   padding: 6px 14px 5px;
@@ -1585,78 +1600,96 @@
 .ca-journal-header-bar > .ca-jbd-handle {
   top: 4px;
 }
-/* EACH GRIP ANSWERS TO ITS OWN HOST. Unscoped, hovering anywhere in a row lit
-   every grip in it at once, which is the "form under construction" this
-   affordance is built to avoid. A grip appears where the hand already is. */
-.ca-jbd-host:hover > .ca-jbd-handle,
-.ca-journal-sec-block:hover .ca-jbd-handle,
-.ca-journal-sec-fold:hover > .ca-jbd-handle,
-.ca-journal-sec-fold:hover .ca-jbd-handle,
-.ca-journal-header-bar:hover .ca-jbd-handle,
-.ca-journal-header-bar:hover > .ca-jbd-handle,
-.ca-journal-widget-block:hover > .ca-jbd-handle,
-.ca-journal-widget-card:hover > .ca-jbd-handle,
-/* `.ca-journal-note--collapsible` was a fourth and fifth selector here until
-   5.14. The class is gone — every field is a `.ca-journal-sec-fold` now, and
-   the two selectors for that one are already in this list. */
-.ca-journal-table:hover .ca-jbd-handle {
+/* ── A GRIP ANSWERS TO THE TOP OF WHAT IT DRAGS, AND TO NOTHING ELSE (1.0.42) ─
+ *
+ * THE RULE THIS FILE HAS STATED SINCE 4.8.3 — *"a grip appears where the hand
+ * already is"* — written once, for every host, in the positive. What was here
+ * was `.ca-jbd-host:hover > .ca-jbd-handle`: hover the thing that is dragged
+ * and its dots appear. That is exactly right where the host is a STRIP, and
+ * wrong everywhere else, because "the thing that is dragged" is usually a box
+ * the reader has their pointer inside of the whole time they are reading it.
+ *
+ * IT WAS ANSWERED TWICE BEFORE, EACH TIME FOR THE HOSTS SOMEONE HAD COMPLAINED
+ * ABOUT. 5.16 hid a card's grip and gave it back from the card's own top edge
+ * — *"drag icon should only appear when the widget's header does"*. 1.0.42
+ * wrote the same three rules again under `.ca-jbd-loose`, for a widget in a
+ * bare fence — *"the grab icon is only supposed to appear with the mouse near
+ * once the header pulls down."* Two families, one rule, and between them the
+ * hosts nobody had reported yet: a widget that draws its own band takes no card
+ * (`hasOwnBar` in block-drag.ts) and so wears no `.has-head`, and a fence with
+ * no bar and one widget hangs its grip on the CONTAINER. Both are boxes, both
+ * lit their dots from a pointer anywhere inside them, and the vault said so a
+ * third time: *"ensure the grip icons only appear when the mouse is
+ * hovering-over. This should be true for all sections or widgets."*
+ *
+ * SO THE THIRD ANSWER IS THE RULE ITSELF, and the two families are deleted
+ * rather than joined by a fourth. A grip comes back from its own 44×10 hit area
+ * over the top edge — inert-looking, and hoverable at `opacity: 0`; from the
+ * strip its host wears at that edge, whichever of the three that is; and from
+ * the states where there is no pointer to ask. A hover of the BODY reveals
+ * nothing, on every host there is.
+ *
+ * AND `.ca-jbd-loose` IS GONE FROM THE SCRIPT WITH ITS RULES. The marker
+ * existed to withhold a reveal this file no longer performs; `LOOSE_CLASS` in
+ * block-drag.ts went with it, because a class applied for a stylesheet that
+ * stopped naming it is the kind of dead wiring the next reader has to prove is
+ * dead before they may cut it.
+ *
+ * ORDER AND WEIGHT. This rule is `.ca-jbd-handle:hover` — two class-level
+ * components against the one of the base rule above, so it wins wherever it
+ * sits, and against the `(hover: none)` resting opacity below, so a device that
+ * CAN hover still gets the full-strength dots under the pointer. */
+.ca-jbd-handle:hover {
   opacity: 1;
 }
-/* ── A HEAD AND ITS GRIP ARE ONE CONTROL, ON ONE TRIGGER (5.16) ────────
- *
- * The list above reveals a grip when the thing it drags is hovered, and for a
- * section bar, a table or a bare block that is the whole affordance: there is
- * nothing else on those surfaces to say a drag is possible. A widget with a
- * HEAD is the case that list was written before. Its head is the 44px band
- * `.ca-journal-widget-card > .ca-journal-block-head` opens over the dots, and
- * that band already has one trigger of its own: the grip. So a card answered
- * two questions with two different gestures — dots on a hover of the whole
- * card, the name only on a hover of the dots — and a reader crossing a
- * dashboard collected a trail of grab icons naming nothing.
- *
- * A vault put it as an instruction: *"drag icon should only appear when the
- * widget's header does (with the mouse hovering around top mid/around the grab
- * icon)."* That is one control with one trigger, and the trigger is the top of
- * the widget. The dots and the band now appear together, on a hover of either,
- * and on nothing else — hovering the BODY of a widget reveals neither.
- *
- * WRITTEN AS AN OVERRIDE RATHER THAN AS FIVE `:not(.has-head)` ARMS ABOVE. The
- * list reaches a card's grip by five routes, three of them descendant selectors
- * (`.ca-journal-sec-block:hover .ca-jbd-handle` and its two neighbours) that
- * light every grip inside a section run, so an exception written into the list
- * would have to be written into each of them and would be one selector away
- * from being wrong again. One rule naming the case is the case.
- *
- * SPECIFICITY, NOT FILE ORDER, DECIDES THE RE-REVEALS. `.has-head` is carried
- * in every one of them, and the `:has()` arms take their argument's weight on
- * top of that, so each outranks both the hide below and the list above wherever
- * it lands. */
-.ca-journal-widget-card.has-head > .ca-jbd-handle,
-.ca-journal-widget-block.has-head > .ca-jbd-handle {
-  opacity: 0;
-}
-/* Its own rule, for the reason given at the head's: one unsupported selector
-   takes down the group it is written in. */
-.ca-journal-widget-card.has-head:has(> .ca-jbd-handle:hover) > .ca-jbd-handle,
-.ca-journal-widget-block.has-head:has(> .ca-jbd-handle:hover) > .ca-jbd-handle {
+/* THE STRIP THE HOST WEARS AT ITS TOP, which is the other half of "the top of
+   the widget" and the half a reader finds without looking: the band a card or a
+   field opens over its own edge, a field's permanent bar (a child of the host,
+   or a grandchild through the fold `frame: section` builds), and a fence's
+   `header:` bar where a widget in a cell drew one of its own.
+
+   A DIRECT CHILD IN EVERY ARM, and the grandchild one names the fold rather
+   than reaching with a descendant `:has()`: a widget's BODY can hold a bar of
+   its own — a nested fence, a table with a title — and lighting the grip from
+   one of those is the body hover arriving from inside, which is the whole of
+   what this rule withholds.
+
+   THEIR OWN RULE, AND ONLY `:has()` ARMS IN IT. One unsupported selector takes
+   down the group it is written in, and the group it would take down here is the
+   only control that moves a widget. */
+.ca-jbd-host:has(> .ca-journal-block-head:hover) > .ca-jbd-handle,
+.ca-jbd-host:has(> .ca-journal-sec:hover) > .ca-jbd-handle,
+.ca-jbd-host:has(> .ca-journal-sec-fold > .ca-journal-sec:hover) > .ca-jbd-handle,
+.ca-jbd-host:has(> .ca-journal-header-bar:hover) > .ca-jbd-handle {
   opacity: 1;
 }
-/* AND THE BAND KEEPS THEM BOTH LIT once the pointer has walked down off the
-   dots onto it — the head takes its hit area back exactly then, which is what
-   makes this hover reachable at all. */
-.ca-journal-widget-card.has-head:has(> .ca-journal-block-head:hover) > .ca-jbd-handle,
-.ca-journal-widget-block.has-head:has(> .ca-journal-block-head:hover) > .ca-jbd-handle {
+/* AND A HOST THAT IS THAT STRIP. `attachBlockHead` hangs a block's grip on
+   `head ?? bar ?? container`, so for a fence with a `header:` line the host IS
+   the bar and for a group it IS the head — there is no strip inside them for
+   the rule above to name, and the element is its own top edge. Both are title
+   strips a reader is already pointing at when they mean that section.
+
+   THE OTHER BANDS ARE NOT HERE, and that is the point rather than an omission:
+   `.ca-jjs-hero`, `.ca-journal-overview-banner` and the two page headers are
+   also `BANDS` entries, and they are BOXES. Hovering a box to reveal its grip
+   is the behaviour this whole family removes. */
+.ca-journal-header-bar.ca-jbd-host:hover > .ca-jbd-handle,
+.ca-journal-group-head.ca-jbd-host:hover > .ca-jbd-handle {
   opacity: 1;
 }
-/* THE STATES WHERE THE HEAD IS OPEN WITHOUT A POINTER ON IT, and the same four
-   the head's own rules name: a drag in hand, a resize in progress, and every
-   widget in a block that is being dropped into. The grip is what is being used
-   in the first two and what is being aimed at in the third; a control that
-   vanished mid-gesture would be the pairing breaking exactly where it matters. */
-.ca-journal-widget-card.has-head.is-dragging > .ca-jbd-handle,
-.ca-journal-widget-card.has-head.is-resizing > .ca-jbd-handle,
-.ca-journal-widget-block.has-head.is-dragging > .ca-jbd-handle,
-.ca-journal-widget-block.is-slotting .ca-journal-widget-card.has-head > .ca-jbd-handle {
+/* THE STATES WHERE THERE IS NO POINTER TO ASK: a drag in hand, a resize in
+   progress, and every grip in a block that is being dropped into. The grip is
+   what is being used in the first two and what is being aimed at in the third;
+   a control that vanished mid-gesture would be this pairing breaking exactly
+   where it matters.
+
+   THE GROUP'S OWN ARM NAMES THE BOX, because `is-dragging` goes on what is
+   DIMMED and for a group that is the box while the grip lives on the head
+   (4.9 §2.2) — the one place the state and the host are two elements. */
+.ca-jbd-host.is-dragging > .ca-jbd-handle,
+.ca-jbd-host.is-resizing > .ca-jbd-handle,
+.ca-journal-group.is-dragging .ca-journal-group-head > .ca-jbd-handle,
+.ca-journal-widget-block.is-slotting .ca-jbd-host > .ca-jbd-handle {
   opacity: 1;
 }
 /* A GROUP'S GRIP LIVES IN ITS FOOT (4.9 §2.2), AND `.jbd-aside` IS GONE WITH THE
@@ -1682,31 +1715,15 @@
    `.jbd-aside`, and the foot's own overrides with it, are gone with the problem
    they were working around rather than carried forward as exceptions nobody can
    re-derive. */
-/* AND IT ANSWERS TO THE WHOLE BOX. `.ca-jbd-host:hover` reveals a grip when the
-   thing it drags is hovered, and the thing this one drags is the group — where
-   that rule alone would ask a reader to find a 16px strip before it showed them
-   what the strip was for. */
-.ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle {
-  opacity: 1;
-}
-/* ── AND A BARE FENCE'S BLOCK GRIP IS GONE, NOT PARKED (5.15) ──────────
- *
- * `.has-widget-grips` was here, with two rules: it took the block's grip off
- * the centre line and up into `.ca-journal-widget-block`'s own `margin-top`,
- * plus a second rule holding that place inside a section run. The case it was
- * for is a fence with no `header:` line and several widgets — a diary entry's
- * shared band is the whole of it — where the block's grip has no head and no
- * bar to sit on and therefore lands on the container's top edge, which IS the
- * first widget's.
- *
- * That was `jbd-aside` again: a grip moved somewhere it means nothing rather
- * than a grip that means something. A vault put it plainly — *"there seems to
- * be a dragger for the entire group of sections on diary entries? it is not
- * necessary."* `block-drag.ts` now draws no block grip at all where it handed
- * grips to the widgets, so there is no second control for a rule here to place
- * and this family is deleted rather than retuned. A fence with ONE widget still
- * has its centred grip, which is where a reader looks and is honest about its
- * own scope: the block is that widget. */
+/* AND THE WHOLE BOX IS NO LONGER THE TRIGGER FOR IT (1.0.42). What was here was
+   `.ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle`, reasoned
+   as *"where that rule alone would ask a reader to find a 16px strip before it
+   showed them what the strip was for"* — the one deliberate ancestor reveal in
+   the file, and the last rule lighting a grip from a pointer resting in a body.
+   The vault's instruction is general: *"this should be true for all sections or
+   widgets."* A group head is a TITLED strip rather than an anonymous one, so
+   the reader reaching for a group is already on it, and the family above gives
+   it the same two triggers every other host has. */
 .ca-jbd-handle:active {
   cursor: grabbing;
 }

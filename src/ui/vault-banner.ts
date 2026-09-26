@@ -77,7 +77,9 @@ import {
 } from "../journals/study-header";
 import { entryDateLabel, TITLE_PROP } from "../diary/entryheader";
 import { entryContext } from "../diary/nav";
-import { journalAccent, journalTypeAtPath } from "../journals/journal";
+import { paintJournalRung, journalTypeAtPath } from "../journals/journal";
+import { paintRung, pageIconOf } from "./rung";
+import { grainRung } from "../diary/lineage";
 import { openVaultSearch } from "./search-all";
 import { openProperties } from "./properties";
 import { sectionsMenuFor } from "./widgets/page-title";
@@ -202,6 +204,15 @@ export class VaultBanner {
     host.removeAttribute("data-ca-surface");
     host.removeAttribute("data-ca-grain");
     host.removeAttribute("data-ca-journal");
+    // THE RUNG GOES WITH THEM (1.0.42), on this method's own rule. A glyph film
+    // and a tier left on a reused leaf is one that outlives its note — and
+    // `--ca-head-glyph` is the one of the five that shows: a diary entry opened
+    // after a Cheatsheet would wear the Cheatsheet's texture behind its ground.
+    host.removeAttribute("data-ca-tier");
+    host.style.removeProperty("--ca-tier-t");
+    host.style.removeProperty("--ca-head-glyph");
+    host.style.removeProperty("--ca-journal-accent");
+    host.style.removeProperty("--ca-journal-accent-rgb");
 
     const file = view.file;
     if (!(file instanceof TFile)) return;
@@ -235,20 +246,23 @@ export class VaultBanner {
       const grain = kind?.surface === "diary" ? kind.grain : "daily";
       root.setAttr("data-ca-grain", grain);
       view.setAttr("data-ca-grain", grain);
+      // AND THE SAME DEPTH CHANNEL AS A JOURNAL (1.0.42) — *"it would make sense
+      // to also implement the same choice for the diary dashboards"*. Only the
+      // depth half travels: the colour is already `[data-ca-grain]`'s, five hues
+      // hand-tuned since 4.80, so there is no accent to set here.
+      paintRung([root, view], grainRung(grain), pageIconOf(fm));
     } else if (surface === "journal") {
       const type = journalTypeAtPath(this.plugin, file.path);
-      if (type) {
-        root.setAttr("data-ca-journal", type.id);
-        view.setAttr("data-ca-journal", type.id);
-        // BOTH TOKENS, for the reason `journalAccent` states: `--ca-grain-tint`
-        // is an `rgba()` over the channels, so a view setting only the colour
-        // washed every journal in the vault accent's purple.
-        const accent = journalAccent(type.id);
-        for (const el of [root, view]) {
-          el.style.setProperty("--ca-journal-accent", accent.css);
-          el.style.setProperty("--ca-journal-accent-rgb", accent.rgb);
-        }
-      }
+      // BOTH ELEMENTS, AND THE VIEW IS THE LOAD-BEARING ONE (1.0.42). `view` is
+      // `.workspace-leaf-content`, which is the element `12-grounds.css` paints
+      // the page ground on — so stamping the rung here is the whole of how a
+      // ground tint knows which journal and which rung it is behind. The banner
+      // takes it too, for its own accent border.
+      //
+      // BOTH ACCENT TOKENS ARE STILL SET, for the reason `journalAccent` states:
+      // `--ca-grain-tint` is an `rgba()` over the channels, so a view setting
+      // only the colour washed every journal in the vault accent's purple.
+      if (type) paintJournalRung(this.app, file, type, [root, view]);
     }
 
     this.applyArt(root);

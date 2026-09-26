@@ -860,7 +860,7 @@ describe("which line drew which widget", () => {
 
   it("stamps before either the cards or the row move anything", () => {
     const stamp = widgets.indexOf("stampLines(container, drawn");
-    const card = widgets.indexOf("for (const { el, title } of named) cardWidget");
+    const card = widgets.indexOf("if (!selfTitled) cardWidget(el, title);");
     const row = widgets.indexOf("layOutRow(");
     expect(stamp).toBeGreaterThan(-1);
     expect(stamp).toBeLessThan(card);
@@ -1158,9 +1158,19 @@ describe("the landing places, as drawn", () => {
     const src = readSrc("block-drag");
     expect(src).toContain("const head = box?.querySelector<HTMLElement>");
     expect(src).toContain('head ? "Drag to move this group" : "Drag to move this block"');
-    expect(ruleFor(".ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle {")).toContain(
-      "opacity: 1"
-    );
+    // AND THE HEAD IS THE TRIGGER, NOT THE BOX (1.0.42). The rule here was
+    // `.ca-journal-group:hover .ca-journal-group-head > .ca-jbd-handle` — the
+    // file's one deliberate ancestor reveal, argued as sparing the reader from
+    // *"having to find a 16px strip before it showed them what the strip was
+    // for"*. A vault asked for the general rule instead: *"ensure the grip
+    // icons only appear when the mouse is hovering-over. This should be true
+    // for all sections or widgets."* A group head is a TITLED strip, so the
+    // reader reaching for a group is already on it, and it takes the same two
+    // triggers every other host has.
+    expect(
+      ruleFor(".ca-journal-group-head.ca-jbd-host:hover > .ca-jbd-handle {")
+    ).toContain("opacity: 1");
+    expect(rules).not.toContain(".ca-journal-group:hover .ca-journal-group-head");
     expect(rules).not.toContain(".ca-journal-group-foot > .ca-jbd-handle");
     // AND THE EXCEPTION IS GONE FROM BOTH SIDES. A rule kept "just in case"
     // after the thing it worked around has been removed is the kind nobody can

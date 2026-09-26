@@ -89,7 +89,7 @@ export function liveFileWidget(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   watchPath: string,
-  build: () => HTMLElement
+  build: (host: HTMLElement) => HTMLElement
 ): HTMLElement {
   const host = createDiv({ cls: "ca-journal-live-widget" });
   const watched = normalizePath(watchPath);
@@ -106,7 +106,7 @@ export function liveFileWidget(
 export function liveFrontmatterWidget(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
-  build: () => HTMLElement
+  build: (host: HTMLElement) => HTMLElement
 ): HTMLElement {
   const host = createDiv({ cls: "ca-journal-live-widget" });
   ctx.addChild(

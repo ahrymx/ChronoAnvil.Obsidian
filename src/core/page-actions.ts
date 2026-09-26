@@ -36,6 +36,7 @@
 import type { IconName } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import { linkPageToDiary } from "../diary/diary-link";
+import { changePageIcon } from "../ui/page-icon";
 import type { ResolvedSurface } from "../ui/section-insert";
 
 // What the menu knows about the note it is drawn in, before any item is built.
@@ -101,6 +102,30 @@ export const PAGE_ACTIONS: readonly PageAction[] = [
       "Dates the page and links it from a diary entry you pick — a day, week, month, quarter or year — so it turns up in search, on-this-day and the bridge.",
     when: (ctx) => ctx.surface !== "entry",
     run: (p, path) => linkPageToDiary(p, path),
+  },
+  {
+    // 1.0.42, and the counterpart to the glyph that release put behind every
+    // banner. That glyph comes from the MODEL — a level's `fallbackEmoji`, a
+    // kind's `emoji`, a diary grain's — which answers "every Cheatsheet" and
+    // not "this page", and the journal editor already owns the first question.
+    //
+    // NO `when`, and that is the deliberate half. Whether a page draws a glyph
+    // at all is a question about its RUNG, which `PageActionContext` cannot ask
+    // — the context is the surface and nothing else, for the reason declared on
+    // that interface, and widening it to reach a note's frontmatter would make
+    // every item's availability something the renderer re-asks on every
+    // metadata change. So the refusal is the handler's: it resolves the glyph
+    // the page would draw, and says there is none rather than opening a picker
+    // whose result would be invisible.
+    //
+    // WRITES ONE FRONTMATTER KEY, and deletes it again when the reader picks
+    // the glyph the page already had.
+    id: "page-icon",
+    label: "Change the page icon",
+    icon: "smile-plus",
+    blurb:
+      "Picks the glyph this one page tiles behind its banner, overriding the one its note type or diary period would give it.",
+    run: (p, path) => changePageIcon(p, path),
   },
 ];
 

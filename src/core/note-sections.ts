@@ -114,6 +114,9 @@ import {
   isWideLine,
   parseWide,
   argSpansIn,
+  hasToken,
+  WIDGET_TOKEN,
+  labelOf,
   readArg,
   splitDirective,
   dropSoloBar,
@@ -127,7 +130,10 @@ import {
   SectionQuestion,
   SectionView,
   SectionWant,
+  SECTION_FORM,
   WIDGET_FORM,
+  FLAG_ON,
+  FLAG_OFF,
   FlagQuestion,
   formAt,
   flagAt,
@@ -425,6 +431,33 @@ export function actionsQuestion(after: string): FlagQuestion {
     off: "Hide the action menu",
   };
 }
+
+// The flag the renderer reads and the question writes.
+//
+// ── THE COMPACT FLAG IS GONE, AND ITS GRAVE IS HERE (1.0.42) ───────────
+//
+// It shipped earlier in this release and did not outlast it. *"I think we can
+// enforce compact mode and remove the larger format."*
+//
+// WHAT IT SELECTED NO LONGER EXISTS. `TASKS_COMPACT` was a `#compact` token on
+// the `tasks:` line and `tasksDensityQuestion` was the box in *Edit sections…*
+// that wrote it; both chose between a one-line task row and a two-line one. The
+// two-line row is gone — its priority pill, date field, time field and delete
+// button are behind a `…` now (`renderTaskRow`) — so the flag chose between one
+// shape and the same shape. A question with one answer is not a question, and a
+// box that writes a token nothing reads is worse than no box: it promises an
+// effect and delivers none.
+//
+// THE TOKEN IS NOT MIGRATED OFF EXISTING LINES. `tasks:todo#compact|Tasks` is
+// written into vaults and `splitArgHead` still parses it off the region key, so
+// a line that carries it renders exactly as one that does not — which is the
+// arrangement `#collapse` has had since 5.14 and for the same reason. Rewriting
+// every entry in every vault to remove a token that changes nothing a reader can
+// see is a migration that costs a file write per note and buys tidiness.
+//
+// WHAT A READER LOSES is the roomy list, and they asked to lose it. What they
+// keep is every property it held: see `taskTags` for what the row still says
+// without being asked, and `task-edit.ts` for where the controls went.
 
 // The banner, as a flat note's catalogue composes it.
 //
@@ -1704,7 +1737,31 @@ export function answersOn(
     // widget has no header line to read, and "there is no bar" is precisely the
     // answer rather than the absence of one.
     if (q.kind === "form") {
-      out[q.key] = formAt(lines, line);
+      // ── UNLESS THE BAR IS THE LINE'S OWN LABEL (1.0.42) ──────────────
+      //
+      // A diary entry's shared band is one fence per BAND rather than per
+      // section, so `formAt` — which asks whether the fence carries a bar —
+      // would hand all seven of its fields one answer. A field titles itself
+      // from the `|Title` on its own line, and that line is the one `locate`
+      // found. See `FormQuestion.titled`.
+      //
+      // READ THE WAY THE RENDERER READS IT, which is two questions since
+      // 1.0.42 — see `withFormTitle`, where the write moved off the label and
+      // onto a `#widget` token so a widget could keep the name it draws on
+      // hover:
+      //
+      //   THE TOKEN, which is the answer a reader gave.
+      //
+      //   OR NO LABEL AT ALL, which is not an answer but is the same render: a
+      //   hand-written `note:scratch` names nothing, `fieldHead` draws it no
+      //   head, and a read calling that a section would tick a box over a field
+      //   that is plainly bare on the page. Lines written by the one build that
+      //   cut labels arrive here too, and read as what they look like.
+      out[q.key] = q.titled
+        ? hasToken(lines[line] ?? "", WIDGET_TOKEN) || !labelOf(lines[line] ?? "")
+          ? WIDGET_FORM
+          : SECTION_FORM
+        : formAt(lines, line);
       continue;
     }
     // AND A FLAG IS READ OFF THE FENCE TOO (1.0.11), for the same reason and one
@@ -1713,7 +1770,18 @@ export function answersOn(
     // read, and it answers `FLAG_OFF` rather than nothing for a fence without the
     // line — a fence with no modifier in it has answered the question.
     if (q.kind === "flag") {
-      out[q.key] = flagAt(lines, line, q);
+      // ── UNLESS THE ANSWER IS A `#token` ON THE LINE ITSELF (1.0.42) ──
+      //
+      // `FormQuestion.titled`'s branch three lines up, for the same surface and
+      // the same reason: a fence is a band of seven sections on a diary entry,
+      // so a modifier read off it answers for all seven. This one is read off
+      // the line `locate` found — the section's own directive, which is the
+      // only thing in the fence that means this section.
+      out[q.key] = q.token
+        ? hasToken(lines[line] ?? "", q.token)
+          ? FLAG_ON
+          : FLAG_OFF
+        : flagAt(lines, line, q);
       continue;
     }
     if (!q.directive) continue;

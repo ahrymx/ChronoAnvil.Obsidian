@@ -1065,6 +1065,140 @@ export function confirmPlan(
   });
 }
 
+// ── The icon table ──────────────────────────────────────────────────────
+//
+// MODULE SCOPE, NOT `onOpen`. It lived inside the method until 1.0.42 and was
+// rebuilt on every open, which is 240 strings of garbage per glance; more to the
+// point, a table nothing outside one method can see cannot be swept by a test,
+// and the one invariant that matters here is not visible by reading it —
+// see `test/emoji-picker.test.ts`.
+//
+// FIFTEEN CATEGORIES OF SIXTEEN, answering *"expand the amount of icons
+// available in the selection menu"*. Sixteen is two full rows of the eight-column
+// grid: a category of fifteen leaves a hole at the end of its second row, which
+// reads as a missing tile rather than the end of a group.
+//
+// NO GLYPH APPEARS TWICE. A duplicate is not cosmetic — the picker marks the
+// reader's current icon with `is-selected`, and the same emoji in two grids marks
+// two tiles, so the window says the reader has chosen two different things. The
+// test asserts it across the whole table rather than per category, since the
+// failure is between categories (📊 belongs to Data, and would have been just as
+// plausible in Work).
+//
+// THE ORIGINAL THIRTY-TWO ARE ALL STILL HERE, redistributed. Each one may already
+// be saved in a reader's vault or journal type, and a glyph dropped from the table
+// still renders on their page while the picker shows nothing selected — the window
+// would be reporting that their own icon does not exist. The test pins the list.
+//
+// Chosen for silhouette as much as for subject, because `page-head.ts` greyscales
+// the film: a glyph carried by colour alone (🟥 against 🟦) is one shape there.
+export const ICON_CATEGORIES: { label: string; emojis: string[] }[] = [
+  {
+    label: "Study & learning",
+    emojis: [
+      "🎓", "📚", "📖", "🧠", "🔬", "🧪", "🧮", "📐",
+      "🏫", "✏️", "✍️", "📔", "🔖", "💭", "🎒", "🗂️",
+    ],
+  },
+  {
+    label: "Writing & notes",
+    emojis: [
+      "📝", "🗒️", "📄", "📃", "📋", "📑", "📕", "📗",
+      "📘", "📙", "📒", "🖊️", "🖋️", "✒️", "📜", "🔗",
+    ],
+  },
+  {
+    label: "Planning & time",
+    emojis: [
+      "📅", "📆", "🗓️", "⏰", "⏱️", "⏳", "⌛", "⏲️",
+      "🕰️", "🔔", "✅", "☑️", "📌", "📍", "🎯", "🏷️",
+    ],
+  },
+  {
+    label: "Data & analysis",
+    emojis: [
+      "📊", "📈", "📉", "💹", "🔢", "🧾", "📇", "🗃️",
+      "🗄️", "⚖️", "🔍", "🔎", "💡", "📡", "🧫", "🎲",
+    ],
+  },
+  {
+    label: "Work & money",
+    emojis: [
+      "💼", "💰", "💵", "💳", "🏦", "📎", "📂", "🏢",
+      "🏭", "🧰", "🔑", "🗝️", "📦", "🪙", "💎", "📮",
+    ],
+  },
+  {
+    label: "Tech & tools",
+    emojis: [
+      "💻", "🖥️", "⌨️", "🖱️", "💾", "💿", "🔌", "🔋",
+      "📱", "🛰️", "🤖", "⚙️", "🛠️", "🖨️", "📟", "🕹️",
+    ],
+  },
+  {
+    label: "Science & nature",
+    emojis: [
+      "🌍", "🌱", "🌿", "🍀", "🌳", "🌲", "🌸", "🌻",
+      "🍂", "🔭", "⚗️", "🧬", "🦠", "☀️", "🌙", "🌟",
+    ],
+  },
+  {
+    label: "Weather & elements",
+    emojis: [
+      "⛅", "☁️", "🌧️", "⛈️", "❄️", "🌈", "🔥", "💧",
+      "🌊", "🌪️", "⚡", "🌡️", "🌅", "🌌", "✨", "☄️",
+    ],
+  },
+  {
+    label: "Health & fitness",
+    emojis: [
+      "🏃", "🚴", "🏋️", "🧘", "🤸", "⚽", "🏀", "🎾",
+      "🏊", "🥊", "🩺", "💊", "🫀", "😴", "🦷", "🧴",
+    ],
+  },
+  {
+    label: "Food & drink",
+    emojis: [
+      "☕", "🍵", "🍎", "🍽️", "🍿", "🥑", "🥗", "🍞",
+      "🧀", "🍳", "🍜", "🍕", "🍰", "🍫", "🥤", "🍷",
+    ],
+  },
+  {
+    label: "Travel & places",
+    emojis: [
+      "✈️", "🚗", "🚲", "🚂", "🚌", "🛳️", "🏠", "🏡",
+      "🏰", "🗽", "🏝️", "🏔️", "🗿", "🧳", "🛏️", "🚀",
+    ],
+  },
+  {
+    label: "Arts & media",
+    emojis: [
+      "🎨", "🎭", "🎬", "🎥", "📷", "📸", "🎵", "🎶",
+      "🎧", "🎸", "🎹", "🎤", "🖼️", "📺", "📻", "💬",
+    ],
+  },
+  {
+    label: "Play & occasions",
+    emojis: [
+      "🎮", "♟️", "🧸", "🪀", "🎳", "🏆", "🥇", "🎖️",
+      "🎪", "🎡", "🎈", "🎁", "🎉", "🎊", "🔮", "🧩",
+    ],
+  },
+  {
+    label: "Marks & colours",
+    emojis: [
+      "⭐", "❤️", "🔴", "🟠", "🟡", "🟢", "🔵", "🟣",
+      "⚫", "⚪", "🔺", "🔻", "⬛", "⬜", "❗", "❓",
+    ],
+  },
+  {
+    label: "Status & flags",
+    emojis: [
+      "🚩", "🏁", "🎏", "⚠️", "⛔", "🛑", "✔️", "✖️",
+      "➕", "➖", "🆕", "🆗", "🔒", "🔓", "🛡️", "⚔️",
+    ],
+  },];
+
 // ── Emoji Picker Modal ──────────────────────────────────────────────────
 //
 // DISMISSAL IS AN ANSWER, AND IT WAS NOT ONE UNTIL 1.0.9. `onClose` emptied the
@@ -1140,38 +1274,38 @@ export class EmojiPickerModal extends Modal {
       });
     }
 
-    const categories: { label: string; emojis: string[] }[] = [
-      {
-        label: "Productivity & Work",
-        emojis: [
-          "💼", "🎯", "🔗", "📅", "🗒️", "💡", "🚀", "📚",
-          "📝", "⚡", "📌", "🏷️", "📊", "📋", "🛠️", "🔍"
-        ],
-      },
-      {
-        label: "Personal & Lifestyle",
-        emojis: [
-          "☕", "✨", "🧘", "🩺", "💰", "🏃", "🏆", "🎨",
-          "⏱️", "⭐", "🌿", "🍎", "🏠", "✈️", "🎧", "💬"
-        ],
-      },
-    ];
+    // A SCROLLING PANE, because 240 tiles is taller than a screen. Obsidian's
+    // modal grows to its content and then clips at the viewport, so without this
+    // the last categories are unreachable and the Save button above them is what
+    // scrolls away. The field and the hint stay outside the pane: they are how a
+    // glyph the table does not carry gets chosen, and they must not scroll off.
+    const pane = contentEl.createDiv({ cls: "ca-emoji-pane" });
+    let selected: HTMLElement | null = null;
 
-    for (const cat of categories) {
-      contentEl.createDiv({ cls: "ca-emoji-cat-title", text: cat.label });
-      const grid = contentEl.createDiv({ cls: "ca-emoji-grid" });
+    for (const cat of ICON_CATEGORIES) {
+      pane.createDiv({ cls: "ca-emoji-cat-title", text: cat.label });
+      const grid = pane.createDiv({ cls: "ca-emoji-grid" });
       for (const emoji of cat.emojis) {
         const btn = grid.createEl("button", {
           cls: "ca-emoji-tile",
           text: emoji,
         });
-        if (emoji === this.current) btn.addClass("is-selected");
+        if (emoji === this.current) {
+          btn.addClass("is-selected");
+          selected = btn;
+        }
         btn.addEventListener("click", () => {
           this.settle(emoji);
           this.close();
         });
       }
     }
+
+    // WHERE THE READER ALREADY IS. With two categories the marked tile was always
+    // on screen; with fifteen it is usually not, and a picker that opens at the
+    // top says nothing about the current choice until the reader finds it. Only
+    // the pane scrolls — `block: "nearest"` keeps the modal itself still.
+    selected?.scrollIntoView({ block: "nearest" });
   }
 
   // An empty field means the current icon for a caller that cannot take "none",

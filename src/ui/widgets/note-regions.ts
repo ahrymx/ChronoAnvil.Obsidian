@@ -40,15 +40,18 @@ import {
   parseEntries,
   serializeEntries,
 } from "../../diary/entries";
-import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
+import { isValidNoteKey, noteKeyOf, readNoteRegion } from "../../core/notestore";
+import { splitArgHead } from "../../core/directive-grammar";
+import { moment } from "../../core/util";
 import {
   ChronoAnvilTask,
-  TaskPriority,
   moveTask,
   newTask,
   parseTasks,
   serializeTasks,
+  taskTags,
 } from "../tasks";
+import { openTaskEditor } from "../task-edit";
 import { fieldFoldStore, fieldHead } from "./note-field";
 
 /**
@@ -231,16 +234,43 @@ export function renderPathRow(
 }
 
 
+// ── ONE LINE, AND ONE BUTTON FOR THE REST (1.0.42) ─────────────────────
+//
+// *"now improve the tasks section/widget. I think we can enforce compact mode
+// and remove the larger format… actually, make it one button (…) to open a edit
+// task window which is similar to the event window editor."*
+//
+// WHAT THIS ROW WAS. Two lines: a box and the text on the first, and on the
+// second a priority pill, a date input, a time input and a delete button —
+// four controls, drawn on every task in every list whether or not any of them
+// had ever been used. Ticking something off is the common act on a list and it
+// cost a row twice the height for chrome that is not part of it. A `#compact`
+// flag existed to fold the second line into the first; it is gone with the line
+// it folded, because a list has one shape now and a flag with one answer is not
+// a question.
+//
+// WHAT IT IS. A box, the text, and a `…` that opens `openTaskEditor` — where
+// the priority, the day, the hour and Delete live, in the frame the event
+// editor uses. See `task-edit.ts` for why that window is the event window's
+// shape rather than a copy of its look.
+//
+// AND THE PROPERTIES ARE STILL ON THE ROW, JUST NOT AS CONTROLS. `taskTags`
+// prints what was chosen under the text, small — the cost of putting a property
+// behind a window is that the row stops showing it, and a list where you open
+// three windows to find what is due tomorrow is worse than the two-line row
+// this replaces.
+//
+// THE DAY IS FORMATTED HERE, because `tasks.ts` is a pure string↔model module
+// by its own header and Obsidian's `moment` is the renderer's import.
 export function renderTaskRow(
   list: HTMLElement,
   task: ChronoAnvilTask,
   cb: {
     onToggle: () => void;
     onText: (value: string) => void;
-    onPriority: (p: TaskPriority) => void;
-    onDue: (d: string | null) => void;
-    onAt: (t: string | null) => void;
-    onDelete: () => void;
+    // The one control that is not the box or the text. Everything that used to
+    // be a chip on the second line is behind it.
+    onEdit: () => void;
   }
 ): void {
   const row = list.createDiv({
@@ -249,16 +279,18 @@ export function renderTaskRow(
     }`,
   });
 
-  // Top line: Checkbox + Editable Task Text
-  const main = row.createDiv({ cls: "ca-journal-task-main" });
-
-  const box = main.createEl("input", {
+  const box = row.createEl("input", {
     type: "checkbox",
     cls: "ca-journal-task-check",
     attr: { "aria-label": task.done ? "Mark task incomplete" : "Mark task complete" },
   });
   box.checked = task.done;
   box.addEventListener("change", () => cb.onToggle());
+
+  // THE TEXT AND ITS EYEBROW IN ONE COLUMN, so the box and the `…` centre
+  // against the pair rather than against the first of them — a row whose task
+  // has a due date would otherwise hang its checkbox off the top.
+  const main = row.createDiv({ cls: "ca-journal-task-main" });
 
   const text = main.createEl("input", {
     type: "text",
@@ -278,93 +310,38 @@ export function renderTaskRow(
     }
   });
 
-  // Bottom line: Metadata chips & actions
-  const meta = row.createDiv({ cls: "ca-journal-task-meta" });
-  const chips = meta.createDiv({ cls: "ca-journal-task-chips" });
+  // NOTHING CHOSEN, NOTHING DRAWN. The strip is built only where there is
+  // something in it, so a plain task is one line of text and the eyebrow means
+  // something wherever it appears. `:empty` would hide it too; not making it is
+  // one fewer element per row on a list that can be long.
+  const tags = taskTags(task, (iso) => {
+    const d = moment(iso);
+    if (!d.isValid()) return iso;
+    // THE YEAR ONLY WHEN IT IS NOT THIS ONE. An eyebrow is four or five
+    // characters of room; "27 Sep" is the answer nearly every time, and the
+    // year is what tells a reader the one date that is not.
+    return d.year() === moment().year() ? d.format("D MMM") : d.format("D MMM YYYY");
+  });
+  if (tags.length) {
+    const eyebrow = main.createDiv({ cls: "ca-journal-task-eyebrow" });
+    tags.forEach((t, i) => {
+      if (i > 0) {
+        eyebrow.createSpan({ cls: "ca-journal-task-fact-sep", text: "·" });
+      }
+      eyebrow.createSpan({ cls: "ca-journal-task-fact", text: t });
+    });
+  }
 
-  // Priority cycle pill: normal → high → low → normal
-  const prioBtn = chips.createEl("button", {
-    cls: "ca-journal-task-prio",
+  const edit = row.createEl("button", {
+    cls: "ca-journal-task-edit",
     attr: {
-      "aria-label": `Cycle priority (currently ${task.priority})`,
-      title: `Priority: ${task.priority}`,
+      "aria-label": "Edit task",
+      title: "Edit task — priority, due date, time, delete",
       type: "button",
     },
   });
-  const PRIO_ORDER: TaskPriority[] = ["normal", "high", "low"];
-  const PRIO_ICON: Record<TaskPriority, string> = {
-    high: "chevrons-up",
-    normal: "minus",
-    low: "chevrons-down",
-  };
-  const PRIO_LABEL: Record<TaskPriority, string> = {
-    high: "High",
-    normal: "Normal",
-    low: "Low",
-  };
-  setIcon(prioBtn.createSpan({ cls: "ca-journal-task-prio-icon" }), PRIO_ICON[task.priority]);
-  prioBtn.createSpan({ cls: "ca-journal-task-prio-label", text: PRIO_LABEL[task.priority] });
-  prioBtn.addEventListener("click", () => {
-    const next =
-      PRIO_ORDER[(PRIO_ORDER.indexOf(task.priority) + 1) % PRIO_ORDER.length];
-    cb.onPriority(next);
-  });
-
-  // Due date pill
-  const dueWrap = chips.createDiv({
-    cls: `ca-journal-task-due-wrap${task.due ? " has-due" : ""}`,
-  });
-  setIcon(dueWrap.createSpan({ cls: "ca-journal-task-due-icon" }), "calendar");
-  const due = dueWrap.createEl("input", {
-    type: "date",
-    cls: "ca-journal-task-due",
-    attr: {
-      "aria-label": "Due date",
-      title: task.due ? `Due: ${task.due}` : "Set due date",
-    },
-  });
-  if (task.due) due.value = task.due;
-
-  // Time pill (beside due date)
-  const atWrap = chips.createDiv({
-    cls: `ca-journal-task-at-wrap${task.at ? " has-at" : ""}`,
-  });
-  setIcon(atWrap.createSpan({ cls: "ca-journal-task-at-icon" }), "clock");
-  const at = atWrap.createEl("input", {
-    type: "time",
-    cls: "ca-journal-task-at",
-    attr: {
-      "aria-label": "Time it is due",
-      title: task.at ? `Time: ${task.at}` : "Set due time",
-    },
-  });
-  if (task.at) at.value = task.at;
-  const syncAt = (): void => {
-    atWrap.toggleClass("is-hidden", !due.value);
-  };
-  syncAt();
-  at.addEventListener("change", () => {
-    atWrap.toggleClass("has-at", Boolean(at.value));
-    cb.onAt(at.value || null);
-  });
-
-  due.addEventListener("change", () => {
-    dueWrap.toggleClass("has-due", Boolean(due.value));
-    cb.onDue(due.value || null);
-    if (!due.value) {
-      at.value = "";
-      atWrap.removeClass("has-at");
-    }
-    syncAt();
-  });
-
-  // Delete action button
-  const del = meta.createEl("button", {
-    cls: "ca-journal-task-del",
-    attr: { "aria-label": "Delete task", title: "Delete task", type: "button" },
-  });
-  setIcon(del, "x");
-  del.addEventListener("click", () => cb.onDelete());
+  setIcon(edit, "ellipsis");
+  edit.addEventListener("click", () => cb.onEdit());
 }
 
 
@@ -378,9 +355,8 @@ export function buildList(
 ): HTMLElement {
   // `key[:placeholder]` — same grammar as `note:`, minus the `#variant` slot,
   // since a list has only one rendering.
-  const colon = rest.indexOf(":");
-  const key = (colon === -1 ? rest : rest.slice(0, colon)).trim();
-  const placeholder = colon === -1 ? "" : rest.slice(colon + 1).trim();
+  const { key, tail } = splitArgHead(rest);
+  const placeholder = tail.slice(1).trim();
 
   const wrap = createDiv({ cls: `ca-journal-list ca-journal-list--${key}` });
   // A LIST FOLDS NOW, WHICH IS THE HALF OF 5.14 A READER ASKS FOR FIRST.
@@ -499,7 +475,12 @@ export function buildPath(
   titled = false,
   barActions: HTMLElement | null = null
 ): HTMLElement {
-  const key = rest.split(":")[0].trim();
+  // THROUGH `noteKeyOf`, WHICH IS THE ONE PARSE OF A REGION KEY (1.0.42). This
+  // read was `rest.split(":")[0]`, which is right up to the moment a `#token`
+  // appears on the head — and two of them do now, `#compact` and `#widget`. An
+  // unparsed one is a region key of `capture#widget`: a field pointed at a span
+  // nothing writes, which renders empty, loses nothing and says nothing either.
+  const key = noteKeyOf(rest);
   const wrap = createDiv({ cls: "ca-journal-path" });
   const chrome = fieldHead({
     wrap,
@@ -609,7 +590,11 @@ export function buildPath(
 
 
 export function buildTasks(
-  host: NoteRegionHost,
+  // `PluginNoteRegionHost`, NOT `NoteRegionHost`, AS OF 1.0.42 — and the widening
+  // is the one thing the `…` button costs. `EditorModal` is constructed with the
+  // plugin, every other door onto an editor already has one, and the host this
+  // is called with is the dispatcher itself, which has carried both since 2.56.25.
+  host: PluginNoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
   label: string | null,
@@ -632,41 +617,65 @@ export function buildTasks(
   titled = false,
   barActions: HTMLElement | null = null
 ): HTMLElement {
-  const key = rest.split(":")[0].trim();
+  // ── THE DIRECTIVE'S OWN FLAGS, AND THERE ARE NONE LEFT (1.0.42) ─────
+  //
+  // `tasks:todo#compact|Tasks` was read here for one build. The spacing of the
+  // list had been a button in this head, then a section option written as a
+  // `#compact` flag on this line — and it is neither now, because *"I think we
+  // can enforce compact mode and remove the larger format"*. A list has one
+  // shape, and a question with one answer is not a question. See `renderTaskRow`
+  // for what that shape is, and `tasksDensityQuestion`'s grave in
+  // `core/note-sections.ts` for why the flag is not simply ignored.
+  //
+  // STILL THROUGH `splitArgHead` RATHER THAN A SPLIT ON `:`. A line written by
+  // the build that had the flag still says `tasks:todo#compact|Tasks`, and an
+  // unparsed `#compact` is a region key of `todo#compact` — a field pointed at a
+  // region nothing writes, which renders empty and loses the reader's list. The
+  // token is read and discarded, which is `#collapse`'s arrangement exactly.
+  const { key } = splitArgHead(rest);
   const wrap = createDiv({ cls: "ca-journal-tasks" });
 
+  // ── THE LABEL, AND NO FALLBACK FOR IT (1.0.42) ──────────────────────
+  //
+  // *"tasks ticked as show as widget but still renders titlebar"*, and this line
+  // was the whole of it: `label ?? "Tasks"`. A field is drawn as a widget by
+  // having its `|Title` taken off — that is what the section/widget toggle
+  // writes and what `fieldHead` reads — so a renderer that supplies a title of
+  // its own for a line that has none is a renderer that cannot be told to stop
+  // drawing one. Six field kinds pass `label` straight through; this was the
+  // seventh, and the odd one out since before the toggle existed.
+  //
+  // WHAT IT COSTS IS A HEAD ON A HAND-WRITTEN `tasks:mykey`, which is the rule
+  // every other field already follows: no label names nothing, and an empty bar
+  // is a rule ruled across the page for no reason. `fieldHead` states it.
   const chrome = fieldHead({
     wrap,
     key,
-    label: label ?? "Tasks",
+    label,
     titled,
     barActions,
     store: fieldFoldStore(host, ctx.sourcePath),
   });
-  const headRight = chrome.actions();
 
-  let isCompact = false;
-  const compactBtn = headRight.createEl("button", {
-    cls: "ca-journal-tasks-compact-toggle",
-    attr: {
-      type: "button",
-      title: "Toggle compact view",
-      "aria-label": "Toggle compact view",
-    },
-  });
-  const compactIcon = compactBtn.createSpan({ cls: "ca-journal-tasks-compact-icon" });
-  setIcon(compactIcon, "list");
-  compactBtn.createSpan({ text: "Compact" });
-
-  compactBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    isCompact = !isCompact;
-    wrap.toggleClass("is-compact", isCompact);
-    compactBtn.toggleClass("is-active", isCompact);
-  });
-
-  const progressEl = headRight.createDiv({ cls: "ca-journal-tasks-progress" });
+  // ── THE READOUT SITS ON THE ADD ROW (1.0.42) ────────────────────────
+  //
+  // *"push the count onto the same line as the input field."*
+  //
+  // AND THAT ENDS A CLASS OF BUG RATHER THAN MOVING A PILL. The count used to be
+  // built in `chrome.actions()` — the field head's slot — which took two fixes
+  // in this release alone: one for the strip being drawn over an empty card for a
+  // count of `0/0`, and one for *"0/1 Done from tasks widget in a group behaves
+  // oddly?"*, where a titled group's bar is not the field's bar and the readout
+  // ended up above both columns. Both are the same shape of fault: a head can
+  // belong to something larger than the field, so anything the FIELD says about
+  // itself has to be inside the field.
+  //
+  // IT IS STILL BUILT ONLY WHEN THERE IS SOMETHING TO READ, for a smaller reason
+  // now: a lone "0/0 done" beside an empty box is a readout of nothing. And
+  // `chrome.actions()` is no longer called from here at all, so the slot stays
+  // `:empty` and the stylesheet goes on hiding it — which is what keeps a fresh
+  // Tasks card down to a title and a box to type in.
+  let progressEl: HTMLElement | null = null;
 
   if (!isValidNoteKey(key)) {
     chrome.body.createDiv({
@@ -677,8 +686,9 @@ export function buildTasks(
   }
 
   const addRow = chrome.body.createDiv({ cls: "ca-journal-tasks-add" });
-  const addIcon = addRow.createSpan({ cls: "ca-journal-tasks-add-icon" });
-  setIcon(addIcon, "circle-plus");
+  // NO GLYPH BEFORE THE BOX. *"Remove the ➕ icon."* — the placeholder already
+  // says "Add a task…", and a plus that is not a button says the same word twice
+  // while looking like something to press.
   const addInput = addRow.createEl("input", {
     type: "text",
     cls: "ca-journal-tasks-add-input",
@@ -692,12 +702,16 @@ export function buildTasks(
 
   const updateProgress = (): void => {
     if (tasks.length === 0) {
-      progressEl.style.display = "none";
-    } else {
-      progressEl.style.display = "";
-      const done = tasks.filter((t) => t.done).length;
-      progressEl.textContent = `${done}/${tasks.length} done`;
+      // REMOVED RATHER THAN HIDDEN, so the slot it lives in goes back to being
+      // `:empty` — which is what the stylesheet is watching for. A reader who
+      // clears the last task gets the card a fresh one has.
+      progressEl?.remove();
+      progressEl = null;
+      return;
     }
+    progressEl ??= addRow.createDiv({ cls: "ca-journal-tasks-progress" });
+    const done = tasks.filter((t) => t.done).length;
+    progressEl.textContent = `${done}/${tasks.length} done`;
   };
 
   const persist = (): void => {
@@ -723,28 +737,37 @@ export function buildTasks(
           task.text = value;
           persist();
         },
-        onPriority: (p) => {
-          task.priority = p;
-          persist();
-          render();
-        },
-        onDue: (d) => {
-          task.due = d;
-          // The hour goes with the day. `parseTaskLine` drops an `at` with no
-          // `due` on the next read, so leaving it set would show a time on the
-          // row that the file no longer holds.
-          if (!d) task.at = null;
-          persist();
-          render();
-        },
-        onAt: (t) => {
-          task.at = t;
-          persist();
-        },
-        onDelete: () => {
-          tasks.splice(index, 1);
-          persist();
-          render();
+        // ── AND EVERYTHING ELSE, IN ONE WINDOW (1.0.42) ─────────────
+        //
+        // THE WRITE STAYS HERE, WHICH IS WHY THE WINDOW HANDS BACK A TASK
+        // RATHER THAN SAVING ONE. A task lives in this note's region and this
+        // closure is what holds the list, the region key and the scheduler;
+        // `task-edit.ts` holds a form. Splitting it the other way would have
+        // put a note write behind a modal that has no file.
+        //
+        // ASSIGNED FIELD BY FIELD RATHER THAN BY REPLACING THE OBJECT, because
+        // `tasks[index]` is what the rest of this closure closes over and what
+        // the next `render` reads — a fresh object in the array would leave the
+        // row's own handlers writing into one nothing persists.
+        onEdit: () => {
+          openTaskEditor(
+            host.app,
+            host.plugin,
+            task,
+            (next) => {
+              task.text = next.text;
+              task.priority = next.priority;
+              task.due = next.due;
+              task.at = next.at;
+              persist();
+              render();
+            },
+            () => {
+              tasks.splice(index, 1);
+              persist();
+              render();
+            }
+          );
         },
       });
     });

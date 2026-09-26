@@ -168,6 +168,14 @@ export interface AppearanceSettings {
   pageGround?: PageGroundId;
   // How much of that texture is let through.
   pageGroundStrength?: PageGroundStrength;
+  // Whether that texture is washed with the note's own accent (1.0.42).
+  //
+  // OPTIONAL AND DEFAULTING TO ON, for the reason the two above it are optional:
+  // a vault saved before this release has an `appearance` block without it, and
+  // a required field would make the type lie about what is on disk. `?? true` at
+  // every read is what makes an absent field mean "on", which is the answer a
+  // reader who has never seen the row wants — it is the feature they asked for.
+  groundTint?: boolean;
 }
 
 export interface ChronoAnvilSettings {
@@ -360,6 +368,7 @@ export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
     grainAesthetics: "vibrant",
     pageGround: "scanline",
     pageGroundStrength: "standard",
+    groundTint: true,
   },
   paths: { ...DEFAULT_PATHS },
   attachments: { ...DEFAULT_ATTACHMENT_OPTIONS },
@@ -1290,6 +1299,28 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
             this.plugin.appearance.apply();
           }
         );
+      });
+
+    // ── The accent wash over the ground (1.0.42) ─────────────────────────
+    //
+    // A TOGGLE AND NOT A FOURTH INTENSITY, which is the one design call on this
+    // row. `Grain accent intensity` already dials how boldly an accent is used
+    // and this wash obeys it — Subtle quietens it, Monochrome flattens it to the
+    // theme's own colour, both without this row's help. What this answers is a
+    // different question: whether a note's whole background is in the business
+    // of saying which note it is at all. That is a yes or a no.
+    new Setting(containerEl)
+      .setName("Tint the page ground")
+      .setDesc(
+        "Washes the background texture with the note's own accent, so a page says which journal and which level it belongs to before anything on it is read. Off paints the texture in the theme's own ink."
+      )
+      .addToggle((t) => {
+        t.setValue(s.appearance?.groundTint ?? true).onChange(async (v) => {
+          if (!s.appearance) s.appearance = { aestheticPreset: "editorial", grainAesthetics: "vibrant", pageGround: "scanline", pageGroundStrength: "standard" };
+          s.appearance.groundTint = v;
+          await this.plugin.saveSettings();
+          this.plugin.appearance.apply();
+        });
       });
 
     new Setting(containerEl)

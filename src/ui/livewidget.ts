@@ -27,7 +27,14 @@ import {
 } from "obsidian";
 
 export interface LiveWidgetOptions {
-  build: () => HTMLElement;
+  // THE HOST IS HANDED IN (1.0.42), and it is handed in on every rebuild rather
+  // than captured once, because that is the only moment a builder can be sure of
+  // where it sits: a render child's `onload` runs once the element is in the
+  // document, so `host.closest(…)` answers here and answers nowhere earlier.
+  // `page-head.ts` is what needed it — a stack's card has to be painted with the
+  // note's grain, and a card painted once would keep the tone of the rung the
+  // note used to be. Every other builder ignores the argument.
+  build: (host: HTMLElement) => HTMLElement;
   // Whether a changed file should trigger a rebuild. Typically a scope
   // check — "is this file under my folder?" — rather than an exact path
   // match, so cross-file aggregation (topics-table, confidence-summary,
@@ -131,7 +138,7 @@ export class LiveWidget extends MarkdownRenderChild {
   private rerender(): void {
     this.opts.onCleanup?.();
     this.containerEl.empty();
-    this.containerEl.appendChild(this.opts.build());
+    this.containerEl.appendChild(this.opts.build(this.containerEl));
     this.containerEl.dispatchEvent(new CustomEvent(LIVE_REDRAW_EVENT));
   }
 }

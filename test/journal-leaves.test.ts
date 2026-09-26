@@ -22,7 +22,16 @@
 
 import { describe, expect, it } from "vitest";
 
-import { STUDY_JOURNAL, journalNounOf } from "../src/journals/journal";
+import {
+  STUDY_JOURNAL,
+  journalNounOf,
+  journalRungOf,
+} from "../src/journals/journal";
+// THE TILE MOVED TO `ui/rung.ts` when the diary gained the same film (1.0.42) —
+// both domains build one from a plain string, and neither owns it.
+import { glyphTile } from "../src/ui/rung";
+import type { JournalType } from "../src/journals/journal";
+import { DEFAULT_PAGE_EMOJI } from "../src/core/constants";
 import { sectionContext } from "../src/journals/journal-sections";
 import {
   nextPageOrder,
@@ -86,6 +95,159 @@ describe("the context strip under a leaf's tracker card", () => {
     expect(t).toContain("pageHeadSays(plugin, file, levelNoun)");
     expect(t).toContain("pageHeadSays(plugin, file, kindLabel)");
     expect(t).toContain("if (!levelNoun && !kindLabel) return null;");
+  });
+});
+
+// ── WHICH RUNG OF THE JOURNAL A NOTE IS (1.0.42) ─────────────────────────
+//
+// *"Journal levels (and pages) look too similar which makes it easy to lose
+// which index table you're looking at."* `journalRungOf` is the answer's
+// arithmetic: a ladder from the journal's own note down to a page, which the
+// page head paints its mass and its glyph film from.
+describe("which rung of its journal a note is", () => {
+  // Study: two levels (Subject, Topic), two kinds (Lesson, Practice), one page.
+  // So six rungs — the home note, two levels, two kinds, the page.
+  const OF = 6;
+
+  it("puts the journal's own note first and a page last", () => {
+    expect(journalRungOf(STUDY_JOURNAL, true, undefined)).toMatchObject({
+      step: 0,
+      of: OF,
+      t: 0,
+      emoji: STUDY_JOURNAL.emoji,
+    });
+    expect(journalRungOf(STUDY_JOURNAL, false, "page")).toMatchObject({
+      step: OF - 1,
+      of: OF,
+      t: 1,
+    });
+  });
+
+  it("orders levels above kinds, and one rung per kind", () => {
+    const step = (v: string): number => {
+      const r = journalRungOf(STUDY_JOURNAL, false, v);
+      expect(r, v).not.toBeNull();
+      return r!.step;
+    };
+    // Outermost first, and strictly increasing — which is what the head's mass
+    // steps down. A Lesson and a Practice deck share a DEPTH and are different
+    // kinds, so they get different rungs: that is the whole reason the ramp is
+    // indexed over kinds rather than over folder depth.
+    expect([
+      step("subject"),
+      step("topic"),
+      step("lesson"),
+      step("practice"),
+      step("page"),
+    ]).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("carries each rung's own glyph", () => {
+    // `JournalKind.emoji` and `JournalLevel.fallbackEmoji` have existed as long
+    // as the model and the banner read neither until this release.
+    expect(journalRungOf(STUDY_JOURNAL, false, "subject")!.emoji).toBe(
+      STUDY_JOURNAL.levels[0].fallbackEmoji
+    );
+    expect(journalRungOf(STUDY_JOURNAL, false, "lesson")!.emoji).toBe(
+      STUDY_JOURNAL.kinds[0].emoji
+    );
+    // A PAGE HAS NO EMOJI OF ITS OWN — `JournalPages` holds an id, a label and a
+    // template — so it takes the one constant, which is the glyph the widget
+    // registry and the section catalogue already print for it.
+    expect(journalRungOf(STUDY_JOURNAL, false, "page")!.emoji).toBe(
+      DEFAULT_PAGE_EMOJI
+    );
+  });
+
+  it("answers null for a stray rather than rung 0", () => {
+    // A note under a journal root declaring a `type:` this journal does not
+    // recognise is UNCLASSIFIED, which is not the same as outermost. Rung 0 is
+    // the loudest head in the journal and the wrong answer for a scratch file;
+    // null means "no rung", and `journalAccent` then keeps the flat per-journal
+    // accent every note here had before 1.0.42.
+    expect(journalRungOf(STUDY_JOURNAL, false, "cheatsheets")).toBeNull();
+    expect(journalRungOf(STUDY_JOURNAL, false, undefined)).toBeNull();
+    expect(journalRungOf(STUDY_JOURNAL, false, "")).toBeNull();
+  });
+
+  it("counts rungs from the journal, so a deeper one does not fall off", () => {
+    // `JournalType.levels` HAS NO CAP. The settings dropdown offers one or two
+    // and `journal-infer.ts` can recover three from a folder tree nobody made
+    // through the UI — so the ladder is computed, and a hand-written four-step
+    // table would have been wrong on the third journal this vault grows.
+    const deep: JournalType = {
+      ...STUDY_JOURNAL,
+      levels: [
+        ...STUDY_JOURNAL.levels,
+        { id: "unit", noun: "Unit", indexTemplate: "Unit Index.md", fallbackEmoji: "📘" },
+      ],
+    };
+    expect(journalRungOf(deep, true, undefined)!.of).toBe(OF + 1);
+    expect(journalRungOf(deep, false, "unit")).toMatchObject({ step: 3, of: 7 });
+    // The ends stay the ends however many rungs there are, which is what keeps
+    // `--ca-tier-t` a fraction the stylesheet can multiply.
+    expect(journalRungOf(deep, false, "page")!.t).toBe(1);
+    expect(journalRungOf(deep, true, undefined)!.t).toBe(0);
+  });
+
+  it("gives a flat journal a ladder too", () => {
+    // One level, one kind: the home note, the level, the kind, the page.
+    const flat: JournalType = {
+      ...STUDY_JOURNAL,
+      levels: [STUDY_JOURNAL.levels[0]],
+      kinds: [STUDY_JOURNAL.kinds[0]],
+    };
+    expect(journalRungOf(flat, true, undefined)!.of).toBe(4);
+    expect(journalRungOf(flat, false, "subject")!.t).toBeCloseTo(1 / 3, 5);
+    // And the level that is gone is gone, rather than answering the rung the
+    // deeper journal gave it.
+    expect(journalRungOf(flat, false, "topic")).toBeNull();
+  });
+});
+
+// ── THE GLYPH TILE (1.0.42) ──────────────────────────────────────────────
+//
+// *"Could the Icon be used as a repeating texture background on the banner? I
+// think it would be a better visual than just a single plate."*
+describe("the kind's glyph as a tiled data URI", () => {
+  it("encodes the whole document, so no emoji can break the value", () => {
+    // A reader's own kind may carry any emoji, including the variation selector
+    // in `🛠️`. Encoding is also what keeps `<`, `>`, `"` and `#` out of a CSS
+    // value — a raw `#` would be read as a fragment and truncate the URI, which
+    // is why `--ca-tex-grain` spells its one `#` as `%23`.
+    const tile = glyphTile(STUDY_JOURNAL.kinds[1].emoji);
+    expect(tile.startsWith('url("data:image/svg+xml,')).toBe(true);
+    expect(tile.endsWith('")')).toBe(true);
+    const body = tile.slice('url("data:image/svg+xml,'.length, -2);
+    expect(body).not.toContain("<");
+    expect(body).not.toContain(">");
+    expect(body).not.toContain('"');
+    expect(body).not.toContain("#");
+    expect(decodeURIComponent(body)).toContain(STUDY_JOURNAL.kinds[1].emoji);
+  });
+
+  it("draws in a fixed cell, so the stylesheet owns the density", () => {
+    // The tile is resolution-independent: `background-size` alone decides how
+    // dense the film is, which is what lets the depth channel be one `calc()`
+    // off `--ca-tier-t` instead of a string per rung from TypeScript.
+    const svg = decodeURIComponent(
+      glyphTile("📖").slice('url("data:image/svg+xml,'.length, -2)
+    );
+    expect(svg).toContain('width="100" height="100"');
+    // AND THE FONT IS NAMED IN THE DOCUMENT, because an SVG used as a
+    // `background-image` is its own image document: it inherits nothing from the
+    // page and falls back to a platform default with no emoji coverage. This is
+    // the difference between a texture and an empty band, and it cannot be seen
+    // from any assertion about the page.
+    expect(svg).toContain("Noto Color Emoji");
+    expect(svg).toContain("sans-serif");
+    // TWO GLYPHS ON A DIAGONAL, not one centred: a single centred glyph repeats
+    // as a visible grid, which reads as a table behind the title.
+    expect([...svg.matchAll(/<text /g)]).toHaveLength(2);
+  });
+
+  it("gives two kinds two different films", () => {
+    expect(glyphTile("📖")).not.toBe(glyphTile("🛠️"));
   });
 });
 

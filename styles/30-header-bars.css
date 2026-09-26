@@ -335,6 +335,43 @@
 .ca-journal-sec-l1 > .ca-journal-header-widgets.ca-journal-widget-bar:empty {
   display: none;
 }
+
+/* ── AND THE STRIP A FIELD BUILDS WHEN NO BAR LENDS IT ONE (1.0.42) ────
+ *
+ * *"0/1 Done from tasks widget in a group behaves oddly?"* Two faults, one
+ * screenshot. The first was whose slot the readout went into and is fixed in
+ * `fieldHead`; this is the second, and it was visible in the ungrouped shot all
+ * along — a full-width dark bar across the top of the Tasks card where a small
+ * pill belongs.
+ *
+ * THE CLASS HAD NO RULE AT ALL. `.ca-journal-field-tools` is built by
+ * `fieldHead` for a field whose fence offers no actions slot, and until now it
+ * was a bare block: the readout inside it is a `div`, so it stretched edge to
+ * edge and wore its pill background as a band. Everything it can hold has only
+ * ever been seen inside `.ca-journal-header-widgets`, which is a flex row — so
+ * the strip that stands in for that slot has to be one too.
+ *
+ * ANCHORED RIGHT, WHICH IS WHERE THE SLOT IT REPLACES SITS. A field's controls
+ * read as chrome at the end of a line, not as content at the start of one, and
+ * a reader who has seen the count on a titled Tasks card should find it in the
+ * same corner on a widget one.
+ *
+ * NO HAIRLINE, UNLIKE THE BAR'S. That rule pays for a border because it hangs
+ * under a title and divides two things; this one opens the box and would be a
+ * rule ruled across the top of a card for nothing. Same reason it collapses
+ * when it is `:empty` — a field that built the strip and then emptied it (the
+ * last task deleted) gets the card a fresh one has. */
+.ca-journal-field-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
+  margin-bottom: var(--ca-space-2);
+}
+.ca-journal-field-tools:empty {
+  display: none;
+}
 /* THE STRIP'S SCALE, WHICH IS LEVEL 2'S AND IS NOW BOTH LEVELS'. 50-entry-
    header.css sized a nested bar's buttons down to `--ca-text-2xs` and argued it as
    a fact about level 2; the argument turns out to be about a PLACE — chrome under
@@ -1113,7 +1150,6 @@ body.is-mobile
   /* And no spine of its own: it paints the CARD's left edge instead, from the
      pseudo-element two rules down, which is where the argument is written. */
   border-left-width: 0;
-  position: static;
 }
 .ca-journal-stack .ca-journal-page-head::after {
   content: none;
@@ -1141,46 +1177,40 @@ body.is-mobile
  *   nothing, so the reader's eye follows the left edge down and the title is
  *   the one thing off it. Three pixels under Technical HUD, which is worse.
  *
- * SO THE CARD GIVES UP ITS LEFT BORDER AND THE HEAD PAINTS IT INSTEAD, full
- * height, in the grain's colour. One edge, one colour, running the whole card,
- * and every band inset the same 14px from it.
+ * SO ONE EDGE RUNS THE WHOLE CARD, in the grain's colour, and every band is
+ * inset the same 14px from it. The head draws none of its own.
  *
- * WHY A PSEUDO-ELEMENT AND NOT THE CARD'S OWN `border-left-color`, which is the
- * shorter rule and the first thing to try: the card cannot see the colour.
- * `page-head.ts` writes `data-ca-grain` and `data-ca-journal` on the HEAD, and
- * 99-aesthetic-presets.css binds `--ca-grain-spine` there — a custom property
- * reaches descendants and never an ancestor, so a card asking for it gets the
- * `00-tokens.css` fallback and a journal note's magenta spine comes out the
- * vault's accent. Reaching the card instead would mean six `:has()` selectors,
- * one per grain plus one for a journal, which is the shape 5.31.2 just deleted.
+ * ── AND IT IS THE CARD'S OWN BORDER AGAIN (1.0.42) ──────────────────
  *
- * WHICH IS WHY THE HEAD GOES `position: static` HERE. The pseudo has to be the
- * head's to read the colour and the CARD's to be as tall as the card, and an
- * absolutely positioned box resolves against the nearest positioned ancestor.
- * The stack's card is `position: relative` at the top of this block and nothing
- * between them is positioned — `.ca-journal-live-widget` is a bare host and
- * `test/journal-stack.test.ts` holds it to that, because a `position` added to
- * that wrapper for a reason of its own would silently shorten this spine to the
- * head again. The head's own `::after` is the only thing `relative` was for and
- * it is `content: none` two rules up.
+ * 5.31.2 drew this as a pseudo-element ON THE HEAD, and said why: *"the card
+ * cannot see the colour. `page-head.ts` writes `data-ca-grain` and
+ * `data-ca-journal` on the HEAD… a custom property reaches descendants and
+ * never an ancestor."* True, and no longer the situation. `buildPageHead` now
+ * paints the identity onto the stack's card as well as the head — it finds the
+ * card from the live host, which a render child can do because its `onload`
+ * runs once the element is in the document — so the card resolves
+ * `--ca-grain-spine` itself and the shorter rule the old comment wanted is
+ * simply available.
  *
- * `:has()` ON THE BORDER RULE so the card gives up an edge only where there is
- * a head to replace it. Every stack has one today — the host is always the
- * banner and all three banner directives draw a page head — and a card with no
- * left edge at all is not the failure this should degrade into. */
+ * WHAT THAT BUYS IS THE HEAD'S `position` BACK, which is what forced the
+ * change. The pseudo had to be the head's to read the colour and the CARD's to
+ * be as tall as the card, so the head went `position: static` and gave up the
+ * only two pseudo-elements it had. The tiled kind glyph (1.0.42) needs a box
+ * the size of the head, and a stack is where the reader's journal pages
+ * actually live — so a feature that switched itself off inside a stack was
+ * switched off everywhere that mattered.
+ *
+ * `:has()` so the card takes the SPINE only where there is a head to have set
+ * the colour. Every stack has one today — the host is always the banner and all
+ * three banner directives draw a page head — and a card falling back to its
+ * ordinary border is the right failure rather than one in the vault's accent.
+ *
+ * SCALED BY THE RUNG, like the head's own spine: the card carries `data-ca-tier`
+ * too, so `--ca-head-spine-k` resolves here and an index card's edge is twice a
+ * page card's. */
 .ca-journal-widget-block.ca-journal-stack:has(.ca-journal-page-head) {
-  border-left: none;
-}
-.ca-journal-stack .ca-journal-page-head::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: var(--ca-head-spine);
-  background: var(--ca-grain-spine);
-  /* Two pixels of decoration over the left edge of every band it crosses. */
-  pointer-events: none;
+  border-left: calc(var(--ca-head-spine) * var(--ca-head-spine-k)) solid
+    var(--ca-grain-spine);
 }
 /* ── A PAGE BANNER THAT IS ALSO A STACK (5.30) ─────────────────────────
  *
@@ -1496,14 +1526,36 @@ body.is-mobile
  * class, and states its ground, its edge and its shadow rather than trusting
  * any of the three to be nothing.
  *
- * WHAT THE PILL LOOKS LIKE NOW, and the brief moved with it. 5.28 asked for
- * *"no surface of its own, no border"*, which was right when the strip was the
- * only chrome in a plain banner; it is inside a card with a coloured spine now,
- * and a row of unbounded words there reads as a caption rather than as
- * controls. An OUTLINED pill answers both: a hairline and a full radius say
- * "press me", the transparent ground keeps the quiet, and the ground arrives
- * only on hover and while the section is open, which is where the weight was
- * always meant to be earned.
+ * WHAT THE PILL LOOKS LIKE NOW, third answer to the same question, asked for as
+ * *"a more lowkey and sleek button style"*. The two before it were both
+ * one-sided:
+ *
+ *   5.28 gave it *"no surface of its own, no border"* — right while the strip
+ *   was the only chrome in a plain banner, and a row of unbounded words once
+ *   the banner became a card with a coloured spine, which reads as a caption
+ *   rather than as controls.
+ *
+ *   5.31.2 answered that with a HAIRLINE AND A FULL RADIUS. It bounds the
+ *   words, and it is the loud way to do it: a line is the highest-contrast mark
+ *   a control can wear, a capsule is the most emphatic shape it can take, and
+ *   four or five of them in a row under the note's name is a toolbar — the one
+ *   thing this strip exists to take away.
+ *
+ * SO THE BOUND MOVES FROM THE EDGE TO THE GROUND. A chip is a faint fill with
+ * no line at all: it is still plainly an object rather than a caption, and it
+ * says so at a fraction of the contrast a border spends. The radius drops from
+ * the capsule to `--ca-radius-sm`, which is what every other small control in
+ * this plugin is cut to, and the padding tightens a pixel on each side. Weight
+ * is still earned — the fill deepens on hover and again while the section is
+ * open — and it is now the SAME property doing the earning at every step, so
+ * the three states read as one dial rather than as three different treatments.
+ *
+ * `color-mix` OFF `--text-normal`, NOT A BACKGROUND TOKEN. The chip has to be
+ * faint against whatever it sits on — a stack card, a plain banner, either
+ * theme — and `--background-modifier-hover` is a fixed overlay that is a hover
+ * cue in every theme that defines it, so using it at rest leaves nothing to
+ * hover TO. A percentage of the ink is the idiom the calendar and the events
+ * board already use for exactly this.
  *
  * NEUTRAL, NOT THE GRAIN'S COLOUR, AND THAT IS AN INHERITANCE FACT RATHER THAN
  * A PREFERENCE. `page-head.ts` writes `data-ca-grain` on the HEAD; the strip is
@@ -1516,37 +1568,64 @@ body.is-mobile
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* WHY THE PADDING BELOW HAD NEVER SIZED THIS BOX. `min-height: 0` was the
+     5.31.2 half of the fix and it cannot reach an explicit `height`: Obsidian
+     gives a `<button>` `height: var(--input-height)`, which is 30px, and the
+     measurement in the chevron block below records exactly that — *"four pixels
+     tall in a THIRTY-pixel pill"* under 4px of padding and a 0.7em label, which
+     no arithmetic here adds up to. So the padding was decorative and the row
+     was app-control height. Both are stated, and `auto` is what makes the
+     other numbers in this rule mean anything. */
   min-height: 0;
+  height: auto;
   /* Nine on the chevron's side and ten on the label's: a round glyph needs less
-     air beside it than a stem does, and the pill looks lopsided at equal. */
-  padding: 4px 9px 4px 10px;
-  border: var(--ca-rule-hair) solid var(--background-modifier-border);
-  border-radius: 999px;
-  background: transparent;
+     air beside it than a stem does, and the pill looks lopsided at equal. One
+     pixel off the top and bottom against the outlined pill — a chip with no
+     line on it needs less air inside to stop looking cramped. */
+  padding: 3px 9px 3px 10px;
+  /* THE EDGE IS RESERVED RATHER THAN DRAWN. `transparent` and not `none`,
+     because this rule's job is to leave Obsidian's own button chrome nothing to
+     supply (see above) AND because the box may not change size if a state, a
+     preset or `:focus-visible` ever does paint one. */
+  border: var(--ca-rule-hair) solid transparent;
+  border-radius: var(--ca-radius-sm);
+  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
   box-shadow: none;
   color: var(--text-muted);
   font-size: var(--ca-bar-text);
   font-weight: 500;
   line-height: 1.45;
   cursor: pointer;
+  /* The weight of the label is NOT on the dial: a font-weight that changes with
+     state reflows the row's widths under the reader's pointer. */
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
     color 120ms ease;
 }
 .ca-journal-reveal-bar > button.ca-journal-reveal-toggle:hover {
-  background: var(--background-modifier-hover);
-  border-color: var(--background-modifier-border-hover);
+  background: color-mix(in srgb, var(--text-normal) 9%, transparent);
+  border-color: transparent;
   color: var(--text-normal);
 }
 /* OPEN READS AS PRESSED. The button is the only thing on screen saying a
    section is open once that section is drawn below it — the card itself says
    nothing about which control opened it — so the state has to be legible on
-   the control rather than only in the chevron's angle. */
+   the control rather than only in the chevron's angle.
+
+   AND IT IS NOW A STEP PAST HOVER RATHER THAN THE SAME PLACE. Both states wore
+   one ground until this round, which made a hovered closed chip and an open one
+   identical — the reader's pointer erased the answer it was reaching for. */
 .ca-journal-reveal-bar > button.ca-journal-reveal-toggle.is-open {
-  background: var(--background-modifier-hover);
-  border-color: var(--background-modifier-border-hover);
+  background: color-mix(in srgb, var(--text-normal) 13%, transparent);
+  border-color: transparent;
   color: var(--text-normal);
+}
+/* So an open chip has somewhere left to go. Without this, hovering one gives no
+   response at all: `.is-open` is written after `:hover`, carries the same
+   specificity, and therefore wins on a chip that is both. */
+.ca-journal-reveal-bar > button.ca-journal-reveal-toggle.is-open:hover {
+  background: color-mix(in srgb, var(--text-normal) 17%, transparent);
 }
 /* ── AND THE CHEVRON SITS IN THE MIDDLE OF THE ROW IT IS ON (5.31.2) ───
  *

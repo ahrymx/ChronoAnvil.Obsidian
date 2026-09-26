@@ -145,7 +145,7 @@ describe("what the head carries, and what it stopped carrying", () => {
     // ids in even if one were passed.
     expect(PAGE_TITLE_LINE).toBe("title");
     expect(PAGE_TITLE_LINE).not.toContain(":");
-    const head = code("ui/widgets/page-head");
+    const head = code("page-head");
     expect(head).toContain("export function livePageHead(");
     const sig = head.slice(head.indexOf("export function livePageHead("));
     expect(sig.slice(0, sig.indexOf(")"))).not.toContain("ids");
@@ -267,7 +267,13 @@ describe("the head is drawn as the page, not as another card", () => {
     // Search, on the Diary folder note, on a Logbook page or on the journals
     // root — six pages that drew a bold line of text over a hairline. The rule
     // is the HEAD'S now and the attributes only bind its colour.
-    expect(head).toContain("border-left: var(--ca-head-spine) solid var(--ca-grain-spine)");
+    // A RUNG SCALES IT (1.0.42). The token is still the preset's and still the
+    // only thing that says how heavy a spine is; `--ca-head-spine-k` is 1
+    // everywhere but a journal note, so this rule is unchanged off a journal.
+    expect(head).toContain(
+      "border-left: calc(var(--ca-head-spine) * var(--ca-head-spine-k)) solid"
+    );
+    expect(head).toContain("var(--ca-grain-spine)");
     expect(head).toContain("padding-left: 14px");
     // AND THE GATE IS GONE RATHER THAN WIDENED. What is left in the presets
     // file is the token BINDING — a custom property inherits, so a grain or a
@@ -328,12 +334,13 @@ describe("the head is drawn as the page, not as another card", () => {
     // the input draws in place, on the title's own metrics, so a size on one
     // and not the other is a row that jumps the moment it is clicked.
     expect(ruleFor(".ca-journal-page-head")).toContain("gap: 6px");
-    expect(ruleFor(".ca-journal-page-head .ca-jph-title")).toContain(
-      "font-size: var(--ca-head-title-size)"
-    );
-    expect(ruleFor(".ca-journal-page-head .ca-jph-title-input")).toContain(
-      "font-size: var(--ca-head-title-size)"
-    );
+    // BOTH TAKE THE RUNG'S FACTOR, AND IT MUST BE BOTH (1.0.42) — for exactly
+    // the reason the comment above gives. A rung that shrank the name and not
+    // the input it is replaced by is a row that jumps on the first keystroke,
+    // which is the defect this pair of assertions already existed to catch.
+    const size = "font-size: calc(var(--ca-head-title-size) * var(--ca-head-title-k))";
+    expect(ruleFor(".ca-journal-page-head .ca-jph-title")).toContain(size);
+    expect(ruleFor(".ca-journal-page-head .ca-jph-title-input")).toContain(size);
   });
 
   it("keeps the face Obsidian's inline title had, one step up", () => {
@@ -747,18 +754,112 @@ describe("the journal's colour reaches the wash, not just the spine", () => {
     // wash behind them fell through to the vault accent — every journal in the
     // vault washing the same purple, on the surface whose job is to say which
     // journal this is.
+    // ── AND THE STAMPING IS ONE FUNCTION NOW (1.0.42) ───────────────────
+    //
+    // Both halves were written out in both files, and 1.0.42 made it five
+    // properties. `paintJournalRung` is the single writer, so this asserts the
+    // fact where it now lives and that both surfaces still go through it.
+    const painter = code("journal");
+    expect(painter).toContain('"--ca-journal-accent"');
+    expect(painter).toContain('"--ca-journal-accent-rgb"');
     for (const name of ["page-head", "vault-banner"]) {
-      const src = code(name);
-      expect(src, name).toContain("journalAccent(type.id)");
-      expect(src, name).toContain('"--ca-journal-accent-rgb"');
+      expect(code(name), name).toContain("paintJournalRung(");
+      // AND NEITHER SETS IT ITSELF ANY MORE, which is the half that keeps one
+      // writer one writer rather than one writer and two survivors.
+      // `setProperty`, not the name: `vault-banner.ts` REMOVES all five on a
+      // leaf it is about to reuse, which is that file's own standing rule.
+      expect(code(name), name).not.toContain('setProperty("--ca-journal-accent"');
     }
+  });
+
+  it("draws the glyph film as a child, only where there is a rung", () => {
+    // NOT `::before`: the stack owns that pseudo on this very element, and the
+    // two rules would have resolved per property rather than picking a winner —
+    // the card's spine keeping its geometry and taking the film's greyscale and
+    // quarter opacity. `test/aesthetic-presets.test.ts` guards the CSS half.
+    expect(code("page-head")).toContain("PAGE_HEAD_FILM_CLASS");
+    // GATED ON THE RETURN VALUE, so the six pages with no rung — the Homepage,
+    // Search, the Diary folder note, a Logbook page, the journals root — gain no
+    // empty div, and a note outside every journal is untouched to the pixel.
+    expect(code("page-head")).toContain(
+      "if (type && paintJournalRung("
+    );
+    // The painter has to report back for that gate to be possible at all.
+    expect(code("journal")).toContain("): JournalRung | null {");
   });
 
   it("names the hue once, where the two readers can share it", () => {
     // `hsl(…, 65%, 55%)` was written out in both files, which is how two copies
     // of one colour drift the first time either is tuned.
-    expect(code("journal")).toContain("css: `hsl(${h}, ${ACCENT_S * 100}%");
+    expect(code("journal")).toContain("css: `hsl(${h}, ");
     expect(code("page-head")).not.toContain("65%, 55%");
     expect(code("vault-banner")).not.toContain("65%, 55%");
   });
+
+  // ── THE RUNG RAMP (1.0.42) ────────────────────────────────────────────
+
+  it("ramps a rung off the journal's own hue, never off a rotation", () => {
+    const src = code("journal");
+    // THE HUE IS THE JOURNAL'S IDENTITY AND DOES NOT MOVE. A 20°-per-rung
+    // rotation from `hueOf("study")` (301°) lands the third rung on 1° and the
+    // fourth on 21° — on top of `--ca-grain-quarterly` (17°) and
+    // `--ca-grain-daily` (34°) — so a Study page would read as a period
+    // dashboard. The ramp is saturation and lightness only.
+    expect(src).toContain("const h = hueOf(id)");
+    expect(src).toContain("RAMP_S");
+    expect(src).toContain("RAMP_L");
+    // SATURATION CARRIES MORE THAN LIGHTNESS, which is the light-theme answer:
+    // there is no theme twin for this, and a wide lightness ramp would wash the
+    // outer rungs out on a light ground.
+    const s0 = RAMP_SPAN(src, "RAMP_S");
+    const l0 = RAMP_SPAN(src, "RAMP_L");
+    expect(s0).toBeGreaterThan(l0);
+    // AND IT STRADDLES THE OLD FLAT VALUE, so a vault's middle rungs move least.
+    expect(src).toContain("const ACCENT_S = 0.65");
+    expect(src).toContain("const ACCENT_L = 0.55");
+  });
+
+  it("counts rungs from the journal rather than from a table", () => {
+    const src = code("journal");
+    // `JournalType.levels` HAS NO CAP: the settings dropdown offers one or two,
+    // `journal-infer.ts` can recover three from a folder tree, and a four-step
+    // table would fall off the end of one. Levels + kinds + the page + the home
+    // note, computed.
+    expect(src).toContain(
+      "const of = type.levels.length + type.kinds.length + 2"
+    );
+    // PAGES ARE ONE RUNG HOWEVER MANY KINDS THERE ARE — `recognisedTypeValues`
+    // says so, because every kind of one journal names the same page id.
+    expect(src).toContain("type.kinds.some((k) => k.pages.id === id)");
+  });
+
+  it("walks levels before kinds, which journalNounOf does not", () => {
+    const src = code("journal");
+    const rung = src.slice(src.indexOf("export function journalRungOf"));
+    const levels = rung.indexOf("type.levels.findIndex");
+    const kinds = rung.indexOf("type.kinds.findIndex");
+    // The order is arbitrary in `journalNounOf` and load-bearing here: the four
+    // id sets are disjoint by construction, so the two can disagree about which
+    // list answered and never about which rung.
+    expect(levels).toBeGreaterThan(0);
+    expect(kinds).toBeGreaterThan(levels);
+  });
+
+  it("leaves the rail's scope call alone", () => {
+    // A rung is the wider ladder the head PAINTS with; the rail is still the
+    // journal's LAYERS, and `railFor` still answers null for a leaf, a page and
+    // a stray — *"an Update is not a layer of the journal, it is what the layers
+    // hold."* The two questions have two functions on purpose.
+    const src = code("page-head");
+    expect(src).toContain("if (depth < 0) return null");
+    expect(code("journal")).toContain("export function journalRungOf");
+  });
 });
+
+// The span of a two-entry ramp table, as a number, so a test can compare the
+// two channels without restating either endpoint.
+function RAMP_SPAN(src: string, name: string): number {
+  const m = new RegExp(`const ${name} = \\[([0-9.]+), ([0-9.]+)\\]`).exec(src);
+  if (!m) throw new Error(`no ${name} table in journal.ts`);
+  return Math.abs(Number(m[1]) - Number(m[2]));
+}

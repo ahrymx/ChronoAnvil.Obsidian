@@ -122,9 +122,14 @@ describe("a journal note's blocks (5.11)", () => {
     expect(row?.ids).toEqual(["review", "tasks"]);
     // Both cells, not just the one that opens the fence — the pill the editor
     // draws is "Widget" for each of them and "Section" for none. (The word was
-    // "Column" when this was written and the sentence outlived it; the pill is
-    // still decided by ARRANGEMENT, which is the fact the assertion is about,
-    // and not by anything the 5.27 subjects touch.)
+    // "Column" when this was written and the sentence outlived it.)
+    //
+    // THE PILL IS DECIDED BY THE FORM ANSWER FIRST AS OF 1.0.42, and this block
+    // is the case where the two readings cannot come apart: `isSectionFence`
+    // refuses a self-titling fence as a column, so a cell is barless by
+    // construction and its form answer is `widget` — which is what `rowForm`
+    // then says. The column set is still what answers for a row with no form
+    // question at all, and it is still the fact this assertion is about.
     expect([...(row?.column ?? [])].sort()).toEqual(["review", "tasks"]);
   });
 

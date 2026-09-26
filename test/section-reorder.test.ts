@@ -30,7 +30,7 @@
 import { describe, expect, it } from "vitest";
 
 import { composeHomeNote, homeSectionModel } from "../src/diary/home-sections";
-import { cellMoveOps, pageBreakOps } from "../src/core/section-model";
+import { blockTitleOps, cellMoveOps, pageBreakOps } from "../src/core/section-model";
 // `keptBlocks` MOVED TO `core/row-order.ts` IN 4.53.0, beside the operations
 // that call it and beside `keptPages`, which is the same rule about the other
 // bit. The behaviour asserted below is unchanged; only its address is.
@@ -355,6 +355,65 @@ describe("the one bit a reorder could not survive", () => {
   });
 });
 
+// ── AND NAMING ONE, WHICH IS THE FIFTH PHASE (1.0.42) ─────────────────
+//
+// The same silence, one control further on. *"Diary groups do not have the
+// choice for Title Header."* A `header:` bar over a group moves no section, no
+// column and no page, so all four walks above return nothing for it — and the
+// footer would say "No changes" over a name the reader had just typed.
+describe("naming a group", () => {
+  const label = (id: string): string | undefined => id.toUpperCase();
+  const view = (
+    title?: string
+  ): { ids: string[]; title?: string }[] => [
+    { ids: ["a", "b"], ...(title ? { title } : {}) },
+    { ids: ["c"] },
+  ];
+
+  it("names a group that gained a bar", () => {
+    const ops = blockTitleOps(view(), view("Evening review"), label);
+    expect(ops).toHaveLength(1);
+    expect(ops[0].kind).toBe("regroup");
+    // REPORTED AGAINST THE OPENER, because the bar is one line over the card and
+    // the opener is what the window keys a group by.
+    expect(ops[0].sectionId).toBe("a");
+    expect(ops[0].detail).toBe('A\'s group is titled "Evening review"');
+  });
+
+  it("names the other direction too, because the control is a toggle", () => {
+    const ops = blockTitleOps(view("Evening review"), view(), label);
+    expect(ops.map((o) => o.detail)).toEqual(["A's group loses its title bar"]);
+  });
+
+  it("names a rename", () => {
+    const ops = blockTitleOps(view("Evening"), view("Evening review"), label);
+    expect(ops.map((o) => o.detail)).toEqual([
+      'A\'s group is titled "Evening review"',
+    ]);
+  });
+
+  it("says nothing when the name did not change", () => {
+    expect(blockTitleOps(view(), view(), label)).toEqual([]);
+    expect(blockTitleOps(view("Same"), view("Same"), label)).toEqual([]);
+  });
+
+  it("reads an absent title and an empty one as the same thing", () => {
+    // ABSENT IS NOT AN EMPTY TITLE on `BlockView`, but neither draws a bar — so
+    // a model that reported "" where another reports nothing must not make the
+    // footer promise a change no write would make.
+    expect(blockTitleOps(view(), view(""), label)).toEqual([]);
+  });
+
+  it("leaves a block that gained or lost a member to the regroup ops", () => {
+    // `pageBreakOps`' RULE, MATCHED THE SAME WAY: by members, not by opener,
+    // because the row that opens a block can move. A block whose membership
+    // changed is somebody joining or leaving and is named as that.
+    const before = [{ ids: ["a", "b", "c"], title: "Three" }];
+    const after = [{ ids: ["a", "b"] }, { ids: ["c"] }];
+    expect(blockTitleOps(before, after, (id) => id)).toEqual([]);
+  });
+});
+
 describe("the window asks both of them", () => {
   const src = readSrc("section-editor");
 
@@ -382,10 +441,12 @@ describe("the window asks both of them", () => {
   });
 
   it("counts what the dry run found, because Save is disabled at zero", () => {
-    // Every phase `regroup` has is named by one of these three, which is the
-    // property that was missing rather than any one of the calls.
+    // Every phase `regroup` has is named by one of these three — four, as of
+    // 1.0.42, when a group could be given a name — which is the property that
+    // was missing rather than any one of the calls.
     expect(src).toContain("cellMoveOps(");
     expect(src).toContain("pageBreakOps(was, now, label)");
+    expect(src).toContain("blockTitleOps(was, now, label)");
     expect(src).toContain('o.kind === "move"');
     expect(src).toContain('o.kind === "regroup"');
   });

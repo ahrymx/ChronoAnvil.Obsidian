@@ -71,6 +71,14 @@
    read, which is the whole reason it is a token — see `00-tokens.css`. */
 .ca-journal-page-head {
   position: relative;
+  /* ── A STACKING CONTEXT, FOR THE GLYPH FILM (1.0.42) ──────────────────
+     The film below is `z-index: -1`, which is what puts it above the head's own
+     wash and below its text — texture under a name rather than a veil over it.
+     A negative z-index only stops there if the element is a stacking context,
+     and `position: relative` alone is not one: without this the film sinks
+     behind the note's page ground and disappears. `12-grounds.css` carries the
+     same note for the same reason, one file over. */
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   /* 6px, not 2px (5.31.2). A 0.7em cap line and a 1.35em serif two pixels apart
@@ -83,7 +91,12 @@
      same number. `--ca-space-7` is 14px on a desktop and 17.5px on a phone —
      see the mobile block in `00-tokens.css` — so the scale cannot state it. */
   padding-left: 14px;
-  border-left: var(--ca-head-spine) solid var(--ca-grain-spine);
+  /* SCALED BY THE RUNG, AND THE MULTIPLICATION IS WHY (1.0.42). The token is
+     still what a preset sets and what `aesthetic-presets.test.ts` pins; what a
+     journal rung adds is `--ca-head-spine-k`, which is 1 everywhere else. See
+     `00-tokens.css` for why a rung may not simply restate the length. */
+  border-left: calc(var(--ca-head-spine) * var(--ca-head-spine-k)) solid
+    var(--ca-grain-spine);
   border-bottom: var(--ca-rule-hair) solid transparent;
   background: linear-gradient(
     90deg,
@@ -120,6 +133,131 @@
     transparent 100%
   );
 }
+/* ── THE KIND'S GLYPH, TILED (1.0.42) ─────────────────────────────────────
+
+   *"Could the Icon be used as a repeating texture background on the banner? I
+   think it would be a better visual than just a single plate."*
+
+   It is, and it is better for a reason worth stating: a plate is a SIXTH object
+   on a row that already holds an eyebrow, a name, a pencil and a menu glyph,
+   and it says one thing. A film says two. WHICH GLYPH names the kind — the
+   fact depth can never express, since a Lesson and a Cheatsheet share a Topic —
+   and HOW DENSE restates the depth, in step with the spine thinning and the
+   name shrinking above.
+
+   ── UNCONDITIONAL HERE, GATED BY ITS OWN VALUE ─────────────────────────
+
+   This file's standing rule since 5.31.2: the head's rules live here and are
+   never gated on `[data-ca-grain]` or `[data-ca-journal]`, because six pages of
+   this vault match neither and drew nothing. So this rule applies to every
+   head, and what decides whether a film appears is whether there is a glyph to
+   draw — `none` is a legal `background-image` and paints exactly nothing.
+
+   A FALLBACK ON THE READ, WHICH IS REQUIRED HERE AND FORBIDDEN ELSEWHERE.
+   `--ca-head-glyph` is NOT in `00-tokens.css`: it is set from TypeScript by
+   `paintJournalRung`, per note, and `tokens.test.ts` states the rule both ways
+   — a token that file defines may carry no fallback, and a token genuinely set
+   from TS must not be in that file and must be read with one.
+
+   ── GREYSCALE INTO `overlay`, WHICH IS NOT A STYLING WHIM ──────────────
+
+   `12-grounds.css` already argued this for the page ground's noise: *"greyscale
+   noise composited in overlay lightens a dark ground and darkens a light one
+   from the same bytes, so the token has no theme twin."* An emoji is colour, and
+   colour tiled forty times behind a name is forty small distractions in a hue
+   nobody chose. Greyscaled and blended, it reads as the wash's own colour
+   embossed into it, and the same bytes work on both themes — which matters more
+   here than for the grain, because this film's bytes come from the reader's own
+   kind and cannot have a twin authored for them.
+
+   ── MASKED AWAY FROM THE WORDS, AGAINST THE WASH ───────────────────────
+
+   `currentColor` IN THE MASK, WHICH IS NOT A COLOUR CHOICE. A mask reads only
+   the ALPHA of its stops, so the hue is arbitrary and any opaque value does the
+   same job — which is exactly why it must not be written as one. `#000` here
+   would be a literal outside `00-tokens.css` and `appearance.test.ts` sweeps for
+   those by hex, correctly: it cannot tell a colour that does not matter from one
+   that does. `currentColor` is opaque, theme-independent, and says what is true
+   — nothing about this gradient is about colour.
+
+   The wash runs 90deg: densest at the spine, gone by the right edge. This runs
+   the other way. That is the whole of why the two can share one head — colour
+   where the mark is, texture out in the half a left-aligned name never reaches,
+   and neither of them stacked on the text. A head is not a card and the name is
+   the only thing on it that must be read.
+
+   ── DENSITY IS ONE `calc()`, NOT FIVE STRINGS ──────────────────────────
+
+   `journalGlyphTile` draws in a 100-unit cell and sizes the glyphs in those
+   units, so the tile is resolution-independent and `background-size` alone
+   decides how dense the film is. That is what lets the depth channel be
+   arithmetic off `--ca-tier-t` — 0 at the journal's own note, 1 at a page —
+   instead of a table this sheet would have to hold one row per rung of. A
+   journal with three levels gets thirds and nothing here changes. */
+/* ── THE KIND GLYPH, TILED BEHIND THE WORDS (1.0.42) ───────────────────────
+   Half of "one accent per kind, and depth as mass": the accent says WHICH
+   journal, the tile says WHAT KIND OF NOTE, and it fades with depth so an index
+   wears it plainly and a page barely at all. The emoji is the one the model
+   already carried and the head had never read — `JournalLevel.fallbackEmoji`,
+   `JournalKind.emoji`, and `DEFAULT_PAGE_EMOJI` for a page, which has none.
+
+   A REAL ELEMENT AND NOT `::before`, WHICH IS NOT A PREFERENCE. Inside a
+   `stack` the head's `::before` is already spoken for: it is the CARD's
+   full-height spine (`30-header-bars.css`), which exists because the card gives
+   up its left border for it. Both rules setting one pseudo does not resolve as
+   a winner — it resolves per property, so the spine would have kept the stack's
+   geometry and colour and taken this rule's `grayscale(1)`, its quarter opacity
+   and its left-edge mask. A colour the reader chose, turned into a smudge.
+   `paintJournalRung` records the same finding from the TypeScript side.
+
+   `grayscale(1)` IS `--ca-tex-grain`'s BARGAIN (`00-tokens.css`): the glyph
+   stops being its own colour, so the same bytes work on both themes and the
+   tile needs no theme twin — on a dark ground it lifts the wash, on a light one
+   it darkens it, and neither needs its own file.
+
+   BUT NOT `mix-blend-mode: overlay`, WHICH IT SHIPPED WITH AND WHICH DREW
+   NOTHING. That half of the bargain does not carry over, and the arithmetic says
+   why in one line: overlay over a backdrop darker than mid-grey is
+   `2 * Cb * Cs`, so on the Editorial card (#24201c, Cb = 0.14) a mid-grey glyph
+   resolves to 0.14 — the backdrop, exactly. At 26% opacity the brightest pixel
+   of an emoji moved the card by SEVEN of 255 levels and the rest of it by none.
+   `--ca-tex-grain` gets away with the same operator because its noise spans full
+   black to full white and overlay pushes both ends; a greyscaled emoji is all
+   middle. Plain alpha instead, which moves the same card twenty levels and a
+   light theme twenty-seven the other way.
+
+   THE FILM IS STILL BEHIND THE TEXT, at `z-index: -1` inside the head's own
+   stacking context: the wash is what it has to read as a texture over, and a
+   layer above the title is a layer over the title.
+
+   THE MASK IS WHY THE TITLE STAYS READABLE. It is a plain left-to-right ramp,
+   and it is written in `currentColor` because a mask reads nothing but alpha —
+   the colour is arbitrary, so the arbitrary choice may as well be one that
+   needs no palette (`test/appearance.test.ts` sweeps this file for raw hex). */
+.ca-jph-film {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--ca-head-glyph, none);
+  background-size: calc(30px + 14px * var(--ca-tier-t, 0))
+    calc(30px + 14px * var(--ca-tier-t, 0));
+  filter: grayscale(1);
+  opacity: calc(0.22 - 0.14 * var(--ca-tier-t, 0));
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, currentColor 18%, transparent) 38%,
+    currentColor 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, currentColor 18%, transparent) 38%,
+    currentColor 100%
+  );
+}
+
 /* `--ca-grain-accent` RATHER THAN `--text-accent` (5.31.2), for the same reason
    the spine reads `--ca-grain-spine`: one token, bound where the grain is
    known and answered by `00-tokens.css` where it is not. The old value is what
@@ -263,7 +401,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--ca-space-3);
-  font-size: var(--ca-head-title-size);
+  font-size: calc(var(--ca-head-title-size) * var(--ca-head-title-k));
   font-weight: 700;
   line-height: 1.25;
   color: var(--text-normal);
@@ -312,7 +450,11 @@
   border-bottom: var(--ca-rule) solid var(--interactive-accent);
   border-radius: 0;
   background: transparent;
-  font-size: var(--ca-head-title-size);
+  /* THE SAME FACTOR AS THE NAME IT REPLACES, which is the whole point of this
+     rule existing: the input is drawn on the title's own metrics so the row does
+     not jump when clicked, and a rung that shrank one and not the other would
+     make every page's title jump on the first keystroke. */
+  font-size: calc(var(--ca-head-title-size) * var(--ca-head-title-k));
   font-weight: 700;
   line-height: 1.25;
   color: var(--text-normal);

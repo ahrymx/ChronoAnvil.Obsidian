@@ -1077,6 +1077,152 @@ export function splitDirective(line: string): DirectiveParts {
   };
 }
 
+// ── THE KEYWORDS WHOSE ONLY HEAD IS THEIR OWN `|Title` (1.0.42) ───────
+//
+// A region FIELD — `note:`, `list:`, `path:`, `tasks:`, `attach:`, `recall:` —
+// owns a keyed span of the note body and titles itself from the `|Title` after
+// it. Nothing else can title one: none of these keywords is in
+// `SECTION_TITLES`, which is the map answering *what should the bar over this
+// BLOCK say*, and it has nothing to say about a thing that has already said it.
+//
+// SO THE LABEL IS THE WHOLE OF THE QUESTION "IS THIS DRAWN AS A SECTION", for a
+// field and for nothing else. A `bridge-notes` line with its label cut still
+// gets a head from `SECTION_TITLES`; a `note:` line with its label cut renders
+// bare, which is what `fieldHead` does with no label.
+//
+// HERE RATHER THAN BESIDE `SECTION_TITLES`, WHICH IS ITS SIBLING AND ITS
+// COMPLEMENT. Two readers need it and they are on opposite sides of the tree:
+// the dispatcher, which asks whether a FENCE is a band of these, and the diary's
+// entry catalogue, which asks whether a SECTION may be offered the form toggle.
+// A model may not import the renderer — `entry-sections.ts` builds its
+// catalogue at module scope, so a cycle back through `ui/widgets` would read a
+// half-initialised table — and a second copy is two tables that disagree the
+// day one of them gains a keyword.
+export const FIELD_KEYWORDS: ReadonlySet<string> = new Set([
+  "note",
+  "list",
+  "path",
+  "tasks",
+  "attach",
+  "recall",
+]);
+
+// What this directive titles itself, or "" for one that titles itself nothing.
+//
+// TRIMMED, AND A BARE TRAILING `|` IS NOTHING. That is the renderer's own rule —
+// *"a bare trailing `|` names nothing, so it falls back rather than producing a
+// nameless pill"* — and a read that disagreed with it would report a section
+// the page draws headless.
+export function labelOf(line: string): string {
+  return (splitDirective(line).label ?? "").trim();
+}
+
+// The same line, titled or untitled.
+//
+// AND IT WRITES NOTHING OVER A TITLE THAT IS ALREADY THERE, which is
+// `withAnswers`' rule for the fence-bar form spelled for a label: turning a
+// field that is already a section back into one must not replace the reader's
+// own wording with the catalogue's. A bare `|` is not a title, so that one is
+// overwritten — it names nothing on the page either.
+export function withLabel(line: string, label: string | null): string {
+  const bar = line.indexOf("|");
+  if (label === null) return bar === -1 ? line : line.slice(0, bar).trimEnd();
+  if (bar !== -1 && line.slice(bar + 1).trim()) return line;
+  const body = (bar === -1 ? line : line.slice(0, bar)).trimEnd();
+  return `${body}|${label}`;
+}
+
+// ── THE `#` FLAGS ON A DIRECTIVE'S OWN LINE (1.0.42) ──────────────────
+//
+// `note:capture#collapse:Captured thoughts land here…|Captured` has been the
+// shape since 4.x and the parse for it was written inline in `buildNote`, which
+// is where the second reader found it: `tasks:todo#compact|Tasks` says one thing
+// about how the task list is DRAWN, and it has to be written by the section
+// editor and read by the renderer without the two inventing the grammar twice.
+//
+// A FLAG SITS ON THE ARGUMENT'S HEAD, before the first `:` of the argument and
+// before the `|`. That is not a new rule, it is where `#collapse` and `#line`
+// already are: the head names the body region a field owns, everything after the
+// first colon is that field's own text — a placeholder a reader may have written
+// colons and hashes into — and the label is the title. So a flag that lived
+// anywhere else would be inside something a reader typed.
+//
+// WHY A FLAG HERE RATHER THAN A MODIFIER LINE IN THE FENCE. `wide` and `actions`
+// are lines, and they are facts about a BLOCK. This is a fact about one
+// directive, and a diary entry's shared band is one fence holding seven of them
+// — the same wall 1.0.42's section/widget toggle hit. A line in that fence would
+// say it for all seven; a flag on the line says it for the line.
+//
+// ORDER IS THE READER'S, AND AN UNKNOWN FLAG IS CARRIED THROUGH. Nothing here
+// judges a token: `withToken` adds at the end and removes by name, so a
+// `#collapse` a template composed survives a Save that turns `#compact` off,
+// and a flag a later release adds survives this one.
+export interface ArgHead {
+  // The argument's head with its flags taken off — the body region a field owns.
+  key: string;
+  // The flags, in the order they were written, `#` and surrounding space gone.
+  tokens: readonly string[];
+  // Everything from the first `:` of the argument, verbatim and including it.
+  // "" when the argument has none.
+  tail: string;
+}
+
+export function splitArgHead(argument: string): ArgHead {
+  const colon = argument.indexOf(":");
+  const head = colon === -1 ? argument : argument.slice(0, colon);
+  const parts = head.split("#");
+  return {
+    key: parts[0].trim(),
+    tokens: parts.slice(1).map((t) => t.trim()).filter(Boolean),
+    tail: colon === -1 ? "" : argument.slice(colon),
+  };
+}
+
+// ── THE TOKEN THAT SAYS "DRAW THIS ONE AS A WIDGET" (1.0.42) ──────────
+//
+// A FIELD'S FORM, ON THE FIELD'S OWN LINE. Every other surface answers this
+// with a `header:` line beside the section; a diary entry's seven fields share
+// one fence, so the answer has to be part of the line it is about — see
+// `FormQuestion.titled`, and `TASKS_COMPACT` for the other answer that moved
+// here for the same reason.
+//
+// HERE RATHER THAN IN `section-model.ts`, WHICH IS WHERE ITS MEANING LIVES,
+// because both ends of this need it and only one of them may import that file:
+// the model writes the token and the dispatcher in `widgets/index.ts` reads it
+// to decide whether to hang the hover head. The grammar is what they already
+// share. Its VALUE equals `WIDGET_FORM`'s and that is a spelling they happen to
+// agree on rather than a dependency — the model passes this constant.
+export const WIDGET_TOKEN = "widget";
+
+// Whether this directive's line carries the flag.
+export function hasToken(line: string, token: string): boolean {
+  return splitArgHead(splitDirective(line).argument).tokens.includes(token);
+}
+
+// The same line with the flag on or off.
+//
+// THE LINE UNTOUCHED WHEN THE ANSWER IS ALREADY WRITTEN, which is `withLabel`'s
+// rule and the property every caller here depends on: a Save that changes
+// nothing must write no bytes, or every note in the vault is rewritten by
+// opening the editor and pressing the button.
+//
+// A LINE WITH NO ARGUMENT HAS NOWHERE TO PUT ONE. `tasks` alone is not a
+// directive this plugin composes — every field names its region — and inventing
+// `tasks:#compact` for it would be writing a region key of "" into a reader's
+// note to record a preference.
+export function withToken(line: string, token: string, on: boolean): string {
+  const bar = line.indexOf("|");
+  const body = bar === -1 ? line : line.slice(0, bar);
+  const label = bar === -1 ? "" : line.slice(bar);
+  const colon = body.indexOf(":");
+  if (colon === -1) return line;
+  const { key, tokens, tail } = splitArgHead(body.slice(colon + 1));
+  if (!key) return line;
+  if (tokens.includes(token) === on) return line;
+  const next = on ? [...tokens, token] : tokens.filter((t) => t !== token);
+  return `${body.slice(0, colon + 1)}${[key, ...next].join("#")}${tail}${label}`;
+}
+
 // The argument with any `,period` flag taken off, and whether it was there.
 export function splitPeriodFlag(argument: string): {
   arg: string;

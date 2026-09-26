@@ -82,6 +82,45 @@ export const CONTAINING_GRAIN: Record<TrackerClass, TrackerClass | null> = {
   yearly: null,
 };
 
+// ── WHICH RUNG OF THE DIARY A GRAIN IS (1.0.42) ──────────────────────────
+//
+// The journal half of this feature indexes a note's banner over the journal's
+// own rungs — *"Journal levels (and pages) look too similar which makes it easy
+// to lose which index table you're looking at"* — and the diary is the same
+// problem with the hierarchy already written down. This is it: the table above
+// IS the ramp, walked rather than tabulated.
+//
+// COUNTING CONTAINERS, WHICH IS WHY IT NEEDS NO SECOND TABLE. A grain's depth is
+// how many periods contain it, so `yearly` is rung 0 and `daily` is rung 4 by
+// the same walk that answers "what is this inside of". Ordering `TRACKER_CLASSES`
+// differently cannot move a rung, which is the trap the comment above the table
+// already names — that list is ordered for a dropdown.
+//
+// `of` COMES FROM THE TABLE'S OWN KEYS for the journal side's reason: a ramp
+// computed from a count survives a sixth grain, and a hand-written five-step one
+// silently puts the new grain on top of an old one. `CONTAINING_GRAIN` is a
+// single chain by construction — `yearly` is the one null — so its key count is
+// the chain's length.
+export function grainRung(grain: TrackerClass): {
+  step: number;
+  of: number;
+  t: number;
+  emoji: string;
+} {
+  const above = (g: TrackerClass): number => {
+    const parent = CONTAINING_GRAIN[g];
+    return parent == null ? 0 : 1 + above(parent);
+  };
+  const of = Object.keys(CONTAINING_GRAIN).length;
+  const step = above(grain);
+  return {
+    step,
+    of,
+    t: of > 1 ? step / (of - 1) : 0,
+    emoji: CLASS_DEFS[grain].emoji,
+  };
+}
+
 // The start of the period of `grain` that contains `at`.
 //
 // CLONED BEFORE SNAPPING, because moment's `startOf` mutates and returns the

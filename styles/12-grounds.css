@@ -100,13 +100,69 @@ body.ca-ground .workspace-leaf-content[data-type="markdown"]::after {
    preset can paint the same surfaces, without the grounds silently going out
    again. It is also the truer selector: a ground clears the backgrounds inside
    a markdown leaf it is drawing on, not every reading view in the window. */
-body.ca-ground .workspace-leaf-content[data-type="markdown"] > .view-content,
-body.ca-ground .workspace-leaf-content[data-type="markdown"] .markdown-reading-view,
-body.ca-ground .workspace-leaf-content[data-type="markdown"] .markdown-preview-view,
-body.ca-ground .workspace-leaf-content[data-type="markdown"] .markdown-source-view,
-body.ca-ground .workspace-leaf-content[data-type="markdown"] .cm-editor,
-body.ca-ground .workspace-leaf-content[data-type="markdown"] .cm-scroller {
+/* ── AND THE TINT NEEDS THE SAME CLEARING (1.0.42) ──────────────────────
+ *
+ * `:is()` RATHER THAN SIX MORE SELECTORS, and the specificity note above is why
+ * it is safe: both arguments are a single class, so `:is()` contributes exactly
+ * what `.ca-ground` contributed and every selector here stays at (0,4,1). Twelve
+ * selectors for one idea would also have been twelve places for the next person
+ * to add a surface to five of. */
+body:is(.ca-ground, .ca-tinted-ground) .workspace-leaf-content[data-type="markdown"] > .view-content,
+body:is(.ca-ground, .ca-tinted-ground) .workspace-leaf-content[data-type="markdown"] .markdown-reading-view,
+body:is(.ca-ground, .ca-tinted-ground) .workspace-leaf-content[data-type="markdown"] .markdown-preview-view,
+body:is(.ca-ground, .ca-tinted-ground) .workspace-leaf-content[data-type="markdown"] .markdown-source-view,
+body:is(.ca-ground, .ca-tinted-ground) .workspace-leaf-content[data-type="markdown"] .cm-editor,
+body:is(.ca-ground, .ca-tinted-ground) .workspace-leaf-content[data-type="markdown"] .cm-scroller {
   background-color: transparent;
+}
+
+/* ── THE ACCENT ON THE GROUND (1.0.42) ──────────────────────────────────
+ *
+ * *"same banner style and background theme make it difficult to quickly gather
+ * what kind of page you're on."* The banner was half the report; this is the
+ * other half. A note's whole background carries its accent, so which journal and
+ * which rung is answered before the reader's eye reaches the head at all.
+ *
+ * NOTHING NEW IS COMPUTED FOR THIS, which is the find the whole feature rests
+ * on. `vault-banner.ts` already stamps the rung on `view.containerEl` — and that
+ * IS this element — refreshing on `file-open`, `layout-change` and
+ * `active-leaf-change`. A custom property inherits, so the accent is already
+ * here; the tint is a gradient reading it.
+ *
+ * `background-image` ON THE ELEMENT, NOT A THIRD PSEUDO. Both are taken by the
+ * films above, and a third layer would need its own stacking order against them.
+ * An element's `background-image` composites over its own `background-color` —
+ * which is what a preset sets, and which stays the note's colour — and under
+ * both films, since those are `z-index: -1` children of a stacking context. So
+ * the order is: the theme's paper, the accent, the pattern, the grain.
+ *
+ * GATED ON `[data-ca-surface]`, because that attribute is exactly the question
+ * "did this plugin recognise this note". A markdown leaf holding somebody else's
+ * note has no accent to read and must not be tinted with the vault's.
+ *
+ * AND IT RAMPS WITH THE RUNG, off the same `--ca-tier-t` the head reads (1.0.42,
+ * extended to the diary in the same release). An index note's page is washed and
+ * a leaf's is nearly clean, so the depth channel is not confined to the banner —
+ * which is the half of the report that was about scrolling PAST the banner. The
+ * fallback is 0, so a recognised note with no rung keeps the flat value.
+ *
+ * `--ca-grain-accent-rgb` IS WHY THIS NEEDED NOTHING FOR THE DIARY. It is set by
+ * all six binding blocks in `99-aesthetic-presets.css` — the five period grains
+ * and the journal — so a dashboard's amber and a Topic's magenta arrive here by
+ * the same token, and `[data-ca-surface]` is the only gate either needs.
+ *
+ * 160deg, AGAINST THE HEAD'S 90deg. The head washes left-to-right off its spine
+ * and this falls from the top-left corner, so the two meet at the corner they
+ * share and the page reads as one surface rather than as a banner sitting on a
+ * differently-tinted sheet. */
+body.ca-tinted-ground .workspace-leaf-content[data-type="markdown"][data-ca-surface] {
+  background-image: linear-gradient(
+    160deg,
+    rgba(var(--ca-grain-accent-rgb), calc(0.1 - 0.07 * var(--ca-tier-t, 0))) 0%,
+    rgba(var(--ca-grain-accent-rgb), calc(0.035 - 0.025 * var(--ca-tier-t, 0)))
+      55%,
+    transparent 100%
+  );
 }
 
 /* ── Strength ─────────────────────────────────────────────────────────────

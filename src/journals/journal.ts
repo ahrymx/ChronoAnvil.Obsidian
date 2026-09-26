@@ -11,6 +11,7 @@ import type { TemplateLayout , SectionOverrides } from "./journal-sections";
 import { only, promptText, promptSuggester, promptNewNote } from "../ui/modals";
 import {
   DEFAULT_ENERGY_FACES,
+  DEFAULT_PAGE_EMOJI,
   DEFAULT_SUBJECT_EMOJI,
   DEFAULT_TOPIC_EMOJI,
   JOURNALS_DIRECTIVE,
@@ -40,6 +41,7 @@ import type {
 } from "./custom-journal";
 import { insertBelowBanner, noteHasDirective } from "../trackers/entry-trackers";
 import { splitGlyph } from "../ui/section-frame";
+import { paintRung, pageIconOf, type RungMark } from "../ui/rung";
 import { journalTypeOfPath } from "../trackers/trackers";
 import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { notify } from "../core/notify";
@@ -456,11 +458,55 @@ export function hueOf(id: string): number {
 const ACCENT_S = 0.65;
 const ACCENT_L = 0.55;
 
-export function journalAccent(id: string): { css: string; rgb: string } {
+// ── AND IT STEPS PER RUNG NOW (1.0.42) ──────────────────────────────────
+//
+// *"Journal levels (and pages) look too similar which makes it easy to lose
+// which index table you're looking at."*
+//
+// One accent for a whole journal is what made every note in Study the same
+// magenta: `hueOf` hashes the journal's ID, so a Subject index, a Topic index, a
+// Cheatsheet and a page differed in nothing but the rail's dots. The hue is the
+// JOURNAL'S IDENTITY and stays fixed; what a rung changes is saturation and
+// lightness.
+//
+// HUE ROTATION IS RULED OUT BY ARITHMETIC RATHER THAN BY TASTE, which is worth
+// recording because it is the obvious move. `hueOf("study")` is 301°, and
+// twenty degrees a rung puts the third at 1° and the fourth at 21° — on top of
+// `--ca-grain-quarterly` (17°) and `--ca-grain-daily` (34°). A Study page would
+// read as a period dashboard, which is a worse confusion than the one being
+// fixed.
+//
+// THE RAMP STRADDLES THE OLD VALUE, deliberately. 0.65/0.55 sits close to the
+// middle of both ranges, so a vault's middle rungs move least and the ends move
+// most — the opposite of anchoring at one end, where every note but one shifts.
+//
+// SATURATION CARRIES MORE OF IT THAN LIGHTNESS, and that is the light-theme
+// answer. There is no theme twin for this: `journalAccent` is pure and the head
+// reads one token. A wide lightness ramp would put the outer rungs at 68% — fine
+// on the reader's dark ground and washed out on a light one — so lightness moves
+// 14 points and saturation moves 42.
+const RAMP_S = [0.72, 0.3];
+const RAMP_L = [0.62, 0.48];
+
+/** `t` in 0..1, outermost rung to innermost. */
+function rampAt(t: number): { s: number; l: number } {
+  const at = ([a, b]: number[]) => a + (b - a) * t;
+  return { s: at(RAMP_S), l: at(RAMP_L) };
+}
+
+export function journalAccent(
+  id: string,
+  // WHERE THIS NOTE SITS, 0..1, AND OPTIONAL ON PURPOSE. A stray note under a
+  // journal root declares no `type:` this journal recognises, so `journalRungOf`
+  // answers null for it and there is no rung to ramp — it keeps the journal's
+  // own accent, which is what every note here had before this release.
+  t?: number
+): { css: string; rgb: string } {
   const h = hueOf(id);
+  const { s, l } = t == null ? { s: ACCENT_S, l: ACCENT_L } : rampAt(t);
   return {
-    css: `hsl(${h}, ${ACCENT_S * 100}%, ${ACCENT_L * 100}%)`,
-    rgb: hslChannels(h, ACCENT_S, ACCENT_L),
+    css: `hsl(${h}, ${Math.round(s * 1000) / 10}%, ${Math.round(l * 1000) / 10}%)`,
+    rgb: hslChannels(h, s, l),
   };
 }
 
@@ -1285,6 +1331,141 @@ export function journalNounOf(type: JournalType, value: string): string | null {
     type.kinds.find((k) => k.pages.id === id)?.pages.label ??
     null
   );
+}
+
+// ── WHICH RUNG OF THE JOURNAL A NOTE IS (1.0.42) ────────────────────────
+//
+// The labelled half of `recognisedTypeValues` answers what a `type:` is CALLED;
+// this answers WHERE IT SITS, which is the fact the page head needs and the one
+// nothing in the tree computed. `railFor` comes closest and deliberately stops
+// short: it returns null for a leaf, a page and a stray, because *"an Update is
+// not a layer of the journal, it is what the layers hold"*. That scope call
+// stands — the rail is still the journal's LAYERS. A rung is the wider ladder
+// the head paints with, and a leaf is on it.
+//
+// ── IT WALKS IN DEPTH ORDER, WHICH `journalNounOf` DOES NOT ─────────────
+//
+// That function walks kinds, then levels, then pages, and says in as many words
+// that the order *"does not matter today: the four sets of ids are disjoint by
+// construction"*. Here the order IS the answer, so this walks levels, then
+// kinds, then pages — outermost first. The disjointness is what makes the two
+// safe to differ: they can disagree about which list answered, never about which
+// rung.
+//
+// ── THE HOME NOTE IS RUNG 0 ────────────────────────────────────────────
+//
+// A journal's own folder note declares no `type:` at all, so it cannot be found
+// by lookup — `railFor` takes the same fact as an argument for the same reason.
+// It is the outermost rung and the caller is the only thing that knows.
+//
+// ── PAGES ARE ONE RUNG, NOT ONE PER KIND ───────────────────────────────
+//
+// `recognisedTypeValues` states it: *"every kind of one journal names the same
+// page id — so this adds one value however many kinds there are."* A ladder with
+// one page rung per kind would count rungs a reader cannot reach.
+//
+// AND IT IS A `RungMark`, WHICH IS THE DIARY'S TYPE TOO (`src/ui/rung.ts`).
+// Declaring the shape twice is what would let the two domains' ramps disagree
+// about what `t` means, and `t` is read by one `calc()` serving both. The alias
+// is here so `journalRungOf`'s signature still names the journal's rung.
+export type JournalRung = RungMark;
+
+export function journalRungOf(
+  type: JournalType,
+  isJournalHome: boolean,
+  typeValue: unknown
+): JournalRung | null {
+  // LEVELS + KINDS + THE PAGE + THE HOME NOTE. Computed rather than tabled,
+  // because `JournalType.levels` has no cap: the settings dropdown offers one or
+  // two, and `journal-infer.ts` can recover three from a folder tree nobody
+  // created through the UI. A four-step table would fall off the end of one.
+  const of = type.levels.length + type.kinds.length + 2;
+  const rung = (step: number, emoji: string): JournalRung => ({
+    step,
+    of,
+    t: of > 1 ? step / (of - 1) : 0,
+    emoji,
+  });
+
+  if (isJournalHome) return rung(0, type.emoji);
+
+  const id = normaliseTypeValue(typeValue);
+  if (id == null) return null;
+
+  const level = type.levels.findIndex((l) => l.id === id);
+  if (level >= 0) return rung(level + 1, type.levels[level].fallbackEmoji);
+
+  const kind = type.kinds.findIndex((k) => k.id === id);
+  if (kind >= 0) return rung(type.levels.length + 1 + kind, type.kinds[kind].emoji);
+
+  if (type.kinds.some((k) => k.pages.id === id)) {
+    return rung(of - 1, DEFAULT_PAGE_EMOJI);
+  }
+  return null;
+}
+
+// Which rung of `type` this file is, asked without drawing anything.
+//
+// SEPARATE FROM THE PAINTER because two callers now need the answer and only
+// one of them is painting: the banner's *Change the page icon* action has to
+// know the glyph a note would draw BY DEFAULT, so that choosing that same glyph
+// stores no override. `kind-columns.ts` states the rule this is in service of —
+// a value equal to its default is deliberately not written, or a reader's
+// frontmatter fills up with records of them agreeing with us.
+export function journalRungFor(
+  app: App,
+  file: TFile,
+  type: JournalType
+): JournalRung | null {
+  return journalRungOf(
+    type,
+    file.path === folderNotePath(type.root),
+    noteTypeOf(app, file)
+  );
+}
+
+// ── ONE PAINTER FOR BOTH STAMPING SITES (1.0.42) ────────────────────────
+//
+// `page-head.ts` and `vault-banner.ts` are the only two callers `journalAccent`
+// has ever had, and until this release each wrote the two accent properties out
+// by hand. The comment on `journalAccent` records what that cost the first time:
+// *"AND THE 65/55 WAS WRITTEN TWICE, which is how the two would have drifted the
+// first time either was tuned."* Four properties and an attribute is past the
+// point where writing it twice is defensible, so the stamping is one function.
+//
+// IT REMOVES WHAT IT DOES NOT SET, which is `vault-banner.ts`' rule rather than
+// this file's: a leaf is REUSED across file switches, so a glyph left on the
+// view is one that outlives the note that caused it — a stray note under a
+// journal root would wear the last Cheatsheet's texture. `page-head.ts` builds a
+// fresh element every time and the removals are no-ops there.
+export function paintJournalRung(
+  app: App,
+  file: TFile,
+  type: JournalType,
+  els: readonly HTMLElement[]
+): JournalRung | null {
+  const rung = journalRungFor(app, file, type);
+  const accent = journalAccent(type.id, rung?.t);
+  const icon = pageIconOf(frontmatterOf(app, file));
+  for (const el of els) {
+    el.setAttr("data-ca-journal", type.id);
+    el.style.setProperty("--ca-journal-accent", accent.css);
+    el.style.setProperty("--ca-journal-accent-rgb", accent.rgb);
+  }
+  // THE DEPTH CHANNEL ITSELF IS `paintRung`'s, and it is shared with the diary
+  // (`src/ui/rung.ts`). This function owns the COLOUR — a journal's hue and the
+  // rung's tone — because that is the half the diary does not need: its five
+  // period hues have been hand-tuned since 4.80.
+  paintRung(els, rung, icon);
+  // RETURNED SO THE HEAD CAN DECIDE WHETHER TO DRAW A FILM. The glyph layer is a
+  // CHILD rather than the head's `::before`, and that is not a style preference:
+  // inside a `stack` the head's `::before` is already taken — it is the CARD's
+  // full-height spine (`30-header-bars.css`), positioned against the card
+  // because the head goes `position: static` there. An unconditional film on the
+  // same pseudo would have greyscaled that spine, faded it to a quarter and
+  // masked it away from its own left edge, which is a colour the reader chose
+  // turned into a grey smudge.
+  return rung;
 }
 
 // The journal type a note belongs to, or undefined.

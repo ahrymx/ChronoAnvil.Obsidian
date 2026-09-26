@@ -35,12 +35,15 @@
 
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import {
+  BlockView,
   SectionModel,
   SectionOp,
   SectionView,
   SectionWant,
   FLAG_ON,
   FlagQuestion,
+  FormQuestion,
+  titledFormQuestion,
   describeAnswers,
   desiredOrder,
   idsOf,
@@ -50,7 +53,12 @@ import {
 } from "../core/section-model";
 import { regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
-import { actionsQuestion, answersOn, flatBlocks, rowRuns } from "../core/note-sections";
+import {
+  actionsQuestion,
+  answersOn,
+  flatBlocks,
+  rowRuns,
+} from "../core/note-sections";
 import { BANNER_ID, WELDS_INTO_BANNER } from "../core/sections";
 import { unweldEntryFences, weldEntryFences } from "../trackers/entry-trackers";
 import {
@@ -79,9 +87,18 @@ import {
 } from "../core/widget-sections";
 import {
   ACTIONS_KEYWORD,
+  FIELD_KEYWORDS,
+  HEADER_KEYWORD,
   MODIFIER_KEYWORDS,
+  ROW_KEYWORD,
+  TAB_KEYWORD,
+  WIDGET_TOKEN,
+  hasToken,
   isCellLine,
+  isHeaderLine,
   isRowLine,
+  isTabLine,
+  labelOf,
   splitDirective,
   withFlagLine,
 } from "../core/directive-grammar";
@@ -255,6 +272,28 @@ const entrySection = (decl: EntryDecl): EntrySection => {
   const built: EntrySection = {
     ...decl,
     applies: (ctx) => decl.directive(ctx) != null,
+    // ── AND A FOURTH DERIVATION: THE FORM TOGGLE (1.0.42) ─────────────
+    //
+    // *"I think the diary sections should have the widget toggle."* The other
+    // three catalogues have offered it since 4.59.0 and this one never has,
+    // because the toggle was written as a `header:` line in the section's fence
+    // and an entry's shared band is ONE fence holding seven sections — a bar
+    // there titles all seven. `FormQuestion.titled` is the other half of the
+    // answer: on an entry the bar IS the `|Title` on the section's own line.
+    //
+    // DERIVED, NOT DECLARED, for the reason the three above are: it restates
+    // what the section's directive already says rather than deciding anything.
+    // Seven copies of one line across the field declarations is a rule with
+    // seven places to forget it, and the eighth field added later would be the
+    // one that quietly had no toggle.
+    //
+    // AND IT IS APPENDED TO WHATEVER THE DECLARATION ASKS, not instead of it:
+    // the banner declares its action-menu flag and the bridge its target, and
+    // neither of those is a field.
+    questions: (ctx) => [
+      ...(decl.questions?.(ctx) ?? []),
+      ...formToggleFor(built, ctx),
+    ],
     render: (ctx, opts) =>
       fenceBlock({
         fence: ENTRY_FENCE,
@@ -270,6 +309,39 @@ const entrySection = (decl: EntryDecl): EntrySection => {
     },
   };
   return built;
+};
+
+// The toggle this declaration may be offered, if any. 1.0.42.
+//
+// TWO CONDITIONS, AND BOTH ARE ABOUT THE LINE THE CATALOGUE COMPOSES rather
+// than about the section's name:
+//
+//   ITS KEYWORD IS A FIELD. `FIELD_KEYWORDS` carries the argument in full: a
+//   field's label is its only head, so cutting it renders the thing bare, and
+//   that is exactly what the widget form means. A `bridge-notes` line with its
+//   label cut still takes a head from `SECTION_TITLES`, so the control would be
+//   a tick that changes nothing — worse than no tick.
+//
+//   AND THE LINE CARRIES A LABEL, which is what gives the answer something to
+//   write BACK. A field composed with none is already in the widget form and
+//   has no title of its own to restore; the catalogue would have to invent one,
+//   which is the thing `FormQuestion.bar` exists to avoid.
+//
+// THROUGH `directiveFor` AND WITH `extra` NAMING THE SECTION, exactly as
+// `probeFor` does, and for a reason a test found: `decl.directive` answers null
+// for a grain the section does not ship on, and only `directiveFor` performs the
+// borrow. Captured ships on daily and is offered on all five, so asking the
+// declaration directly left a weekly entry's Captured with no toggle — and the
+// title it would have been offered over is the one it actually borrowed.
+const formToggleFor = (
+  section: EntrySection,
+  ctx: EntrySectionContext
+): FormQuestion[] => {
+  const line = directiveFor(section, { ...ctx, extra: [section.id] });
+  if (line == null) return [];
+  const { keyword, label } = splitDirective(line);
+  if (!FIELD_KEYWORDS.has(keyword) || !(label ?? "").trim()) return [];
+  return [titledFormQuestion(keyword, (label ?? "").trim())];
 };
 
 const on = (
@@ -639,6 +711,11 @@ const ENTRY_DECLS: EntryDecl[] = [
       quarterly: "tasks:todo|Goals this quarter",
       yearly: "tasks:todo|Goals this year",
     }),
+    // NO QUESTION OF ITS OWN (1.0.42). It had one for part of this release —
+    // how the list is drawn — and the answer had two values; there is one shape
+    // of task list now, so the box is gone with the shape it chose between. See
+    // the note where `tasksDensityQuestion` was. The widget toggle this field
+    // still wears is appended by the builder above, to every field alike.
   },
   {
     id: "capture",
@@ -1406,6 +1483,36 @@ export function parseEntry(
         p.re.test(line.trim())
     );
 
+  // ── AND THE FENCE A WIDGET SITS ALONE IN (1.0.42) ─────────────────────
+  //
+  // The narrowing above is kept and one hole in it is closed. 1.0.42 lets a
+  // reader group the band's members, which means the band is written as SEVERAL
+  // fences — and a block holding one page widget then gets a fence with no field
+  // in it to choose it. Left at that, the plugin would write a fence it could no
+  // longer find: `detect` would stop reporting the widget, the editor would offer
+  // to add a second one, and the first would sit there rendering.
+  //
+  // SO A FENCE JOINS THE BAND BY ABUTTING IT, and that is a much narrower
+  // question than the one refused above. Two conditions, both required: every
+  // non-blank line in it is the catalogue's — a shared directive or one of the
+  // layout modifiers — and nothing but BLANK LINES separates it from a fence
+  // already in the band. A pasted example keeps its own words, so the first
+  // clause rules it out; the `links:` fence of a pre-3.2 entry sits above the
+  // rule with the whole banner between, so the second does.
+  //
+  // WHAT IT COSTS. A reader whose own fence holds nothing but widget directives
+  // and sits directly under the band is adopted into it — which is the same
+  // thing that happens today if they write that line INSIDE the band's fence,
+  // and a better answer than the editor offering them a duplicate.
+  const catalogued = (line: string): boolean =>
+    probes.some((p) => p.s.band === "shared" && p.re.test(line.trim())) ||
+    MODIFIER_KEYWORDS.has(splitDirective(line.trim()).keyword);
+  const widgetTail = (line: string): boolean =>
+    probes.some(
+      (p) =>
+        p.s.band === "shared" && isPageWidgetId(p.s.id) && p.re.test(line.trim())
+    );
+
   const shape: EntryShape = { own: [], shared: [], regions: new Map() };
 
   // Fences, classified by what is in them.
@@ -1457,6 +1564,11 @@ export function parseEntry(
         .map((l, n) => ({ id: structuralOwner(l), at: f.open + 1 + n }))
         .filter((o): o is { id: string; at: number } => o.id !== null),
       shares: body.some(sharesCatalogue),
+      // A fence that could join the band by abutting it: page widgets and the
+      // catalogue's own furniture, and nothing else.
+      tail:
+        body.some(widgetTail) &&
+        body.every((l) => l.trim() === "" || catalogued(l)),
     };
   });
 
@@ -1466,8 +1578,32 @@ export function parseEntry(
   // entry whose directives someone deleted by hand still addable to; it is a
   // list of one because there is one place for an add to go.
   const sharing = candidates.filter((f) => f.shares);
-  const chosen = sharing.length
-    ? sharing
+  // The widget-only fences that abut one — see `catalogued` above. Grown to a
+  // fixed point, so a run of them joins a fence at a time rather than only the
+  // one touching the band.
+  const band = new Set(sharing);
+  const blankBetween = (
+    a: { close: number },
+    b: { open: number }
+  ): boolean =>
+    lines.slice(a.close + 1, b.open).every((l) => l.trim() === "");
+  for (let grew = band.size > 0; grew; ) {
+    grew = false;
+    candidates.forEach((f, i) => {
+      if (band.has(f) || !f.tail) return;
+      const prev = candidates[i - 1];
+      const next = candidates[i + 1];
+      if (
+        (prev && band.has(prev) && blankBetween(prev, f)) ||
+        (next && band.has(next) && blankBetween(f, next))
+      ) {
+        band.add(f);
+        grew = true;
+      }
+    });
+  }
+  const chosen = band.size
+    ? candidates.filter((f) => band.has(f))
     : candidates.length
     ? [candidates[candidates.length - 1]]
     : [];
@@ -2059,7 +2195,25 @@ export function applyEntrySections(
         optionsFor(want, id)
       );
       if (directive == null) continue;
-      const line = { id, line: directive };
+      // AND THE ANSWERS THE CATALOGUE DOES NOT COMPOSE (1.0.42). `directive`
+      // above is the section as the catalogue writes it, which is titled and
+      // roomy; a reader who adds a field and unticks **Show as section** — or
+      // ticks **Show a compact list** — in the same Save has answered a question
+      // nothing on this path was asking. The splice runs over the one line,
+      // which is what `withFormTitle` and `withFlagToken` both require.
+      //
+      // THE TWO KINDS THAT ARE WRITTEN ON THE SECTION'S OWN LINE, and only
+      // those: every other answer is already in `chosen` above, and an ordinary
+      // flag's answer is a whole line in the fence — which a one-line array is
+      // not a fence to write into.
+      const [line0] = withAnswers(
+        [directive],
+        (section.questions?.(ctx) ?? []).filter(
+          (q) => q.kind === "form" || (q.kind === "flag" && q.token !== undefined)
+        ),
+        optionsFor(want, id)
+      );
+      const line = { id, line: line0 };
       fenceOf.set(line, lastFence);
       kept.push(line);
     }
@@ -2241,7 +2395,17 @@ const rowFor =
       // question in the list off the section's own line, and widening the
       // bridge's target read from the whole file to one line is a change to a
       // shipped control that this release has no reason to make.
-      ...(text !== undefined && questions?.some((q) => q.kind === "flag")
+      //
+      // AND FOR A TITLED FORM, 1.0.42, WHICH IS THE SAME GATE WIDENED BY ONE
+      // KIND RATHER THAN OPENED. A form's answer is not an argument span either
+      // — it is whether the section's own line carries a `|Title` — so
+      // `answerInText` returns null for it exactly as it does for a flag, and
+      // every field's box would have drawn *"set when added"* over a title that
+      // is plainly on the page. The narrowing the paragraph above argues for is
+      // untouched: the bridge asks a `choice` and neither kind, so its target is
+      // still read from the whole file the way a shipped control was reading it.
+      ...(text !== undefined &&
+      questions?.some((q) => q.kind === "flag" || q.kind === "form")
         ? { answered: answersOn(s.locate(text, ctx), questions, text) }
         : {}),
     });
@@ -2271,6 +2435,358 @@ const structuralFlats = (ctx: EntrySectionContext): FlatSection[] =>
     .filter((s) => s.band !== "shared")
     .map((s) => bindSection(s, ctx));
 
+// ── AND THE BAND IS BOUND AFTER ALL, AS ITSELF (1.0.42) ─────────────────
+//
+// WHAT THE PARAGRAPH ABOVE SAID, AND WHY IT IS ANSWERED RATHER THAN REVERSED.
+// The withholding was right about one thing and wrong about the other.
+//
+// RIGHT: `structuralFlats` cannot bind a shared section, and that is not an
+// omission to be filled in. `flatBlocks` reads a FENCE — one fence, one block —
+// so seven fields sharing one would come back as a single seven-column group
+// that nobody wrote and that the reader would then be offered a split of.
+//
+// WRONG: *"a reader must not be offered a column of it"*. The reader asked for
+// exactly that — *"unable to group tasks and captured log even though they're
+// widgets?"* — and a field drawn as a widget is the same kind of thing the
+// homepage lets them group freely. The withholding also made the window say the
+// WRONG NO: `column` never learned these ids, so the refusal that fired was the
+// title-bar one, about a bar a field drawn as a widget does not have.
+//
+// SO THE BAND IS READ BY ITS OWN RULE RATHER THAN BY `flatBlocks`'. THE UNIT IS
+// THE ROW, NOT THE FENCE: a fence carrying a `row` line is one block, and an
+// unrowed fence's fields are a block each. That is `rowRuns(weld: true)` read
+// backwards — an unrowed member joins the run before it, so the fence boundary
+// between two unrowed fields is not a fact about their arrangement, it is
+// whatever the last compose happened to leave — and it is what makes the round
+// trip an identity: the partition this reports composes back to the fences it
+// was read from.
+//
+// AND THE SPLIT IS NOT A JUDGEMENT ABOUT THE READER'S WRITING, which was the
+// other half of the refusal. The distinction it missed is that a field's REGION
+// is their writing and its DIRECTIVE is its chrome. Regions are not moved (see
+// the note above `EntryShape`), a directive line is copied VERBATIM into
+// whichever fence it lands in — a retitled `|The good bits` included — and a
+// band holding a line this catalogue did not write is refused outright by
+// `readBand` rather than rearranged around.
+
+// One fence of the band, as an arrangement.
+interface BandFence {
+  rowed: boolean;
+  ids: string[];
+  // Which of them a `tab` line opens, by `flatBlocks`' rule: never the first,
+  // and only inside a row.
+  pages: Set<string>;
+  // What this fence's own `header:` bar says, or null for a fence with none —
+  // 1.0.42. A group of fields is the one block on this surface that can be
+  // given a name, because every other kind of block is titled by the section
+  // that opens it. See `BlockView.title`.
+  title: string | null;
+}
+
+// The whole band, as something that can be read and written back.
+interface BandRead {
+  fences: BandFence[];
+  // Each field's directive line, VERBATIM. What a regroup moves between fences
+  // is this string and nothing else.
+  lineOf: Map<string, string>;
+  // The span the fences occupy, which a rewrite replaces whole.
+  from: number;
+  to: number;
+  // The fence markers to re-emit, taken from the first fence — which is safe
+  // because a band whose fences are not all one kind is refused below.
+  open: string;
+  close: string;
+}
+
+// The band as an arrangement, or null when this window must leave it exactly as
+// it is.
+//
+// ONE READER FOR BOTH HALVES, and that is the whole safety argument. `blocks`
+// answers *could you group these* and `regroupBand` answers *here is the
+// grouping*; two predicates would be two chances for the window to offer a join
+// the Save then declines, which is the failure `layoutOps`' dry run exists to
+// make impossible and which a second copy of these rules would quietly put
+// back.
+//
+// WHAT IT REFUSES, all for one reason — the rewrite re-emits the band out of the
+// directive lines it read here, so anything else in there would be dropped:
+//
+//   • a line the catalogue did not write: the reader's own directive,
+//   • any modifier but `row` and `tab` — a `height:`, a `frame`, a `cell`
+//     (which nothing on this surface composes: no entry section declares one,
+//     so `rowRuns`' `divided` set is empty for every grain),
+//   • a `row` line that is not its fence's first line, or a second one,
+//   • a `tab` line that opens a fence, holds nothing, or sits in a fence with no
+//     row — `parseTabs` refuses the last of those as well,
+//   • two lines claiming one id, which would make the rewrite pick one,
+//   • anything but blank lines between the fences of the band, and
+//   • fences that are not all of one kind.
+//
+// A REFUSAL IS NOT A MESSAGE. The band comes back as no blocks at all, the
+// window never learns those ids, and the one place a reader can ask — the
+// disabled **Make a group** button — says so in `whyNotColumn`.
+const readBand = (shape: EntryShape, lines: readonly string[]): BandRead | null => {
+  if (!shape.shared.length) return null;
+  const fences: BandFence[] = [];
+  const lineOf = new Map<string, string>();
+  for (const fence of shape.shared) {
+    if (lines[fence.open] !== lines[shape.shared[0].open]) return null;
+    if (lines[fence.close] !== lines[shape.shared[0].close]) return null;
+    const read: BandFence = {
+      rowed: false,
+      ids: [],
+      pages: new Set(),
+      title: null,
+    };
+    let tab = false;
+    for (const b of fence.body) {
+      if (b.id !== null) {
+        if (lineOf.has(b.id)) return null;
+        lineOf.set(b.id, b.line);
+        if (tab) {
+          if (!read.ids.length) return null;
+          read.pages.add(b.id);
+          tab = false;
+        }
+        read.ids.push(b.id);
+        continue;
+      }
+      const bare = b.line.trim();
+      if (bare === "") continue;
+      if (isRowLine(bare)) {
+        if (read.rowed || read.ids.length) return null;
+        read.rowed = true;
+        continue;
+      }
+      if (isTabLine(bare)) {
+        if (tab) return null;
+        tab = true;
+        continue;
+      }
+      // ── AND THE ONE THE READER NAMED THE GROUP WITH (1.0.42) ────────
+      //
+      // A `header:` bar in a row fence is drawn once, full width, over both
+      // columns (`row.ts`) — so in a rowed band fence it is the GROUP'S name
+      // and this window may write it. Anywhere else it is refused with every
+      // other modifier: over an unrowed band it would title the whole band,
+      // which is the head `fieldBand` exists to keep off one, and `soleField`
+      // would take the head off the only field under it into the bargain.
+      //
+      // DIRECTLY UNDER THE `row` LINE, which is where `rowRuns` puts a bar and
+      // where `regroupBand` writes it back. A second one, or one over a field,
+      // is a fence this did not compose and is left alone.
+      if (isHeaderLine(bare)) {
+        const named = splitDirective(bare).argument.trim();
+        if (!read.rowed || read.ids.length || read.title || !named) return null;
+        read.title = named;
+        continue;
+      }
+      return null;
+    }
+    if (tab || !read.ids.length) return null;
+    if (read.pages.size && !read.rowed) return null;
+    fences.push(read);
+  }
+  // NOTHING BUT BLANK LINES BETWEEN THEM, because the rewrite replaces the whole
+  // span from the first opener to the last closer. A reader who wrote a
+  // paragraph between two of their rows keeps it by keeping their arrangement.
+  const held = new Set<number>();
+  for (const f of shape.shared) {
+    for (let i = f.open; i <= f.close; i++) held.add(i);
+  }
+  const from = shape.shared[0].open;
+  const to = shape.shared[shape.shared.length - 1].close;
+  for (let i = from; i <= to; i++) {
+    if (!held.has(i) && lines[i].trim() !== "") return null;
+  }
+  return { fences, lineOf, from, to, open: lines[from], close: lines[shape.shared[0].close] };
+};
+
+// ── AND A COLUMN IS A WIDGET, WHICH IS 4.12 §A ON THIS SURFACE (1.0.42) ──
+//
+// THE REPORT: *"Sections are being allowed to be placed into groups. As you can
+// see they're not rendering as widgets. Disable the link icons and reject cards
+// with the section flag, only allow widgets."* The screenshot is a row of three
+// whose first cell is Attachments wearing a full title bar and a chevron, with
+// the cell under it shoved out of shape — a group whose columns do not line up
+// because one of them brought a head the row has no room for.
+//
+// THE RULE IS NOT NEW AND THIS SURFACE WAS THE ONE PLACE IT WAS NOT ASKED. "A
+// section that draws its own title bar is not a column" is 4.12 §A, it is what
+// `BlockView.column` carries, and `whyNotColumn` has said it in two voices
+// since 4.53.0. When the band learned to group, `bandBlocks` handed back
+// `column: [...ids]` — every field, unconditionally — because at that moment a
+// field's form was not a thing this reader looked at.
+//
+// READ THE WAY THE ANSWER IS READ, not the way the renderer reads it. The two
+// differ by one clause: `answersOn` counts a line with NO LABEL as a widget
+// (`note-sections.ts`) because a nameless field draws no head either way, and
+// the renderer arrives at the same place by having no title to hang. Asking the
+// answer's question is what keeps the tick box and the link icon agreeing —
+// they disagree only if two walks are written to match rather than to ask.
+const fieldIsWidget = (line: string): boolean =>
+  hasToken(line, WIDGET_TOKEN) || !labelOf(line);
+
+// The band's fields, as blocks.
+//
+// LOOSE AND A COLUMN TOGETHER, OR NEITHER. Everywhere else the two are
+// independent — see `BlockView.column` — and here they are one fact, because
+// both reduce to the same question: can this band be re-emitted at all.
+// `hasKnownExtent`, which is what `loose` normally turns on, is answered by the
+// FILE rather than by the catalogue here: `parseEntry` attributes exactly one
+// line to each field, and that line is what a split carries. There is no span to
+// bound and therefore nothing to guess.
+const bandBlocks = (text: string, ctx: EntrySectionContext): BlockView[] => {
+  const band = readBand(parseEntry(text, ctx), text.split("\n"));
+  if (!band) return [];
+  const block = (
+    ids: string[],
+    pages: string[] = [],
+    title: string | null = null
+  ): BlockView => ({
+    ids,
+    loose: [...ids],
+    // LOOSE AND A COLUMN ARE NO LONGER ONE FACT (1.0.42). The essay above is
+    // about whether a field can be moved AT ALL, which is still answered by the
+    // file for every one of them; this is the separate question of whether it is
+    // the KIND of thing a column is, and a field wearing a title bar is not. A
+    // field that got into a group before this asked — or by hand — keeps its
+    // `loose`, which is what leaves **Take out of the group** live: the one
+    // control that repairs the note.
+    column: ids.filter((id) => fieldIsWidget(band.lineOf.get(id) ?? "")),
+    pages,
+    ...(title ? { title } : {}),
+    // NEVER A STACK. The band's fences carry `row` or nothing; `parseStack`
+    // refuses a fence that is both, and a `stack` line in the band would have
+    // been refused by `readBand` above as a modifier this cannot carry.
+    stack: false,
+  });
+  return band.fences.flatMap((f) =>
+    f.rowed
+      ? [
+          block(
+            [...f.ids],
+            f.ids.filter((id) => f.pages.has(id)),
+            f.title
+          ),
+        ]
+      : f.ids.map((id) => block([id]))
+  );
+};
+
+// The band, re-emitted as the partition `want` asks for.
+//
+// ONE FENCE PER BLOCK, opened by `row` where the block has more than one member
+// and by nothing where it has one, with consecutive unrowed blocks welded into
+// one fence — which is `rowRuns(weld: true)`, written out over lines rather than
+// over sections. The two composers agreeing is not a coincidence to be checked:
+// it is why a group made here, saved, and read back by `bandBlocks` is the group
+// the reader made.
+const regroupBand = (
+  text: string,
+  ctx: EntrySectionContext,
+  want: readonly (readonly string[])[],
+  pages: readonly string[],
+  titles?: ReadonlyMap<string, string>
+): string | null => {
+  const lines = text.split("\n");
+  const band = readBand(parseEntry(text, ctx), lines);
+  if (!band) return null;
+  const groups: string[][] = [];
+  for (const b of want) {
+    const mine = b.filter((id) => band.lineOf.has(id));
+    if (!mine.length) continue;
+    // A BLOCK STRADDLING THE BAND'S EDGE IS REFUSED, not trimmed to the part
+    // that fits. The rule that a section cannot cross the rule is `apply`'s, and
+    // a partition that crosses it here is one this cannot write rather than one
+    // to guess the intent of.
+    if (mine.length !== b.length) return null;
+    // ── AND A GROUP TAKES WIDGETS ONLY (1.0.42) ─────────────────────────
+    //
+    // *"reject cards with the section flag, only allow widgets."* The editor
+    // refuses the join already — `bandBlocks` leaves a titled field out of
+    // `column`, so the link icon is disabled with 4.12 §A's own sentence — and
+    // this is the same rule where the write can see it. A row is columns side
+    // by side; a field wearing a permanent title bar brings a head the row has
+    // no room for, and a fence composed with one in it is a file the renderer
+    // draws wrong.
+    //
+    // REFUSED WHOLE, which is this function's answer to every shape it has no
+    // spelling for. A partition naming such a group is not trimmed to the part
+    // that would render — that would silently drop a field's directive.
+    if (
+      mine.length > 1 &&
+      !mine.every((id) => fieldIsWidget(band.lineOf.get(id) ?? ""))
+    ) {
+      return null;
+    }
+    groups.push(mine);
+  }
+  const named = groups.flat();
+  // EVERY FIELD, EXACTLY ONCE. A partition that lost one would drop its
+  // directive on the floor; one that names it twice would write it out twice,
+  // giving two widgets one region.
+  if (named.length !== band.lineOf.size) return null;
+  if (new Set(named).size !== named.length) return null;
+  // ── WHAT EACH GROUP IS CALLED (1.0.42) ──────────────────────────────
+  //
+  // KEYED BY THE BLOCK'S OPENER, the same key `pages` and `stacks` are read
+  // with, so a group that was broken up or reordered loses a name that named a
+  // shape that is gone rather than carrying it onto whatever now opens there.
+  //
+  // AND ABSENT MEANS *KEEP WHAT IS WRITTEN*, not *clear it*, which is `pages`'
+  // convention again: `layoutOps` and every other caller that asks only about
+  // the partition would otherwise strip a bar the reader typed. The map the
+  // reader's tick fills is the one that can empty it, by omitting a key.
+  const kept = new Map<string, string>();
+  for (const f of band.fences) {
+    if (f.title) kept.set(f.ids[0], f.title);
+  }
+  const bars = titles ?? kept;
+  const runs: string[][] = [];
+  let rowed = false;
+  for (const g of groups) {
+    const cells = g.flatMap((id, i) =>
+      i > 0 && pages.includes(id)
+        ? [TAB_KEYWORD, band.lineOf.get(id) as string]
+        : [band.lineOf.get(id) as string]
+    );
+    if (g.length > 1) {
+      // A ROW OF ONE IS NOT A ROW, and so it is not a group and has no name.
+      // The `header:` bar in a fence holding a single field would be read by
+      // `fenceTitled && soleField` as that FIELD'S title and take its own head
+      // away — the bar would replace the name rather than sit above it.
+      const bar = bars.get(g[0]);
+      runs.push([
+        ROW_KEYWORD,
+        ...(bar && bar.trim() ? [`${HEADER_KEYWORD}:${bar.trim()}`] : []),
+        ...cells,
+      ]);
+      rowed = true;
+      continue;
+    }
+    const last = runs[runs.length - 1];
+    if (last && !rowed) {
+      last.push(...cells);
+      continue;
+    }
+    runs.push(cells);
+    rowed = false;
+  }
+  const body = runs.flatMap((r, i) => [
+    ...(i ? [""] : []),
+    band.open,
+    ...r,
+    band.close,
+  ]);
+  const next = [
+    ...lines.slice(0, band.from),
+    ...body,
+    ...lines.slice(band.to + 1),
+  ].join("\n");
+  return next === text ? null : next;
+};
+
 // The one rearrangement this surface has, and it refuses everything else.
 //
 // NOT `regroupFlatNote`, WHICH IS THE FUNCTION EVERY OTHER SURFACE USES. Four
@@ -2290,32 +2806,69 @@ const structuralFlats = (ctx: EntrySectionContext): FlatSection[] =>
 // that does nothing.
 const regroupEntry = (
   text: string,
+  ctx: EntrySectionContext,
   blocks: readonly (readonly string[])[],
-  stacks?: readonly string[]
+  pages?: readonly string[],
+  stacks?: readonly string[],
+  titles?: ReadonlyMap<string, string>
 ): string | null => {
+  const want = blocks.filter((b) => b.length > 0);
+  const home = want.find((b) => b.includes(BANNER_ID));
+  // EVERY OTHER MULTI-MEMBER BLOCK IS A ROW OF THE BAND, or this is a partition
+  // that cannot be written. The two halves below each take the blocks that are
+  // theirs and ignore the rest, so the shape nobody owns has to be refused here
+  // — otherwise a block pairing the banner with a field would be silently read
+  // as two arrangements neither of which the reader asked for.
+  const band = new Set(
+    sharedBody(parseEntry(text, ctx))
+      .map((b) => b.id)
+      .filter((id): id is string => id !== null)
+  );
+  if (
+    want.some(
+      (b) => b !== home && b.length > 1 && !b.every((id) => band.has(id))
+    )
+  ) {
+    return null;
+  }
+
+  // ── the weld, which is the arrangement the banner has ────────────────
+  //
   // ABSENT MEANS LEAVE THE ARRANGEMENT ALONE, which is `pages`' convention and
   // is not the same as an empty list. A caller that never mentions stacks is
   // not asking for the weld to be undone.
-  if (stacks === undefined) return null;
-  const want = blocks.filter((b) => b.length > 0);
-  const home = want.find((b) => b.includes(BANNER_ID));
-  if (!home) return null;
-  // EVERYTHING IN THE BANNER'S BLOCK BUT THE BANNER, AND THE BANNER MUST OPEN
-  // IT. Both facts fall out of one line: `WELDS_INTO_BANNER` is a list of
-  // GUESTS and the host is not on it, so a block the banner does not open puts
-  // the banner itself among these and is refused by the rule below rather than
-  // by a second check saying the same thing.
-  const guests = home.slice(1);
-  if (guests.some((id) => !WELDS_INTO_BANNER.has(id))) return null;
-  // ONE GUEST. An entry has one weldable section and the pair in
-  // `entry-trackers.ts` folds one fence into one other; a partition naming two
-  // is asking for a card this cannot write.
-  if (guests.length > 1) return null;
-  // Every OTHER block here must hold one section. An entry has no other
-  // arrangement, so a partition claiming one is a partition this cannot write.
-  if (want.some((b) => b !== home && b.length > 1)) return null;
-  if (guests.length === 0) return unweldEntryFences(text);
-  return stacks.includes(guests[0]) ? weldEntryFences(text) : null;
+  let out = text;
+  if (stacks !== undefined) {
+    if (!home) return null;
+    // EVERYTHING IN THE BANNER'S BLOCK BUT THE BANNER, AND THE BANNER MUST OPEN
+    // IT. Both facts fall out of one line: `WELDS_INTO_BANNER` is a list of
+    // GUESTS and the host is not on it, so a block the banner does not open puts
+    // the banner itself among these and is refused by the rule below rather than
+    // by a second check saying the same thing.
+    const guests = home.slice(1);
+    if (guests.some((id) => !WELDS_INTO_BANNER.has(id))) return null;
+    // ONE GUEST. An entry has one weldable section and the pair in
+    // `entry-trackers.ts` folds one fence into one other; a partition naming two
+    // is asking for a card this cannot write.
+    if (guests.length > 1) return null;
+    const welded =
+      guests.length === 0
+        ? unweldEntryFences(out)
+        : stacks.includes(guests[0])
+          ? weldEntryFences(out)
+          : null;
+    if (welded !== null) out = welded;
+  }
+
+  // ── and the rows the band has (1.0.42) ──────────────────────────────
+  //
+  // AFTER THE WELD AND OVER ITS OUTPUT, because one Save can ask for both and a
+  // regroup returns one text. The weld moves the tracker fence above the rule
+  // and the band lives below it, so neither read disturbs the other's lines —
+  // which is why this composes rather than having to be ordered.
+  const grouped = regroupBand(out, ctx, want, pages ?? [], titles);
+  if (grouped !== null) out = grouped;
+  return out === text ? null : out;
 };
 
 // This entry, as the editor sees it.
@@ -2343,7 +2896,15 @@ export function entrySectionModel(ctx: EntrySectionContext): SectionModel {
     },
     plan: (text, want) => planEntrySections(text, ctx, want),
     apply: (text, want) => applyEntrySections(text, ctx, want),
-    blocks: (text) => flatBlocks(text, structuralFlats(ctx)),
-    regroup: (text, blocks, _pages, stacks) => regroupEntry(text, blocks, stacks),
+    // TWO READERS, ONE LIST. The structural half is a fence per section and is
+    // read by the common walk; the band is a row per block and is read by its
+    // own (see `bandBlocks`). They are concatenated in file order, which is the
+    // order the window draws.
+    blocks: (text) => [
+      ...flatBlocks(text, structuralFlats(ctx)),
+      ...bandBlocks(text, ctx),
+    ],
+    regroup: (text, blocks, pages, stacks, titles) =>
+      regroupEntry(text, ctx, blocks, pages, stacks, titles),
   };
 }

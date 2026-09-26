@@ -3164,6 +3164,25 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   white-space: nowrap;
 }
 
+/* ── And the words, where the group has to supply its own (1.0.42) ──────
+ *
+ * A diary entry's fields title themselves on their own directives, so the bar
+ * over a group of them is a line no section composes and the reader types it.
+ * The box sits beside the tick on the card's bar and is hidden until the tick
+ * is on, which is `hidden` rather than `display` — the frame is redrawn on
+ * every answer and a box toggled by a class would have two states to keep.
+ *
+ * NARROW BY DEFAULT AND GROWING TO ITS CONTENT'S ROOM, because the bar is a
+ * single row of controls: `min-width` keeps a typed name readable and
+ * `flex: 1 1 auto` lets it take the slack a short card's bar has going spare
+ * without pushing the move buttons off the end. */
+.ca-tpl-block-name {
+  flex: 1 1 auto;
+  min-width: 7em;
+  max-width: 16em;
+  font-size: var(--font-ui-smaller);
+}
+
 /* And the same block in the Layout pane, where the point is the SHAPE: three
    widgets across the page are drawn across it. */
 .ca-wizard-row {

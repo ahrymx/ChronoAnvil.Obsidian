@@ -133,6 +133,33 @@ export interface TrackerClassDef {
   // the tracker adjective ("daily") used in "no daily trackers are defined".
   // This one goes in "Jump to week" and "Earliest week".
   periodNoun: string;
+  // ── THE GLYPH THE BANNER TILES BEHIND ITS WORDS (1.0.42) ─────────────
+  //
+  // The journal side of this feature reads `JournalKind.emoji` and
+  // `JournalLevel.fallbackEmoji` — the model already held a glyph per rung, and
+  // the head had simply never drawn it. The diary's rungs are these five, and
+  // they had no glyph at all, so this is the field that makes the two domains
+  // the same feature rather than two.
+  //
+  // IT PASSES THE TEST ABOVE: a string, no DOM, no moment, no import. And it
+  // belongs beside `periodNoun` for the same reason that does — a reader
+  // choosing what a week is called and what a week looks like is answering one
+  // question, and answering it in two files is the scavenger hunt this table
+  // exists to end.
+  //
+  // FIVE SHAPES CHOSEN FOR THEIR SILHOUETTE, because the film greyscales the
+  // glyph and blends it into the wash at a fifth of its weight — so what a
+  // reader actually resolves is an outline, and five variants of a rounded
+  // rectangle would have been five of the same mark. A globe for the year, bars
+  // for the quarter, a month's grid, a week's spiral pad, the day's sun: a
+  // circle, a column, a grid, a ringed edge, a star. Two of them are round, and
+  // they are the two ends of the ramp — furthest apart in size, in tone and in
+  // the colour the grain already gives them, and never adjacent.
+  //
+  // AND NOT `DEFAULT_PAGE_EMOJI`, which is why the week is a notepad and not a
+  // sheet of paper: that one means "a page of a journal" three folders away, and
+  // one glyph for two things is the whole defect this feature exists to fix.
+  emoji: string;
   // The moment unit this grain steps by, for a picker's prev/next.
   unit: "day" | "isoWeek" | "month" | "quarter" | "year";
   // How an entry of this grain is named: prefix, then the date in `fileFormat`.
@@ -177,6 +204,7 @@ export const CLASS_DEFS: Record<TrackerClass, TrackerClassDef> = {
     journalProperty: "Daily Notes",
     dateProperty: "journal-date",
     periodNoun: "day",
+    emoji: "☀️",
     unit: "day",
     filePrefix: "Day-",
     fileFormat: "YYYY-MM-DD",
@@ -191,6 +219,7 @@ export const CLASS_DEFS: Record<TrackerClass, TrackerClassDef> = {
     journalProperty: "Weekly Entry",
     dateProperty: "week-start",
     periodNoun: "week",
+    emoji: "🗒️",
     unit: "isoWeek",
     filePrefix: "Week-",
     fileFormat: "YYYY-[W]WW",
@@ -205,6 +234,7 @@ export const CLASS_DEFS: Record<TrackerClass, TrackerClassDef> = {
     journalProperty: "Monthly Entry",
     dateProperty: "month",
     periodNoun: "month",
+    emoji: "📆",
     unit: "month",
     filePrefix: "Month-",
     fileFormat: "YYYY-MM",
@@ -219,6 +249,7 @@ export const CLASS_DEFS: Record<TrackerClass, TrackerClassDef> = {
     journalProperty: "Quarterly Entry",
     dateProperty: "quarter-start",
     periodNoun: "quarter",
+    emoji: "📊",
     unit: "quarter",
     filePrefix: "Quarter-",
     fileFormat: "YYYY-[Q]Q",
@@ -233,6 +264,7 @@ export const CLASS_DEFS: Record<TrackerClass, TrackerClassDef> = {
     journalProperty: "Yearly Entry",
     dateProperty: "year-start",
     periodNoun: "year",
+    emoji: "🌍",
     unit: "year",
     filePrefix: "Year-",
     fileFormat: "YYYY",

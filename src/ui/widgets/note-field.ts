@@ -31,6 +31,7 @@ import {
   readNoteRegion,
 } from "../../core/notestore";
 import { CAPTURE_NOTE_KEY } from "../../core/constants";
+import { splitArgHead } from "../../core/directive-grammar";
 
 /**
  * The note-region contract, plus the plugin and the debounce scheduler.
@@ -221,7 +222,32 @@ export function fieldHead(opts: FieldHeadOptions): FieldHead {
   const { wrap, key, label } = opts;
   const barActions = opts.barActions ?? null;
   if (opts.titled || !label) {
-    let strip: HTMLElement | null = barActions;
+    // ── AND ONLY THE BAR THAT NAMES **THIS** FIELD LENDS ITS SLOT (1.0.42) ──
+    //
+    // *"0/1 Done from tasks widget in a group behaves oddly?"* — with the
+    // screenshots showing the readout sitting on a titled group's own head,
+    // above both of its pages, still there when the reader flipped to the page
+    // the task list is not on.
+    //
+    // TWO BRANCHES, ONE SLOT, AND THAT WAS THE MISTAKE. `titled` means *the bar
+    // over this fence names this field*, and lending that bar's actions slot is
+    // exactly right there: the field drew no head, so its controls would have
+    // nowhere else to go, and the bar they land on is its own. `!label` is a
+    // different fact — this field has no name of its own, because it is drawn as
+    // a widget, or because nobody wrote one — and it says nothing about whose
+    // bar is above it.
+    //
+    // IN A ROW FENCE THOSE COME APART. A group's `header:` bar names the GROUP;
+    // `soleField` is what tells the two cases apart and is false the moment the
+    // fence holds two fields, so `titled` is correctly false here — and the
+    // readout went onto the group's bar anyway, through the other branch. A
+    // control on the group's head is a control over both columns and every page
+    // of them, which is neither where it belongs nor what it describes.
+    //
+    // So the slot is inherited on `titled` and nowhere else. A nameless field
+    // under a bar that does not name it builds its own strip, inside its own
+    // box, where the thing it counts is.
+    let strip: HTMLElement | null = opts.titled ? barActions : null;
     return {
       body: wrap,
       actions: () => {
@@ -257,13 +283,16 @@ export function buildNote(
   // grow; default = auto-growing multi-line area). The key still names the
   // body region; the variant is presentation only, and a per-key modifier
   // class lets each field be styled to its purpose in CSS.
-  const colon = rest.indexOf(":");
-  const head = (colon === -1 ? rest : rest.slice(0, colon)).trim();
-  const placeholder = colon === -1 ? "" : rest.slice(colon + 1).trim();
-  const hash = head.indexOf("#");
-  const key = (hash === -1 ? head : head.slice(0, hash)).trim();
-  const variant = hash === -1 ? "" : head.slice(hash + 1).trim();
-  const singleLine = variant === "line";
+  // THROUGH `splitArgHead` SINCE 1.0.42, which is this parse generalised rather
+  // than a second one. It was written here first and a second reader wanted it:
+  // the task list's `#compact` flag is written by the section editor and read by
+  // its renderer, so the grammar for what a `#` means on a directive had to be
+  // somewhere both could reach. One difference comes with the move, and it is
+  // the one this always meant: `note:log#collapse#line` reads as two flags now
+  // rather than as one flag spelled `collapse#line`.
+  const { key, tokens, tail } = splitArgHead(rest);
+  const placeholder = tail.slice(1).trim();
+  const singleLine = tokens.includes("line");
   // `#collapse` NO LONGER SELECTS ANYTHING, AND THE DIRECTIVE KEEPS IT (5.14).
   //
   // It used to be what made a field foldable: `note:capture#collapse` folded and

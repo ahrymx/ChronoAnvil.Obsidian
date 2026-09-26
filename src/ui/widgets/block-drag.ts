@@ -127,6 +127,20 @@ export const CARD_CLASS = "ca-journal-widget-card";
 // has. Written by `stampLines`, read by the gesture. 4.8 §1.4.
 const GRIP_CLASS = "ca-jbd-handle";
 
+// ── AND THE MARKER THAT SAID SO IS GONE AGAIN, ONE ROUND LATER ───────
+//
+// `LOOSE_CLASS = "ca-jbd-loose"` was here for exactly as long as the stylesheet
+// had a reveal to withhold. It marked the widgets a bare fence had handed its
+// places out to, because 5.16's pairing was written for a card and `.jbd-host`
+// alone lit a loose widget's dots from a hover of anything in it.
+//
+// The sheet now states that pairing ONCE, for every host — a grip answers to
+// its own hit area, to the strip its host wears at the top, and to nothing else
+// — so there is no host-wide reveal left for a marker to be an exception to. A
+// class applied for rules that stopped naming it is dead wiring the next reader
+// has to prove is dead before they may cut it, so it is cut here instead.
+// See `05-inline-widgets.css`, "A GRIP ANSWERS TO THE TOP OF WHAT IT DRAGS".
+
 // What is in the air, for the slots that would be a no-op. 4.8.7.
 //
 // A MODULE VARIABLE, NOT THE DOM, and every block on the page shares it because

@@ -383,6 +383,31 @@
      that cannot disagree, and two rules that must NOT agree need two. */
   --ca-head-title-size: 1.5em;
 
+  /* ── AND TWO FACTORS OVER IT AND THE SPINE (1.0.42) ───────────────────
+     A JOURNAL RUNG SCALES THESE, IT DOES NOT RESTATE THEM, and that is the
+     whole reason these two exist. *"Journal levels (and pages) look too
+     similar"* is answered by stepping the head's mass down the hierarchy —
+     a Subject index opens with a full masthead, a page with a compact bar —
+     and the obvious way to write that is a per-rung `--ca-head-spine: 2px`.
+
+     It cannot be written that way. `--ca-head-spine` is what a PRESET owns:
+     Editorial Monastic sets it to 2px and Technical HUD to 3px, on `body`,
+     and a rung binding a length on the head element out-specifies both — so
+     every journal head would snap back to the same spine under every preset,
+     which is the defect 5.31.2 removed from the other direction.
+
+     A factor composes instead of replacing. The preset keeps saying how heavy
+     a head's spine is; the rung says how much of that this rung gets; and a
+     note with no rung reads 1 and is unchanged to the pixel. It is also the
+     rule `99-aesthetic-presets.css` already states for itself — *"a preset
+     that needs a per-preset value sets a TOKEN on the body class, never a
+     property on the rule"* — applied one level further in.
+
+     BOTH DEFAULT TO 1 AND ARE UNITLESS, so `calc()` can multiply them into a
+     length declared anywhere without this file knowing which unit won. */
+  --ca-head-spine-k: 1;
+  --ca-head-title-k: 1;
+
   /* The rule-weight scale (3.6). Three tiers, and like the radii above,
      nothing in this sheet should type a raw px border width outside them.
 

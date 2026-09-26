@@ -572,6 +572,123 @@ describe("the surface survives Live Preview, where a block is a line", () => {
     );
   });
 
+  it("paints display maths as part of the card, not a hole in it (1.0.41)", () => {
+    // *"ChronoAnvil's Prose blocks need to support LaTeX."* A `$$` block is
+    // mounted exactly as a table is — `div.math.math-block.cm-embed-block`,
+    // per the editor's own DOM — so it came back through the same hole the
+    // in-between rule leaves for a `.cm-embed-block`.
+    //
+    // ONE SELECTOR LIST, NOT A SECOND RULE. "Exactly the same" is a property
+    // that has to survive the next edit to the stylesheet, and matching
+    // declarations in two places is how it stops being true.
+    const table = `${LP} ~ .cm-embed-block.cm-table-widget:has(~ .cm-line.ca-prose-block)`;
+    const math = `${LP} ~ .cm-embed-block.math-block:has(~ .cm-line.ca-prose-block)`;
+    for (const rule of cssRules(table)) expect(cssRules(math)).toContain(rule);
+    // Three of them: the paint, the inset, and the inset at phone width. The
+    // fourth rule maths is in is the scroll below, which a table does not need.
+    expect(cssRules(table)).toHaveLength(3);
+  });
+
+  it("scrolls an equation wider than the card inside it (1.0.41)", () => {
+    // The report came with a reading-mode screenshot of a `\begin{aligned}`
+    // block leaving the card at the right border and carrying on across the
+    // page behind it. MathJax does not wrap and cannot be asked to, so wide
+    // content scrolls inside itself — 99-time-grid.css's rule for the week
+    // grid, arriving at the other thing here that cannot be made narrower.
+    const scroll = cssRule(".ca-prose-block .math-block");
+    // EVERY SPELLING OF THE ELEMENT IS IN THE SAME RULE, because the surface
+    // class lands somewhere different in each mode: on the block Obsidian
+    // wrapped the maths in, on the maths block itself where the equation IS
+    // the block, and on the sibling widget Live Preview mounts.
+    for (const also of [
+      ".ca-journal-sec-block .math-block",
+      ".ca-journal-sec-block.math-block",
+      ".ca-prose-block.math-block",
+      `${LP} ~ .cm-embed-block.math-block:has(~ .cm-line.ca-prose-block)`,
+    ]) {
+      expect(cssRules(also), also).toContain(scroll);
+    }
+    // BOTH AXES ARE NAMED, per the grid: one axis set makes the other scroll by
+    // accident. A maths box's height is its content's, so the answer down is
+    // `hidden` rather than a cap.
+    expect(scroll).toContain("overflow-x: auto");
+    expect(scroll).toContain("overflow-y: hidden");
+
+    // AND IT IS THE MATHS BLOCK THAT SCROLLS, NEVER THE SURFACE. `overflow` on
+    // a member block would clip what is allowed to leave one — the frame's
+    // hover controls sit outside their block — and a card that scrolled would
+    // take the whole run's writing with it.
+    for (const surface of [".ca-journal-sec-block", ".ca-prose-block", LP]) {
+      expect(cssRules(surface).join("\n"), surface).not.toContain("overflow");
+    }
+  });
+
+  it("ends a Live Preview run on a drawn row when maths is at an end (1.0.41)", () => {
+    // Display maths is the second thing Live Preview mounts instead of
+    // drawing, and it arrived at `livePreviewSpans` as the table's bug word
+    // for word: a cheat sheet that ends on an equation had no last line, so
+    // nothing carried `is-prose-last` and the card stopped above the maths.
+    const lines = [
+      "<!--chronoanvil-prose-->",
+      "",
+      "$$",
+      "\\frac{18}{24} = \\frac{3}{4}",
+      "$$",
+      "",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5 }]);
+
+    // A one-line `$$ x $$` is the same row: Obsidian mounts that one too, and
+    // where it does not the run merely ends on the blank line below it — the
+    // air the table rule has accepted since 1.0.40.
+    const oneLine = [
+      "<!--chronoanvil-prose-->",
+      "",
+      "$$ \\frac{3}{4} $$",
+      "",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(livePreviewSpans(oneLine)).toEqual([{ from: 1, to: 3 }]);
+
+    // Writing at the ends keeps the trimmed span it always had — an equation
+    // in the MIDDLE of the writing is reached by the stylesheet, not by this.
+    const written = [...lines];
+    written.splice(2, 0, "Simplify by the HCF:");
+    written.splice(7, 0, "Which is in its lowest terms.");
+    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 7 }]);
+
+    // AND `$$` MID-LINE IS NOT A BLOCK. Obsidian draws it inside the row, the
+    // row is a `.cm-line`, and the decoration lands on it as it always did.
+    const inline = [
+      "<!--chronoanvil-prose-->",
+      "",
+      "Divide by the HCF: $$ \\frac{18}{24} = \\frac{3}{4} $$",
+      "",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(livePreviewSpans(inline)).toEqual([{ from: 2, to: 2 }]);
+  });
+
+  it("leaves a `$$` a reader printed inside a code fence alone (1.0.41)", () => {
+    // `markerLinesIn`'s reason one file over: a reader writing ABOUT LaTeX puts
+    // `$$` in a ```` ``` ```` block, and a code fence's rows are drawn — they
+    // are the `HyperMD-codeblock-bg` rows the stylesheet paints. Counting one
+    // as mounted would step the run's end off a row that was working.
+    const lines = [
+      "<!--chronoanvil-prose-->",
+      "",
+      "```",
+      "$$",
+      "x = 1",
+      "$$",
+      "```",
+      "",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(livePreviewSpans(lines)).toEqual([{ from: 2, to: 6 }]);
+  });
+
   it("ends a section run rather than being taken into one", () => {
     // The brace to that belt, and the only one of the two that removes the
     // cause: a bar titles a WIDGET section, and prose is the note itself. A run

@@ -73,11 +73,18 @@
 // `named`'s stated rule: *recorded at the append, because that is the only place
 // both halves are in hand.*
 //
-// EPHEMERAL, AND WRITING NOWHERE. `note-regions.ts`' `let isCompact = false` is
-// the precedent rather than the four `Record<string, …>` maps in settings: those
+// EPHEMERAL, AND WRITING NOWHERE. `log-list.ts`' `let isCompact = false` is the
+// precedent rather than the four `Record<string, …>` maps in settings: those
 // exist for answers a reader would be annoyed to lose across a session, and a
 // half-made selection is not one. A note that re-opened with ticks already in it
 // would be one stray click from a delete.
+//
+// THE `tasks:` LIST USED TO BE THAT PRECEDENT AND IS NOT ONE ANY MORE (1.0.42),
+// which is worth a line because it is the distinction rather than a change of
+// address: *"Make it a option on the sections card via the section editor
+// instead."* — how the task list is DRAWN turned out to be an answer a reader
+// gives once and expects to find again, so it went onto the directive. A
+// half-made multi-select is the other kind, and still is.
 
 import {
   MarkdownPostProcessorContext,

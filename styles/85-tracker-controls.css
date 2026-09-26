@@ -1473,6 +1473,34 @@
   color: var(--text-faint);
   margin: -8px 0 12px;
 }
+/* The picker window, which had no rule of its own until the table grew from 32
+   glyphs to 240. Two things follow from that size.
+
+   THE GRIDS SCROLL AND THE FIELD DOES NOT. Obsidian's modal grows to its content
+   and then clips at the viewport, so fifteen categories put the last ones out of
+   reach AND scrolled the Save button away with them — the one control that can
+   choose a glyph the table does not carry. Capping the pane keeps the head fixed.
+
+   THE WIDTH IS PINNED TO THE GRID. Eight 38px tiles and their seven 6px gaps need
+   346px; the tiles are a fixed size, so a narrower window does not reflow to seven
+   columns, it overflows. 380px covers the content padding, and `min()` yields on a
+   phone-width window rather than forcing a sideways scroll. */
+.ca-emoji-modal {
+  min-width: min(380px, 90vw);
+}
+.ca-emoji-pane {
+  max-height: min(48vh, 440px);
+  overflow-y: auto;
+  /* A pane that has hit its end stops there instead of handing the wheel to the
+     note behind the modal, which would scroll the reader's page under it. */
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+/* The category title carries the air between one group and the next; the first
+   one needs none, since the pane's own top edge is already that gap. */
+.ca-emoji-pane .ca-emoji-cat-title:first-child {
+  margin-top: 0;
+}
 
 /* --- Section header (label + optional action) --------------------------- */
 

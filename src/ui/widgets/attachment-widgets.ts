@@ -39,7 +39,7 @@ import {
   normalizePath,
 } from "obsidian";
 import { basename, ensureFolder, moment, noExt, openFile } from "../../core/util";
-import { isValidNoteKey, readNoteRegion } from "../../core/notestore";
+import { isValidNoteKey, noteKeyOf, readNoteRegion } from "../../core/notestore";
 import { panDuringDrag } from "../drag-scroll";
 import { slugify } from "../../core/util";
 import { confirmAction, promptText } from "../modals";
@@ -991,7 +991,12 @@ export function buildAttachments(
   titled = false,
   barActions: HTMLElement | null = null
 ): HTMLElement {
-  const key = rest.split(":")[0].trim();
+  // THROUGH `noteKeyOf`, WHICH IS THE ONE PARSE OF A REGION KEY (1.0.42). This
+  // read was `rest.split(":")[0]`, which is right up to the moment a `#token`
+  // appears on the head — and two of them do now, `#compact` and `#widget`. An
+  // unparsed one is a region key of `capture#widget`: a field pointed at a span
+  // nothing writes, which renders empty, loses nothing and says nothing either.
+  const key = noteKeyOf(rest);
   const wrap = createDiv({ cls: `ca-journal-attach ca-journal-attach--${key}` });
   const chrome = fieldHead({
     wrap,

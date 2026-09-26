@@ -774,45 +774,61 @@ describe("the stack's card", () => {
     // the card's outer edge: 2px of `--background-modifier-border`, 2px of the
     // journal's magenta, then the gutter — a double edge, a spine that stopped
     // 40px above the card's floor, and a name inset one border further than the
-    // chevron strip under it. The card gives up its left border and the head
-    // paints it, full height, in the grain's colour.
+    // chevron strip under it. One edge, the card's, in the grain's colour.
     const band = css().indexOf(".ca-journal-stack .ca-journal-page-head {");
     expect(band).toBeGreaterThan(0);
-    const bandRule = css().slice(band, css().indexOf("}", band));
-    expect(bandRule).toContain("border-left-width: 0");
-    // The pseudo has to be the head's to read the colour and the CARD's to be
-    // as tall as the card. An absolutely positioned box resolves against the
-    // nearest POSITIONED ancestor, and `98-page-head.css` makes every head one.
-    expect(bandRule).toContain("position: static");
+    expect(css().slice(band, css().indexOf("}", band))).toContain(
+      "border-left-width: 0"
+    );
 
-    const gone = css().indexOf(
+    // ── AND IT IS THE CARD'S OWN BORDER AGAIN (1.0.42) ──────────────────
+    //
+    // 5.31.2 drew it as a pseudo-element on the HEAD, because *"the card cannot
+    // see the colour"* — `page-head.ts` stamped the grain on the head, and a
+    // custom property reaches descendants and never an ancestor. It paints the
+    // stack's CARD now as well, so the card resolves `--ca-grain-spine` itself.
+    // What that buys is the head's `position` back, which is what forced the
+    // change: the pseudo arrangement cost the head both of its pseudo-elements,
+    // and the tiled kind glyph needs a box the size of the head.
+    const at = css().indexOf(
       ".ca-journal-widget-block.ca-journal-stack:has(.ca-journal-page-head) {"
     );
-    expect(gone).toBeGreaterThan(0);
-    expect(css().slice(gone, css().indexOf("}", gone))).toContain("border-left: none");
+    expect(at).toBeGreaterThan(0);
+    const rule = css().slice(at, css().indexOf("}", at));
+    expect(rule).toContain("var(--ca-grain-spine)");
+    // SCALED BY THE RUNG, like the head's own spine — the card carries
+    // `data-ca-tier` too, so an index card's edge is twice a page card's.
+    expect(rule).toContain("var(--ca-head-spine) * var(--ca-head-spine-k)");
 
-    const spine = css().indexOf(".ca-journal-stack .ca-journal-page-head::before {");
-    expect(spine).toBeGreaterThan(0);
-    const rule = css().slice(spine, css().indexOf("}", spine));
-    expect(rule).toContain("position: absolute");
-    // Top to bottom of the card, which is the whole of the fix: a spine that
-    // ends where the head's box ends ends at a line where nothing else changes,
-    // because the chevron strip below it deliberately takes no rule.
-    expect(rule).toContain("top: 0");
-    expect(rule).toContain("bottom: 0");
-    expect(rule).toContain("left: 0");
-    expect(rule).toContain("width: var(--ca-head-spine)");
-    expect(rule).toContain("background: var(--ca-grain-spine)");
+    // AND THE HEAD'S PSEUDO IS GONE RATHER THAN LEFT DRAWING NOTHING. Two boxes
+    // over one edge is the doubling this test is named after.
+    expect(css()).not.toContain(".ca-journal-stack .ca-journal-page-head::before");
+    // The head is `position: relative` from the unconditional rule, and nothing
+    // here takes it back — that is what the film needs.
+    expect(css().slice(band, css().indexOf("}", band))).not.toContain("position:");
+  });
+
+  it("names the card's class the same way in the stylesheet and in TypeScript", () => {
+    // `page-head.ts` finds the card with `host.closest(".ca-journal-stack")`, as
+    // a LITERAL: `chromeClasses` pushes that class from `widgets/index.ts`, and
+    // that module imports `page-head.ts`, so naming it there and reading it here
+    // would close a cycle for one string. This is the check a rename would
+    // actually trip, and it is why the literal is allowed to stand.
+    expect(readSrc("ui/widgets/index")).toContain('out.push("ca-journal-stack")');
+    expect(readSrc("ui/widgets/page-head")).toContain(
+      'host.closest(".ca-journal-stack")'
+    );
   });
 
   it("leaves the host between the head and the card unpositioned", () => {
-    // THE SPINE'S CONTAINING BLOCK, AND NOTHING ELSE STATES IT. The pseudo above
-    // is as tall as the nearest positioned ancestor; the stack's card is
-    // `position: relative` and `.ca-journal-live-widget` — the bare host the
-    // head is built inside — is the only thing between them. A `position` added
-    // to that wrapper for a reason of its own would silently shorten this spine
-    // back to the head, which is the bug it was written to fix, so the absence
-    // is checked rather than described.
+    // 5.31.2 wrote this to protect the spine's containing block, and that reason
+    // expired with the pseudo (1.0.42) — the card draws its own edge now. The
+    // GUARD did not expire, it changed hands: the glyph film is absolute against
+    // the HEAD, which is a positioned, isolated ancestor of its own, and
+    // `.ca-journal-live-widget` sits between the head and the card. A `position`
+    // on that bare host would not reach the film, but it would put a second
+    // containing block into a chain two features now read — so the absence is
+    // still checked rather than described.
     for (const { name, css: text } of styleSheets()) {
       const bare = text.replace(/\/\*[\s\S]*?\*\//g, "");
       const re = /\.ca-journal-live-widget[^{}]*\{([^}]*)\}/g;
@@ -1029,13 +1045,14 @@ describe("the chevron strip's place in the card", () => {
     }
     // AND EACH STATES ITS GROUND, ITS EDGE AND ITS SHADOW rather than trusting
     // any of the three to be nothing, which is the half of the fix specificity
-    // alone does not do.
+    // alone does not do. The VALUES have moved twice since; these three
+    // PROPERTIES are the invariant, because each one is a thing Obsidian's own
+    // button chrome supplies to whoever leaves it unsaid.
     const base = css.indexOf(".ca-journal-reveal-bar > button.ca-journal-reveal-toggle {");
     const rule = css.slice(base, css.indexOf("}", base));
-    expect(rule).toContain("background: transparent");
+    expect(rule).toMatch(/\bbackground:/);
     expect(rule).toContain("box-shadow: none");
     expect(rule).toContain("border: var(--ca-rule-hair) solid");
-    expect(rule).toContain("border-radius: 999px");
     // The old one-class rules are gone rather than left underneath as a second
     // answer to the same question. Anchored at a line start: the winning rule
     // ENDS in that same text, so a bare `toContain` can never see the
@@ -1043,6 +1060,58 @@ describe("the chevron strip's place in the card", () => {
     expect(css).not.toMatch(/\n\.ca-journal-reveal-toggle \{/);
     expect(css).not.toMatch(/\n\.ca-journal-reveal-toggle:hover \{/);
     expect(css).not.toMatch(/\n\.ca-journal-reveal-toggle\.is-open \{/);
+  });
+
+  // ── AND WHAT THEY ARE MADE OF NOW (1.0.42) ───────────────────────────
+
+  it("bounds the chip with a ground rather than with a line", () => {
+    // *"a more lowkey and sleek button style"*. A border is the highest-contrast
+    // mark a control can wear and a capsule the most emphatic shape it can take,
+    // so five of them in a row under the note's name read as the toolbar this
+    // strip exists to remove. The fill bounds the words at a fraction of that
+    // contrast — so the edge has to be genuinely gone, not merely paler.
+    const css = readCss();
+    const base = css.indexOf(".ca-journal-reveal-bar > button.ca-journal-reveal-toggle {");
+    const rule = css.slice(base, css.indexOf("}", base));
+    expect(rule).toContain("border: var(--ca-rule-hair) solid transparent");
+    expect(rule).not.toContain("999px");
+    expect(rule).toContain("border-radius: var(--ca-radius-sm)");
+    expect(rule).toMatch(/background: color-mix\(in srgb, var\(--text-normal\)/);
+    // AND THE PADDING HAS TO BE WHAT SIZES IT. `min-height: 0` cannot reach the
+    // explicit `height: var(--input-height)` Obsidian gives a `<button>`, which
+    // is why the chevron block below measures a THIRTY-pixel pill under 4px of
+    // padding and a 0.7em label. Without this line every number in this rule is
+    // decorative and the strip is a row of app controls.
+    expect(rule).toContain("height: auto");
+    expect(rule).toContain("min-height: 0");
+  });
+
+  it("deepens one ground across the three states instead of changing treatment", () => {
+    // OPEN HAS TO BE A STEP PAST HOVER. Both wore `--background-modifier-hover`
+    // until this round, so a hovered closed chip and an open one were identical
+    // — the pointer erased the answer the reader was reaching for. And an open
+    // chip needs a fourth stop, because `.is-open` is written after `:hover` at
+    // equal specificity and otherwise wins on a chip that is both.
+    const css = readCss();
+    const alpha = (state: string): number => {
+      const sel = `.ca-journal-reveal-bar > button.ca-journal-reveal-toggle${state} {`;
+      const at = css.indexOf(sel);
+      expect(at, `no rule for ${sel}`).toBeGreaterThan(0);
+      const rule = css.slice(at, css.indexOf("}", at));
+      const m = /background: color-mix\(in srgb, var\(--text-normal\) (\d+)%/.exec(rule);
+      expect(m, `no mixed ground in ${sel}`).not.toBeNull();
+      return Number(m?.[1]);
+    };
+    const rest = alpha("");
+    const hover = alpha(":hover");
+    const open = alpha(".is-open");
+    const openHover = alpha(".is-open:hover");
+    expect(rest).toBeLessThan(hover);
+    expect(hover).toBeLessThan(open);
+    expect(open).toBeLessThan(openHover);
+    // Faint enough at rest to stay chrome. A chip that opens at a tenth of the
+    // ink is a button, which is the thing being walked back from.
+    expect(rest).toBeLessThanOrEqual(6);
   });
 
   it("draws the chevron at a size the row can see, and nudges it", () => {

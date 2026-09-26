@@ -151,10 +151,87 @@ describe("the section header is built in one place", () => {
 
     // THE TOOLS SURVIVE THE WITHHELD HEAD, which is the half of the rule that
     // is easy to lose: a Study note's `tasks:` under `header:✅ Tasks` draws no
-    // title and still shows Compact and its progress readout. 5.10 fixed that
-    // once for this one widget by hand; the frame now owes it to all seven.
+    // title and still shows its progress readout. 5.10 fixed that once for this
+    // one widget by hand; the frame now owes it to all seven.
     expect(head).toContain("barActions");
     expect(head).toContain("ca-journal-field-tools");
+  });
+
+  it("lends a fence's actions slot only to the field that bar names", () => {
+    // ── THE HALF THAT WAS TOO WIDE (1.0.42) ──────────────────────────────
+    //
+    // *"0/1 Done from tasks widget in a group behaves oddly?"* — three
+    // screenshots of a titled group of Tasks and Captured, with the task
+    // readout sitting on the GROUP'S head, above both columns, still there on
+    // the page the task list is not on.
+    //
+    // ONE BRANCH, TWO FACTS. `titled` means *the bar over this fence names this
+    // field*, and lending that bar's slot is right there. `!label` means *this
+    // field has no name of its own* — drawn as a widget, or never given one —
+    // and says nothing about whose bar is above it. They come apart in a row
+    // fence, where `soleField` is false and the `header:` bar names the group.
+    const head = readSrc("note-field");
+    expect(head).toContain(
+      "let strip: HTMLElement | null = opts.titled ? barActions : null;"
+    );
+    expect(head).not.toContain("let strip: HTMLElement | null = barActions;");
+    // AND THE DISPATCHER STILL HANDS THE SLOT OVER UNCONDITIONALLY, which is
+    // why the rule has to live here: `headerGroup` is the bar of whatever
+    // `header:` line came last in the fence, and in a row that is the group's.
+    expect(readSrc("widgets")).toContain("fenceTitled && soleField,");
+  });
+
+  it("gives that strip the shape of the slot it stands in for", () => {
+    // THE SECOND FAULT IN THE SAME SCREENSHOTS, and it was visible in the
+    // ungrouped one all along: `.ca-journal-field-tools` had no rule at all, so
+    // the readout — a `div` — stretched edge to edge and wore its pill
+    // background as a full-width band across the top of the card.
+    //
+    // A FLEX ROW ANCHORED RIGHT, because everything it can hold has only ever
+    // been seen inside `.ca-journal-header-widgets`, which is one.
+    const css = readCss();
+    const at = css.indexOf(".ca-journal-field-tools {");
+    expect(at).toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf("}", at));
+    expect(rule).toContain("display: flex");
+    expect(rule).toContain("justify-content: flex-end");
+    // AND IT COLLAPSES WHEN IT IS EMPTY, as the bar's slot does — a field that
+    // built the strip and then emptied it gets the card a fresh one has.
+    expect(css).toContain(".ca-journal-field-tools:empty");
+  });
+
+  it("lets no renderer invent a title for a field that has none", () => {
+    // ── THE OTHER HALF OF "NO LABEL, NO HEAD", AND IT WAS MISSING (1.0.42) ──
+    //
+    // *"tasks ticked as show as widget but still renders titlebar"*, and the
+    // whole of it was `label: label ?? "Tasks"` in `buildTasks`. `fieldHead`'s
+    // first branch is *no label → no head*, which is exactly how a field is
+    // drawn as a widget: the section/widget toggle writes the answer by taking
+    // the `|Title` off the line. A renderer that supplies a title for a line
+    // that has none has quietly opted its field out of that control — the box
+    // is drawn, the Save writes the file, the head comes back.
+    //
+    // SIX RENDERERS PASSED IT STRAIGHT THROUGH AND ONE DID NOT, which is why
+    // this is a sweep rather than one assertion: the rule is invisible in the
+    // file that breaks it, and nothing in 6,500 tests noticed for a release.
+    //
+    // READ OFF EVERY `fieldHead({` CALL, because the argument is where the
+    // damage is done. A fallback computed two lines above and passed as `label`
+    // would still slip through — and would be a fair thing to ask this to catch
+    // one day; what it catches today is the spelling all seven call sites use.
+    for (const { file, code } of sources) {
+      let at = code.indexOf("fieldHead({");
+      while (at !== -1) {
+        const args = code.slice(at, code.indexOf("});", at));
+        const label = /\n\s*label(?::\s*([^,\n]+))?,/.exec(args);
+        expect(label, `${file} @ ${at}`).not.toBeNull();
+        const value = (label![1] ?? "label").trim();
+        expect(value, `${file} @ ${at}`).toMatch(/^[\w.?]+$/);
+        expect(value, `${file} @ ${at}`).not.toContain("??");
+        expect(value, `${file} @ ${at}`).not.toContain("|");
+        at = code.indexOf("fieldHead({", at + 1);
+      }
+    }
   });
 
   it("is given the host the section's body goes into", () => {
@@ -1063,13 +1140,19 @@ describe("every editor is on the shared frame", () => {
       .filter((l) => !l.trim().startsWith("//"))
       .join("\n");
 
-  it("has all five of §5.2's list on it", () => {
+  it("has all five of §5.2's list on it, and the sixth that joined them", () => {
     const on: [string, string][] = [
       ["journal-chart-ui.ts", "JournalChartEditModal"],
       ["tracker-picker.ts", "TrackerPickerModal"],
       ["kind-change.ts", "KindChangeModal"],
       ["capture.ts", "CaptureModal"],
       ["event-ui.ts", "EventEditModal"],
+      // 1.0.42: *"make it one button (…) to open a edit task window which is
+      // SIMILAR TO THE EVENT WINDOW EDITOR."* The resemblance the reader asked
+      // for is this list — the head, the error line, the footer and the
+      // Enter-saves rule — so `TaskEditModal` gets it by extending the frame
+      // rather than by copying `EventEditModal`'s look.
+      ["task-edit.ts", "TaskEditModal"],
     ];
     for (const [f, cls] of on) {
       expect(codeOf(f), cls).toMatch(
