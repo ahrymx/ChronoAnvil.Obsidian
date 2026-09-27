@@ -775,10 +775,10 @@ export function buildLogList(
   // field folds.
   //
   // THE STORE IS PASSED IN rather than derived, because this widget's fold has
-  // always been the CALLER's: `captureCollapsedByDefault` is read by
-  // `noteFoldState` through the capture widget's own `startCollapsed`, and a
-  // logbook's is a no-op. Handing the frame those two functions keeps every
-  // caller's answer exactly where it was.
+  // always been the CALLER's: the capture widget hands in its own
+  // `startCollapsed` / `onFold` over `noteFoldState`, and a logbook's is a
+  // no-op. Handing the frame those two functions keeps every caller's answer
+  // exactly where it was.
   const chrome = fieldHead({
     wrap,
     key,

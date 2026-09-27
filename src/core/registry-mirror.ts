@@ -81,6 +81,16 @@ export const NOT_MIRRORED = [
   // and a mirror written in that window would carry it to the next vault. One
   // string is a cheap way to be sure it never travels.
   "revealedNoteSections",
+  // ── AND A SECOND ONE, FOR THE SAME REASON (1.0.46) ───────────────────
+  //
+  // `captureCollapsedByDefault` was a real preference and was mirrored like
+  // one, until it stopped being a preference: a vault-wide toggle naming ONE
+  // section, removed in favour of the fold control sitting on the field. See
+  // `ui/widgets/note-field.ts`. It is on this list rather than simply absent
+  // from the type for the sentence above — the walk is over the OBJECT, and a
+  // data.json still carrying it in the window before `pruneNoteState` runs
+  // would otherwise hand the dead key to the next vault.
+  "captureCollapsedByDefault",
   "captureDraft",
   "collapsedSettingsGroups",
 ] as const;

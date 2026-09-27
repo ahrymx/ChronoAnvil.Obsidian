@@ -30,7 +30,6 @@ import {
   joinRegionBlocks,
   readNoteRegion,
 } from "../../core/notestore";
-import { CAPTURE_NOTE_KEY } from "../../core/constants";
 import { splitArgHead } from "../../core/directive-grammar";
 
 /**
@@ -75,8 +74,8 @@ export class NoteFieldWatcher extends MarkdownRenderChild {
 // ── the fold, as three functions rather than three closures (4.28) ────
 //
 // Extracted from `buildNote` when the capture region stopped being a textarea:
-// the card list folds where the field folded, remembers what it remembered, and
-// honours the same `captureCollapsedByDefault` setting. Two widgets computing
+// the card list folds where the field folded and remembers what it remembered.
+// Two widgets computing
 // one storage key from the same three parts is how the two come to disagree
 // about which entry a fold belongs to — and the key is `::note:<key>` for both,
 // deliberately, because the fold belongs to the REGION rather than to whichever
@@ -86,20 +85,32 @@ export function noteFoldKey(sourcePath: string, key: string): string {
   return `${sourcePath}::note:${key}`;
 }
 
-// Absent means "not yet touched in this entry", which falls back to the global
-// default rather than to a hardcoded one — that is what makes the setting a
-// *default* and not just an initial value for new vaults.
+// Absent means "not yet touched in this entry", and every field reads that the
+// same way: OPEN.
+//
+// ── IT USED TO BRANCH ON THE KEY, AND THAT BRANCH IS GONE (1.0.46) ────
+//
+// `key === CAPTURE_NOTE_KEY` fell back to a `captureCollapsedByDefault` setting
+// instead — a vault-wide toggle for one section out of every section this
+// plugin draws, written when Captured was a textarea and was the only region in
+// a note that could fold at all. That is no longer true of anything: every
+// labelled field folds, each remembers its own answer per entry, and the
+// control that says so is on the field. A global preference naming one of them
+// is a rule the reader has to go and find before their entries make sense.
+//
+// NOTHING IS MIGRATED, because there is nothing to carry. The setting was a
+// default for an untouched field; a field the reader HAS touched already has
+// its answer in `collapsedNoteSections` and keeps it. `pruneNoteState` deletes
+// the retired key from data.json, as it did for `revealedNoteSections`.
 export function noteFoldState(
   plugin: ChronoAnvilPlugin,
   sourcePath: string,
   key: string
 ): boolean {
-  const stored =
-    plugin.settings.collapsedNoteSections?.[noteFoldKey(sourcePath, key)];
-  if (stored != null) return stored;
-  return key === CAPTURE_NOTE_KEY
-    ? plugin.settings.captureCollapsedByDefault
-    : false;
+  return (
+    plugin.settings.collapsedNoteSections?.[noteFoldKey(sourcePath, key)] ??
+    false
+  );
 }
 
 // Stored explicitly either way: once a field has been toggled by hand in this
@@ -199,7 +210,7 @@ export interface FieldHeadOptions {
   wrap: HTMLElement;
   // Where the fold is remembered. `fieldFoldStore` is the answer for a field
   // drawn on a note; the capture log and the logbook carry their own, because
-  // their callers already decide the default (`captureCollapsedByDefault`).
+  // their callers hold the two functions rather than a plugin to read from.
   //
   // REQUIRED, RATHER THAN DERIVED FROM A CONTEXT. This function used to take a
   // `MarkdownPostProcessorContext` to build the default store itself, which
@@ -303,9 +314,9 @@ export function buildNote(
   // turn `capture#collapse` into a region key nobody has, which is a rewrite of
   // every entry in every vault to change nothing a reader can see.
   //
-  // WHAT DECIDES CAPTURED'S DEFAULT is `noteFoldState`, and always did: the
-  // `captureCollapsedByDefault` setting is read off the KEY, not off this
-  // modifier. So the one field that opened folded still opens folded.
+  // WHAT DECIDES CAPTURED'S DEFAULT is `noteFoldState`, and always did — never
+  // this modifier. As of 1.0.46 that answer is the same one every other field
+  // gets: open, until the reader folds it in an entry.
 
   const wrap = createDiv({
     cls: `ca-journal-note ca-journal-note--${key}${

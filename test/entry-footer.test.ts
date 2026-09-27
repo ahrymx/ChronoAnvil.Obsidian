@@ -34,7 +34,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readCode, readCss, readSrc } from "./sources";
+import { cssRule, readCode, readCss, readSrc } from "./sources";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../src/trackers/trackers";
 
 describe("the controls leave the title band", () => {
@@ -318,12 +318,56 @@ describe("the band reads as a footer and not as the overview's", () => {
     expect(css).toContain(".ca-journal-slim-banner:hover .ca-jsh-more");
   });
 
-  it("and the date list opens over the card rather than off its edge", () => {
-    const at = css.indexOf(".ca-journal-entry-context .ca-jeh-datenav-menu");
-    expect(at).toBeGreaterThan(0);
-    const menu = css.slice(at, css.indexOf("}", at));
-    expect(menu).toContain("bottom: calc(100% + 6px)");
-    expect(menu).toContain("transform: none");
+  it("and the date list is placed against the window, not against the card", () => {
+    // ── THIS CASE USED TO PIN THE OPPOSITE, AND IT WAS RIGHT UNTIL 1.0.45 ──
+    //
+    // It asserted `bottom: calc(100% + 6px)` and `transform: none` on a
+    // `.ca-journal-entry-context .ca-jeh-datenav-menu` override — the rule that
+    // flipped the footer's list UP and left-aligned it, because below was over
+    // the note's first paragraph and centred hung off the card's left edge.
+    //
+    // 1.0.45 welded the entry into one card, and that card sets
+    // `overflow: hidden` so the head's spine stops at the radius. An
+    // `absolute` menu inside it is cropped to the card in BOTH directions, and
+    // the card is shorter than the list either way, which is what the reader
+    // reported as two bugs: "should grow downward", and old entries appearing
+    // to list different dates. `dateOptions` takes `(plugin, grain)` and has no
+    // welded branch — it was one list under two crops.
+    //
+    // So no CSS rule decides the direction now. The menu is fixed and
+    // `ui/drop-menu.ts` writes its coordinates from the trigger's rect.
+    expect(css).not.toContain(".ca-journal-entry-context .ca-jeh-datenav-menu");
+    const menu = cssRule(".ca-jeh-datenav-menu");
+    expect(menu).toContain("position: fixed");
+    expect(menu).not.toContain("bottom:");
+    expect(menu).not.toContain("transform:");
+    // The one thing the flip still changes is which way the shadow points.
+    expect(cssRule(".ca-jeh-datenav-menu.is-above")).toContain(
+      "box-shadow: var(--ca-elev-2-up)"
+    );
+  });
+
+  it("and both date pickers hand their menu to the same placer", () => {
+    // The entry's picker and the dashboards' `period-nav` build the same menu
+    // out of the same classes, so a fix to one that is not a fix to the other
+    // is a fix that comes back. `periodnav.ts` sits on a banner that can itself
+    // be a stack, which is the same `overflow: hidden`.
+    const place = readCode("drop-menu");
+    expect(place).toContain("export function anchorDropMenu(");
+    // Downward is the default and the flip is a measurement, not a site.
+    expect(place).toContain("menu.offsetHeight > below && above > below");
+    for (const mod of ["entryheader", "periodnav"]) {
+      const code = readCode(mod);
+      expect(code, mod).toContain(
+        'import { anchorDropMenu } from "../ui/drop-menu";'
+      );
+      expect(code, mod).toContain("unanchor = anchorDropMenu(trigger, menu, list);");
+      // Opened on show, released on close — a fixed box that outlived its menu
+      // would keep re-placing a node nothing can see.
+      expect(code, mod).toContain("if (unanchor) unanchor();");
+      // `scrollIntoView` scrolls every scrollable ancestor, the note included.
+      expect(code, mod).not.toContain("scrollIntoView");
+    }
   });
 });
 

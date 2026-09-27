@@ -1185,9 +1185,12 @@ mark.ca-jdr-highlight {
  * because `note:capture#collapse:…|Captured` is written into five template
  * assets and every entry composed from them; dropping it from the parse would
  * turn `capture#collapse` into a region key nobody has. What decided Captured's
- * default was never the suffix anyway — `captureCollapsedByDefault` is read off
- * the KEY by `noteFoldState` — so the one field that opened folded still does,
- * and the other six gained a chevron rather than losing one. */
+ * default was never the suffix anyway — `noteFoldState` read it off the KEY, by
+ * way of a `captureCollapsedByDefault` setting, so the one field that opened
+ * folded went on doing so while the other six gained a chevron rather than
+ * losing one. That setting is gone as of 1.0.46 and Captured opens like the
+ * rest; `note-field.ts` carries the argument. Nothing here changes either way:
+ * the fold is drawn the same whichever answer it starts on. */
 
 /* Captures are a chronological strip rather than prose: a monospace-ish,
    slightly tighter block reads as a log of stamped moments and visually

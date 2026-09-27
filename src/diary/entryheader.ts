@@ -50,6 +50,7 @@
 import { App, MarkdownPostProcessorContext, setIcon, TFile, Menu, MenuItem} from "obsidian";
 import { settingsButton } from "../ui/section-frame";
 import { attachNoteRename } from "../ui/header-title";
+import { anchorDropMenu } from "../ui/drop-menu";
 import { isManagedTemplate } from "../trackers/entry-trackers";
 import { openEntryTemplateWindow } from "../ui/entry-template-modal";
 import type ChronoAnvilPlugin from "../main";
@@ -222,8 +223,11 @@ function buildDatePicker(
   setIcon(trigger.createSpan({ cls: "ca-jeh-datenav-caret" }), "chevrons-up-down");
 
   let menu: HTMLElement | null = null;
+  let unanchor: (() => void) | null = null;
   const closeMenu = (): void => {
     if (!menu) return;
+    if (unanchor) unanchor();
+    unanchor = null;
     menu.remove();
     menu = null;
     trigger.removeClass("is-open");
@@ -270,8 +274,15 @@ function buildDatePicker(
       });
     }
 
+    unanchor = anchorDropMenu(trigger, menu, list);
     // Land the scroll on the current entry so the list opens centred on "today".
-    if (currentRow) currentRow.scrollIntoView({ block: "center" });
+    // AFTER the anchor, which is what settles the list's height — and by
+    // `scrollTop` rather than `scrollIntoView`, which scrolls every scrollable
+    // ancestor and so drags the note out from under the menu just opened.
+    if (currentRow) {
+      list.scrollTop =
+        currentRow.offsetTop - (list.clientHeight - currentRow.offsetHeight) / 2;
+    }
 
     // Defer wiring outside-click so this same click doesn't immediately close it.
     setTimeout(() => {

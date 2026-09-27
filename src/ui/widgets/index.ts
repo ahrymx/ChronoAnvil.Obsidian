@@ -2975,9 +2975,13 @@ export class Widgets implements
         //
         // And the key IS the identity here: `constants.ts` gives capture its
         // own region precisely so it is not confused with prose written on
-        // purpose, and this is that distinction becoming visible. The
-        // precedent is one file over — `note-field.ts` already reads
-        // `key === CAPTURE_NOTE_KEY` to decide the fold default.
+        // purpose, and this is that distinction becoming visible.
+        //
+        // `note-field.ts` used to read the same key for a second reason — a
+        // `captureCollapsedByDefault` setting decided whether Captured opened
+        // folded. That went in 1.0.46 and this dispatch did not, because the
+        // two asked different questions of the key: one was a global preference
+        // naming one section, this is which RENDERER the region takes.
         widget =
           noteKeyOf(rest) === CAPTURE_NOTE_KEY
             ? buildCaptureLog(this, rest, ctx, label, {

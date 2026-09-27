@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readCode, readCss } from "./sources";
+import { NOT_MIRRORED } from "../src/core/registry-mirror";
 import {
   grainsShowingCapture,
   logbookTargets,
@@ -558,3 +559,64 @@ describe("the capture dialogue visuals", () => {
   });
 });
 
+
+describe("Captured folds like every other field (1.0.46)", () => {
+  // *"remove the settings option and machinery that makes the captured log
+  // render collapsed/uncollapsed. It is a defunked function tied to just one
+  // section, implemented long before V1"* — and the description is exact:
+  // `captureCollapsedByDefault` was a vault-wide toggle naming ONE section,
+  // written when Captured was a textarea and was the only region in a note that
+  // could fold at all. Every labelled field folds now and each remembers its own
+  // answer per entry, so a global default for one of them is a rule the reader
+  // has to go and find before their entries make sense.
+
+  it("keeps no setting, no default and no control for it", () => {
+    const settings = readCode("settings");
+    expect(settings).not.toContain("captureCollapsedByDefault: boolean");
+    expect(settings).not.toContain("captureCollapsedByDefault: true");
+    expect(settings).not.toContain("Collapse captures by default");
+    // The `<details>` badge stated the same answer and went with it.
+    expect(settings).not.toContain('"Collapsed" : "Expanded"');
+    // The rest of the capture group is untouched — this removed one control,
+    // not the group it sat in.
+    expect(settings).toContain("captureDraft");
+    expect(settings).toContain("Unsaved draft");
+  });
+
+  it("asks the fold record and nothing else, whatever the key", () => {
+    // The branch that read the key is what made Captured different. Gone, so
+    // `noteFoldState` is one lookup with one fallback for all five namespaces.
+    const code = readCode("note-field");
+    expect(code).not.toContain("plugin.settings.captureCollapsedByDefault");
+    const at = code.indexOf("export function noteFoldState(");
+    expect(at).toBeGreaterThan(0);
+    const body = code.slice(at, code.indexOf("\n}", at));
+    expect(body).toContain("collapsedNoteSections?.[noteFoldKey(sourcePath, key)]");
+    // Written across two lines by the formatter, so match on the token.
+    expect(body.replace(/\s+/g, " ")).toContain("?? false");
+    expect(body).not.toContain("CAPTURE_NOTE_KEY");
+  });
+
+  it("still dispatches the capture region to the log renderer", () => {
+    // TWO QUESTIONS WERE BEING ASKED OF THE SAME KEY and only one of them was
+    // the defunct one. `note:capture` draws a card list rather than a textarea,
+    // and that has nothing to do with which state it opens in.
+    const code = readCode("widgets");
+    expect(code).toContain("noteKeyOf(rest) === CAPTURE_NOTE_KEY");
+    expect(code).toContain("buildCaptureLog(this, rest, ctx, label, {");
+    // And it still remembers a fold the reader makes in this entry.
+    expect(code).toContain(
+      "noteFoldState(this.plugin, ctx.sourcePath, CAPTURE_NOTE_KEY)"
+    );
+  });
+
+  it("sweeps the retired key out of data.json rather than leaving it", () => {
+    // The precedent is `revealedNoteSections` (1.0.25), and the reason is the
+    // one `pruneNoteState` exists for: a record that only ever grows.
+    const main = readCode("main");
+    expect(main).toContain('"captureCollapsedByDefault"');
+    expect(main).toContain("delete stale[dead];");
+    // And it must not travel to the next vault in the window before that runs.
+    expect([...NOT_MIRRORED]).toContain("captureCollapsedByDefault");
+  });
+});

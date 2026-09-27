@@ -577,7 +577,10 @@ describe("where the answer is kept", () => {
     // this used to be is not pruned key by key any more, it is dropped whole the
     // first time the plugin loads.
     const main = readCode("main");
-    expect(main).toContain("delete stale.revealedNoteSections;");
+    // 1.0.46 gave the sweep a second name (`captureCollapsedByDefault`), so it
+    // walks a list rather than testing one field — both must be on it.
+    expect(main).toContain('"revealedNoteSections"');
+    expect(main).toContain("delete stale[dead];");
     expect(main).toContain("pruneCollapsedSections(folds, live)");
     // AND THE EXCLUSION OUTLIVES THE FIELD, on purpose: `mirroredPart` walks the
     // settings OBJECT, so a data.json still carrying the dead record could

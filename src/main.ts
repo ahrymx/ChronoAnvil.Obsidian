@@ -383,23 +383,31 @@ export default class ChronoAnvilPlugin extends Plugin {
     const folds = this.settings.collapsedNoteSections;
     const tabs = this.settings.openGroupTabs;
     const gridFilters = this.settings.timeGridFilters;
-    // ── AND THE RECORD THE REVEALS USED TO KEEP (1.0.25) ─────────────────
+    // ── AND THE FIELDS THAT ARE FIELDS NO LONGER ─────────────────────────
     //
-    // `revealedNoteSections` WAS THE FOURTH OF THESE (5.28) and is a field no
-    // longer. A reveal defaults to OPEN now and files its answer as a fold,
-    // namespaced `::reveal:` inside `collapsedNoteSections` — so it is pruned by
-    // the walk over that record below, and `ui/reveal.ts` argues why the second
-    // record was only ever the opposite default in disguise.
+    // `revealedNoteSections` WAS THE FOURTH OF THESE (5.28), retired in 1.0.25.
+    // A reveal defaults to OPEN now and files its answer as a fold, namespaced
+    // `::reveal:` inside `collapsedNoteSections` — so it is pruned by the walk
+    // over that record below, and `ui/reveal.ts` argues why the second record
+    // was only ever the opposite default in disguise.
     //
-    // DELETED RATHER THAN MIGRATED, because there is nothing in it to carry:
-    // every key it held said *the reader opened this*, which is what the new
-    // default says for free. It is swept here rather than left in data.json for
-    // the reason `::journal:list` is swept below — a record that only ever grows
-    // is what this method exists to stop, and a retired one never shrinks on its
-    // own.
-    const stale = this.settings as { revealedNoteSections?: unknown };
-    const retired = stale.revealedNoteSections === undefined ? 0 : 1;
-    if (retired) delete stale.revealedNoteSections;
+    // `captureCollapsedByDefault` joined it in 1.0.46: a vault-wide toggle for
+    // whether ONE section, Captured, opened folded. `note-field.ts` holds that
+    // argument. Nothing is carried from it either — it was the answer for a
+    // field the reader had never touched, and a field they HAVE touched already
+    // has its answer in `collapsedNoteSections`.
+    //
+    // DELETED RATHER THAN MIGRATED, and swept here rather than left in
+    // data.json for the reason `::journal:list` is swept below: a record that
+    // only ever grows is what this method exists to stop, and a retired key
+    // never shrinks on its own.
+    const stale = this.settings as unknown as Record<string, unknown>;
+    let retired = 0;
+    for (const dead of ["revealedNoteSections", "captureCollapsedByDefault"]) {
+      if (stale[dead] === undefined) continue;
+      delete stale[dead];
+      retired++;
+    }
     const any =
       Object.keys(folds ?? {}).length > 0 ||
       Object.keys(tabs ?? {}).length > 0 ||

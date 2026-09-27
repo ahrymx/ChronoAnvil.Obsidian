@@ -159,7 +159,6 @@
    A pill trigger showing the current entry's date; click drops a scrollable
    list of every day/month to jump to. */
 .ca-jeh-datenav {
-  position: relative;
   display: inline-flex;
 }
 .ca-jeh-datenav-trigger {
@@ -212,11 +211,31 @@
 .ca-jeh-datenav-trigger.is-open .ca-jeh-datenav-caret {
   color: var(--interactive-accent);
 }
+/* ── IT IS PLACED, NOT POSITIONED (1.0.46) ───────────────────────────
+ *
+ * `position: fixed`, with `top` and `left` written by `ui/drop-menu.ts` from the
+ * trigger's own rect. That file carries the argument; the short version is that
+ * this was `absolute` inside `.ca-jeh-datenav`, and on a welded diary entry the
+ * nearest clip ancestor is the stack card's `overflow: hidden` — so the menu was
+ * cropped to a card that is shorter than the list, in whichever direction it
+ * grew. A fixed box's containing block is the window, which no ancestor crops.
+ *
+ * WHAT THIS RULE NO LONGER DECIDES IS THE DIRECTION. Two rules used to: this one
+ * dropped the menu below and centred it, and a `.ca-journal-entry-context`
+ * override flipped it above and left-aligned it, because in the footer "below"
+ * was over the note's first paragraph and a 220px menu centred on a ~110px
+ * control hung off the card's left edge. Both were right about their own site
+ * and neither could know the room, which is what the reader hit: the entry's
+ * copy grew up into two rows' worth of card and cropped the rest of the list.
+ * The placement measures instead, and left-aligns everywhere — the alignment
+ * the override argued for, now that it is clamped to the window as well.
+ *
+ * `is-above` is the flipped state, and the shadow is all it changes: it points
+ * away from the trigger, which is the reason it had a direction at all. */
 .ca-jeh-datenav-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  top: 0;
+  left: 0;
   z-index: 30;
   min-width: 220px;
   max-width: 280px;
@@ -226,21 +245,7 @@
   background: var(--background-primary);
   box-shadow: var(--ca-elev-2);
 }
-/* ── 3.7: the same list, opened from the card's last row ─────────────────
-   Centred-and-below is right for a trigger in the middle of a page. In the
-   footer it is wrong twice: the stepper is the leftmost thing in the card, so
-   a 220px menu centred on a ~110px control hangs off the card's left edge, and
-   the footer's underside is the bottom of the banner, so "below" is over the
-   note's first paragraph.
-
-   It drops UP and aligns LEFT — anchored to the control's own edge, over the
-   card it belongs to. The shadow flips with it, for the same reason it points
-   away from the trigger in the first place. */
-.ca-journal-entry-context .ca-jeh-datenav-menu {
-  top: auto;
-  bottom: calc(100% + 6px);
-  left: 0;
-  transform: none;
+.ca-jeh-datenav-menu.is-above {
   box-shadow: var(--ca-elev-2-up);
 }
 .ca-jeh-datenav-list {

@@ -244,12 +244,21 @@ export interface ChronoAnvilSettings {
   // `ui/reveal.ts` holds the reversal and `pruneNoteState` deletes the retired
   // field.
   //
-  // AND AN ABSENT KEY MEANS THE CONTROL'S OWN DEFAULT, which is open for three of
-  // the five and not for the other two. The capture field's falls back to
-  // `captureCollapsedByDefault` (`noteFoldState`), and the calendar's two panels
-  // ship collapsed by the reader's own instruction in 1.0.28 — so both of those
-  // store the answer EXPLICITLY EITHER WAY, `false` included, where a header bar
-  // stores `true` or nothing. Two policies, one map, and the thing that makes
+  // AND AN ABSENT KEY MEANS THE CONTROL'S OWN DEFAULT, which is open for four of
+  // the five and not for the fifth. The calendar's two panels ship collapsed by
+  // the reader's own instruction in 1.0.28, so that one stores the answer
+  // EXPLICITLY EITHER WAY, `false` included, where a header bar stores `true` or
+  // nothing.
+  //
+  // THE CAPTURE FIELD USED TO BE A SECOND SUCH POLICY, and it was the only one
+  // with a SETTING behind it: `captureCollapsedByDefault`, a global toggle that
+  // named one section out of every section this plugin draws. Removed in 1.0.46
+  // — an option that exists for exactly one field is a preference nobody knows
+  // they have, and folding Captured in the entry that needs it folded is the
+  // control that was already there. Captured now defaults open like everything
+  // else and remembers what the reader does to it, per entry.
+  //
+  // Two policies, one map, and the thing that makes
   // that safe is that nothing ever reads a key it did not write: `pathwatch.ts`
   // prunes and retargets on the PATH in front of the first `::` and never looks
   // at the value (`pruneCollapsedSections` says so in as many words). A walk that
@@ -302,10 +311,6 @@ export interface ChronoAnvilSettings {
   // Unsaved quick-capture text, kept so closing the box doesn't lose it.
   // Lives here rather than in memory so it survives a restart.
   captureDraft: string;
-  // Default collapsed state for the capture field in an entry. Per-entry
-  // toggles are remembered individually in collapsedNoteSections; this is only
-  // the starting state for one not yet touched.
-  captureCollapsedByDefault: boolean;
   // Journal folders the reader has told ChronoAnvil to stop offering to import.
   // Paths, not ids — an unregistered folder has no id anyone has agreed to.
   // Moving or renaming one offers it again, which is right: to everything else
@@ -424,7 +429,6 @@ export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
   openGroupTabs: {},
   timeGridFilters: {},
   captureDraft: "",
-  captureCollapsedByDefault: true,
   collapsedSettingsGroups: {},
   entrySections: {},
   entrySectionBand: {},
@@ -1000,8 +1004,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         "⚡",
         "Quick capture",
         "Getting a thought into an entry without opening it",
-        false,
-        s.captureCollapsedByDefault ? "Collapsed" : "Expanded"
+        false
       )
     );
 
@@ -1939,18 +1942,14 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       }
     }
 
-    new Setting(containerEl)
-      .setName("Collapse captures by default")
-      .setDesc(
-        "Whether the Captured field in an entry starts folded. Captures accumulate all day, so folding keeps them from pushing the rest of the entry down. Folding or unfolding it in a particular entry is remembered for that entry and overrides this."
-      )
-      .addToggle((t) =>
-        t.setValue(s.captureCollapsedByDefault).onChange(async (v) => {
-          s.captureCollapsedByDefault = v;
-          await this.plugin.saveSettings();
-          this.refresh();
-        })
-      );
+    // THE FOLD TOGGLE THAT USED TO SIT HERE IS GONE (1.0.46). "Collapse
+    // captures by default" was a vault-wide switch naming ONE section — the
+    // only field in the plugin with a preference of its own, written when
+    // Captured was a textarea and nothing else in a note could fold at all.
+    // Everything can fold now, each field remembers its own answer per entry,
+    // and a global default for one of them is a setting a reader has to find
+    // before they can understand why their entries differ from the control
+    // sitting on the field itself.
 
     const draft = s.captureDraft ?? "";
     if (draft) {
