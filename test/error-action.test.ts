@@ -123,10 +123,10 @@ describe("the root-collision refusal", () => {
     // a journal somebody is still using is not the quick way past a wizard
     // step. It returns a bare string, which is what "no action" IS.
     expect(src).toContain(
-      "Give this one a different name, or delete ${cfg.name} from Settings → ChronoAnvil → Journals first."
+      "Give this one a different name, or remove ${cfg.name} from Settings → ChronoAnvil → Journals first."
     );
     // The stale branch: the only one that gets an action.
-    expect(src).toContain('label: `Delete “${cfg.name}” and continue`');
+    expect(src).toContain('label: `Remove “${cfg.name}” and continue`');
     const live = src.indexOf("Journals first.`");
     const stale = src.indexOf("and continue`");
     expect(live).toBeGreaterThan(0);

@@ -75,7 +75,7 @@ import {
   buildCalendar,
   calendarPanelKey,
 } from "../../diary/calendar";
-import { openDayEventMenu } from "../../events/event-ui";
+import { openDayCellMenu } from "../../events/event-ui";
 import {
   buildEventsList,
   buildUpcomingEvents,
@@ -218,7 +218,7 @@ export function buildCalendarRegion(
           header: true,
           ctx,
           onContext: (iso, evt) =>
-            openDayEventMenu(plugin.app, plugin, iso, evt),
+            openDayCellMenu(plugin.app, plugin, iso, evt),
         }),
       // Entries move the dots and the heat map; the events note moves the
       // bars and badges. Both have to redraw the grid.

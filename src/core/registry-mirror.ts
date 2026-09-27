@@ -299,7 +299,7 @@ export class Registry {
       `ChronoAnvil: no plugin settings found, so ${describeMirror(mirror)} ` +
         `${describeMirror(mirror) === "your settings" ? "was" : "were"} ` +
         `restored from ${REGISTRY_MIRROR} in this vault. ` +
-        `To start from scratch instead, delete that file and reload.`,
+        `To start from scratch instead, remove that file and reload.`,
       15000
     );
   }

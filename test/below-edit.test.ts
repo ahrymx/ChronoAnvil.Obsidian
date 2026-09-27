@@ -780,7 +780,7 @@ describe("what the delete says before it deletes", () => {
     // `confirmAction`'s fifth argument, which paints `mod-warning` rather than
     // `mod-cta` on the button that does it.
     const text = src();
-    const call = text.indexOf("`Delete ${n} note${n === 1 ? \"\" : \"s\"}?`");
+    const call = text.indexOf("`Remove ${n} note${n === 1 ? \"\" : \"s\"}?`");
     expect(call).toBeGreaterThan(-1);
     expect(text.slice(call, call + 500)).toMatch(/\n\s+true\n\s+\);/);
   });
@@ -860,7 +860,7 @@ describe("the foot the Edit button sits in", () => {
     // group's head exists only inside this mode, so a door describing only the
     // ticks would leave it undiscoverable.
     expect(foot).toContain(
-      'const hint = "Select notes to move or delete, or remove an empty note type";'
+      'const hint = "Select notes to move or remove, or remove an empty note type";'
     );
     // BOTH, per `addHeadButton`'s rule: `title` is the hover and `aria-label` is
     // the only name a screen reader has for an icon.

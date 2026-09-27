@@ -260,13 +260,36 @@ export function moveRow(
     : moveBlock(arr, band, id, delta);
 }
 
-// A cell trades places with the cell beside it, INSIDE its group.
+// A cell trades places with the cell beside it, INSIDE its group — unless the
+// press would take it over a tab boundary, which is a different move and is
+// `crossPage`'s.
 //
-// PAGE BOUNDARIES STAY WHERE THEY ARE, which is what makes this the way to move
-// a widget from one page of a group to another: the two cells either side of a
-// boundary swap, so one crosses it going up and the other going down. See
-// `keptPages` — the rule is the one `keptBlocks` already keeps for blocks, said
-// one level in.
+// ── THE REPORT (1.0.43) ──────────────────────────────────────────────────
+//
+// *"Moving open tasks down into tab 2 replaces with logbook, but it should
+// insert."* A homepage whose sections are one group cut into two tabs:
+//
+//   tab 1 [ Diary, Overview navigator, Open tasks ]   tab 2 [ Logbook, Events ]
+//
+// Press Move down on Open tasks. It traded places with Logbook, and because a
+// boundary is restored BY POSITION (`keptPages`) the boundary stayed in the slot
+// it was in — so Open tasks arrived in tab 2 and Logbook was carried out of it.
+// One press, two sections moved, and the one the reader did not touch changed
+// tabs.
+//
+// 4.53.0 chose that deliberately and said so here: *"the two cells either side
+// of a boundary swap, so one crosses it going up and the other going down."* The
+// argument was that a reader watching two rows swap expects to see two rows
+// swap, and it is sound for two cells INSIDE a page, where it still holds. What
+// it missed is that a tab boundary is not a slot in a list, it is a wall: the
+// cell beside a wall has no neighbour on the other side of it to trade with,
+// because the thing on the other side is in a different tab.
+//
+// SO A PRESS AT THE WALL MOVES THE WALL. The rows do not reorder at all — Open
+// tasks stays where it is in the file and the boundary steps up over it, which
+// is the same picture from the reader's side (the section crosses the divider)
+// and leaves every other section where they left it. Crossing back is the
+// opposite press, and the two are a round trip.
 export function moveCell(
   arr: Arrangement,
   band: readonly string[],
@@ -280,8 +303,78 @@ export function moveCell(
   const from = cells.indexOf(id);
   const to = from + delta;
   if (to < 0 || to >= cells.length) return null;
+  const wall = wallAt(arr, cells, from, delta);
+  if (wall) return crossPage(arr, wall);
   [cells[from], cells[to]] = [cells[to], cells[from]];
   return settle(arr, band, flatten(blocks, at, cells));
+}
+
+// The boundary this press is standing at, if it is standing at one: the cell
+// that currently opens a tab, and the cell that will open it afterwards.
+//
+// ONE FUNCTION FOR THE MOVE AND FOR THE LABEL. `section-editor.ts` writes what
+// an arrow is about to do BEFORE the press rather than discovering it after, so
+// the arrow that crosses a tab has to be answerable without doing the move —
+// and a second spelling of "is there a wall here" is a second chance for the
+// button and the press to disagree.
+//
+// THE TWO DIRECTIONS ARE NOT MIRRORS, which is the part worth writing down. Going
+// DOWN, the cell arrives at the head of the tab below, so it takes the opening
+// mark off the cell that has it. Going UP, the cell leaves the head of its own
+// tab for the foot of the tab above, so the mark passes to whatever was standing
+// behind it — and at the end of the block there is nothing standing behind it,
+// the tab it opened had one member, and a tab whose last member walks out of it
+// is gone.
+function wallAt(
+  arr: Arrangement,
+  cells: readonly string[],
+  from: number,
+  delta: number
+): { opens: string; takes: string | undefined } | null {
+  if (delta !== 1 && delta !== -1) return null;
+  // A STACK HAS NO TABS TO CROSS. `parseTabs` refuses a `tab` line in a fence
+  // with no `row` and `parseStack` refuses a fence that is both, so a page bit
+  // inside a stack describes a boundary no write could make — and acting on one
+  // here would spend a press moving nothing the reader can see.
+  if (arr.stacked.has(cells[1])) return null;
+  const opens = delta === 1 ? cells[from + 1] : cells[from];
+  if (!arr.paged.has(opens)) return null;
+  return { opens, takes: delta === 1 ? cells[from] : cells[from + 1] };
+}
+
+// The wall moves; nothing else does.
+//
+// STRAIGHT TO `normalise`, NOT THROUGH `settle`. `settle` is for a reorder — it
+// restores the boundaries a new row order should carry and returns null when the
+// order did not change, which is exactly what this move does to the order. The
+// two bits it would put back are the two this operation exists to move.
+function crossPage(
+  arr: Arrangement,
+  wall: { opens: string; takes: string | undefined }
+): NextArrangement {
+  const paged = new Set(arr.paged);
+  paged.delete(wall.opens);
+  // `normalise` drops a mark on a block's opener, which is right and is what
+  // makes a tab whose only member leaves it disappear rather than linger as a
+  // boundary with nothing in front of it.
+  if (wall.takes !== undefined) paged.add(wall.takes);
+  return normalise(arr.rows, arr.joined, paged, arr.stacked);
+}
+
+// Whether this press takes the cell over a tab boundary rather than past a
+// neighbour — the question the arrow's own label asks.
+export function crossesPage(
+  arr: Arrangement,
+  band: readonly string[],
+  id: string,
+  delta: number
+): boolean {
+  const block = blockOf(band, arr.joined, id);
+  if (block.length < 2) return false;
+  const from = block.indexOf(id);
+  const to = from + delta;
+  if (to < 0 || to >= block.length) return false;
+  return wallAt(arr, block, from, delta) !== null;
 }
 
 // A whole block moves past the whole block beside it.
@@ -557,10 +650,18 @@ export function normalise(
 // BY POSITION IN THE BLOCK, exactly as `keptBlocks` restores block boundaries by
 // position in the list, and for the same reason: a boundary is a property of
 // where a row SITS, and the bit that records it belongs to whichever row ends up
-// there. Two cells either side of a page boundary trading places therefore swap
-// pages, which is what a reader watching two rows swap expects to see — and the
-// alternative, carrying the bit with the row, silently moves the boundary and
-// leaves one page holding everything.
+// there. Two cells of the SAME page trading places therefore leave the page
+// boundaries exactly where the reader left them — and the alternative, carrying
+// the bit with the row, silently moves a boundary and leaves one page holding
+// everything.
+//
+// THE OTHER HALF OF THAT SENTENCE WAS RETIRED IN 1.0.43. It used to read on:
+// *"two cells either side of a page boundary trading places therefore swap
+// pages"*, offered as the way to move a widget from one tab to another. It was
+// reported as a bug the first time a reader used it, because it moves two
+// sections when they touched one. `moveCell` no longer produces that swap — a
+// press at a boundary moves the BOUNDARY — so this rule is now only ever asked
+// about a reorder within a page, which is the case it was always right about.
 //
 // A BLOCK THAT WAS BROKEN UP BY THE MOVE IS LEFT ALONE, on `keptBlocks`' rule: a
 // reader whose move changed a group's membership is regrouping, and the

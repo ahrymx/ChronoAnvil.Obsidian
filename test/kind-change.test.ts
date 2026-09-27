@@ -226,7 +226,7 @@ describe("what counts as a depth change", () => {
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe("removed");
     expect(out[0].subject).toBe("level");
-    expect(out[0].detail).toContain("Nothing is moved or deleted");
+    expect(out[0].detail).toContain("Nothing is moved or removed");
   });
 
   it("ignores a row that has no id, rather than deriving one", () => {

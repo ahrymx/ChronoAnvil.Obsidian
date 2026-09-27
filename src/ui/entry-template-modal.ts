@@ -235,8 +235,8 @@ class EntryTemplateModal extends Modal {
     if (!layout) return;
     const del = actions.createEl("button", {
       cls: "ca-tpl-toggle",
-      text: "Delete",
-      attr: { "aria-label": `Delete ${layout.label}` },
+      text: "Remove",
+      attr: { "aria-label": `Remove ${layout.label}` },
     });
     del.addEventListener("click", () => {
       void (async () => {
@@ -245,13 +245,13 @@ class EntryTemplateModal extends Modal {
         // it; a layout lives in data.json, which the reader has no undo for.
         const ok = await confirmAction(
           this.app,
-          `Delete “${layout.label}”?`,
+          `Remove “${layout.label}”?`,
           "The layout is removed from your settings. Entries you built from it are not touched.",
-          "Delete"
+          "Remove"
         );
         if (!ok) return;
         await this.manager.deleteLayout(layout.id);
-        new Notice(`ChronoAnvil: deleted “${layout.label}”`);
+        new Notice(`ChronoAnvil: removed “${layout.label}”`);
         await this.refresh();
       })();
     });

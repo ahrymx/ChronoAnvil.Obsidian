@@ -461,15 +461,15 @@ function rows(
       );
       menu.addItem((i) =>
         i
-          .setTitle("Delete")
+          .setTitle("Remove")
           .setIcon("trash-2")
           .onClick(() => {
             void (async () => {
               const ok = await confirmAction(
                 plugin.app,
-                "Delete event",
-                `Delete \u201c${def.title}\u201d? Diary entries that already reference it keep their property; the reference is simply ignored.`,
-                "Delete",
+                "Remove event",
+                `Remove \u201c${def.title}\u201d? Diary entries that already reference it keep their property; the reference is simply ignored.`,
+                "Remove",
                 true
               );
               if (!ok) return;

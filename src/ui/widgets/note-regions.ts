@@ -227,7 +227,7 @@ export function renderPathRow(
 
   const del = actions.createEl("button", {
     cls: "ca-journal-path-del",
-    attr: { "aria-label": "Delete step", title: "Delete step", type: "button" },
+    attr: { "aria-label": "Remove step", title: "Remove step", type: "button" },
   });
   setIcon(del, "x");
   del.addEventListener("click", () => cb.onDelete());
@@ -336,7 +336,7 @@ export function renderTaskRow(
     cls: "ca-journal-task-edit",
     attr: {
       "aria-label": "Edit task",
-      title: "Edit task — priority, due date, time, delete",
+      title: "Edit task — priority, due date, time, remove",
       type: "button",
     },
   });

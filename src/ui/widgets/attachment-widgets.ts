@@ -224,7 +224,7 @@ export function attachmentMenu(
   if (!external && item.kind !== "text") {
     menu.addItem((i) =>
       i
-        .setTitle("Remove and delete file…")
+        .setTitle("Remove file from vault…")
         .setIcon("trash-2")
         .onClick(() => cb.onDelete(index))
     );
@@ -426,7 +426,7 @@ export function renderAttachmentTile(
 }
 
 
-export async function deleteAttachmentFile(
+export async function removeAttachmentFile(
   deps: PluginNoteRegionHost,
   item: Attachment,
   ctx: MarkdownPostProcessorContext
@@ -444,9 +444,9 @@ export async function deleteAttachmentFile(
     // folder was for — see `core/trash.ts`.
     const ok = await confirmAction(
       deps.app,
-      "Delete attachment?",
+      "Remove attachment?",
       `${file.path} ${trashClause(trashDestination(deps.app))}, and its link is removed from this note. Other notes linking to it will break.`,
-      "Delete file",
+      "Remove file",
       true
     );
     if (!ok) return false;
@@ -477,7 +477,7 @@ export async function deleteAttachmentFile(
   // and the fallback forced the system trash, so it silently disagreed with the
   // sentence the confirm above now prints.
   if (!(await trashItem(deps.app, file))) {
-    new Notice(`Couldn't delete ${file.path}.`);
+    new Notice(`Couldn't remove ${file.path}.`);
     return false;
   }
   return true;
@@ -1093,8 +1093,8 @@ export function buildAttachments(
     },
     onDelete: (index) => {
       const item = items[index];
-      void deleteAttachmentFile(deps, item, ctx).then((deleted) => {
-        if (!deleted) return;
+      void removeAttachmentFile(deps, item, ctx).then((gone) => {
+        if (!gone) return;
         const at = items.indexOf(item);
         if (at !== -1) items.splice(at, 1);
         persist();

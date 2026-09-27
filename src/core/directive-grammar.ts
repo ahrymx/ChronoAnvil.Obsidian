@@ -732,7 +732,7 @@ export function parseWide(lines: readonly string[]): WideSpec {
   if (wideLines.length > 1) {
     return {
       wide: false,
-      error: `This block has ${wideLines.length} wide lines. A page is one width — delete the extra one.`,
+      error: `This block has ${wideLines.length} wide lines. A page is one width — remove the extra one.`,
     };
   }
 
@@ -740,7 +740,7 @@ export function parseWide(lines: readonly string[]): WideSpec {
   if (raw) {
     return {
       wide: false,
-      error: `wide takes no value, so \`wide: ${raw}\` is refused. A page is either wide or it is not; delete the line to make it narrow again.`,
+      error: `wide takes no value, so \`wide: ${raw}\` is refused. A page is either wide or it is not; remove the line to make it narrow again.`,
     };
   }
 
@@ -816,7 +816,7 @@ export function parseCells(lines: readonly string[]): CellSpec {
     return {
       cells: false,
       error:
-        "cell divides a row into columns, and this block has no row line. Add row above the directives, or delete the cell line.",
+        "cell divides a row into columns, and this block has no row line. Add row above the directives, or remove the cell line.",
     };
   }
 
@@ -934,7 +934,7 @@ export function parseTabs(lines: readonly string[]): TabSpec {
     return {
       tabs: false,
       error:
-        "tab divides a group into pages, and this block has no row line. Add row above the directives, or delete the tab line.",
+        "tab divides a group into pages, and this block has no row line. Add row above the directives, or remove the tab line.",
     };
   }
 
@@ -1041,7 +1041,7 @@ export function parseHeights(lines: readonly string[]): HeightSpec {
   if (!lines.some((l) => isRowLine(l))) {
     return {
       error:
-        "height sets how tall one widget's card is, and a card is only drawn inside a row. Add row above the directives, or delete the height line.",
+        "height sets how tall one widget's card is, and a card is only drawn inside a row. Add row above the directives, or remove the height line.",
     };
   }
 

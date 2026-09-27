@@ -2162,9 +2162,9 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Confirm before deleting a file")
+      .setName("Confirm before removing a file")
       .setDesc(
-        "'Remove' only ever removes the link from the note. This asks first when you choose 'Remove and delete file', which moves it to the trash."
+        "'Remove from note' only ever removes the link from the note. This asks first when you choose 'Remove file from vault', which moves the file to the trash."
       )
       .addToggle((t) =>
         t.setValue(a.confirmDelete).onChange(async (v) => {
@@ -2565,7 +2565,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     rowButton(
       actions,
       "trash-2",
-      "Delete journal",
+      "Remove journal",
       async () => {
         // THE FOLDERS QUESTION IS ASKED SEPARATELY, WHICH IS WHY THIS SENTENCE
         // NO LONGER ANSWERS IT (4.17 §3). It used to end "The folders and notes
@@ -2575,9 +2575,9 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         // the stale registration this release came from.
         const ok = await confirmAction(
           this.app,
-          `Delete "${cfg.name}"?`,
-          "This removes the journal from ChronoAnvil — its section, commands and buttons all disappear. Nothing is deleted from your vault.",
-          "Delete",
+          `Remove "${cfg.name}"?`,
+          "This removes the journal from ChronoAnvil — its section, commands and buttons all disappear. Nothing is removed from your vault.",
+          "Remove",
           true
         );
         if (!ok) return;
@@ -2597,12 +2597,12 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           // folders go, in the words Obsidian's own *Deleted files* setting uses,
           // and says outright when that destination is permanent.
           const LEAVE = "Leave its folders and notes where they are";
-          const DELETE = "Delete its folders and notes";
+          const DELETE = "Remove its folders and notes";
           const them = onDisk.length === 1 ? "it" : "them";
           const chosen = await promptSuggester(
             this.app,
             [LEAVE, DELETE],
-            `${onDisk.join(", ")} — what should happen to ${them}? If deleted, ${them} ${trashClause(trashDestination(this.app))}.`
+            `${onDisk.join(", ")} — what should happen to ${them}? If removed, ${them} ${trashClause(trashDestination(this.app))}.`
           );
           // Cancelling abandons the deletion, on the same rule the tracker
           // picker below states in full: the safe reading of "I did not answer"
@@ -2628,7 +2628,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           // not answer" is that nothing should happen.
           const n = orphaned.length;
           const KEEP = `Keep ${n === 1 ? "it" : "them"} — widen to all journals`;
-          const DROP = `Delete ${n === 1 ? "it" : "them"} with the journal type`;
+          const DROP = `Remove ${n === 1 ? "it" : "them"} with the journal type`;
           const chosen = await promptSuggester(
             this.app,
             [KEEP, DROP],
@@ -2651,9 +2651,9 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           try {
             gone = await trashJournalFolders(this.app, cfg);
           } catch (err) {
-            console.error("ChronoAnvil: couldn't delete journal folders", err);
+            console.error("ChronoAnvil: couldn't remove journal folders", err);
             new Notice(
-              `ChronoAnvil: couldn't delete ${cfg.name}'s folders — nothing was changed.`
+              `ChronoAnvil: couldn't remove ${cfg.name}'s folders — nothing was changed.`
             );
             return;
           }
@@ -2666,7 +2666,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
           if (gone.length < onDisk.length) {
             const left = onDisk.filter((p) => !gone.includes(p));
             new Notice(
-              `ChronoAnvil: couldn't delete ${left.join(", ")} — “${cfg.name}” is still registered.`
+              `ChronoAnvil: couldn't remove ${left.join(", ")} — “${cfg.name}” is still registered.`
             );
             return;
           }
@@ -2675,7 +2675,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
         await removeJournal(this.plugin, index, how);
         if (gone.length) {
           new Notice(
-            `ChronoAnvil: deleted “${cfg.name}” and its folders 🗑️`
+            `ChronoAnvil: removed “${cfg.name}” and its folders 🗑️`
           );
         }
         this.refresh();
@@ -3113,13 +3113,13 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     rowButton(
       actions,
       "trash-2",
-      "Delete tracker",
+      "Remove tracker",
       async () => {
         const ok = await confirmAction(
           this.app,
-          `Delete "${t.label || t.id}"?`,
+          `Remove "${t.label || t.id}"?`,
           `This removes the tracker from the daily template and from Diary.base. Entries you have already written keep their "${t.id}" property — nothing on disk is edited.`,
-          "Delete",
+          "Remove",
           true
         );
         if (!ok) return;

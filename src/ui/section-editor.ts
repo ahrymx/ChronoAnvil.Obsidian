@@ -89,6 +89,7 @@ import {
   breakUp,
   canMoveBlock,
   canMoveRow,
+  crossesPage,
   joinables,
   joinInto,
   moveBlock,
@@ -2661,7 +2662,20 @@ export class SectionEditorModal extends EditorModal {
         ? `This is the ${delta < 0 ? "first" : "last"} column of its group`
         : `Nothing to move ${where} past`;
     }
-    if (unit === "cell") return `Move ${where} inside the group`;
+    if (unit === "cell") {
+      // AND WHETHER IT IS ABOUT TO CROSS A TAB (1.0.43). The one press in this
+      // window that moves a section without reordering anything: at a tab
+      // boundary the cell steps over the divider and every other section stays
+      // exactly where it is. A reader who reads "Move down inside the group" and
+      // watches their section leave the tab it was in has been told the wrong
+      // thing — which is half of what the report was about.
+      if (crossesPage(this.arrangement, band, id, delta)) {
+        return delta < 0
+          ? "Move up into the tab before"
+          : "Move down into the next tab";
+      }
+      return `Move ${where} inside the group`;
+    }
     // WHAT IT IS ABOUT TO STEP OVER. A group is one block, so a row below one
     // moves past the whole of it in a single press — which is the behaviour the
     // report asked for and the one a reader will not expect unless told.

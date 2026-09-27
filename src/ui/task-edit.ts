@@ -174,7 +174,7 @@ class TaskEditModal extends EditorModal {
     // over the ordinary act of finishing with something.
     if (this.onDelete) {
       const del = footer.createEl("button", {
-        text: "Delete",
+        text: "Remove",
         cls: "mod-warning",
       });
       del.addEventListener("click", () => {

@@ -1125,7 +1125,7 @@ function renderLogItemCard(
     cb.onToggle
   );
   if (!isEditing) button("pencil", "Edit this item", cb.onEdit);
-  button("x", "Delete this item", cb.onDelete);
+  button("x", "Remove this item", cb.onDelete);
 
   if (!isEditing) {
     // Text, not markdown. The region is plain text by contract — see the

@@ -1512,7 +1512,7 @@ export class JournalEditModal extends SteppedEditorModal {
         copy.addEventListener("click", (evt) => {
           this.offerLayoutCopy(evt, variantId);
         });
-        const remove = actions.createEl("button", { text: "Delete" });
+        const remove = actions.createEl("button", { text: "Remove" });
         remove.addClass("mod-warning");
         remove.addEventListener("click", () => {
           void this.deleteVariant(kindId, variantId, path);
@@ -1843,7 +1843,7 @@ export class JournalEditModal extends SteppedEditorModal {
       this.app,
       shared
         ? `Stop offering “${variant.label}” for ${kind.label.toLowerCase()}?`
-        : `Delete the “${variant.label}” layout?`,
+        : `Remove the “${variant.label}” layout?`,
       `It stops being offered when creating a ${kind.label.toLowerCase()}. ` +
         (shared
           ? `It stays available for ${listSentence(otherLabels)}.\n\n`
@@ -1851,8 +1851,8 @@ export class JournalEditModal extends SteppedEditorModal {
         `Notes already made from it are unaffected — a ${variant.label} was ` +
         `always just a ${kind.label.toLowerCase()}, with the same trackers and ` +
         `the same place in every table.\n\n` +
-        `${file} stays in your templates folder. Delete it yourself if you want it gone.`,
-      shared ? "Stop offering it" : "Delete the layout",
+        `${file} stays in your templates folder. Remove it yourself if you want it gone.`,
+      shared ? "Stop offering it" : "Remove the layout",
       true
     );
     if (!ok) return;
@@ -1872,7 +1872,7 @@ export class JournalEditModal extends SteppedEditorModal {
     notify.ok(
       shared
         ? `ChronoAnvil: “${variant.label}” no longer offered for ${kind.label.toLowerCase()}`
-        : `ChronoAnvil: deleted “${variant.label}”`
+        : `ChronoAnvil: removed “${variant.label}”`
     );
     this.refreshBody();
   }
@@ -2842,15 +2842,15 @@ export class JournalEditModal extends SteppedEditorModal {
       // thing to have standing between a misread sentence and a vanished
       // sidebar section.
       if (onDisk.length > 0) {
-        return `${shared} Give this one a different name, or delete ${cfg.name} from Settings → ChronoAnvil → Journals first.`;
+        return `${shared} Give this one a different name, or remove ${cfg.name} from Settings → ChronoAnvil → Journals first.`;
       }
       // FOLDERS GONE: the reported case, and the only one that gets an action.
       // Deleting here is safe in a way nothing else in this file is — there is
       // nothing on disk left to lose, because the reader already removed it.
       return {
-        message: `${shared}\n\nBut ${cfg.name}'s folders are no longer in your vault, so that registration is left over from a journal whose files were deleted. Removing it frees the name.`,
+        message: `${shared}\n\nBut ${cfg.name}'s folders are no longer in your vault, so that registration is left over from a journal whose files were removed. Removing it frees the name.`,
         action: {
-          label: `Delete “${cfg.name}” and continue`,
+          label: `Remove “${cfg.name}” and continue`,
           // WIDEN, NOT DELETE, for the trackers — and unlike the row, this does
           // not ask. The row asks because a reader who chose Delete on a row is
           // in a window about journals with time to answer a second question;

@@ -311,7 +311,7 @@ describe("the grammar", () => {
     // does nothing.
     const why = parseHeights(["height: 240", "diary:3"]).error ?? "";
     expect(why).toContain("row");
-    expect(why).toContain("delete the height line");
+    expect(why).toContain("remove the height line");
     expect(parseHeights(["row", "height: 240", "diary:3"]).error).toBeNull();
   });
 

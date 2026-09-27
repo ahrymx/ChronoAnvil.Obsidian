@@ -1050,7 +1050,7 @@ function describeRefusedRemove(
 // is not a note.
 export const UNMARKED_PROSE_REFUSAL =
   "written as ordinary markdown here — Reload this note to mark it, " +
-  "or delete the headings by hand";
+  "or remove the headings by hand";
 
 function describeKept(kept: readonly { key: string; lines: number }[]): string {
   const total = kept.reduce((n, k) => n + k.lines, 0);
@@ -1822,7 +1822,7 @@ export function planSections(
           ? UNMARKED_PROSE_REFUSAL
           : section.locked
             ? "required — cannot be removed"
-            : "written as ordinary markdown — delete it by hand",
+            : "written as ordinary markdown — remove it by hand",
       });
       continue;
     }
@@ -3225,7 +3225,7 @@ export function diffKinds(before: KindLike[], after: KindLike[]): KindChange[] {
       subject: "kind",
       id: k.id,
       label: k.label,
-      detail: `${k.id}.md stays on disk. Delete it yourself if you want it gone.`,
+      detail: `${k.id}.md stays on disk. Remove it yourself if you want it gone.`,
     });
   }
 
@@ -3316,7 +3316,7 @@ export function diffLevels(
       subject: "level",
       id: lvl.id,
       label: lvl.noun,
-      detail: `${lvl.id}.md stays on disk, and so does every folder. Nothing is moved or deleted.`,
+      detail: `${lvl.id}.md stays on disk, and so does every folder. Nothing is moved or removed.`,
     });
   }
 
@@ -3666,7 +3666,7 @@ function journalRefusal(
   if (!sectionRemovable(section, ctx, sectionOverrides(ctx, section.id))) {
     return section.locked
       ? "Part of every journal note, so it can't be removed. You can still move it."
-      : "Written as ordinary markdown — the plugin cannot tell it from your own prose, so delete it by hand.";
+      : "Written as ordinary markdown — the plugin cannot tell it from your own prose, so remove it by hand.";
   }
   return proseNoteRefusal(section, ctx, text, id);
 }

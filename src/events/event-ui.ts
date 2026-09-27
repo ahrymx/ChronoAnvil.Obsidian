@@ -15,7 +15,7 @@
 // and keeping three copies of that form in sync by hand is exactly the kind of
 // job that quietly stops being done.
 
-import { App, Menu, Notice, Setting, setIcon } from "obsidian";
+import { App, Menu, Notice, Setting, TFile, setIcon } from "obsidian";
 import { EditorModal } from "../ui/editor-modal";
 import type ChronoAnvilPlugin from "../main";
 import { confirmAction } from "../ui/modals";
@@ -36,7 +36,10 @@ import {
   weekdayOf,
 } from "./events";
 import { deleteEvent, readEvents, saveEvent } from "./eventstore";
-import { today } from "../core/util";
+import { moment, today } from "../core/util";
+import { locateEntry } from "../diary/lineage";
+import { notify } from "../core/notify";
+import { trashClause, trashDestination, trashItem } from "../core/trash";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -166,7 +169,7 @@ class EventEditModal extends EditorModal {
 
     if (!this.isNew) {
       const del = footer.createEl("button", {
-        text: "Delete",
+        text: "Remove",
         cls: "mod-warning",
       });
       del.addEventListener("click", () => void this.remove());
@@ -676,9 +679,9 @@ class EventEditModal extends EditorModal {
   private async remove(): Promise<void> {
     const ok = await confirmAction(
       this.app,
-      "Delete event",
-      `Delete "${this.draft.title}"? Diary entries that already reference it keep their property; the reference is simply ignored.`,
-      "Delete",
+      "Remove event",
+      `Remove "${this.draft.title}"? Diary entries that already reference it keep their property; the reference is simply ignored.`,
+      "Remove",
       true
     );
     if (!ok) return;
@@ -703,12 +706,36 @@ export function openEventEditor(
 }
 
 // The calendar's right-click menu for one day: add an event anchored to it,
-// plus edit/delete for whatever already falls on it.
+// edit whatever already falls on it, and remove the day's entry.
 //
-// Note what this menu doesn't offer: anything that would create a diary entry.
+// ── IT STOPPED BEING ONLY ABOUT EVENTS (1.0.43) ──────────────────────────
+//
+// *"Add 'Delete Note' to right click context menu on diary-calendar day
+// cells"*, then *"rename it to Remove Note"*.
+//
+// WHAT THE PARAGRAPH HERE USED TO SAY, because it is the thing this reverses:
+// *"Note what this menu doesn't offer: anything that would create a diary entry.
 // Left-click already does that, deliberately and visibly. A right-click is for
-// the events layer, and the two stay separate.
-export function openDayEventMenu(
+// the events layer, and the two stay separate."*
+//
+// THAT RULE WAS ABOUT CREATING, AND IT STILL HOLDS. A right-click still makes no
+// entry — the argument was that two gestures offering the same creation is one
+// gesture too many, and nothing here creates. What it did not cover is the
+// opposite direction: left-click has never been able to REMOVE a day, so there
+// was no gesture for it anywhere on this card, and a reader who opened a day by
+// accident had to go to the file explorer to undo it. That is the gap, and a
+// right-click on the cell is where it belongs — the day is the thing being named
+// and the cell is the only place in the plugin that names one.
+//
+// SO THE NAME IS `openDayCellMenu` NOW. It has one caller and it is the day
+// cell's menu rather than the events layer's; a function whose name claims a
+// narrower job than it does is how the next person adding a row to it gets the
+// argument above wrong.
+//
+// THE ROW IS LAST, AFTER A SEPARATOR, AND IT IS THE ONLY DESTRUCTIVE THING HERE.
+// Obsidian's `Menu` has no "danger" styling to lean on, so position and distance
+// are the whole of what says so — and the confirm is what actually protects it.
+export function openDayCellMenu(
   app: App,
   plugin: ChronoAnvilPlugin,
   iso: string,
@@ -737,5 +764,62 @@ export function openDayEventMenu(
     }
   }
 
+  // OFFERED ONLY WHERE THERE IS ONE, and `locateEntry` is how that question is
+  // asked honestly: it probes the period tree and then the grain's old flat
+  // folder, so a vault that has never been repaired is answered about the note it
+  // actually has. A row reading "Remove note…" over a day with no note is a
+  // control that can only fail, and a row that fails silently on a vault
+  // mid-migration is worse — it would be claiming the day is empty.
+  const entry = locateEntry(app, plugin.settings.paths, "daily", iso);
+  if (entry) {
+    menu.addSeparator();
+    menu.addItem((i) =>
+      i
+        .setTitle("Remove note…")
+        .setIcon("trash-2")
+        .onClick(() => void removeDayEntry(app, entry, iso, onChanged))
+    );
+  }
+
   menu.showAtMouseEvent(evt);
+}
+
+// The day's entry, deleted the way this vault says deletions happen.
+//
+// `trashClause` NAMES THE DESTINATION IN THE SENTENCE THE READER AGREES TO, which
+// is `core/trash.ts`'s whole reason for existing: a vault whose *Deleted files*
+// setting is **Permanently delete** must be told so before the button, not after
+// the note. And the broken-links clause is the house's wording, from
+// `attachment-widgets.ts` — a diary entry is linked from its week, its month and
+// its quarter by `setGraphLinks`, so this one is never hypothetical.
+//
+// THE DATE IS THE TITLE, NOT THE FILE'S NAME. A reader right-clicked a cell in a
+// month grid; `Day-2026-09-27.md` is the answer to a question they did not ask,
+// and it is in the detail line where it belongs as evidence.
+async function removeDayEntry(
+  app: App,
+  entry: TFile,
+  iso: string,
+  onChanged: () => void
+): Promise<void> {
+  const when = moment(iso);
+  const day = when.isValid() ? when.format("D MMMM YYYY") : iso;
+  const ok = await confirmAction(
+    app,
+    `Remove the entry for ${day}?`,
+    `${entry.path} ${trashClause(trashDestination(app))}. Links from your other notes to it will break.`,
+    "Remove note",
+    true
+  );
+  if (!ok) return;
+  if (!(await trashItem(app, entry))) {
+    notify.fail(`ChronoAnvil could not remove ${entry.name}.`);
+    return;
+  }
+  notify.ok(`Removed ${entry.name}`);
+  // The grid's dot, its heat tint and the month's count all read the entry list,
+  // and the card that was right-clicked is still on screen. Its own
+  // `shouldRefresh` watches the diary folder, so this is belt for a caller that
+  // passed one — the events menu has always redrawn through it.
+  onChanged();
 }

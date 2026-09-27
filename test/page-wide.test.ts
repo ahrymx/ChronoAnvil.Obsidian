@@ -96,7 +96,7 @@ describe("what a `wide` line says", () => {
     const spec = parseWide([WIDE_KEYWORD + ": yes", "title"]);
     expect(spec.wide).toBe(false);
     expect(spec.error).toContain("wide: yes");
-    expect(spec.error).toContain("delete the line");
+    expect(spec.error).toContain("remove the line");
   });
 
   it("refuses two of them, because a page is one width", () => {

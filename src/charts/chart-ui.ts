@@ -702,7 +702,7 @@ export class ChartEditModal extends SteppedEditorModal {
 
     if (!this.isNew && this.opts.onDelete) {
       const del = footer.createEl("button", {
-        text: "Delete",
+        text: "Remove",
         cls: "mod-warning",
       });
       del.setAttr("title", "Remove this chart from the note");

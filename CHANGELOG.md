@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Moving a section into a tab inserts it, instead of trading places with
+  what was already there.** *"Moving open tasks down into tab 2 replaces with
+  logbook, but it should insert."* With a group cut into two tabs, pressing
+  **Move down** on the last section of tab 1 swapped it with the first section
+  of tab 2 — so one press moved two sections, and the one you did not touch
+  changed tabs.
+
+  A press at a tab boundary now moves the boundary: the section crosses the
+  divider and everything else stays exactly where you left it. Pressing the
+  other arrow brings it back. The arrows say which of the two things they are
+  about to do — *Move down into the next tab* rather than *Move down inside the
+  group* — and a section that was alone in its tab takes the tab with it when it
+  leaves.
+
+- **Right-click a day on the Diary calendar → Remove note.** A diary entry is the
+  one note this plugin creates on a single click, and there was no gesture
+  anywhere on that card for undoing it — a day opened by accident had to be
+  deleted from the file explorer. The row is offered only on a day that actually
+  has an entry, and it finds one wherever it is filed, including a vault that has
+  never been repaired.
+
+  It asks first, and the question names where the note is going in the words your
+  own **Settings → Files and links → Deleted files** uses — including the case
+  where that setting is *Permanently delete*. It also says the thing a removal
+  cannot avoid: links to the entry from its week, month and quarter will break.
+
+- **One verb: *Remove*.** The row above arrived beside a title row that said
+  *Delete note…* — the same act, through the same confirm, under a different
+  word. Every button, menu row, confirmation and notice now says **remove**:
+  a journal, a tracker, a chart, an event, a template, a task, a note and a
+  selection of notes. Two words for one act only ever raise the question of what
+  the second one does differently.
+
+  Two things deliberately keep *delete*. Obsidian's own **Deleted files** setting
+  is named as Obsidian names it, because the sentence exists so you can go and
+  find it. And the attachment menu's pair is now told apart by what it acts on
+  rather than by how hard it acts: **Remove from note** takes the link out, and
+  **Remove file from vault…** takes the file too.
+
 - **The Diary card remembers which panels you had open.** *"Remember if
   diary-calendar chevrons are expanded. Some users want to keep coming up rolled
   down."* Both words in that footer — **Upcoming events** and **Jump to a date…**

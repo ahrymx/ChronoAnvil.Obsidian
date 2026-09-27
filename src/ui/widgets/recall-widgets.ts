@@ -289,7 +289,7 @@ export function buildRecall(
 
       const del = row.createEl("button", {
         cls: "ca-jrc-edit-del",
-        attr: { "aria-label": "Delete card", type: "button" },
+        attr: { "aria-label": "Remove card", type: "button" },
       });
       setIcon(del, "x");
       del.addEventListener("click", () => {

@@ -251,7 +251,7 @@ class JournalChartEditModal extends EditorModal {
     // it by being refused.
     if (this.staleTracker) {
       this.showError(
-        `This chart plots "${this.staleTracker}", which this journal can no longer carry. Pick another tracker, or delete the chart.`
+        `This chart plots "${this.staleTracker}", which this journal can no longer carry. Pick another tracker, or remove the chart.`
       );
     }
   }
@@ -268,7 +268,7 @@ class JournalChartEditModal extends EditorModal {
     cancel.addEventListener("click", () => this.close());
 
     if (!this.isNew && this.opts.onDelete) {
-      const del = footer.createEl("button", { text: "Delete", cls: "mod-warning" });
+      const del = footer.createEl("button", { text: "Remove", cls: "mod-warning" });
       del.addEventListener("click", () => void this.remove());
     }
 
@@ -291,7 +291,7 @@ class JournalChartEditModal extends EditorModal {
     if (this.chartable.length === 0) return null;
     if (!this.draft.tracker) return "Pick a tracker to chart.";
     if (!this.trackerDef()) {
-      return `"${this.draft.tracker}" isn't a tracker this journal can chart — pick another, or delete the chart.`;
+      return `"${this.draft.tracker}" isn't a tracker this journal can chart — pick another, or remove the chart.`;
     }
     return null;
   }

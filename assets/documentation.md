@@ -110,7 +110,7 @@ Directives:
 - `quarter-summary` — the Quarterly Overview's whole summary: the quarter's banner over a rollup of the three months it spans, driven by that note's `quarter-start` property.
 - `year-summary` — the year's statistics band: entries, what share of the days that covers, longest streak and a twelve-month density strip. Driven by the note's `year-start`.
 - `period-recap:quarter|year` — goals, highlights and challenges gathered from the months the period covers, so a quarter or a year reads back what its months said rather than restating their numbers.
-- `events` — the special-events manager: every repeating and one-off event, grouped into Repeating / Coming up / Earlier with counts and folds, over a deck carrying search, kind chips, a sort toggle and an **Add event ▾** menu. Press a row to edit it; its `⋯` turns it off, duplicates or deletes it. The main section of the events note.
+- `events` — the special-events manager: every repeating and one-off event, grouped into Repeating / Coming up / Earlier with counts and folds, over a deck carrying search, kind chips, a sort toggle and an **Add event ▾** menu. Press a row to edit it; its `⋯` turns it off, duplicates or removes it. The main section of the events note.
 - `events:upcoming[:N]` — the next `N` events (default 5), each with a relative "in 3 days" / "day 2 of 5" readout. A standalone list, for a page that wants upcoming events without a calendar; the homepage's `diary` card already ends with this list.
 - `upcoming[:N]` — the same list under its own keyword, for a page that wants it as a block of its own rather than as part of the events manager. `3`, `5` (the default) and `10` are what the section editor offers; any number works if you type it.
 - `time-grid[:<what>][:<days>]` — the week laid against the hours: meetings, logbook items, captures and tasks that are due, each in its own place. `what` is one of `events`, `logbooks`, `tasks`, `captures` and defaults to all four; `days` is `3` (around today) or `1`, and defaults to the whole week. Written together the two are joined with a bar — `time-grid:events|3`. It reads the whole vault rather than the note's folder, because events and due dates live wherever their notes do.
@@ -268,7 +268,7 @@ Two places decide this, and they answer different questions.
 **Settings → Trackers** decides what every **new diary entry** starts with.
 Turning "On every new daily/monthly entry" on keeps that tracker's
 `tracker:<id>` line and blank frontmatter key in sync inside the live template
-for its class — add, rename or delete a tracker in Settings and every new entry
+for its class — add, rename or remove a tracker in Settings and every new entry
 picks it up. "Diary.base column" does the same for that file's columns, adding
 the column to the views that can actually show that class (a monthly tracker's
 column goes to the monthly and mixed views, not the daily one). Both only ever
@@ -337,7 +337,7 @@ back round sooner just as a Lesson would.
 One thing to know if you have Practice notes you graded before this: they hold
 a Confidence rather than an Accuracy, so they stop being counted in the topic
 average (which is the point) and drop out of the review queue until you grade
-them again. Nothing is deleted — the old value stays in the note's frontmatter.
+them again. Nothing is removed — the old value stays in the note's frontmatter.
 
 What a kind is *rated on* is also what the **+ Add tracker** list offers, so a
 Practice note isn't offered Confidence any more. It's a filter and not a rule:
@@ -431,7 +431,7 @@ in.
 opens with a few `##` headings — Overview, Notes, Next steps, or whatever the
 journal's own preset says. They are real markdown headings rather than plugin
 fields, so they show in the outline, fold like any heading, and read the same if
-you ever uninstall ChronoAnvil. Retitle them, add them, delete them in any note;
+you ever uninstall ChronoAnvil. Retitle them, add them, remove them in any note;
 then **Save as layout…** on that note writes those headings into every note of
 that kind you make afterwards. Titles only — the words you wrote under a heading
 stay in the note you wrote them in.
@@ -456,7 +456,7 @@ You can also write the list without leaving the change window.
 headings, one per line: reorder them, rename one, add one, take one out. The
 list is applied to the headings the note already has rather than composed
 fresh, so a heading carries everything written under it while it moves — and a
-heading you take out but have written under is not deleted, it simply moves to
+heading you take out but have written under is not removed, it simply moves to
 the end, and the window tells you so before you save. One that still holds only
 the wording the template shipped does go.
 
@@ -645,8 +645,8 @@ The file holds everything in Settings except three things that describe a
 moment rather than a configuration: which sections you had folded, anything
 half-typed in the capture box, and which settings groups were open.
 
-**To reset ChronoAnvil completely**, delete the mirror as well as `data.json` —
-deleting `data.json` on its own no longer clears anything, since the mirror
+**To reset ChronoAnvil completely**, remove the mirror as well as `data.json` —
+removing `data.json` on its own no longer clears anything, since the mirror
 simply puts it back. The notice you get after a restore says this too.
 
 It sits at the vault root rather than under `00 - Infrastructure` because it
@@ -681,9 +681,9 @@ on the vault bar goes up the same chain, one step at a time.
 * **↑ ↓** — move a page up or down. The whole list is renumbered as you go, so
   the numbers you see are the order the pages are in.
 * **⋯** — *Rename…* (every link pointing at the page follows it), *New page
-  inside* (split this one without opening it first), and *Delete note…*.
+  inside* (split this one without opening it first), and *Remove note…*.
 
-Deleting a page that holds pages of its own takes them with it — it lives in a
+Removing a page that holds pages of its own takes them with it — it lives in a
 folder, and the folder goes.
 
 Splitting a long note also makes it harder to *find*, which is why
@@ -801,7 +801,7 @@ The `events` widget is the manager. It draws every event you have, grouped into 
 - **Add event ▾** asks which rhythm before it opens the form: *One-off* / *Repeats every year* / *Repeats every week*. The editor can still change it afterwards; the menu just means you don't start on the wrong form.
 - **Search** is always there, and the **kind chips** beside it — `All` / `Repeating` / `One-off` / `Off` — carry counts. They are two questions drawn as one strip: `Off` crosses the other two, so a switched-off birthday is counted under both `Repeating` and `Off`.
 - **Sort** toggles between date order and name order. Name order reorders *inside* each group; the three groups stay where they are.
-- **Press a row** to edit that event — with a finger, a mouse or the keyboard. The **`⋯`** at its end holds the rest: **Turn off / Turn on**, **Duplicate**, **Delete**.
+- **Press a row** to edit that event — with a finger, a mouse or the keyboard. The **`⋯`** at its end holds the rest: **Turn off / Turn on**, **Duplicate**, **Remove**.
 - A switched-off event dims and wears an **Off** pill rather than only dimming, and every row shows when it next comes round on the right.
 
 Turning an event off leaves it in the list and takes it off every calendar — which is what you want for a holiday you observe some years and not others.
@@ -917,7 +917,7 @@ dragged.
 
 The **Add chart** and **Edit…** controls sit in the section's own header bar;
 Edit… prompts you to pick which chart when a section has more than one, and the
-editor that opens holds **Delete** as well as the fields — so one button covers
+editor that opens holds **Remove** as well as the fields — so one button covers
 both changing a chart and removing it, and the toolbar stays two controls wide
 on a phone. The whole section is stored in the note as a
 single `` ```chronoanvil-charts `` block (one line per chart), so every dashboard
@@ -938,11 +938,11 @@ both grids always line up.
 
 A title card and three rows. The card at the top is the page's own name with a cog at its right — the cog opens the section editor, and clicking the name renames the note itself. Obsidian's own title above the note is hidden while that card is there, so the name is said once — remove the block and it comes back. **Every ChronoAnvil page has a banner now**: the homepage, Search, the diary and journals folder notes, the four period overviews, and — as they always did — diary entries and journal notes. A banner is one block that says which note this is and where it goes, and one row in the section editor. On the dashboards and Search it carries the page's name, a row of destinations — Home, Diary, Journals — and the Today/scope pills beneath them, all in one card. The homepage's banner keeps just the name, because its **Go to** grid is already that row. Entries and journal notes carry no separate name line: their banner already names the note and renames it. Those two are drawn by one **slim banner**, so there are two banner formats in the plugin, a large one for pages you land on and a slim one for pages you write in, and both open with the note's name and put the row of destinations under it. Under the slim banner sits the **page-context section**: on a diary entry the title you give the day, set large, with the navigator between entries at the far edge, then a caption row carrying the entry's date opposite **Tracking:**, then a hairline and the logging grid; on a journal note the note's level and kind above the same caption row and grid. Clicking the title opens a field the same size as the words in it, and a date ChronoAnvil cannot read is left blank rather than replaced with the name of the grain. The banner cannot be removed — it is the way out of the page. On a folder note the name is the folder's, so a default vault reads **02 - Diary** there, and renaming it renames the folder too. Then the top row is two columns — the diary card on the left, and a grid of shortcuts (**Go to**) with your open tasks and this date in previous years stacked on the right; then the journals card; then the vault's charts. The top row is a single `chronoanvil` block with a `row` line in it, which is what puts those three next to each other. A row wraps rather than squeezing: each cell asks for a minimum width, so the three are three across on a wide window, two and one on a half-width pane, and a plain column on a phone.
 
-You can rearrange any of it from **Edit this note's sections…**. Unticking one widget of a row removes just that widget and leaves the row, whether it stood alone in a column or was stacked with another; a member whose lines cannot be told apart from its neighbours' cannot use **Take out of the group**, and the control says so on hover rather than sitting there greyed with no explanation. **The homepage's diary card can be unticked.** Its destination pills are that page's only time navigation, but the ribbon, the palette and the diary dashboard are all still ways in — a homepage of journals and charts is a coherent thing to want. The diary dashboard's copy of the card is still required. A homepage you already have is not changed by any of this: ChronoAnvil writes that note only when it is missing, so to take the new layout, delete it and run **Set up / repair vault**.
+You can rearrange any of it from **Edit this note's sections…**. Unticking one widget of a row removes just that widget and leaves the row, whether it stood alone in a column or was stacked with another; a member whose lines cannot be told apart from its neighbours' cannot use **Take out of the group**, and the control says so on hover rather than sitting there greyed with no explanation. **The homepage's diary card can be unticked.** Its destination pills are that page's only time navigation, but the ribbon, the palette and the diary dashboard are all still ways in — a homepage of journals and charts is a coherent thing to want. The diary dashboard's copy of the card is still required. A homepage you already have is not changed by any of this: ChronoAnvil writes that note only when it is missing, so to take the new layout, remove it and run **Set up / repair vault**.
 
 ## How wide the homepage is
 
-A new homepage is written with `cssclasses: ca-wide` in its properties, and ChronoAnvil gives that class a width of its own — wider than Obsidian's **readable line length**, and capped where that setting imposes no cap at all. It exists because of `row`: a row splits the page into equal cells, so with readable line length on (700px by default) a two-cell row leaves each widget about 345px and every one of them renders in its narrow layout. Whether your dashboard is wide or collapsed should not depend on a setting meant for how many characters read comfortably in a line of prose. It is a line in your note rather than a setting of the plugin's: delete it and the page follows your own preference again, and nothing will write it back. You can add the same line to any dashboard you build yourself. A homepage you already have is not touched.
+A new homepage is written with `cssclasses: ca-wide` in its properties, and ChronoAnvil gives that class a width of its own — wider than Obsidian's **readable line length**, and capped where that setting imposes no cap at all. It exists because of `row`: a row splits the page into equal cells, so with readable line length on (700px by default) a two-cell row leaves each widget about 345px and every one of them renders in its narrow layout. Whether your dashboard is wide or collapsed should not depend on a setting meant for how many characters read comfortably in a line of prose. It is a line in your note rather than a setting of the plugin's: remove it and the page follows your own preference again, and nothing will write it back. You can add the same line to any dashboard you build yourself. A homepage you already have is not touched.
 
 **A wide page stays wide however far down you scroll.** ChronoAnvil reads the width from the note itself rather than from the page's title card — Obsidian removes a section from the page while it is far off screen, so evidence read from a card scrolls away with the card — and it holds wherever you are on the page and however long the page gets.
 

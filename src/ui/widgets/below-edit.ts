@@ -193,7 +193,7 @@ export function buildBelowFoot(
   // an empty group's head appears only inside this mode, so a door that still
   // described only the ticks would leave the one act a reader cannot discover
   // by pressing rows undescribed.
-  const hint = "Select notes to move or delete, or remove an empty note type";
+  const hint = "Select notes to move or remove, or remove an empty note type";
   edit.setAttr("aria-label", hint);
   edit.setAttr("title", hint);
   edit.setAttr("aria-pressed", "false");
@@ -868,7 +868,7 @@ export class BelowEdit extends MarkdownRenderChild {
     }
     this.deleteBtn = acts.createEl("button", {
       cls: "mod-warning",
-      text: "Delete…",
+      text: "Remove…",
       attr: { type: "button" },
     });
     this.registerDomEvent(this.deleteBtn, "click", (evt) => {
@@ -1185,9 +1185,9 @@ export class BelowEdit extends MarkdownRenderChild {
     const where = trashClause(trashDestination(plugin.app));
     const ok = await confirmAction(
       plugin.app,
-      `Delete ${n} note${n === 1 ? "" : "s"}?`,
+      `Remove ${n} note${n === 1 ? "" : "s"}?`,
       `They ${where}. Links from your other notes to them will break. A note with its own pages takes them with it.`,
-      n === 1 ? "Delete" : `Delete ${n}`,
+      n === 1 ? "Remove" : `Remove ${n}`,
       true
     );
     if (!ok) return;
@@ -1195,13 +1195,13 @@ export class BelowEdit extends MarkdownRenderChild {
     // NO "PAGES ONLY" SECOND ANSWER. That scope belongs to the single row's `⋯`,
     // where 4.50.2 put it; across N notes it is a question with N answers.
     const items = this.resolve(picked).map((r) => r.whole);
-    const { deleted, failed } = await trashSeveral(plugin.app, items);
+    const { removed, failed } = await trashSeveral(plugin.app, items);
     if (failed.length > 0) {
       notify.fail(
-        `ChronoAnvil deleted ${deleted} of ${items.length} — these could not be deleted: ${failed.join(", ")}`
+        `ChronoAnvil removed ${removed} of ${items.length} — these could not be removed: ${failed.join(", ")}`
       );
     } else {
-      notify.ok(`Deleted ${deleted} note${deleted === 1 ? "" : "s"}`);
+      notify.ok(`Removed ${removed} note${removed === 1 ? "" : "s"}`);
     }
     // THE MODE STAYS OPEN AND THE SELECTION GOES. The rows that were ticked are
     // on their way out of the table, and the live widget's own folder watch is

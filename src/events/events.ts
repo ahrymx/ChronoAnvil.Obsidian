@@ -1135,7 +1135,7 @@ export function deletedMeeting(
   if (def.kind === "recurring") {
     return {
       ok: false,
-      why: "this meeting repeats — deleting it here would delete every one of them, so open it from the calendar instead",
+      why: "this meeting repeats — removing it here would remove every one of them, so open it from the calendar instead",
     };
   }
   return { ok: true };

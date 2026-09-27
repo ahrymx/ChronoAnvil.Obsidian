@@ -293,7 +293,7 @@ function addDeleteRows(menu: Menu, table: KindRowContext, path: string): void {
       // menu row in this plugin keeps, down to `attachment-widgets.ts`' own
       // *Remove and delete file…*. *Move to bin* had none, and it was the one
       // row here that acted on a reader's note.
-      .setTitle("Delete note…")
+      .setTitle("Remove note…")
       .setIcon("trash-2")
       .onClick(() => void remove(table, path))
   );
@@ -346,7 +346,7 @@ async function remove(table: KindRowContext, path: string): Promise<void> {
 
   const choice = await promptAction(
     plugin.app,
-    `Delete ${file.basename}?`,
+    `Remove ${file.basename}?`,
     detail,
     [
       // THE CTA IS THE WHOLE DELETION, because it is what the row's own control
@@ -357,7 +357,7 @@ async function remove(table: KindRowContext, path: string): Promise<void> {
       // open"* — and that was an argument about the act rather than about the
       // modal. The act is now a deletion, so the red is the honest half of the
       // same rule.
-      { value: "all", label: pages.length ? `Note and ${many}` : "Delete", cta: true, destructive: true },
+      { value: "all", label: pages.length ? `Note and ${many}` : "Remove", cta: true, destructive: true },
       ...(pages.length ? [{ value: "pages", label: `${plural(pageLabel)} only`, destructive: true }] : []),
     ]
   );
@@ -370,10 +370,10 @@ async function removeWhole(
   item: TAbstractFile
 ): Promise<void> {
   if (!(await trashItem(plugin.app, item))) {
-    notify.fail(`ChronoAnvil could not delete ${item.name}.`);
+    notify.fail(`ChronoAnvil could not remove ${item.name}.`);
     return;
   }
-  notify.ok(`Deleted ${item.name}`);
+  notify.ok(`Removed ${item.name}`);
 }
 
 // The pages, one at a time.
@@ -397,11 +397,11 @@ async function removePages(
     .map((p) => getFile(plugin.app, p))
     .filter((f): f is TFile => f != null);
   if (files.length === 0) {
-    notify.info(`${host.basename} has no ${many} left to delete.`);
+    notify.info(`${host.basename} has no ${many} left to remove.`);
     return;
   }
 
-  const { deleted, failed } = await trashSeveral(plugin.app, files);
+  const { removed, failed } = await trashSeveral(plugin.app, files);
   // REPORTS WHAT WENT, NOT WHAT WAS ASKED FOR, and NAMES what did not. A delete
   // can fail per file — a read-only path, a sync holding one open — and a flat
   // "deleted" over a set half of which is still there is the kind of report that
@@ -409,9 +409,9 @@ async function removePages(
   // does with them is go and look.
   if (failed.length > 0) {
     notify.fail(
-      `ChronoAnvil deleted ${deleted} of ${files.length} ${many} — these could not be deleted: ${failed.join(", ")}`
+      `ChronoAnvil removed ${removed} of ${files.length} ${many} — these could not be removed: ${failed.join(", ")}`
     );
     return;
   }
-  notify.ok(`Deleted ${deleted} ${many}`);
+  notify.ok(`Removed ${removed} ${many}`);
 }

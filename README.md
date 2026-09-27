@@ -87,7 +87,7 @@ which you left it in.
 Birthdays, trips, a standing Tuesday call: the events note lists them all,
 grouped into Repeating, Coming up and Earlier, each group counted and foldable.
 Search and the kind chips are always there, a row is pressed to edit it, and the
-**⋯** at its end turns it off, duplicates it or deletes it — the same with a
+**⋯** at its end turns it off, duplicates it or removes it — the same with a
 finger as with a mouse. An event turned off keeps its place in the list and
 leaves every calendar, which is what a holiday you observe some years wants.
 

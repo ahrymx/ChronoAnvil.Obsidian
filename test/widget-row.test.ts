@@ -191,7 +191,7 @@ describe("where a row's cells divide (4.4 §1)", () => {
     expect(error).toContain("no row line");
     // Names both ways out.
     expect(error).toContain("Add row");
-    expect(error).toContain("delete");
+    expect(error).toContain("remove");
   });
 
   it("takes a width, which is what 4.4 §2 left the spelling free for", () => {

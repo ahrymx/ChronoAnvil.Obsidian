@@ -114,12 +114,12 @@ export function trashClause(where: TrashDestination | null): string {
     case "local":
       return "will be moved to the vault's .trash folder, where you can put it back";
     case "none":
-      return "will be permanently deleted — your Deleted files setting is set to permanent, so this cannot be undone";
+      return "will be permanently removed — your Deleted files setting is set to permanent, so this cannot be undone";
     default:
       // The setting could not be read. Say that, and point at it: a vague
       // sentence the reader can resolve themselves beats a confident one that
       // might be wrong about where their note went.
-      return "will be deleted, according to Settings → Files and links → Deleted files";
+      return "will be removed, according to Settings → Files and links → Deleted files";
   }
 }
 
@@ -140,7 +140,7 @@ export async function trashItem(app: App, item: TAbstractFile): Promise<boolean>
     await app.fileManager.trashFile(item);
     return true;
   } catch (e) {
-    console.error("[ChronoAnvil] could not delete", item.path, e);
+    console.error("[ChronoAnvil] could not remove", item.path, e);
     return false;
   }
 }
@@ -155,19 +155,19 @@ export async function trashItem(app: App, item: TAbstractFile): Promise<boolean>
 //
 // IT RETURNS THE FAILED PATHS, NOT A COUNT OF THEM. A reader whose delete left
 // three notes behind needs to know WHICH three, because the next thing they do is
-// look at them; "3 could not be deleted" sends them to hunt.
+// look at them; "3 could not be removed" sends them to hunt.
 //
 // NO EARLY RETURN. One failure must not take the rest of the list with it — a
 // read-only path or a file a sync is holding open is that one file's problem.
 export async function trashSeveral(
   app: App,
   items: readonly TAbstractFile[]
-): Promise<{ deleted: number; failed: string[] }> {
-  let deleted = 0;
+): Promise<{ removed: number; failed: string[] }> {
+  let removed = 0;
   const failed: string[] = [];
   for (const item of items) {
-    if (await trashItem(app, item)) deleted += 1;
+    if (await trashItem(app, item)) removed += 1;
     else failed.push(item.path);
   }
-  return { deleted, failed };
+  return { removed, failed };
 }

@@ -492,7 +492,7 @@ describe("the control on a title's row", () => {
     // the destination, not the shape of the question, so this assertion is the
     // same assertion with the row's new name in it.
     const text = src();
-    expect(text.match(/setTitle\("Delete note…"\)/g) ?? []).toHaveLength(1);
+    expect(text.match(/setTitle\("Remove note…"\)/g) ?? []).toHaveLength(1);
     expect(text).not.toContain("Move pages to bin");
     // AND THE BIN'S WORDING IS GONE FROM THE ROW, not merely unused: a menu that
     // still says "bin" over a call that deletes is the 4.50 report again.
@@ -502,9 +502,9 @@ describe("the control on a title's row", () => {
 
   it("ends the row in an ellipsis, because it opens a dialogue", () => {
     // The convention every other menu row in this plugin keeps, down to
-    // `attachment-widgets.ts`' own *Remove and delete file…*. *Move to bin* had
+    // `attachment-widgets.ts`' own *Remove file from vault…*. *Move to bin* had
     // none, and it was the one row here that acted on a reader's note.
-    expect(src()).toContain('setTitle("Delete note…")');
+    expect(src()).toContain('setTitle("Remove note…")');
   });
 
   it("offers the pages-only answer only where there are pages", () => {
@@ -586,7 +586,7 @@ describe("the control on a title's row", () => {
     // `trashSeveral` returns their PATHS, because the next thing a reader does
     // with a note that would not delete is go and look at it.
     const text = src();
-    expect(text).toContain("const { deleted, failed } = await trashSeveral(");
+    expect(text).toContain("const { removed, failed } = await trashSeveral(");
     expect(text).toContain("if (failed.length > 0) {");
     expect(text).toContain("${failed.join(\", \")}");
   });
@@ -664,6 +664,10 @@ describe("a journal note goes where the reader's vault says deleted files go", (
     // It was true of a rename and it is a lie about a delete — the single most
     // dangerous sentence the old design could have left behind.
     expect(src()).not.toContain("Nothing is deleted");
+    // AND NOT IN THE NEW VOCABULARY EITHER (1.0.43). The verb became *remove*
+    // across the plugin; the sentence this forbids is dangerous for what it
+    // promises, not for which word it promises it in.
+    expect(src()).not.toContain("Nothing is removed");
   });
 
   it("says the links will break, which is the one real loss", () => {

@@ -44,6 +44,7 @@ import {
   breakUp,
   canMoveBlock,
   canMoveRow,
+  crossesPage,
   joinInto,
   joinables,
   keptPages,
@@ -406,17 +407,19 @@ describe("the bits stay describable", () => {
     expect([...out.paged]).toEqual([]);
   });
 
-  it("keeps a page boundary where it is when two cells swap across it", () => {
+  it("keeps a page boundary where it is when two cells of one page swap", () => {
     // BY POSITION, exactly as `keptBlocks` restores block boundaries by
-    // position. The two cells either side of a boundary trade places, so one
-    // crosses it going up and the other going down — which is what a reader
-    // watching two rows swap expects. Carrying the bit with the row would move
-    // the boundary instead and leave one page holding everything.
+    // position. Carrying the bit with the row would move the boundary instead
+    // and leave one page holding everything.
+    //
+    // THIS IS THE HALF OF THE 4.53.0 RULE THAT SURVIVED 1.0.43 — see the
+    // crossing block below for the half that did not. Both cells here are in
+    // page two, so the reorder is inside a page and the wall is not involved.
     const a = at(ROWS, GROUP.slice(1), ["tasks"]);
-    const out = moveRow(a, BAND, "tasks", -1);
+    const out = moveRow(a, BAND, "tasks", 1);
     expect(pagesOf(blockOf(out!.rows, out!.joined, "diary"), out!.paged)).toEqual([
-      ["diary", "tasks"],
-      ["launcher", "upcoming"],
+      ["diary", "launcher"],
+      ["upcoming", "tasks"],
     ]);
   });
 
@@ -618,5 +621,126 @@ describe("the window is thin over it", () => {
     // group" is available only because the unit is decided before the press.
     expect(editor()).toContain("private moveLabel(");
     expect(editor()).toContain("`Move ${where} past the group`");
+  });
+});
+
+// ── A CELL AT A TAB BOUNDARY (1.0.43) ────────────────────────────────────
+//
+// *"Moving open tasks down into tab 2 replaces with logbook, but it should
+// insert."* The homepage's sections are one group cut into two tabs; a press of
+// Move down on the last section of tab 1 traded it with the first section of
+// tab 2, so the section the reader had not touched was carried out of its tab.
+//
+// THE ONE THAT WOULD BE SILENT IF IT BROKE is not the section that moves — the
+// reader is watching that one — it is the OTHER one. A swap looks right in the
+// place the eye is, which is why 4.53.0 shipped it and why every case below
+// asserts the whole arrangement rather than where the pressed section landed.
+
+describe("a cell standing at a tab boundary crosses it", () => {
+  // Group of four, cut after the second: tab 1 [diary, launcher], tab 2
+  // [tasks, upcoming]. `launcher` and `tasks` are the two cells at the wall.
+  const two = (): Arrangement => at(ROWS, GROUP.slice(1), ["tasks"]);
+  const pages = (a: Arrangement | null): string[][] =>
+    a ? pagesOf(blockOf(a.rows, a.joined, "diary"), a.paged) : [];
+
+  it("inserts at the head of the tab below rather than swapping into it", () => {
+    // THE REPORT, in the fixture's words: `launcher` joins tab 2 and `tasks`
+    // stays in it.
+    expect(pages(moveRow(two(), BAND, "launcher", 1))).toEqual([
+      ["diary"],
+      ["launcher", "tasks", "upcoming"],
+    ]);
+  });
+
+  it("joins the foot of the tab above, going the other way", () => {
+    // Not a mirror of the line above, and that is the trap `wallAt` is written
+    // around: going down the mark comes OFF the neighbour, going up it passes to
+    // whatever was standing behind the cell that leaves.
+    expect(pages(moveRow(two(), BAND, "tasks", -1))).toEqual([
+      ["diary", "launcher", "tasks"],
+      ["upcoming"],
+    ]);
+  });
+
+  it("moves nothing but the wall", () => {
+    // The whole of the defect. The rows do not reorder, so no section but the
+    // one the reader pressed changes which tab it is in.
+    const out = moveRow(two(), BAND, "launcher", 1);
+    expect(out!.rows).toEqual([...ROWS]);
+    expect(shape(out)).toEqual(shape(two()));
+  });
+
+  it("is a round trip, both ways", () => {
+    const down = moveRow(two(), BAND, "launcher", 1);
+    expect(pages(moveRow(down!, BAND, "launcher", -1))).toEqual(pages(two()));
+    const up = moveRow(two(), BAND, "tasks", -1);
+    expect(pages(moveRow(up!, BAND, "tasks", 1))).toEqual(pages(two()));
+  });
+
+  it("takes the tab with it when it was the tab's last member", () => {
+    // Tab 2 is `upcoming` alone. It walks out; a boundary with nothing in front
+    // of it is not a tab, so the group is back to one.
+    const lone = at(ROWS, GROUP.slice(1), ["upcoming"]);
+    expect(pages(moveRow(lone, BAND, "upcoming", -1))).toEqual([
+      ["diary", "launcher", "tasks", "upcoming"],
+    ]);
+  });
+
+  it("still stops at the ends of the block", () => {
+    const a = two();
+    expect(moveCell(a, BAND, "diary", -1)).toBeNull();
+    expect(moveCell(a, BAND, "upcoming", 1)).toBeNull();
+    expect(canMoveRow(BAND, a.joined, "upcoming", 1)).toBe(false);
+  });
+
+  it("leaves a press that is not at the wall as a swap", () => {
+    // One cell of tab 2 past the other. The boundary is not involved and the
+    // 4.53.0 rule is still what puts it back.
+    expect(pages(moveRow(two(), BAND, "tasks", 1))).toEqual([
+      ["diary", "launcher"],
+      ["upcoming", "tasks"],
+    ]);
+  });
+
+  it("says so before the press, with the same answer the press uses", () => {
+    // `section-editor.ts` writes an arrow's label from `crossesPage` and the
+    // handler calls `moveRow`. Two spellings of "is there a wall here" would be
+    // a button that promises one move and a press that makes another, so the
+    // predicate is asserted against the operation rather than on its own.
+    const a = two();
+    for (const [id, delta] of [
+      ["launcher", 1],
+      ["tasks", -1],
+      ["diary", 1],
+      ["tasks", 1],
+      ["upcoming", -1],
+      ["diary", -1],
+      ["upcoming", 1],
+    ] as const) {
+      const out = moveRow(a, BAND, id, delta);
+      const moved = out !== null && out.rows.every((r, i) => r === a.rows[i]);
+      expect(crossesPage(a, BAND, id, delta), `${id} ${delta}`).toBe(moved);
+    }
+  });
+
+  it("finds no wall inside a stack, which has no tabs", () => {
+    // `parseTabs` refuses a `tab` line in a fence with no `row`, so a page bit
+    // inside a stack describes a boundary no write could make. Acting on one
+    // would spend a press moving nothing the reader can see.
+    const welded = at(ROWS, GROUP.slice(1), ["tasks"], GROUP.slice(1));
+    expect(crossesPage(welded, BAND, "launcher", 1)).toBe(false);
+    expect(shape(moveRow(welded, BAND, "launcher", 1))).toEqual([
+      ["banner"],
+      ["diary", "tasks", "launcher", "upcoming"],
+      ["journals"],
+      ["charts"],
+    ]);
+  });
+
+  it("is the label the editor draws, in the reader's words", () => {
+    const src = readSrc("ui/section-editor.ts");
+    expect(src).toContain('"Move up into the tab before"');
+    expect(src).toContain('"Move down into the next tab"');
+    expect(src).toContain("crossesPage(this.arrangement, band, id, delta)");
   });
 });
