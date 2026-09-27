@@ -64,6 +64,8 @@ import {
   statScopeOf,
 } from "../journals/stats-band";
 import { attachCellMenus } from "./widgets/stats-band-menu";
+import { taskEditButton, taskEyebrow } from "./widgets/note-regions";
+import { openTaskEditor } from "./task-edit";
 import { attachKindRowMenu, attachPageRowMenu } from "./widgets/kind-row-menu";
 import { journalChartRefusal, journalTallyRefusal, summarize } from "../charts/charts";
 import { partsOf } from "../core/section-model";
@@ -3569,6 +3571,32 @@ async function toggleTaskDone(
   line: string,
   indexHint: number
 ): Promise<void> {
+  await writeTaskRow(app, file, key, line, indexHint, (tasks, at) => {
+    tasks[at].done = true;
+  });
+}
+
+// The write behind every one of those edits, and the reason there is one of it.
+//
+// THREE ACTS, ONE QUESTION (1.0.44). Ticking a row, editing it and removing it
+// differ in a single line each; what they share is the hard part —
+// *which task in that note is the row I am looking at* — and `resolveToggleTarget`
+// is the answer, matching the serialized line first and falling back to the
+// index only when the index still points at the same line. A second copy of that
+// resolution would be a second chance to write to the wrong task on a note
+// another pane has edited since this table was drawn.
+//
+// EVERY BRANCH RETURNS THE TEXT UNCHANGED RATHER THAN THROWING. A row whose task
+// has already been ticked, or whose region has been renamed, is not an error: it
+// is a stale row, and the repaint that follows will drop it.
+async function writeTaskRow(
+  app: App,
+  file: TFile,
+  key: string,
+  line: string,
+  indexHint: number,
+  edit: (tasks: ChronoAnvilTask[], at: number) => void
+): Promise<void> {
   await app.vault.process(file, (text) => {
     const region = allNoteRegions(text).find((r) => r.key === key);
     if (!region) return text;
@@ -3577,11 +3605,11 @@ async function toggleTaskDone(
     const target = resolveToggleTarget(tasks, line, indexHint);
     if (target === -1) return text;
 
-    tasks[target].done = true;
+    edit(tasks, target);
     const next = writeNoteRegion(text, key, serializeTasks(tasks));
     // Proactively refresh this file's cache entry from the text we're about to
-    // write, so the follow-up repaint sees the completion even before the
-    // vault's modify event lands and updates stat.mtime.
+    // write, so the follow-up repaint sees the change even before the vault's
+    // modify event lands and updates stat.mtime.
     taskCache.set(file.path, {
       mtime: file.stat.mtime,
       size: next.length,
@@ -3807,17 +3835,26 @@ function bucketTasks(
 // for itself could disagree with the header across local midnight.
 function buildTaskRow(
   list: HTMLElement,
-  app: App,
+  plugin: ChronoAnvilPlugin,
   row: OpenTaskRow,
   todayIso: string
 ): void {
+  const app = plugin.app;
   const rowEl = list.createDiv({
     cls: `ca-journal-task-row ca-jtt-row ca-journal-task-${row.task.priority}`,
   });
 
-  const main = rowEl.createDiv({ cls: "ca-journal-task-main" });
-
-  const box = main.createEl("input", {
+  // THE BOX IS THE ROW'S, NOT THE COLUMN'S (1.0.44). It used to be the first
+  // child of `-main`, which was a flex ROW here and a flex COLUMN in the shared
+  // base rule — and when 1.0.42 rebuilt the per-note task row it added
+  // `flex-direction: column` to the base without this override resetting it. The
+  // box went to one line and the text to the next, which is the report:
+  // *"tasks are taking two lines where it should only be one."*
+  //
+  // Both lists now hold the same three things in the same three places — box,
+  // column, and what the column says about itself — so there is nothing left for
+  // this file to override.
+  const box = rowEl.createEl("input", {
     type: "checkbox",
     cls: "ca-journal-task-check",
     attr: { "aria-label": "Mark task complete" },
@@ -3832,6 +3869,8 @@ function buildTaskRow(
     void toggleTaskDone(app, row.file, row.key, row.line, row.index);
   });
 
+  const main = rowEl.createDiv({ cls: "ca-journal-task-main" });
+
   // Extract inline tags from task text
   const rawText = row.task.text;
   const tags: string[] = [];
@@ -3845,47 +3884,69 @@ function buildTaskRow(
   main.createSpan({ cls: "ca-journal-task-text ca-jtt-text", text: cleanText || rawText });
   rowEl.setAttr("aria-label", `${row.task.priority} priority task`);
 
-  const meta = rowEl.createDiv({ cls: "ca-journal-task-meta" });
-  const chips = meta.createDiv({ cls: "ca-journal-task-chips" });
-
-  for (const tag of tags) {
-    chips.createSpan({ cls: "ca-journal-task-tag", text: tag });
-  }
-
+  // ── THE FACTS GO UNDER THE TEXT (1.0.44) ──────────────────────────────
+  //
+  // *"I think the tags (priority, date, time, etc.) should be moved below the
+  // checkbox and text, in a very small font."* They were a cluster of bordered
+  // chips pushed to the right end of the row by `space-between`, which is what
+  // made the row wrap in the first place: a chip cluster is a second column, and
+  // two columns in a card this narrow is two lines.
+  //
+  // NOT `taskTags`, AND THE DIFFERENCE IS THE POINT. That is the per-note row's
+  // list: an absolute day, because the reader is looking at the note the task is
+  // written in. This is a list of tasks from everywhere, so the day is relative
+  // — *tomorrow*, *2d ago* — and the overdue ones have to keep saying so in a
+  // second channel. The markup is shared; the words are not.
+  const facts: { text: string; cls?: string }[] = [];
   if (row.task.priority !== "normal") {
-    const prio = chips.createSpan({
-      cls: `ca-journal-task-prio ca-journal-task-${row.task.priority}`,
-      attr: { title: `Priority: ${row.task.priority}` },
-    });
-    const prioIcon = row.task.priority === "high" ? "chevrons-up" : "chevrons-down";
-    setIcon(prio.createSpan({ cls: "ca-journal-task-prio-icon" }), prioIcon);
-    prio.createSpan({
-      cls: "ca-journal-task-prio-label",
-      text: row.task.priority === "high" ? "High" : "Low",
-    });
+    // FIRST, WHICH IS A LOAD-BEARING POSITION: the row carries
+    // `ca-journal-task-high` / `-low`, and the base stylesheet tints the
+    // eyebrow's FIRST fact from it. A normal task has no such class, so the rule
+    // cannot fire on whatever else happens to lead.
+    facts.push({ text: row.task.priority === "high" ? "High" : "Low" });
   }
+  // `todayIso` is hoisted above the group loop; a null (unparseable clock)
+  // yields "" there, and `dueLabel` treats any real due date as a valid
+  // comparison — when `todayIso` is "" we skip the label entirely.
+  if (row.task.due && todayIso !== "") {
+    const { text, overdue } = dueLabel(row.task.due, todayIso);
+    facts.push({ text, cls: overdue ? "ca-jtt-due-overdue" : undefined });
+  }
+  if (row.task.at) facts.push({ text: row.task.at });
+  // LAST, AND IN THE READER'S OWN CASE. The eyebrow is uppercased, which is
+  // right for three words this file chose and wrong for a tag the reader typed:
+  // `ca-journal-task-tag` turns that off, and is why these keep a class of their
+  // own rather than becoming plain facts.
+  for (const tag of tags) facts.push({ text: tag, cls: "ca-journal-task-tag" });
 
-  if (row.task.due) {
-    // `todayIso` is hoisted above the group loop; a null (unparseable
-    // clock) yields "" there, and dueLabel treats any real due date as a
-    // valid comparison — when todayIso is "" we skip the label entirely.
-    if (todayIso !== "") {
-      const { text, overdue } = dueLabel(row.task.due, todayIso);
-      const due = chips.createSpan({
-        cls: `ca-jtt-due${overdue ? " ca-jtt-due-overdue" : ""}`,
-        text,
-      });
-      setIcon(due.createSpan({ cls: "ca-jtt-due-icon" }), "calendar");
-    }
-  }
-
-  if (row.task.at) {
-    const at = chips.createSpan({
-      cls: "ca-jtt-at ca-journal-task-at-wrap",
-      text: row.task.at,
-    });
-    setIcon(at.createSpan({ cls: "ca-jtt-at-icon" }), "clock");
-  }
+  // ── AND THE SAME `…` THE PER-NOTE ROW HAS (1.0.44) ────────────────────
+  //
+  // *"Might as well add the hamburger menu from tasks to open-tasks for each
+  // entry."* This list was read-only apart from the checkbox, which made it the
+  // one place a task could be SEEN and not changed: finding the overdue one here
+  // meant opening the note it lives in to move its date.
+  //
+  // IT WRITES TO THE ROW'S OWN NOTE, not to the note the table is drawn in, and
+  // through the same `writeTaskRow` the checkbox uses — so the "which task is
+  // this" question is asked once and answered the same way for all three acts.
+  const strip = taskEyebrow(main, facts);
+  taskEditButton(strip, () => {
+    openTaskEditor(
+      app,
+      plugin,
+      row.task,
+      (next) => {
+        void writeTaskRow(app, row.file, row.key, row.line, row.index, (tasks, at) => {
+          tasks[at] = next;
+        });
+      },
+      () => {
+        void writeTaskRow(app, row.file, row.key, row.line, row.index, (tasks, at) => {
+          tasks.splice(at, 1);
+        });
+      }
+    );
+  });
 }
 
 export function buildTasksTable(
@@ -4063,7 +4124,7 @@ export function buildTasksTable(
         });
 
         const list = bucketBody.createDiv({ cls: "ca-jtt-list" });
-        for (const row of rows) buildTaskRow(list, app, row, todayIso);
+        for (const row of rows) buildTaskRow(list, plugin, row, todayIso);
       }
     }
   });

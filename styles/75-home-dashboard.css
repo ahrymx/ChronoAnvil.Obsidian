@@ -882,7 +882,12 @@
 }
 .ca-journal-task-row {
   display: flex;
-  align-items: center;
+  /* THE TOP, NOT THE MIDDLE (1.0.44). Every row is two lines now — the `…` moved
+     onto the strip under the text, so the strip is always there — and a checkbox
+     centred against both of them sits between a task's name and its properties,
+     belonging to neither. `-check`'s own `margin-top` does the optical centring
+     against the first line. */
+  align-items: flex-start;
   gap: 10px;
   padding: 6px 8px 6px 10px;
   border: 1px solid color-mix(in srgb, var(--interactive-accent) 18%, var(--background-modifier-border));
@@ -899,21 +904,21 @@
 }
 /* Priority-tinted backgrounds & spines */
 .ca-journal-task-row.ca-journal-task-high {
-  background: color-mix(in srgb, var(--color-red, #e05561) 7%, var(--background-secondary));
+  background: color-mix(in srgb, var(--color-red, #e05561) 4%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--color-red, #e05561) 22%, var(--background-modifier-border));
   border-left-color: var(--color-red, #e05561);
 }
 .ca-journal-task-row.ca-journal-task-high:hover {
-  background: color-mix(in srgb, var(--color-red, #e05561) 11%, var(--background-secondary));
+  background: color-mix(in srgb, var(--color-red, #e05561) 8%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--color-red, #e05561) 38%, var(--background-modifier-border-hover));
 }
 .ca-journal-task-row.ca-journal-task-low {
-  background: color-mix(in srgb, var(--ca-ev-teal) 7%, var(--background-secondary));
+  background: color-mix(in srgb, var(--ca-ev-teal) 4%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--ca-ev-teal) 22%, var(--background-modifier-border));
   border-left-color: var(--ca-ev-teal);
 }
 .ca-journal-task-row.ca-journal-task-low:hover {
-  background: color-mix(in srgb, var(--ca-ev-teal) 11%, var(--background-secondary));
+  background: color-mix(in srgb, var(--ca-ev-teal) 8%, var(--background-secondary));
   border-color: color-mix(in srgb, var(--ca-ev-teal) 38%, var(--background-modifier-border-hover));
 }
 .ca-journal-task-row.ca-journal-task-normal {
@@ -946,9 +951,18 @@
  * THE PRIORITY TINTS STAY. They are on the row itself — the spine's colour and
  * the card's wash — and they were never the pill: a high task reads as urgent
  * from across the page without anything having to be spelled, which is the one
- * thing the removed chip did that the eyebrow alone would not. */
+ * thing the removed chip did that the eyebrow alone would not.
+ *
+ * AND THE WASH STEPPED BACK IN 1.0.44, from 7% to 4%. Three signals now say
+ * "high" — the spine, the wash and the eyebrow's first word in red — and a row
+ * that is a solid block of tint is one the eye reads as a warning banner rather
+ * than as a task. The spine is the loud one on purpose: it is a 3px edge, so it
+ * survives being quiet everywhere else. */
 .ca-journal-task-check {
   flex: 0 0 auto;
+  /* Optically centred on the TEXT line: that line is the input's line-height
+     plus its 2px padding, and this is half the difference. */
+  margin-top: 4px;
   cursor: pointer;
   accent-color: var(--interactive-accent);
   width: 18px;
@@ -962,7 +976,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 1px;
+  gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -1018,11 +1032,18 @@
  * (`buildTaskRow` in `src/ui/tables.ts`) — and it means something else entirely.
  * Two meanings for one class survive only as long as both rules stay scoped, so
  * this one is a `fact` instead. */
+/* ── THE STRIP UNDER THE TEXT, AND WHAT SITS AT ITS END (1.0.44) ───────
+ *
+ * It holds the row's one control now, so it is drawn whether or not the task has
+ * a property to print — which is also what makes every row in a list the same
+ * height. `align-items: center` rather than `baseline`: a 22px button has no
+ * baseline worth aligning to, and the facts are all one size. */
 .ca-journal-task-eyebrow {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0 5px;
+  min-height: 22px;
   padding-left: 5px;
   font-size: var(--ca-text-2xs);
   line-height: 1.3;
@@ -1058,6 +1079,8 @@
  * answer `.ca-journal-attach-menu` gives one block down, for the same reason. */
 .ca-journal-task-edit {
   flex: 0 0 auto;
+  /* THE FAR END OF THE STRIP, whether three facts sit beside it or none. */
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;

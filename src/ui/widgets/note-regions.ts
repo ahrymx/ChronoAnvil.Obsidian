@@ -262,6 +262,80 @@ export function renderPathRow(
 //
 // THE DAY IS FORMATTED HERE, because `tasks.ts` is a pure string↔model module
 // by its own header and Obsidian's `moment` is the renderer's import.
+// The strip of facts under a task's text, drawn.
+//
+// TWO LISTS, ONE EYEBROW (1.0.44). The Open-tasks TABLE had the same report this
+// row was rebuilt for — *"tasks are taking two lines where it should only be
+// one"* — and the same answer: the facts go under the text, small. Two builders
+// emitting the same three class names by hand is how one of them gains a
+// separator the other does not, so the MARKUP is shared here.
+//
+// WHAT IS NOT SHARED IS WHICH FACTS, and deliberately. This row prints an
+// absolute day (*27 Sep*) because it sits in the note the task lives in; the
+// table prints a relative one (*tomorrow*, *2d ago*) because it is a list of
+// tasks from everywhere and "when" is the only thing ordering them. The table
+// also carries the `#hashtags` pulled out of the task's own text, which this row
+// leaves in the text where the reader typed them.
+//
+// NOTHING CHOSEN, NOTHING DRAWN. The strip is built only where there is
+// something in it, so a plain task is one line and the eyebrow means something
+// wherever it appears. `:empty` would hide it too; not making it is one fewer
+// element per row on a list that can be long.
+export function taskEyebrow(
+  main: HTMLElement,
+  facts: readonly { text: string; cls?: string }[]
+): HTMLElement {
+  const eyebrow = main.createDiv({ cls: "ca-journal-task-eyebrow" });
+  facts.forEach((fact, i) => {
+    if (i > 0) {
+      eyebrow.createSpan({ cls: "ca-journal-task-fact-sep", text: "·" });
+    }
+    eyebrow.createSpan({
+      cls: fact.cls
+        ? `ca-journal-task-fact ${fact.cls}`
+        : "ca-journal-task-fact",
+      text: fact.text,
+    });
+  });
+  return eyebrow;
+}
+
+// The `…`, at the end of the strip.
+//
+// ON THE SECOND LINE, NOT THE FIRST (1.0.44). *"Move this menu onto the tags row
+// to maximise the space for task text."* It sat at the end of the text line and
+// took 22px plus a gap off every task's name, on the line where the name is the
+// only thing that matters — while the line under it, which is faint and usually
+// half empty, had the room to spare. `margin-left: auto` puts it at the far end
+// of that line whether there are three facts beside it or none.
+//
+// AND IT IS WHY THE STRIP IS ALWAYS DRAWN. It used to be built only where there
+// was a fact to print; now it carries the one control the row has, so a task
+// with no properties still has a strip — and every row in a list is the same
+// height, which is the other half of what the report asked for.
+export function taskEditButton(
+  host: HTMLElement,
+  onClick: () => void
+): HTMLButtonElement {
+  const edit = host.createEl("button", {
+    cls: "ca-journal-task-edit",
+    attr: {
+      "aria-label": "Edit task",
+      title: "Edit task — priority, due date, time, remove",
+      type: "button",
+    },
+  });
+  setIcon(edit, "ellipsis");
+  edit.addEventListener("click", (e) => {
+    // The row's own text is an input and the table's row is inside a link-bearing
+    // group head; neither should see this press.
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+  return edit;
+}
+
 export function renderTaskRow(
   list: HTMLElement,
   task: ChronoAnvilTask,
@@ -287,9 +361,10 @@ export function renderTaskRow(
   box.checked = task.done;
   box.addEventListener("change", () => cb.onToggle());
 
-  // THE TEXT AND ITS EYEBROW IN ONE COLUMN, so the box and the `…` centre
-  // against the pair rather than against the first of them — a row whose task
-  // has a due date would otherwise hang its checkbox off the top.
+  // THE TEXT, ITS FACTS AND ITS ONE CONTROL IN ONE COLUMN. The box is the only
+  // thing left beside it, and it aligns with the TEXT line rather than with the
+  // middle of the pair — a checkbox halfway between a task's name and its
+  // properties belongs to neither.
   const main = row.createDiv({ cls: "ca-journal-task-main" });
 
   const text = main.createEl("input", {
@@ -310,10 +385,8 @@ export function renderTaskRow(
     }
   });
 
-  // NOTHING CHOSEN, NOTHING DRAWN. The strip is built only where there is
-  // something in it, so a plain task is one line of text and the eyebrow means
-  // something wherever it appears. `:empty` would hide it too; not making it is
-  // one fewer element per row on a list that can be long.
+  // WHICH FACTS, AND IN WHOSE WORDS. `taskTags` chooses them and `taskEyebrow`
+  // draws them; what this row decides is the date format. See both.
   const tags = taskTags(task, (iso) => {
     const d = moment(iso);
     if (!d.isValid()) return iso;
@@ -322,26 +395,8 @@ export function renderTaskRow(
     // year is what tells a reader the one date that is not.
     return d.year() === moment().year() ? d.format("D MMM") : d.format("D MMM YYYY");
   });
-  if (tags.length) {
-    const eyebrow = main.createDiv({ cls: "ca-journal-task-eyebrow" });
-    tags.forEach((t, i) => {
-      if (i > 0) {
-        eyebrow.createSpan({ cls: "ca-journal-task-fact-sep", text: "·" });
-      }
-      eyebrow.createSpan({ cls: "ca-journal-task-fact", text: t });
-    });
-  }
-
-  const edit = row.createEl("button", {
-    cls: "ca-journal-task-edit",
-    attr: {
-      "aria-label": "Edit task",
-      title: "Edit task — priority, due date, time, remove",
-      type: "button",
-    },
-  });
-  setIcon(edit, "ellipsis");
-  edit.addEventListener("click", () => cb.onEdit());
+  const strip = taskEyebrow(main, tags.map((text) => ({ text })));
+  taskEditButton(strip, () => cb.onEdit());
 }
 
 

@@ -353,19 +353,19 @@
   background: var(--background-secondary);
   color: var(--text-faint);
 }
+/* A task's own #hashtags, pulled out of its text and printed in the eyebrow
+   under it (1.0.44). It was a bordered chip in the row's right-hand cluster;
+   that cluster is gone, and a border here would make a fact look like the
+   control it is not — the same argument `ca-journal-task-eyebrow` is built on.
+   WHAT IT KEEPS IS THE READER'S OWN CASE. The eyebrow uppercases, which is
+   right for the three words this plugin chose and wrong for a tag somebody
+   typed: `#Reading` is not `#READING`. Monospace for the same reason the old
+   chip had it — a tag is a token, not a word. */
 .ca-journal-tasks-table .ca-journal-task-tag {
-  font-size: var(--ca-text-2xs);
   font-family: var(--font-monospace);
-  padding: 1px 6px;
-  border-radius: var(--ca-radius-xs);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.ca-journal-tasks-table .ca-journal-task-tag:hover {
-  color: var(--text-accent);
-  border-color: var(--text-accent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
 }
 .ca-journal-tasks-table .ca-jtt-group-head {
   display: flex;
@@ -389,136 +389,112 @@
   background: var(--background-secondary);
   color: var(--text-muted);
 }
-/* Rows read as a clean single-line list with left priority accent and right metadata.
-   When horizontal space is constrained, metadata tags wrap onto a new row below the text,
-   allowing the task text to use the full available width. */
+/* ── ONE LINE, AND THE FACTS UNDER IT (1.0.44) ─────────────────────────
+ *
+ * This used to read: *"metadata tags wrap onto a new row below the text when
+ * horizontal space is constrained"*, and `flex-wrap: wrap` with
+ * `justify-content: space-between` is how it did it. That is a row of TWO
+ * columns — text on the left, a cluster of chips on the right — and in a card
+ * the width of a homepage cell the two do not fit, so the wrap fired every
+ * time. The report was the result: *"tasks are taking two lines where it should
+ * only be one."*
+ *
+ * The chips are an eyebrow under the text now, so there is no second column to
+ * push away and nothing to wrap: a box, a column, and the column decides its own
+ * height. Same three declarations as the per-note row in 75-home-dashboard.css,
+ * which is the point — see `taskEyebrow`. */
 .ca-journal-tasks-table .ca-jtt-row {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
+  align-items: flex-start;
+  gap: 10px;
   padding: 6px 8px;
+  /* ── A LIST ROW, NOT A CARD (1.0.44) ─────────────────────────────────
+   *
+   * This rule has declared `border-bottom`, `border-left` and a small radius
+   * since 5.2 — a divided list — while the shared `.ca-journal-task-row` under
+   * it declared a full `border`, a `--ca-radius-md` and `--ca-elev-1`. Four of
+   * those six reached the table, so every task in it drew as a rounded, shadowed,
+   * outlined card inside a list of flat group heads, and a high-priority one
+   * drew that outline in red. Nobody wrote that; it is what a shared class does
+   * when only one of its two consumers is thinking about the box.
+   *
+   * So the card chrome is turned off HERE rather than weakened there: the
+   * per-note widget is a list of cards on a dashboard and should stay one. */
+  border: none;
   border-bottom: 1px solid var(--background-modifier-border);
   border-left: var(--ca-rule-edge) solid transparent;
-  border-radius: var(--ca-radius-xs);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
   transition: background 0.12s ease;
-  flex-wrap: wrap;
 }
 .ca-journal-tasks-table .ca-jtt-row:hover {
   background: var(--background-modifier-hover);
+  box-shadow: none;
 }
 .ca-journal-tasks-table .ca-jtt-list .ca-jtt-row:last-child {
   border-bottom: none;
 }
-.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-main {
-  width: auto;
-  flex: 1 1 200px;
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
+/* NO `-main` RULE HERE ANY MORE, AND THAT IS THE FIX. This file had its own,
+   which made the column a ROW — and it was written before the base rule had a
+   `flex-direction` at all. 1.0.42 gave the base one (`column`, for the per-note
+   row's text-and-eyebrow pair) and this override, setting `display`,
+   `align-items` and `gap` but not `flex-direction`, inherited it: the checkbox
+   drew on one line and the text on the next. An override that names four of a
+   rule's five properties is not an override, it is a rule waiting for the fifth
+   to change under it. Both lists want the same column, so the base rule is the
+   only one. */
 .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
-  margin-top: 3px;
   flex-shrink: 0;
 }
-.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-meta {
-  padding-left: 0;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-/* ── THE THREE RULES THAT MOVED HERE (1.0.42) ──────────────────────────
+/* ── AND THE RULES THAT MOVED HERE IN 1.0.42 ARE GONE (1.0.44) ─────────
  *
- * `ca-journal-task-prio-icon` and `ca-journal-task-at-wrap` were base rules in
- * 75-home-dashboard.css, shared between the per-note task WIDGET and this table.
- * *"make it one button (…) to open a edit task window"* deleted the widget's
- * second line, and with it every chip on it — so this table is the only thing
- * left that draws a priority glyph or an hour pill, and the rules belong to the
- * thing that draws them.
+ * A priority glyph, an hour pill, a due pill and their three icon sizes. They
+ * were base rules in 75-home-dashboard.css until the per-note row stopped
+ * drawing chips, at which point this table was the last thing that did and they
+ * were moved here and scoped. One release later this table stopped drawing them
+ * too: an eyebrow is text, so there is no glyph to size and no pill to fill.
  *
- * SCOPED, NOW THAT THEY HAVE ONE OWNER. Both were unscoped because two surfaces
- * shared them, and an unscoped `.ca-journal-task-at-wrap` sitting in the
- * dashboard file for one consumer in another file is how a rule outlives the
- * element it was written for.
- *
- * `.ca-jtt-at-icon` GETS A SIZE FOR THE FIRST TIME. The clock glyph beside an
- * hour was only ever inside `.ca-journal-task-at-wrap`, whose `inline-flex` laid
- * it out but never sized it — so it drew at Lucide's default while its `-due`
- * sibling two rules up has been 0.9em since 5.2. Found by moving the rules
- * rather than by looking at the table. */
-.ca-journal-tasks-table .ca-journal-task-prio-icon {
-  display: inline-flex;
-}
-.ca-journal-tasks-table .ca-journal-task-prio-icon .svg-icon {
-  width: 0.95em;
-  height: 0.95em;
-}
-.ca-journal-tasks-table .ca-journal-task-at-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-secondary));
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 15%, var(--background-modifier-border));
-  border-radius: var(--ca-radius-pill);
-  font-size: var(--ca-text-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.ca-journal-tasks-table .ca-jtt-at-icon {
-  display: inline-flex;
-}
-.ca-journal-tasks-table .ca-jtt-at-icon .svg-icon {
-  width: 0.9em;
-  height: 0.9em;
-}
-.ca-journal-tasks-table .ca-jtt-row .ca-journal-task-prio {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  font-size: var(--ca-text-2xs);
-  font-weight: 600;
-  border-radius: var(--ca-radius-pill);
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-/* Priority accent and background tint */
+ * WORTH THE TWO MOVES RATHER THAN A DELETE IN 1.0.42. Scoping them is what made
+ * this deletion a deletion — an unscoped rule for an element nothing builds is
+ * invisible, and `test/css-namespace.test.ts` finds it only because the name is
+ * unused ANYWHERE. Had they stayed in the dashboard file they would have been
+ * deleted here by hand, or not at all. */
+/* Priority accent and background tint, stepped back to match the per-note row's
+   (1.0.44): the spine, the wash and the eyebrow's first word all say "high", and
+   in a dense list the wash is the one of the three that turns a row of tasks
+   into a block of colour. `border-color` is deliberately not set — this row has
+   no border but its bottom rule, which belongs to the list rather than to the
+   task. */
 .ca-journal-tasks-table .ca-jtt-row.ca-journal-task-high {
-  background: color-mix(in srgb, var(--color-red, #e05561) 7%, var(--background-secondary));
+  background: color-mix(in srgb, var(--color-red, #e05561) 4%, var(--background-secondary));
   border-left-color: var(--color-red, #e05561);
 }
 .ca-journal-tasks-table .ca-jtt-row.ca-journal-task-high:hover {
-  background: color-mix(in srgb, var(--color-red, #e05561) 12%, var(--background-secondary));
+  background: color-mix(in srgb, var(--color-red, #e05561) 8%, var(--background-secondary));
 }
 .ca-journal-tasks-table .ca-jtt-row.ca-journal-task-low {
-  background: color-mix(in srgb, var(--ca-ev-teal) 7%, var(--background-secondary));
+  background: color-mix(in srgb, var(--ca-ev-teal) 4%, var(--background-secondary));
   border-left-color: var(--ca-ev-teal);
   opacity: 0.85;
 }
 .ca-journal-tasks-table .ca-jtt-row.ca-journal-task-low:hover {
-  background: color-mix(in srgb, var(--ca-ev-teal) 12%, var(--background-secondary));
+  background: color-mix(in srgb, var(--ca-ev-teal) 8%, var(--background-secondary));
 }
 /* Read-only text: not an <input>, so drop the field affordances the editable
-   per-note widget carries and let it sit as plain flowing text. */
+   per-note widget carries and let it sit as plain flowing text. `flex: 1` is
+   gone with the row it was a child of — in the column it now sits in, that
+   would stretch it down the card's whole height. */
 .ca-journal-tasks-table .ca-jtt-text {
   cursor: default;
-  flex: 1;
   line-height: 1.4;
+}
+/* The other half of "drop the field affordances", which this rule has claimed
+   to do since 5.2 while leaving the tint on. The base is an <input>: it lights
+   up on hover to say it can be typed in. This one cannot. */
+.ca-journal-tasks-table .ca-jtt-text:hover {
+  background: transparent;
 }
 .ca-journal-tasks-table .ca-jtt-row.is-done .ca-jtt-text {
   text-decoration: line-through;
@@ -527,35 +503,15 @@
 .ca-journal-tasks-table .ca-jtt-row.is-done {
   opacity: 0.55;
 }
-.ca-journal-tasks-table .ca-jtt-due {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--ca-text-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-  padding: var(--ca-space-1) var(--ca-space-3);
-  border-radius: var(--ca-radius-pill);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-}
-.ca-journal-tasks-table .ca-jtt-due-icon {
-  display: inline-flex;
-}
-.ca-journal-tasks-table .ca-jtt-due-icon .svg-icon {
-  width: 0.9em;
-  height: 0.9em;
-}
-/* Overdue due date reads as a danger pill; low-alpha red tint keeps the red
-   text readable (see .ca-jtt-pill-danger for why a raw theme error-bg fails). */
+/* AN OVERDUE DAY IS THE ONE FACT THAT SHOUTS. Every other fact in the eyebrow
+   is the same faint grey, which is what makes the strip readable as one thing;
+   this one has to be findable while scrolling a list of forty. It was a danger
+   PILL, and the red is all that survives the move — a filled pill among plain
+   words would be a control, and the eyebrow has none.
+   COLOUR IS NOT THE ONLY CHANNEL: the text itself says `2d ago`. */
 .ca-journal-tasks-table .ca-jtt-due-overdue {
-  padding: 1px 8px;
-  border-radius: var(--ca-radius-pill);
-  background: rgba(var(--color-red-rgb, 224, 85, 97), 0.15);
-  border-color: transparent;
   color: var(--text-error, #e05561);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Mobile layout for tasks-table */

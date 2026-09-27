@@ -10,6 +10,7 @@ import { App, TFile } from "obsidian";
 import {
   CONTAINING_GRAIN,
   containingPeriods,
+  diaryEntryScope,
   entriesOfGrain,
   entryFolder,
   entryNoteName,
@@ -483,5 +484,79 @@ describe("every entry of one grain", () => {
     expect(
       entriesOfGrain(renamed, DEFAULT_PATHS, "daily").map((f) => f.path)
     ).toEqual(["02 - Diary/Daily/2026-07-02 Thursday.md"]);
+  });
+});
+
+// ── and where a watcher has to look ───────────────────────────────────────
+//
+// *"Remove Note on diary-calendar works but the mood gauge stays on the day cell
+// until the page is reloaded, which might seem like a bug to a new user."* The
+// card watched `02 - Diary/Daily/` — which since 4.81 is where entries written
+// before 4.81 are — and watched it for CONTENT events only, so a removed note
+// fired nothing at all and a note created in the tree fired nothing either.
+//
+// THIS IS `entriesOfGrain`'S SCOPE AS A PREDICATE, and they are in one file for
+// the reason the module exists: a widget whose watcher looks somewhere its
+// builder does not read states the truth once and then keeps it.
+describe("the scope a diary widget has to watch", () => {
+  const inScope = diaryEntryScope(DEFAULT_PATHS);
+
+  it("covers both places an entry can be", () => {
+    // Every path `entriesOfGrain` returned above, asked of the watcher. Written
+    // as the same walk rather than as a list, because a fixture list is exactly
+    // how the two halves came to disagree in the first place.
+    for (const grain of TRACKER_CLASSES) {
+      for (const f of entriesOfGrain(HALF_MIGRATED, DEFAULT_PATHS, grain)) {
+        expect(inScope(f.path), `${grain}: ${f.path}`).toBe(true);
+      }
+    }
+  });
+
+  it("covers the tree even where no entry sits yet", () => {
+    // The point of watching a FOLDER: the file whose arrival has to be heard
+    // about does not exist when the watcher is built.
+    expect(inScope(entryPath(DEFAULT_PATHS, "daily", "2027-01-04"))).toBe(true);
+    expect(inScope(legacyEntryPath(DEFAULT_PATHS, "daily", "2027-01-04"))).toBe(
+      true
+    );
+  });
+
+  it("leaves the rest of the vault out of it", () => {
+    for (const path of [
+      "Homepage.md",
+      "01 - Material/Week-in-review.md",
+      "03 - Journals/Study/Study.md",
+    ]) {
+      expect(inScope(path), path).toBe(false);
+    }
+  });
+
+  it("does not claim a folder whose name merely starts the same way", () => {
+    // `folderPrefix` is what makes this a folder test — a bare `startsWith`
+    // would have `02 - Diary` claiming `02 - Diary archive/…`.
+    expect(inScope(`${DEFAULT_PATHS.diaryRoot} archive/Day-2026-08-29.md`)).toBe(
+      false
+    );
+  });
+
+  it("holds a grain folder the reader moved out of the diary", () => {
+    // The five are configurable and need not nest, which is why the prefixes are
+    // unioned rather than folded into the root's.
+    const away = { ...DEFAULT_PATHS, diaryDaily: "Journal/Days" };
+    expect(diaryEntryScope(away)("Journal/Days/Day-2026-08-29.md")).toBe(true);
+    // And the root still answers for the tree.
+    expect(diaryEntryScope(away)(entryPath(away, "daily", "2026-08-29"))).toBe(
+      true
+    );
+  });
+
+  it("is every grain's scope at once, not one grain's", () => {
+    // The calendar draws dots from daily entries and its underlines from the
+    // other four, so a scope narrower than what the widget reads is the defect
+    // this exists to prevent.
+    for (const grain of TRACKER_CLASSES) {
+      expect(inScope(legacyEntryPath(DEFAULT_PATHS, grain, "2026-08-29")), grain)
+        .toBe(true);
+    }
   });
 });

@@ -5,6 +5,63 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.44] - 2026-09-27
+
+### Fixed
+
+- **A day's mood tint and dot disappear with the note, without a reload.**
+  *"Remove Note on diary-calendar works but the mood gauge stays on the day cell
+  until the page is reloaded, which might seem like a bug to a new user."* It is
+  one. The Diary card watched its entries for *content* changes, and a note that
+  has been removed is never read again — so the cell kept its heat tint, its dot
+  and its place in the month's count over a note that was gone.
+
+  It now also watches for a note arriving, leaving, or being renamed, so the grid
+  keeps up with the file explorer and with your sync as well as with the menu.
+  And the card it was right-clicked on redraws immediately rather than a moment
+  later.
+
+  Underneath that was a second, quieter half: the card was watching the *Daily
+  entries* folder, which is where entries written before the diary grew its
+  period tree still live. A day created anywhere in the tree never lit its dot
+  either, until something else happened to redraw the page. The watcher now looks
+  in both places, which is where the card already reads from.
+
+### Changed
+
+- **An Open tasks row is one line again, with its properties under it.** *"Tasks
+  are taking two lines where it should only be one. I think the tags (priority,
+  date, time, etc.) should be moved below the checkbox and text, in a very small
+  font."* Priority, due date, time and a task's own `#hashtags` were a cluster of
+  chips pushed to the right end of the row — a second column, which in a card the
+  width of a homepage cell never fit beside the text, so every row wrapped.
+
+  They are now a small strip under the text, the same one the per-note task row
+  has had since 1.0.42, built by the same code so the two lists cannot drift
+  apart. The table keeps its own words: a relative day (*tomorrow*, *2d ago*)
+  rather than an absolute one, an overdue day in red, and your tags in the case
+  you typed them. Underneath that was a second fault, fixed with it — the
+  checkbox and the text were drawing on separate lines inside the row.
+
+- **Every Open tasks row has the `…` too, and it sits on the properties line.**
+  *"Might as well add the hamburger menu from tasks to open-tasks for each entry;
+  and move this menu onto the tags row to maximise the space for task text."* The
+  gathered list could tick a task off and nothing else — to change a priority or
+  a due date you had to find the note the task lives in. It now opens the same
+  edit window the per-note list does, from the same button, and saves back to
+  whichever note the row came from.
+
+  The button sits at the far end of the small strip under the task rather than
+  beside it, which gives the task's own words the whole of the first line. The
+  strip is now always drawn, so it can hold the button on a task with nothing
+  else to say — and every row in a list is the same height because of it.
+
+  Around that, the polish: the checkbox lines up with the first line of a long
+  task instead of with the middle of the block, the priority washes are lighter
+  so a coloured row still reads as a row, an overdue day is red words rather than
+  a red pill, and a row in the gathered table draws as a line in a list rather
+  than as a card with a border, a radius and a shadow of its own.
+
 ## [1.0.43] - 2026-09-27
 
 ### Changed

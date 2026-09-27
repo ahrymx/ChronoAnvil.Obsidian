@@ -75,6 +75,7 @@ import {
   buildCalendar,
   calendarPanelKey,
 } from "../../diary/calendar";
+import { diaryEntryScope } from "../../diary/lineage";
 import { openDayCellMenu } from "../../events/event-ui";
 import {
   buildEventsList,
@@ -206,26 +207,55 @@ export function buildCalendarRegion(
   const n = Number(rest.trim());
   const agenda = Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_UPCOMING;
   const eventsPath = normalizePath(plugin.settings.paths.events);
-  const diaryPrefix = normalizePath(plugin.settings.paths.diaryDaily) + "/";
+  // ── WHAT THE GRID IS MADE OF IS WHICH ENTRIES EXIST (1.0.44) ─────────
+  //
+  // *"Remove Note on diary-calendar works but the mood gauge stays on the day
+  // cell until the page is reloaded, which might seem like a bug to a new
+  // user."* It would seem like one because it is one, and the removal only
+  // exposed it — this card watched `metadataCache.on("changed")` and nothing
+  // else, which is a CONTENT event. A deleted file is parsed exactly never, so
+  // the heat tint, the dot and the month's count went on stating a note that was
+  // no longer in the vault. `liveScopedWidget`'s essay is the same finding one
+  // release and several widgets earlier; this is the hand-rolled `LiveWidget`
+  // that was never brought onto it.
+  //
+  // AND THE SCOPE WAS THE FLAT DAILY FOLDER, which since 4.81 is where entries
+  // written before 4.81 are. `diaryEntryScope` is `entriesOfGrain`'s own two
+  // places — the period tree and the five legacy folders — so the watcher looks
+  // exactly where the builder reads. A day created in the tree never lit its dot
+  // either, for the same reason and with no report, because creating a note
+  // fires `changed` once its body lands and the grid was simply never told.
+  const inDiary = diaryEntryScope(plugin.settings.paths);
+  const inScope = (path: string): boolean =>
+    path === eventsPath || inDiary(path);
   const host = createDiv({ cls: "ca-journal-live-widget" });
-  ctx.addChild(
-    new LiveWidget(plugin.app, host, {
-      build: () =>
-        buildCalendar(plugin, {
-          state,
-          folds,
-          agenda,
-          header: true,
-          ctx,
-          onContext: (iso, evt) =>
-            openDayCellMenu(plugin.app, plugin, iso, evt),
-        }),
-      // Entries move the dots and the heat map; the events note moves the
-      // bars and badges. Both have to redraw the grid.
-      shouldRefresh: (f) =>
-        f.path === eventsPath || f.path.startsWith(diaryPrefix),
-    })
-  );
+  const live = new LiveWidget(plugin.app, host, {
+    build: () =>
+      buildCalendar(plugin, {
+        state,
+        folds,
+        agenda,
+        header: true,
+        ctx,
+        // THE CARD THAT WAS RIGHT-CLICKED REDRAWS AT ONCE, rather than after the
+        // watcher's debounce. The menu has always taken this callback and this
+        // caller has always let it default to nothing — which was survivable only
+        // while the act was adding an event, since the events note is a file the
+        // scope above watches. Removing a note is the act with nothing left to
+        // fire, so the immediate redraw is the one the reader sees.
+        onContext: (iso, evt) =>
+          openDayCellMenu(plugin.app, plugin, iso, evt, () => live.refresh()),
+      }),
+    // Entries move the dots and the heat map; the events note moves the
+    // bars and badges. Both have to redraw the grid.
+    shouldRefresh: (f) => inScope(f.path),
+    // The half a content event cannot carry: a note removed, created, renamed
+    // into the diary or dragged out of it. One predicate asked of both, which is
+    // `liveScopedWidget`'s rule — two spellings of one scope is how a widget
+    // comes to watch two slightly different folders.
+    shouldRefreshPath: inScope,
+  });
+  ctx.addChild(live);
   return host;
 }
 

@@ -43,6 +43,7 @@ import type { TrackerClass } from "../trackers/trackers";
 import {
   filesUnder,
   folderNotePath,
+  folderPrefix,
   getFile,
   moment,
 } from "../core/util";
@@ -293,6 +294,32 @@ export function entriesOfGrain(
     if (f.path !== legacyNote) take(f);
   }
   return out;
+}
+
+// ── WHERE A WATCHER HAS TO LOOK, FOR THE SAME REASON ─────────────────────
+//
+// `entriesOfGrain` reads two places per grain and a widget drawn FROM it has to
+// watch both, or it draws the truth once and then keeps it. This is that scope,
+// derived from the same two expressions so the reader and the watcher cannot
+// come to disagree about where a diary entry can be.
+//
+// A PREFIX PER FOLDER, VIA `folderPrefix`, because these are configurable and
+// need not nest: the five grain folders default to sitting under `diaryRoot` and
+// a reader may put any of them anywhere. Unioning them costs nothing and
+// assuming they nest is a silence.
+//
+// IT IS THE SCOPE FOR EVERY GRAIN AT ONCE, not one grain's. Every caller of it
+// draws from several — the calendar's dots are daily, its underlines weekly,
+// monthly, quarterly and yearly — and a scope narrower than what the widget
+// reads is exactly the defect this exists to prevent.
+export function diaryEntryScope(paths: DiaryPaths): (path: string) => boolean {
+  const prefixes = [
+    folderPrefix(paths.diaryRoot),
+    ...(Object.keys(CONTAINING_GRAIN) as TrackerClass[]).map((g) =>
+      folderPrefix(legacyGrainFolder(paths, g))
+    ),
+  ];
+  return (path) => prefixes.some((p) => path.startsWith(p));
 }
 
 // ── §2. THE CHAIN ABOVE ONE ENTRY ────────────────────────────────────────

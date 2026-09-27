@@ -740,7 +740,12 @@ export function openDayCellMenu(
   plugin: ChronoAnvilPlugin,
   iso: string,
   evt: MouseEvent,
-  onChanged: () => void = () => {}
+  // REQUIRED, AND IT USED TO DEFAULT TO NOTHING (1.0.44). The one caller took the
+  // default, which was survivable while every row here wrote the events note — a
+  // file the calendar's watcher was told about. *Remove note…* writes no file, so
+  // the card kept the day's mood tint over a note that was gone. A callback whose
+  // default is silence is a callback nobody passes.
+  onChanged: () => void
 ): void {
   const menu = new Menu();
   const onDay = eventsOnDay(readEvents(app, plugin), iso);
@@ -817,9 +822,14 @@ async function removeDayEntry(
     return;
   }
   notify.ok(`Removed ${entry.name}`);
-  // The grid's dot, its heat tint and the month's count all read the entry list,
-  // and the card that was right-clicked is still on screen. Its own
-  // `shouldRefresh` watches the diary folder, so this is belt for a caller that
-  // passed one — the events menu has always redrawn through it.
+  // THE GRID'S DOT, ITS HEAT TINT AND THE MONTH'S COUNT ALL READ THE ENTRY LIST,
+  // and the card that was right-clicked is still on screen. This is the whole of
+  // what redraws it promptly: *"the mood gauge stays on the day cell until the
+  // page is reloaded, which might seem like a bug to a new user."*
+  //
+  // The card also watches the vault for a removed path now, so the repaint would
+  // arrive a debounce later without this — belt and braces, and deliberately, for
+  // the one act in this menu whose whole visible effect is something CEASING to be
+  // drawn. A reader who has just confirmed a removal is looking at the cell.
   onChanged();
 }

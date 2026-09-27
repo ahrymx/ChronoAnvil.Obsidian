@@ -238,7 +238,7 @@ describe("the day cell's Remove note", () => {
     expect(menu()).toContain("export function openDayCellMenu(");
     expect(menu()).not.toContain("openDayEventMenu");
     expect(readCode("ui/widgets/directive-regions.ts")).toContain(
-      "openDayCellMenu(plugin.app, plugin, iso, evt)"
+      "openDayCellMenu(plugin.app, plugin, iso, evt, () => live.refresh())"
     );
   });
 });

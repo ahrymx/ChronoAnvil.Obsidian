@@ -744,6 +744,65 @@ describe("a table drops a row when its note moves away", () => {
   });
 });
 
+// ── THE SAME RULE, ONE CARD THAT WAS NEVER BROUGHT ONTO IT (1.0.44) ───────
+//
+// *"Remove Note on diary-calendar works but the mood gauge stays on the day cell
+// until the page is reloaded, which might seem like a bug to a new user."*
+//
+// It seems like one because it is one, and the report is the 4.50.2 finding above
+// arriving at the one widget that hand-rolls its own `LiveWidget` instead of
+// going through `liveScopedWidget`. Everything the grid draws — the dots, the
+// heat tint, the month counts, the four underlines — is made of WHICH ENTRIES
+// EXIST, and it was watching for content.
+
+describe("the diary card hears a note appear and disappear", () => {
+  const src = (): string => readCode("directive-regions.ts");
+  const region = (): string => {
+    const text = src();
+    const at = text.indexOf("export function buildCalendarRegion(");
+    return text.slice(at, text.indexOf("\nexport function", at + 1));
+  };
+
+  it("watches paths as well as parsed content", () => {
+    // A removed file is parsed exactly never, so `metadataCache.on("changed")`
+    // had nothing to say about the act whose entire visible effect is something
+    // ceasing to be drawn.
+    const body = region();
+    expect(body).toContain("shouldRefresh: (f) => inScope(f.path),");
+    expect(body).toContain("shouldRefreshPath: inScope,");
+  });
+
+  it("looks where the entries actually are, not in the flat daily folder", () => {
+    // `02 - Diary/Daily/` is where entries written BEFORE 4.81 are. A day created
+    // in the period tree never lit its dot either — the same fault with no report,
+    // because creating a note fires `changed` and the grid was never told.
+    const body = region();
+    expect(body).toContain("diaryEntryScope(plugin.settings.paths)");
+    expect(body).not.toContain("paths.diaryDaily");
+    expect(body).not.toContain("diaryPrefix");
+  });
+
+  it("keeps the events note in the same one predicate", () => {
+    // Events move the bars and the badges, entries move everything else, and both
+    // redraw the same grid. One predicate asked of both event kinds, which is the
+    // rule the describe above states.
+    const body = region();
+    expect(body).toContain("path === eventsPath || inDiary(path)");
+    expect((body.match(/shouldRefresh/g) ?? []).length).toBe(2);
+  });
+
+  it("redraws the card it was right-clicked on at once", () => {
+    // The watcher would get there a debounce later. The menu has always taken an
+    // `onChanged` and this caller has always let it default to nothing, which was
+    // survivable only while every row wrote the events note.
+    expect(region()).toContain("() => live.refresh()");
+    // And the default is gone, so the next caller cannot take it by accident.
+    expect(readCode("events/event-ui.ts")).not.toContain(
+      "onChanged: () => void = () => {}"
+    );
+  });
+});
+
 describe("a menu row identifies its note by path, never by TFile", () => {
   const src = () => readCode("kind-row-menu.ts");
 

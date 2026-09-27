@@ -190,8 +190,7 @@ describe("one line, and the height of one line", () => {
   it("draws the box, the words and nothing between them", () => {
     const code = readCode("ui/widgets/note-regions");
     // The three elements a row is. `-main` is a COLUMN holding the text and the
-    // eyebrow, which is why the box and the button centre against the pair
-    // rather than against the words alone.
+    // strip under it, so the box is the only thing left beside it.
     for (const cls of [
       "ca-journal-task-check",
       "ca-journal-task-main",
@@ -199,7 +198,13 @@ describe("one line, and the height of one line", () => {
     ]) {
       expect(code, cls).toContain(cls);
     }
-    expect(cssRule(".ca-journal-task-row")).toContain("align-items: center");
+    // THE TOP, NOT THE MIDDLE (1.0.44). This asserted `center`, on the argument
+    // that the box and the `…` should centre against the text-and-eyebrow pair.
+    // The `…` moved onto the strip, which made the strip permanent — so every
+    // row is two lines and a centred box sits between a task's name and its
+    // properties, belonging to neither. It aligns with the first line instead.
+    expect(cssRule(".ca-journal-task-row")).toContain("align-items: flex-start");
+    expect(cssRule(".ca-journal-task-check")).toContain("margin-top");
     expect(cssRule(".ca-journal-task-row")).not.toContain(
       "flex-direction: column"
     );
@@ -222,26 +227,26 @@ describe("one line, and the height of one line", () => {
     ]) {
       expect(code, dead).not.toContain(dead);
     }
-    // THE STYLESHEET IS ASKED A NARROWER QUESTION, because three of those names
-    // are still drawn — by the Open-tasks TABLE (`buildTaskRow` in
-    // `src/ui/tables.ts`), which has a priority chip and an hour pill of its own
-    // and shared the widget's rules for them. What must be gone is an UNSCOPED
-    // rule: one sitting in the dashboard file for a consumer in another file is
-    // how a rule outlives the element it was written for.
-    for (const moved of [
+    // AND THE STYLESHEET IS NOW ASKED THE SAME QUESTION (1.0.44). Four of those
+    // names outlived this row by one release, because the Open-tasks TABLE
+    // (`buildTaskRow` in `src/ui/tables.ts`) still drew a priority chip and an
+    // hour pill and shared the widget's rules for them. 1.0.42 SCOPED them here
+    // rather than deleting them, and that is what made this deletion possible at
+    // all: an unscoped rule for an element nothing builds is invisible, and the
+    // namespace sweep finds it only because the name is unused everywhere.
+    //
+    // The table's facts are an eyebrow now, on the same three classes this row
+    // uses, so there is no second spelling of a task's metadata left in the tree.
+    for (const gone of [
       "ca-journal-task-prio-icon",
       "ca-journal-task-at-wrap",
       "ca-journal-task-meta",
       "ca-journal-task-chips",
+      "ca-journal-task-del",
+      "ca-journal-tasks.is-compact",
+      "ca-jtt-due-icon",
+      "ca-jtt-at-icon",
     ]) {
-      const rules = (css.match(new RegExp(`^[^\\n{}]*\\.${moved}\\b[^\\n{}]*\\{`, "gm")) ?? []);
-      expect(rules.length, moved).toBeGreaterThan(0);
-      for (const r of rules) {
-        expect(r, moved).toContain(".ca-journal-tasks-table");
-      }
-    }
-    // And the row's own deleted controls leave no rule at all, under any scope.
-    for (const gone of ["ca-journal-task-del", "ca-journal-tasks.is-compact"]) {
       expect(css, gone).not.toContain(`.${gone}`);
     }
     // And the callbacks those controls were wired through. `renderTaskRow` takes
@@ -409,15 +414,42 @@ describe("the one button", () => {
     const at = code.indexOf("export function renderTaskRow(");
     expect(at).toBeGreaterThan(-1);
     const body = code.slice(at, code.indexOf("\n}", at));
-    expect(body.match(/createEl\("button"/g) ?? []).toHaveLength(1);
-    expect(body).toContain("ca-journal-task-edit");
-    expect(body).toContain('setIcon(edit, "ellipsis")');
+    // NO BUTTON BUILT HERE AT ALL SINCE 1.0.44 — `taskEditButton` builds it, for
+    // this row and for the Open-tasks table, and the row asks for it on the
+    // STRIP rather than on itself. That is the whole of *"move this menu onto
+    // the tags row to maximise the space for task text"*: the name gets the line
+    // to itself.
+    expect(body.match(/createEl\("button"/g) ?? []).toHaveLength(0);
+    expect(body).toContain("const strip = taskEyebrow(main,");
+    expect(body).toContain("taskEditButton(strip, () => cb.onEdit())");
+
+    const btn = code.indexOf("export function taskEditButton(");
+    expect(btn).toBeGreaterThan(-1);
+    const made = code.slice(btn, code.indexOf("\n}", btn));
+    expect(made).toContain("ca-journal-task-edit");
+    expect(made).toContain('setIcon(edit, "ellipsis")');
     // A button in a form-shaped widget that does not say `type="button"` submits
     // something, eventually.
-    expect(body).toContain('type: "button"');
+    expect(made).toContain('type: "button"');
     // And it says what it opens, for a pointer that hovers and for a screen
     // reader that cannot see the glyph at all.
-    expect(body).toContain('"aria-label": "Edit task"');
+    expect(made).toContain('"aria-label": "Edit task"');
+    // AT THE FAR END OF THE STRIP, with three facts beside it or none.
+    expect(cssRule(".ca-journal-task-edit")).toContain("margin-left: auto");
+  });
+
+  it("keeps the strip even where there is nothing true to say", () => {
+    // It holds the row's one control now, so "nothing chosen, nothing drawn" no
+    // longer applies to the strip itself — only to what is in it. The payoff is
+    // that every row in a list is the same height, which is the other half of a
+    // report about rows taking two lines.
+    const code = readCode("ui/widgets/note-regions");
+    const at = code.indexOf("export function taskEyebrow(");
+    const body = code.slice(at, code.indexOf("\n}", at));
+    expect(body).not.toContain("if (!facts.length) return");
+    expect(body).toContain("return eyebrow;");
+    // And it reserves the button's height, so an empty one is not a thin gap.
+    expect(cssRule(".ca-journal-task-eyebrow")).toContain("min-height: 22px");
   });
 
   it("is reachable by a pointer that cannot hover", () => {
