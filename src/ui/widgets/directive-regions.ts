@@ -68,7 +68,13 @@ import {
 } from "../../journals/journals-header";
 import { buildReviewQueue } from "../../review/review-queue";
 import { pagesUnder } from "../../core/query";
-import { CalendarState, buildCalendar } from "../../diary/calendar";
+import {
+  CalendarFolds,
+  CalendarPanel,
+  CalendarState,
+  buildCalendar,
+  calendarPanelKey,
+} from "../../diary/calendar";
 import { openDayEventMenu } from "../../events/event-ui";
 import {
   buildEventsList,
@@ -148,6 +154,42 @@ export function buildCalendarRegion(
   // rebuilds below don't yank the user back to the current month while
   // they're browsing (see CalendarState in calendar.ts).
   const state: CalendarState = {};
+  // ── AND THE TWO FOOTER PANELS ACROSS RELOADS (1.0.42) ───────────────
+  //
+  // *"Remember if diary-calendar chevrons are expanded. Some users want to keep
+  // coming up rolled down."*
+  //
+  // BUILT HERE RATHER THAN IN `calendar.ts`, which takes the plugin and could
+  // have read the record itself. Nine files write `collapsedNoteSections` and
+  // each builds the smallest adapter it needs; what must not happen is a tenth
+  // that disagrees about the policy, so the policy is stated once, here, in six
+  // lines next to the key it uses.
+  //
+  // EXPLICITLY EITHER WAY, `false` INCLUDED — `setNoteFold`'s shape rather than
+  // `Widgets.foldStore()`'s, and the difference matters. That store DELETES a key
+  // whose value is false, which is correct when absent means open; both of these
+  // panels ship CLOSED, so "the reader opened this" is a fact only a stored
+  // `false` can carry. `pruneCollapsedSections` reads the key and never the
+  // value, so it survives the load-time prune and the rename retarget.
+  const folds: CalendarFolds = {
+    isOpen: (panel: CalendarPanel) =>
+      plugin.settings.collapsedNoteSections?.[
+        calendarPanelKey(ctx.sourcePath, panel)
+      ] === false,
+    setOpen: (panel: CalendarPanel, open: boolean) => {
+      if (!plugin.settings.collapsedNoteSections) {
+        plugin.settings.collapsedNoteSections = {};
+      }
+      const key = calendarPanelKey(ctx.sourcePath, panel);
+      const map = plugin.settings.collapsedNoteSections;
+      if (map[key] === !open) return;
+      map[key] = !open;
+      // Fire-and-forget, as every other fold write is: a failed save costs a
+      // remembered panel, not correctness, and awaiting it would make a click on
+      // a word in the footer wait for disk.
+      void plugin.saveSettings();
+    },
+  };
   // `diary[:N]` is the homepage's whole Diary section in one card:
   // greeting + numbers + destination pills as a header band, then the
   // month grid, then the next N events (2.13.7).
@@ -171,6 +213,7 @@ export function buildCalendarRegion(
       build: () =>
         buildCalendar(plugin, {
           state,
+          folds,
           agenda,
           header: true,
           ctx,

@@ -234,14 +234,27 @@ export interface ChronoAnvilSettings {
   // remembers which sections the user has folded so they stay folded across
   // reloads. Absent key = expanded (the default).
   //
-  // THREE KINDS OF KEY, ONE MEANING. `"<notePath>::<title>"` is a header bar's,
-  // `"<notePath>::frame:<kind>"` a `frame: section`'s, and
-  // `"<notePath>::reveal:<id>"` a banner chevron's since 1.0.25 — each
-  // namespaced so it cannot collide with a title a reader wrote, and every one
-  // of them absent-means-open. That last one had a record of its own
-  // (`revealedNoteSections`) for as long as a reveal shipped CLOSED and the
-  // answer worth keeping was the opposite one; `ui/reveal.ts` holds the reversal
-  // and `pruneNoteState` deletes the retired field.
+  // FIVE KINDS OF KEY, ONE RECORD. `"<notePath>::<title>"` is a header bar's,
+  // `"<notePath>::frame:<kind>"` a `frame: section`'s, `"<notePath>::note:<key>"`
+  // a note field's, `"<notePath>::reveal:<id>"` a banner chevron's since 1.0.25
+  // and `"<notePath>::calendar:<panel>"` a diary card's footer panel since
+  // 1.0.42 — each namespaced so it cannot collide with a title a reader wrote.
+  // The reveal had a record of its own (`revealedNoteSections`) for as long as a
+  // reveal shipped CLOSED and the answer worth keeping was the opposite one;
+  // `ui/reveal.ts` holds the reversal and `pruneNoteState` deletes the retired
+  // field.
+  //
+  // AND AN ABSENT KEY MEANS THE CONTROL'S OWN DEFAULT, which is open for three of
+  // the five and not for the other two. The capture field's falls back to
+  // `captureCollapsedByDefault` (`noteFoldState`), and the calendar's two panels
+  // ship collapsed by the reader's own instruction in 1.0.28 — so both of those
+  // store the answer EXPLICITLY EITHER WAY, `false` included, where a header bar
+  // stores `true` or nothing. Two policies, one map, and the thing that makes
+  // that safe is that nothing ever reads a key it did not write: `pathwatch.ts`
+  // prunes and retargets on the PATH in front of the first `::` and never looks
+  // at the value (`pruneCollapsedSections` says so in as many words). A walk that
+  // wanted to *unfold everything* would be the first caller that had to know, and
+  // it would have to ask per namespace.
   collapsedNoteSections: Record<string, boolean>;
   // Which page of a tabbed widget group the reader last had open, keyed
   // "<notePath>::<blockIndex>". Absent key = the first page. 4.34 §4.

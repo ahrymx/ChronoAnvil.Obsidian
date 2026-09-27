@@ -433,26 +433,73 @@ export interface CalendarState {
   monthKey?: string;
   // Whether the reader has opened the agenda — 1.0.28, and it is here for the
   // paragraph above rather than for a reason of its own. The agenda ships
-  // COLLAPSED now, so "open" is a thing the reader did, and a rebuild triggered
+  // COLLAPSED, so "open" is a thing the reader did, and a rebuild triggered
   // by the events note changing is precisely the moment they did it: add an
   // event from the manager, the calendar redraws, and the list you opened to
   // check your work folds itself away again. Same failure as the month, same
   // place to keep the answer.
-  //
-  // NOT IN SETTINGS, WHICH IS WHERE THE OTHER FOLDS LIVE. `collapsedNoteSections`
-  // keeps a record per note and per section because those folds are about a
-  // SECTION of a page. This is a control inside one widget's card, on a card that
-  // may appear more than once in a vault, and the state is worth exactly as much
-  // as the month cursor beside it: until the pane closes. Persisting it would
-  // mean naming this panel in a per-note key, which is the machinery a fold uses
-  // because a fold IS a section — see `revealKey` in ui/reveal.ts for the three
-  // kinds of key that record already holds, and note that none of them is
-  // "a control inside a widget".
   agendaOpen?: boolean;
+  // And the jump row, for the same reason. It had no record at all before 1.0.42
+  // — its state lived in a class on the element — so opening it, picking a date
+  // and changing your mind closed it again on the next redraw.
+  jumpOpen?: boolean;
+}
+
+// ── AND ACROSS RELOADS, AS OF 1.0.42 ───────────────────────────────────
+//
+// *"Remember if diary-calendar chevrons are expanded. Some users want to keep
+// coming up rolled down."*
+//
+// WHAT THE PARAGRAPH ABOVE USED TO SAY, AND WHY IT IS GONE. It argued this
+// answer must NOT go in settings: `collapsedNoteSections` is for folds of a
+// SECTION of a page, this is a control inside one widget's card, and the state
+// was worth exactly as much as the month cursor beside it — until the pane
+// closes. The reader has now said what it is worth, which is the one input that
+// argument was missing. A reader who keeps the agenda open wants it open, and
+// re-opening it on every reload is the same disagreement between a gesture and
+// its result that 1.0.25 reversed for the banner's reveals (`ui/reveal.ts`).
+//
+// `CalendarState` DOES NOT GO AWAY, and that is not belt-and-braces. It is the
+// in-pane memory — a rebuild mid-session must not consult the disk, and a
+// caller with no note to key against (an embedded grid, a test) still gets a
+// working toggle. The store below is the authority WHEN THERE IS ONE.
+//
+// THE DEFAULT IS STILL CLOSED, because that is what the reader asked for in
+// 1.0.28 and this ask does not touch it: *"automatically collapsed"* is about a
+// card nobody has pressed, and remembering is about one somebody has. Which
+// means an ABSENT key here means CLOSED, where an absent `"<path>::<title>"`
+// means open — so the answer is written EXPLICITLY EITHER WAY, `false` included,
+// exactly as `setNoteFold` writes the capture field's. That is the fourth kind
+// of key in that record and the second whose absent value is not "open"; see the
+// `collapsedNoteSections` comment in core/settings.ts for the whole list.
+export type CalendarPanel = "agenda" | "jump";
+
+// Where a calendar panel's answer is filed.
+//
+// The separator is `SECTION_KEY_SEP`'s, so `pathwatch.ts` prunes and retargets
+// these with the same lines it uses for every other per-note record — and the
+// prune reads the KEY only, so an explicitly stored `false` survives it.
+//
+// `calendar:` NAMESPACES IT, the rule `note:`, `frame:` and `reveal:` already
+// follow, because a header bar's keys are `"<path>::<title>"` and a reader who
+// titled a section `agenda` would otherwise fold this card's panel.
+export function calendarPanelKey(path: string, panel: CalendarPanel): string {
+  return `${path}::calendar:${panel}`;
+}
+
+// The persistent half, as an interface rather than the plugin — `FoldStore`'s
+// reason, and this module is imported by the widget dispatcher.
+export interface CalendarFolds {
+  isOpen(panel: CalendarPanel): boolean;
+  setOpen(panel: CalendarPanel, open: boolean): void;
 }
 
 export interface CalendarOptions {
   state?: CalendarState;
+  // Where the two footer panels remember themselves across reloads (1.0.42).
+  // Absent is not an error: the toggles still work for the life of the render,
+  // which is the bargain every host without a plugin strikes.
+  folds?: CalendarFolds;
   // Right-click on a day cell. Supplied by the widget layer so calendar.ts
   // doesn't need to know about modals or the events store.
   onContext?: (iso: string, evt: MouseEvent) => void;
@@ -755,6 +802,34 @@ export function buildCalendar(
   const jumpToggle = footer.createSpan({ cls: "ca-jc-jump-toggle", text: "Jump to a date…" });
   const statusEl = footer.createSpan({ cls: "ca-jc-status" });
 
+  // ── ONE RESOLVER, BOTH PANELS (1.0.42) ──────────────────────────────
+  //
+  // THE STORE WINS WHERE THERE IS ONE, and the `CalendarState` field is the
+  // fallback rather than a mirror of it — a pane that has no note to key against
+  // still gets a toggle that works for the life of the render. Written once for
+  // the two panels because the two toggles are one control in two places
+  // (93-calendars.css says so about their shared rule), and two copies of a
+  // default is how the pair comes to ship differently.
+  const panelOpen = (panel: CalendarPanel, local: boolean | undefined): boolean =>
+    opts.folds ? opts.folds.isOpen(panel) : local === true;
+  // AND THE WRITE GOES TO BOTH. The store is what survives the reload; the state
+  // object is what survives the rebuild two lines later, when the events note
+  // changes and the card is drawn again from the same closure.
+  //
+  // CALLED FROM THE CLICK AND NOT FROM THE FIRST DRAW, which is the whole reason
+  // it is separate from the `apply` in each toggle below. Recording the state a
+  // panel was BORN in would have every calendar note seed both its keys the first
+  // time it renders — a draw that writes to disk, and one that puts back the two
+  // rows `pruneCollapsedSections` had just dropped for a note nobody has touched.
+  // An absent key is an answer here; only a press replaces it.
+  const setPanel = (panel: CalendarPanel, open: boolean): void => {
+    if (state) {
+      if (panel === "agenda") state.agendaOpen = open;
+      else state.jumpOpen = open;
+    }
+    opts.folds?.setOpen(panel, open);
+  };
+
   const jumpRow = root.createDiv({ cls: "ca-jc-jump-row" });
   const jumpDay = jumpRow.createEl("input", { type: "date", cls: "ca-jc-jump-day" });
   const jumpDayBtn = jumpRow.createEl("button", { cls: "ca-jc-jump-day-btn", text: "Open Day" });
@@ -987,7 +1062,22 @@ export function buildCalendar(
     label.addEventListener("click", () => openQuarter(`${cursor.year()}-Q${q + 1}`));
   });
 
-  jumpToggle.addEventListener("click", () => jumpRow.toggleClass("open", !jumpRow.hasClass("open")));
+  // THE JUMP ROW REMEMBERS ITSELF TOO, since 1.0.42 — *"remember if
+  // diary-calendar chevronS are expanded"*, and there are two of them. Its state
+  // lived in a class and nowhere else, so it closed on every redraw: pick a date,
+  // open the day, come back and the row you were using is shut.
+  //
+  // The class stays `open` rather than becoming `is-open`. It is the selector
+  // `.ca-jc-jump-row.open` in the stylesheet reads, the agenda's `.is-open` is on
+  // the TOGGLE rather than on the panel, and renaming a class to match a
+  // neighbour that is not the same thing is a change with no reader in it.
+  const applyJump = (open: boolean): void => jumpRow.toggleClass("open", open);
+  applyJump(panelOpen("jump", state?.jumpOpen));
+  jumpToggle.addEventListener("click", () => {
+    const next = !jumpRow.hasClass("open");
+    applyJump(next);
+    setPanel("jump", next);
+  });
   jumpDayBtn.addEventListener("click", () => {
     if (!jumpDay.value) { setStatus("Pick a day first."); return; }
     openDay(jumpDay.value);
@@ -1039,15 +1129,18 @@ export function buildCalendar(
     const showAgenda = (open: boolean) => {
       root.toggleClass("is-agenda-open", open);
       agendaToggle.toggleClass("is-open", open);
-      if (state) state.agendaOpen = open;
     };
     // COLLAPSED IS THE ABSENT ANSWER, which is what "automatically collapsed"
-    // means for a record that starts empty: `=== true` rather than a falsy test,
-    // so a state object from an older build opens closed rather than undefined.
-    showAgenda(state?.agendaOpen === true);
-    agendaToggle.addEventListener("click", () =>
-      showAgenda(!root.hasClass("is-agenda-open"))
-    );
+    // means for a record that starts empty — and it is still the answer now that
+    // the record can outlive the pane: `panelOpen` asks the store for a stored
+    // `false` or `true` and falls back to `=== true` on the state object, so an
+    // unanswered panel opens closed rather than undefined either way.
+    showAgenda(panelOpen("agenda", state?.agendaOpen));
+    agendaToggle.addEventListener("click", () => {
+      const next = !root.hasClass("is-agenda-open");
+      showAgenda(next);
+      setPanel("agenda", next);
+    });
   }
 
   return root;

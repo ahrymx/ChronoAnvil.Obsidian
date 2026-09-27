@@ -5,6 +5,21 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.43] - 2026-09-27
+
+### Changed
+
+- **The Diary card remembers which panels you had open.** *"Remember if
+  diary-calendar chevrons are expanded. Some users want to keep coming up rolled
+  down."* Both words in that footer — **Upcoming events** and **Jump to a date…**
+  — now keep their state across a reload, per note. The jump row had never kept
+  it at all: its answer lived in a class on the element, so picking a date,
+  opening the day and coming back found the row shut again.
+
+  Both still ship collapsed, which is what was asked for when the fold was added
+  and is not what this changes — a card nobody has pressed opens the way it
+  always did. What is remembered is a press.
+
 ## [1.0.42] - 2026-09-26
 
 ### Changed
