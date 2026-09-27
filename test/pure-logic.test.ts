@@ -3809,18 +3809,43 @@ describe("shipped daily template", () => {
       return lines.slice(open + 1, close).map((l) => l.trim());
     };
 
-    // The banner: the strip that names the note, and nothing else.
-    const banner = fenceAfter("entry-header");
+    // ── TWO PARTS OF ONE FENCE, NOT TWO FENCES (1.0.45) ────────────────
+    //
+    // This asserted `fenceAfter("entry-header")` and
+    // `fenceAfter("# chronoanvil:trackers:start")` on two separate fences, which
+    // is what 4.20 composed and what the reader has welded by hand since 1.0.10.
+    // An entry now composes welded — *"the stack is what a diary entry IS"* — so
+    // there is one fence holding two `stack` parts, and the SEPARATION 4.20 won
+    // is what still has to hold: the banner part says nothing about trackers and
+    // the tracker part says nothing about the banner. A single fence with the
+    // markers and no `stack` line above them would be the pre-4.20 shape back,
+    // and `stackParts` is what tells the two apart.
+    const fence = fenceAfter("stack");
+    expect(fence.filter((l) => l === "stack")).toHaveLength(2);
+
+    const at = (n: number): string[] => {
+      const from = fence.indexOf("stack", n === 0 ? 0 : fence.indexOf("stack") + 1);
+      const to = fence.indexOf("stack", from + 1);
+      return fence.slice(from + 1, to === -1 ? fence.length : to);
+    };
+
+    // The banner part: the strip that names the note, and nothing else.
+    const banner = at(0);
     expect(banner).toContain("entry-header");
     expect(banner).not.toContain("# chronoanvil:trackers:start");
     expect(banner).not.toContain("tracker:Mood");
 
-    // The grid, in a block of its own directly beneath it.
-    const trackers = fenceAfter("# chronoanvil:trackers:start");
+    // The grid, in a part of its own directly beneath it.
+    const trackers = at(1);
     expect(trackers).toContain("tracker:Mood");
     expect(trackers).toContain("sleep");
     expect(trackers).toContain("# chronoanvil:trackers:end");
     expect(trackers).not.toContain("entry-header");
+
+    // AND NO RULE UNDER THE CARD. The composer wrote a literal `---` between the
+    // grid and the reader's fields from 4.20 until 1.0.45, when the two cards it
+    // separated became one and the card's own edge took the job.
+    expect(lines.filter((l) => l.trim() === "---")).toHaveLength(2);
   });
 
   it("still exposes the region to the per-note editor after the split", () => {
@@ -3933,9 +3958,20 @@ describe("shipped monthly template", () => {
     const lines = monthly.split("\n");
     const region = locateTrackerRegion(lines)!;
     expect(region.marked).toBe(true);
-    const fence = lines.slice(region.fenceOpen, region.fenceClose);
-    // Its own block, so the banner's directive is not in it.
-    expect(fence).not.toContain("entry-header");
+    // ── AND FINDABLE AGAIN NOW THAT IT SHARES ONE (1.0.45) ─────────────
+    //
+    // This asserted the fence holding the region did NOT hold `entry-header`,
+    // which was 4.20's separation read at the fence. An entry composes welded,
+    // so the two share a fence and that assertion cannot be made there any
+    // more — the separation moved to the `stack` parts, where the daily
+    // template's test above reads it. What this test is for is unchanged and is
+    // the harder half: every "+ Add tracker" write goes through
+    // `locateTrackerRegion`, and it must land between the markers rather than
+    // anywhere else in a fence that now also holds the banner.
+    const marked = lines.slice(region.bodyStart, region.bodyEnd);
+    expect(marked).not.toContain("entry-header");
+    expect(lines[region.fenceOpen].trim()).toBe("```chronoanvil");
+    expect(region.bodyStart).toBeGreaterThan(lines.indexOf("entry-header"));
   });
 
   it("picks up a goal written as a ChronoAnvil task", () => {
@@ -6796,19 +6832,40 @@ describe("per-entry trackers", () => {
     // with, byte for byte, on every grain. `regroupFlatNote` fails this: four
     // of the five have an empty tracker region, which `moveCell` refuses, and
     // on the fifth it lands the unwelded fence below the `---`.
+    //
+    // ── AND IT IS READ FROM THE OTHER END NOW (1.0.45) ─────────────────
+    //
+    // `composeEntryTemplate` returns a WELDED entry as of this release, so
+    // `weldEntryFences(text)` correctly declines it — *already welded* — and the
+    // property has to start from the unwelded shape instead. It is the same
+    // claim: break the composed entry up, weld it again, and the bytes come
+    // back. What that also pins is the thing the composer now depends on — a
+    // composed entry is byte-identical to a hand-welded one, so the two
+    // functions remain exact inverses over exactly the text that ships.
     for (const grain of ["daily", "weekly", "monthly", "quarterly", "yearly"] as const) {
       it(`welds and unwelds a ${grain} entry back to the file it started as`, () => {
-        const text = composeEntryTemplate(grain);
-        const welded = weldEntryFences(text)!;
-        expect(welded).not.toBeNull();
-        expect(welded.split("\n").filter((l) => l.trim() === FENCE)).toHaveLength(2);
-        expect(unweldEntryFences(welded)).toBe(text);
+        const composed = composeEntryTemplate(grain);
+        expect(composed.split("\n").filter((l) => l.trim() === FENCE)).toHaveLength(2);
+        const apart = unweldEntryFences(composed)!;
+        expect(apart).not.toBeNull();
+        expect(apart.split("\n").filter((l) => l.trim() === FENCE)).toHaveLength(3);
+        expect(weldEntryFences(apart)).toBe(composed);
       });
     }
 
+    it("declines an entry that is already welded, which is how one composes", () => {
+      // The composer pipes its own text through `weldEntryFences` and falls back
+      // to the unwelded shape with `?? composed`. If this ever returned a string
+      // the composed entry would carry two `stack` lines per part.
+      expect(weldEntryFences(composeEntryTemplate("daily"))).toBeNull();
+    });
+
     it("refuses to unweld a note that was never welded", () => {
       expect(unweldEntryFences(twoFence)).toBeNull();
-      expect(unweldEntryFences(composeEntryTemplate("daily"))).toBeNull();
+      // The composed entry BROKEN UP — which is what the composer wrote until
+      // 1.0.45, and what pressing *Break up* still gives.
+      const apart = unweldEntryFences(composeEntryTemplate("daily"))!;
+      expect(unweldEntryFences(apart)).toBeNull();
     });
 
     it("refuses to unweld a stack whose second part holds no trackers", () => {

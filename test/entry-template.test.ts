@@ -297,9 +297,17 @@ describe("what a reload would destroy", () => {
     // being in the replacement rather than by a list written into the loss
     // walk, which is what stops this going wrong the next time the composer
     // emits something new.
+    //
+    // AND THE RULE IS NOT ONE OF THEM ANY MORE (1.0.45). The composer wrote a
+    // literal `---` under the tracker fence from 4.20 until the entry welded into
+    // one card, at which point the card's own edge was the boundary and the rule
+    // was a third device saying the same thing. Two `---` are left and both are
+    // the frontmatter's. What this test is for — that the spacer is not reported
+    // as content a reload destroyed — is unchanged, and the count is asserted so
+    // the composer growing a new loose line fails here rather than silently.
     const tpl = composeEntryTemplate("daily");
     expect(tpl).toContain("`chronoanvil:spacer`");
-    expect(tpl.split("\n").filter((l) => l.trim() === "---")).toHaveLength(3);
+    expect(tpl.split("\n").filter((l) => l.trim() === "---")).toHaveLength(2);
     expect(entryReloadLoss(tpl, tpl, ctxFor("daily"))).toEqual([]);
   });
 

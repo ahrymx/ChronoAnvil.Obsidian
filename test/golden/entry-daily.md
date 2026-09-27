@@ -10,18 +10,15 @@ Sleep:
 ---
 `chronoanvil:spacer`
 ```chronoanvil
+stack
 entry-header
 actions
-```
-
-```chronoanvil
+stack
 # chronoanvil:trackers:start
 tracker:Mood
 sleep
 # chronoanvil:trackers:end
 ```
-
----
 
 ```chronoanvil
 note:focus#line:What are you focusing on today?|Today's focus

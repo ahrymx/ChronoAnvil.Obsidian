@@ -619,7 +619,17 @@ describe("what the dispatcher registers, and where the strip goes", () => {
     // sections that had left the fence. `:empty` is still in the stylesheet and
     // is still right, but a control the note cannot use should not be in the
     // document waiting for a rule to hide it.
-    expect(widgets).toContain('const strip = container.createDiv({ cls: "ca-journal-reveal-bar" });');
+    // ── AND THE HOST IS A CHOICE AS OF 1.0.45 ─────────────────────────
+    //
+    // This named `container` in the literal. A strip that would hold exactly one
+    // button is drawn into the page-context row instead — one pill does not earn
+    // a band of the card — so the parent is `host`, which is the row or the card.
+    // What the guard above still decides is unchanged and is what this test is
+    // for: whether a strip exists at all.
+    expect(widgets).toContain('const strip = host.createDiv({ cls: "ca-journal-reveal-bar" });');
+    expect(widgets).toContain(
+      "const host =\n            contextStrip && welded.size === 1 ? contextStrip : container;"
+    );
     const at = widgets.indexOf("ca-journal-reveal-bar");
     const guard = widgets.lastIndexOf("if (isBannerFence && revealAnchors.length) {", at);
     expect(guard).toBeGreaterThan(0);

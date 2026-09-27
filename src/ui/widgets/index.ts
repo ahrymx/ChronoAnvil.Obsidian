@@ -1865,12 +1865,18 @@ export class Widgets implements
       // strip would tell it which day it was. `entryContextFor` is the same
       // question `section-insert.ts` asks to decide which catalogue a note has,
       // so the two cannot disagree about what an entry is.
+      //
+      // AND THE STRIP IS KEPT IN HAND (1.0.45), because the chevron strip may
+      // be drawn INTO it rather than above it — see the reveal strip's own
+      // block, which is where that decision is made and argued.
+      let contextStrip: HTMLElement | null = null;
       if (
         hasTrackerRegion &&
         this.plugin.sections.entryContextFor(ctx.sourcePath) &&
         !isManagedTemplate(this.plugin, ctx.sourcePath)
       ) {
         const strip = buildEntryContext(this.plugin, ctx, true);
+        contextStrip = strip;
         // PREPENDED ON THE NEW SHAPE, APPENDED ON THE OLD ONE, and the two are
         // the same decision rather than a special case. On a note composed by
         // 4.20 or later this block is the tracker section and the strip is its
@@ -2368,7 +2374,40 @@ export class Widgets implements
         // `:empty` rule that has to be shipped and matched to do it. A banner
         // whose sections are each in a card of their own draws no strip at all.
         if (isBannerFence && revealAnchors.length) {
-          const strip = container.createDiv({ cls: "ca-journal-reveal-bar" });
+          // ── ONE PILL DOES NOT GET A ROW (1.0.45) ──────────────────────
+          //
+          // A diary entry has exactly ONE weldable part. `WELDS_INTO_BANNER`
+          // holds five ids and only `trackers` exists on an entry surface, so
+          // this strip is one pill reading "📊 Trackers" — and it spends a full
+          // band of the card to say one word, between the date stepper above it
+          // and the grid below. The reader, on the mock of the six shapes:
+          // *"No strip — one pill rides the stepper row. Clearer separation of
+          // title and date picker makes it better."*
+          //
+          // SO THE HOST MOVES, AND NOTHING ELSE DOES. The element is the same
+          // `ca-journal-reveal-bar`, filled by the same `RevealBar`, carrying
+          // the same buttons — it is drawn into the page-context strip instead
+          // of beside it, and the stylesheet pushes it to that row's right end.
+          // `RevealBar.draw()` claims and releases targets and must not also
+          // decide where it lives, which is why the choice is here.
+          //
+          // `welded.size` IS THE BUTTON COUNT. `revealButtons` groups every
+          // target by id and this set holds exactly the ids that registered one,
+          // so a note that turns out to have two revealable parts gets its row
+          // back with no second condition to keep in step. That is the whole
+          // gate: a row shared by two controls is a row, and a row holding one
+          // pill is a line of the band above it.
+          const host =
+            contextStrip && welded.size === 1 ? contextStrip : container;
+          const strip = host.createDiv({ cls: "ca-journal-reveal-bar" });
+          // AND THE HOST SAYS SO, so the stylesheet does not have to ask with
+          // `:has()`. `jec-nav-only` spends the full width on three controls —
+          // arrows at the card's two edges, the picker centred — which was the
+          // right shape while the row held nothing else and 1.0.10 kept
+          // deliberately. Sharing the row takes that premise away, so the
+          // navigator comes back to the capsule `jeh-seg` names and the pill
+          // takes the end it frees.
+          if (host !== container) host.addClass("ca-jec-shared");
           // ABOVE THE FIRST THING IT HIDES, WHATEVER THAT TURNED OUT TO BE.
           // `trackerBar` was the anchor in the first cut, and a note whose
           // banner reveals only "what's below" — a subject with no logging
@@ -2376,12 +2415,14 @@ export class Widgets implements
           // nothing moved the strip from where `createDiv` appended it. The
           // anchors are the elements the reveals actually registered, so the
           // strip cannot disagree with them.
-          const kids = Array.from(container.children);
-          const at = revealAnchors
-            .map((el) => kids.indexOf(el))
-            .filter((i) => i >= 0)
-            .sort((a, b) => a - b)[0];
-          if (at !== undefined) container.insertBefore(strip, kids[at]);
+          if (host === container) {
+            const kids = Array.from(container.children);
+            const at = revealAnchors
+              .map((el) => kids.indexOf(el))
+              .filter((i) => i >= 0)
+              .sort((a, b) => a - b)[0];
+            if (at !== undefined) container.insertBefore(strip, kids[at]);
+          }
           ctx.addChild(
             new RevealBar(strip, ctx.sourcePath, this.revealStore(), welded)
           );

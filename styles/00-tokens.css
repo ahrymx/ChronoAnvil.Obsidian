@@ -483,6 +483,32 @@
      been re-weighting all of them. */
   --ca-head-spine: var(--ca-rule-edge);
 
+  /* THE STACKED CARD'S INSET, AND WHY IT IS A TOKEN RATHER THAN 14px TYPED NINE
+     TIMES (1.0.45).
+
+     A stack states `padding: 0` and every band inside it states its own inset,
+     so that a band which is `display: none` takes its air away with it. That
+     makes the inset the one number every band in the card has to agree on —
+     the head, the chevron strip, the page-context strip, the logging grid's
+     cells, a welded section's bar and everything the section drew under it —
+     and `30-header-bars.css` said it eight times as a literal.
+
+     WHAT FORCED IT WAS THE NINTH SITE, IN ANOTHER FILE. `98-page-head.css`
+     states the head's `padding-left` and has carried a comment since 5.30
+     saying *"14px, as a literal, because the spine's gutter is what
+     `30-header-bars.css` declares for a stacked head and the two must be the
+     same number"* — a rule that knows it must match another file's literal and
+     cannot say so. That is the same argument `--ca-head-spine` above makes one
+     paragraph up, and it is answered the same way.
+
+     NOT `--ca-space-7`, WHICH IS ALSO 14px. The scale is 14px on a desktop and
+     17.5px on a phone (see the mobile block below), and the head's own comment
+     is why that cannot state this: a card whose bands moved in from the edge on
+     a narrow screen while its border stayed put would open a gutter exactly
+     where the card exists to close one. This is a card's geometry, not a step
+     on the spacing scale. */
+  --ca-stack-inset: 14px;
+
   /* The level rail's marker. Its own token rather than a number in
      `98-page-head.css`, because the three states are three rules and a dot that
      changed size between them would read as a wobble rather than as a state.

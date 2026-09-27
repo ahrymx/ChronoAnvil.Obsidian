@@ -5,6 +5,48 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.45] - 2026-09-27
+
+### Changed
+
+- **A diary entry opens as one card.** *"How should stacks look for diary
+  entries… they serve slightly different grouping needs."* They do, and the
+  difference is what the card ends on. A journal page's stack ends on its
+  contents — the index of its children is the last thing in the box, so the box
+  is the whole page. An entry's cannot: what an entry holds is the seven fields
+  you write in, and those are yours rather than chrome. An entry's card is a
+  **head** — its name, the day it is, and the things you log — with the writing
+  underneath it.
+
+  So that is what a new entry now is: the banner, the date stepper and the
+  logging grid in one card, and your fields in their own cards below it. It has
+  been one press of **Edit sections… → Stack** since 1.0.10; it is simply what
+  the diary is now, because it is one object on every entry in every vault.
+  **Break up** in the same menu still takes it apart, and gives back exactly the
+  file you would have had before.
+
+  Entries already in your vault are left alone. Nothing rewrites them, and the
+  weld button works on them as it always has.
+
+- **The `📊 Trackers` chevron moved onto the date row.** An entry has exactly one
+  thing that chevron can open, so the strip was a full row of the card spent
+  saying one word. It now sits at the right-hand end of the row the date stepper
+  is already on, which also gives the stepper back its ordinary size: the arrows
+  and the picker are one small control at the left instead of three large ones
+  stretched across the card. Your title says the date once, in heading type,
+  and the picker no longer says it again underneath in bold.
+
+  Where a page has more than one section welded in — a Subject with its trackers
+  and its topics — the strip keeps a row of its own. Two controls make a row;
+  one does not.
+
+- **One boundary under the card instead of three.** There was the card's own
+  edge, then a horizontal rule, then a gap of a third size — three devices
+  making one statement. The rule is no longer written into a new entry, and the
+  space below the card is now the same gap every other pair of cards on the page
+  has. Existing entries keep the rule that is already in their markdown; it is
+  one line you can delete.
+
 ## [1.0.44] - 2026-09-27
 
 ### Fixed

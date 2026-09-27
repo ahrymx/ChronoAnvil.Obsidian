@@ -60,6 +60,12 @@ import {
 import { parseFrame, stackParts } from "../src/core/directive-grammar";
 import { WELDS_INTO_BANNER } from "../src/core/sections";
 import { breakUp, weldInto } from "../src/core/row-order";
+
+// THE CARD'S INSET, AS THE STYLESHEET NOW NAMES IT (1.0.45). Eight rules in
+// `30-header-bars.css` and one in `98-page-head.css` stated `14px` as a literal,
+// each with a comment saying it had to match the others. Written here once so a
+// change to the number is a change in one place in the tests as well.
+const INSET = "var(--ca-stack-inset)";
 import { revealPartsIn } from "../src/ui/reveal";
 import { goldenNotes } from "./golden-notes";
 import type { SectionModel } from "../src/core/section-model";
@@ -519,6 +525,7 @@ describe("every section the list says may weld, actually can", () => {
     // a release where every weld had quietly become a refusal.
     const welds: string[] = [];
     let already = 0;
+    const shipped: string[] = [];
     const refused: string[] = [];
 
     for (const note of goldenNotes()) {
@@ -538,6 +545,7 @@ describe("every section the list says may weld, actually can", () => {
         // read back. It is checked on the same three terms as a fresh weld.
         if (host?.ids.includes(id)) {
           already++;
+          shipped.push(`${note.name}/${id}`);
           const body = firstFence(note.text);
           expect(
             parseFrame(body.filter((l) => l.length && !l.startsWith("#"))).frame,
@@ -616,7 +624,17 @@ describe("every section the list says may weld, actually can", () => {
     // stated in prose. Naming them is what keeps the skip from coming back
     // silently: the grain whose model stopped implementing an arrangement would
     // vanish from this list rather than fail anything.
-    expect(welds.filter((w) => w.startsWith("entry-"))).toEqual([
+    //
+    // ── AND THEY SHIP WELDED AS OF 1.0.45, SO THEY ARE IN THE OTHER LIST ──
+    //
+    // `composeEntryTemplate` pipes its composition through `weldEntryFences`, so
+    // every entry golden arrives at the `already` branch above instead of the
+    // weld branch — and that branch asserts MORE about them than this list did:
+    // the card is drawn, the fence has one part per welded section, and the
+    // chevrons are one fewer than the parts. The naming stays, on the branch
+    // they now take, for exactly the reason the paragraph above gives.
+    expect(welds.filter((w) => w.startsWith("entry-"))).toEqual([]);
+    expect(shipped.filter((w) => w.startsWith("entry-"))).toEqual([
       "entry-daily/trackers",
       "entry-weekly/trackers",
       "entry-monthly/trackers",
@@ -647,13 +665,14 @@ describe("the stack's card", () => {
     // 50-entry-header.css, and `chromeClasses` withholds that class inside a
     // stack — *a fence is a banner or it is the tracker section* — so welding
     // the grid into the banner left the strip a bare div: no flex, no gutter,
-    // no air. The card's own 14px, which is what every band in it states.
+    // no air. The card's own inset, which is what every band in it states —
+    // `--ca-stack-inset` as of 1.0.45, and a literal in eight places before it.
     const at = css().indexOf(".ca-journal-stack > .ca-journal-entry-context,");
     expect(at, "the strip has no band inside a stack").toBeGreaterThan(0);
     const rule = css().slice(at, css().indexOf("}", at));
     expect(rule).toContain(".ca-journal-note-context");
     expect(rule).toContain("display: flex");
-    expect(rule).toContain("padding: 0 14px 4px");
+    expect(rule).toContain(`padding: 0 ${INSET} 4px`);
     // AND NO BLEED AND NO RULE, which is the whole difference from the twin it
     // replaces. That one bleeds out of the tracker section's 12px card padding
     // and bands itself top and bottom; this card states `padding: 0` so each
@@ -697,8 +716,12 @@ describe("the stack's card", () => {
       " .ca-journal-stack > .ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill {"
     );
     // And the tracker card keeps its own emphasis, which is what it was for.
+    // AND GUARDED, NOT CANCELLED (1.0.45). The tracker card's emphasis is still
+    // the reason this rule exists; what changed is that it stands down when the
+    // chevron pill shares the row, because "it spans the full width" is the
+    // premise of every declaration in it. See `ca-jec-shared`.
     expect(flat).toContain(
-      " .ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill { width: 2.2em;"
+      " .ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-navpill { width: 2.2em;"
     );
   });
 
@@ -739,7 +762,7 @@ describe("the stack's card", () => {
     const at = css().indexOf(".ca-journal-stack .ca-journal-page-head {");
     expect(at).toBeGreaterThan(0);
     const rule = css().slice(at, css().indexOf("}", at));
-    expect(rule).toContain("padding-left: 14px");
+    expect(rule).toContain(`padding-left: ${INSET}`);
     // ── AND THERE IS NO LONGER A SPINE TO BE WITHOUT (5.31.2) ─────────
     //
     // This asserted that the gated preset rule sat LATER in the sheet than the
@@ -751,7 +774,13 @@ describe("the stack's card", () => {
     // file is edited for a reason of its own — so what is checked now is that
     // the two files still agree on the number.
     const head = styleSheets().find((f) => f.name === "98-page-head.css");
-    expect(head?.css).toContain("padding-left: 14px");
+    // AND THE NUMBER IS NAMED NOW (1.0.45). Both files read `--ca-stack-inset`,
+    // so "the two files still agree" is a thing the stylesheet states rather
+    // than a thing this test has to police — which is the same argument
+    // `--ca-head-spine` made one token up. Asserted as the token in both, so a
+    // literal creeping back into either is a failure here.
+    expect(head?.css).toContain(`padding-left: ${INSET}`);
+    expect(head?.css).not.toContain("padding-left: 14px");
     expect(css()).not.toContain(".ca-journal-page-head[data-ca-grain],");
   });
 
@@ -850,7 +879,7 @@ describe("the stack's card", () => {
       ".ca-journal-page-banner.ca-journal-stack > .ca-journal-links-card > .ca-journal-links-bar {"
     );
     expect(at).toBeGreaterThan(0);
-    expect(css().slice(at, css().indexOf("}", at))).toContain("padding: 7px 14px");
+    expect(css().slice(at, css().indexOf("}", at))).toContain(`padding: 7px ${INSET}`);
     // The plain page banner keeps its own, which is what makes the rule above
     // a combined case rather than a change to either class.
     const alone = css().indexOf(
@@ -885,7 +914,7 @@ describe("the stack's card", () => {
     );
     expect(at).toBeGreaterThan(0);
     const rule = css().slice(at, css().indexOf("}", at));
-    expect(rule).toContain("padding: 8px 14px 6px");
+    expect(rule).toContain(`padding: 8px ${INSET} 6px`);
     // THE WHOLE OF THE FIX, and it must be stated as an absence: any negative
     // horizontal margin here cancels the inset again.
     expect(rule).not.toMatch(/margin:[^;]*-14px/);
@@ -904,8 +933,9 @@ describe("the stack's card", () => {
     ]) {
       const at = css().indexOf(`${selector} {`);
       expect(at, selector).toBeGreaterThan(0);
-      expect(css().slice(at, css().indexOf("}", at)), selector).toMatch(
-        /padding(-left)?:[^;]*\b14px/
+      const rule = css().slice(at, css().indexOf("}", at));
+      expect(rule, selector).toMatch(
+        new RegExp(`padding(-left)?:[^;]*${INSET.replace(/[()-]/g, "\\$&")}`)
       );
     }
   });
@@ -1022,9 +1052,18 @@ describe("the chevron strip's place in the card", () => {
     expect(src).toContain("revealAnchors");
     const at = src.indexOf('createDiv({ cls: "ca-journal-reveal-bar" })');
     expect(at).toBeGreaterThan(0);
-    const after = src.slice(at, at + 900);
+    const after = src.slice(at, at + 1600);
     expect(after).toContain("container.insertBefore(strip");
     expect(after).not.toContain("trackerBar?.parentElement === container");
+    // ── AND ONLY WHERE THE STRIP IS A BAND OF THE CARD (1.0.45) ────────
+    //
+    // A one-button strip is drawn into the page-context row instead, where
+    // `margin-left: auto` puts it at the end — so the placement above is
+    // conditional on the host being the card. Without the guard the strip would
+    // be inserted before the grid AND parented into the row, which is one
+    // element in two places: the last `insertBefore` wins and the row it was
+    // drawn into loses it silently.
+    expect(after).toContain("if (host === container) {");
   });
 
   // ── WHAT THE PILLS ARE MADE OF (5.31.2) ──────────────────────────────
@@ -1148,7 +1187,7 @@ describe("the chevron strip's place in the card", () => {
     // 6 over 10: the floor is the head's own top inset at the other end of the
     // card, and a row of bordered objects cannot sit as tight under the name as
     // a row of bare words could.
-    expect(rule).toContain("padding: 6px 14px 10px");
+    expect(rule).toContain(`padding: 6px ${INSET} 10px`);
   });
 });
 
@@ -1413,5 +1452,145 @@ describe("the welded logging grid counts the columns the grid has", () => {
         .flatMap((q) => [...q.matchAll(/max-width: (\d+)px/g)].map((m) => m[1]))
     );
     expect([...widths]).toEqual(["640"]);
+  });
+});
+
+// ── A DIARY ENTRY OPENS AS ONE CARD (1.0.45) ─────────────────────────────
+//
+// *"How should stacks look for diary entries?"* — asked beside a screenshot of
+// an unwelded entry (five objects up a page) and one of a journal Subject page
+// welded into one box. The two serve different grouping needs, and the
+// difference is what the card ENDS ON: a journal stack ends on its content, so
+// the box is the whole page; an entry's cannot, because its content is seven
+// reader-written fields. An entry's card is a HEAD.
+//
+// The reader picked one of six mocked shapes: *"No strip — one pill rides the
+// stepper row. Clearer separation of title and date picker makes it better than
+// the recommended mix of 2 and 3."*
+describe("a diary entry's head card", () => {
+  const css = () => readCss();
+  const flat = () => readCss().replace(/\s+/g, " ");
+
+  it("spends no band of the card on one word", () => {
+    // A diary entry has exactly ONE weldable part — `WELDS_INTO_BANNER` holds
+    // five ids and only `trackers` exists on an entry surface — so the strip is
+    // one pill, and `padding: 6px … 10px` of card for it. It rides the row that
+    // is already there instead.
+    const src = readSrc("widgets");
+    expect(src).toContain("welded.size === 1 ? contextStrip : container");
+    // THE ELEMENT IS UNCHANGED, WHICH IS THE POINT. Same class, same
+    // `RevealBar`, same store and same claim/release — a different parent.
+    expect(src).toContain('createDiv({ cls: "ca-journal-reveal-bar" })');
+    expect(src).toContain("new RevealBar(strip, ctx.sourcePath, this.revealStore(), welded)");
+    // AND THE DECISION IS NOT INSIDE `RevealBar`, which claims and releases
+    // targets and must not also decide where it lives.
+    expect(readSrc("ui/reveal")).not.toContain("ca-jec-shared");
+    expect(readSrc("ui/reveal")).not.toContain("contextStrip");
+  });
+
+  it("pushes that pill to the end of the navigation row", () => {
+    const at = flat().indexOf(".ca-journal-entry-context > .ca-journal-reveal-bar,");
+    expect(at).toBeGreaterThan(0);
+    const rule = flat().slice(at, flat().indexOf("}", at));
+    expect(rule).toContain(".ca-journal-note-context > .ca-journal-reveal-bar");
+    expect(rule).toContain("margin: 0 0 0 auto");
+    // No band inset and no band air: it is a control on somebody else's row.
+    expect(rule).toContain("padding: 0");
+    // AND THE BAND RULE STOPS MATCHING ON ITS OWN. `> .ca-journal-reveal-bar` is
+    // the stack's direct child, which the bar is not once it moves inside the
+    // strip — so the two shapes cannot both apply and neither cancels the other.
+    expect(css()).toContain(".ca-journal-stack > .ca-journal-reveal-bar {");
+  });
+
+  it("gives that row the floor the strip gave up", () => {
+    // `jec-nav-only`'s four-class override states `padding-bottom: 4px`, right
+    // while a band opening with 6px of its own follows it — *"the same ten
+    // measured across the seam"*. What follows now is the grid's hairline, so
+    // the row states the whole ten.
+    const at = flat().indexOf(
+      ".ca-journal-widget-block.ca-journal-stack > .ca-journal-entry-context.ca-jec-shared,"
+    );
+    expect(at).toBeGreaterThan(0);
+    expect(flat().slice(at, flat().indexOf("}", at))).toContain("padding-bottom: 10px");
+  });
+
+  it("stands the full-width navigator down when the row is shared", () => {
+    // Six rules in `50-entry-header.css` explode `jeh-seg` into three separate
+    // controls across the full width, and every one of them rests on "this row
+    // holds nothing else". They are GUARDED rather than cancelled — restating a
+    // border, a radius, a width and a ground onto four exploded controls would
+    // be four overrides waiting for a fifth property to change under them.
+    const guarded = [...flat().matchAll(/\.ca-jec-nav-only(:not\(\.ca-jec-shared\))?/g)].map(
+      (m) => !!m[1]
+    );
+    expect(guarded.filter((g) => g).length).toBeGreaterThanOrEqual(6);
+    // The hover pair is deliberately NOT guarded: a ground under the picker is
+    // right in both shapes, and the `border-color` beside it is inert on a
+    // segment whose border the capsule draws.
+    expect(flat()).toContain(
+      ".ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger:hover,"
+    );
+    // And the capsule the guard falls back to is the one that was always there.
+    expect(css()).toMatch(/\n\.ca-jeh-nav\.ca-jeh-seg \{[^}]*border-radius: var\(--ca-radius-pill\)/);
+  });
+
+  it("keeps the title band and the stepper undivided, and rules above the grid", () => {
+    // THE READER'S REASON FOR PICKING THIS SHAPE OVER THE OTHER TWO BANDS:
+    // *"Clearer separation of title and date picker."* Candidate 1 gave the
+    // stepper a divider of its own and candidate 2 folded it into the title; this
+    // one leaves the boundary between them unmarked and lets the two read as two
+    // lines of one name band, which is what `.ca-journal-page-head`'s cancelled
+    // bottom rule has said since 5.31.2.
+    const at = flat().indexOf(".ca-journal-stack > .ca-journal-tracker-bar, .ca-journal-stack > .ca-journal-sec-l1 {");
+    expect(at).toBeGreaterThan(0);
+    expect(flat().slice(at, flat().indexOf("}", at))).toContain("border-top: var(--ca-rule)");
+    // The divider list names the bands that START one, and the stepper is not
+    // one of them — a closed band is `display: none` and takes its rule with it,
+    // which a rule on the stepper could not do.
+    expect(flat()).not.toContain(
+      ".ca-journal-stack > .ca-journal-entry-context { border-top"
+    );
+    for (const sel of [
+      ".ca-journal-stack > .ca-journal-entry-context,",
+      ".ca-journal-stack .ca-journal-page-head {",
+    ]) {
+      const from = flat().indexOf(sel);
+      expect(from, sel).toBeGreaterThan(0);
+      expect(flat().slice(from, flat().indexOf("}", from)), sel).not.toContain("border-top:");
+    }
+  });
+
+  it("hands off to the writing with one gap, not three devices", () => {
+    // The card's edge, a composed `---`, then a gap of a third size. The rule is
+    // not composed any more (`entry-sections.ts`) and both cards take the gap
+    // every other pair on the page has.
+    // READ WITHOUT COMMENTS, because `readCss()` keeps them and both of these
+    // rules now carry an essay naming the `0.9em` they replaced — the same trap
+    // a class name written with a leading dot in prose sets for a `not.toContain`
+    // sweep.
+    const bare = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const sel of [
+      ".ca-journal-widget-block.ca-journal-stack {",
+      ".ca-journal-widget-block.ca-journal-tracker-section {",
+    ]) {
+      const at = bare.indexOf(sel);
+      expect(at, sel).toBeGreaterThan(0);
+      const rule = bare.slice(at, bare.indexOf("}", at));
+      expect(rule, sel).toContain("margin: 0 0 var(--ca-widget-gap)");
+      expect(rule, sel).not.toContain("0.9em");
+    }
+  });
+
+  it("names the inset both files had to agree on", () => {
+    const tokens = styleSheets().find((f) => f.name === "00-tokens.css")!.css;
+    expect(tokens).toContain("--ca-stack-inset: 14px;");
+    // NO COMMA FALLBACK, per the project rule: a token declared unconditionally
+    // here is always there, and a fallback beside it is a second value nobody
+    // maintains. `test/tokens.test.ts` sweeps for this; asserted at the site too.
+    expect(readCss()).not.toContain("var(--ca-stack-inset,");
+    // Every band of the card reads it, in both files.
+    expect(
+      [...readCss().matchAll(/var\(--ca-stack-inset\)/g)].length
+    ).toBeGreaterThanOrEqual(9);
   });
 });

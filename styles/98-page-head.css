@@ -86,11 +86,15 @@
      one line here that has to be seen as introducing the other. */
   gap: 6px;
   padding-bottom: var(--ca-space-4);
-  /* 14px, as a literal, because the spine's gutter is what
-     `30-header-bars.css` declares for a stacked head and the two must be the
-     same number. `--ca-space-7` is 14px on a desktop and 17.5px on a phone —
-     see the mobile block in `00-tokens.css` — so the scale cannot state it. */
-  padding-left: 14px;
+  /* THE STACKED CARD'S INSET, WHICH THIS RULE AND `30-header-bars.css` HAVE TO
+     AGREE ON. It was a literal in both files with a comment in each saying so —
+     a rule that knows it must match another file's number and cannot name it —
+     until 1.0.45 gave it a token. The reason the spacing scale cannot state it
+     is unchanged and is written where the token is declared: `--ca-space-7` is
+     14px on a desktop and 17.5px on a phone, and a card whose bands moved in
+     from the edge while its border stayed put would open a gutter exactly where
+     the card exists to close one. */
+  padding-left: var(--ca-stack-inset);
   /* SCALED BY THE RUNG, AND THE MULTIPLICATION IS WHY (1.0.42). The token is
      still what a preset sets and what `aesthetic-presets.test.ts` pins; what a
      journal rung adds is `--ca-head-spine-k`, which is 1 everywhere else. See

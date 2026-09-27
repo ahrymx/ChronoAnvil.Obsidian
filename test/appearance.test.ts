@@ -1198,11 +1198,23 @@ describe("the banner is one material, and the minimal one is quiet", () => {
   it("spans the period navigator across the full top row with centered date selector", () => {
     // The period navigator spans the full width of the tracker card's top row,
     // with navigation chevrons on both sides and an enlarged centered date trigger.
-    const nav = body(".ca-journal-entry-context.ca-jec-nav-only .ca-jeh-nav.ca-jeh-seg");
+    //
+    // ── AND ONLY WHILE THE ROW IS ITS OWN (1.0.45) ─────────────────────
+    //
+    // "Spans the full width" is the premise of every declaration below, and a
+    // welded entry's chevron pill now shares this row — so the rules are scoped
+    // `:not(.ca-jec-shared)` and the navigator falls back to the capsule
+    // `jeh-seg` names when it does. The shape asserted here is still the one the
+    // tracker card draws, which is where the enlargement was always for.
+    const nav = body(
+      ".ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-nav.ca-jeh-seg"
+    );
     expect(nav).toContain("width: 100%");
     expect(nav).toContain("justify-content: space-between");
 
-    const dateTrigger = body(".ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger");
+    const dateTrigger = body(
+      ".ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-datenav-trigger"
+    );
     expect(dateTrigger).toContain("font-size: var(--ca-text-base)");
     expect(dateTrigger).toContain("border-radius: var(--ca-radius-pill)");
 

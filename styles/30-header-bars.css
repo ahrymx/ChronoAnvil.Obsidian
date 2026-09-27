@@ -1102,7 +1102,15 @@ body.is-mobile
   /* Each band's own rule is the divider, as in the two cards above. */
   gap: 0;
   padding: 0;
-  margin: 0 0 0.9em;
+  /* THE GAP EVERY OTHER PAIR OF CARDS ON THE PAGE HAS (1.0.45). This was
+     `0.9em` — 14.4px at the note's font size, inherited from the two-card shape
+     it replaced, and different from the 10px the widget stack below it uses
+     between every one of its own cards. On a diary entry the difference showed:
+     the card ended, then a composed `---`, then a gap of a third size, and the
+     reader read three separation devices where there is one boundary. The
+     composer no longer writes the rule (`entry-sections.ts`), and the gap is now
+     the page's. */
+  margin: 0 0 var(--ca-widget-gap);
   background: var(--background-secondary);
   border: var(--ca-rule) solid var(--background-modifier-border);
   border-radius: var(--ca-radius-md);
@@ -1143,9 +1151,9 @@ body.is-mobile
  * than `display: none`, because the box is never generated at all. */
 .ca-journal-stack .ca-journal-page-head {
   padding-top: 10px;
-  padding-right: 14px;
+  padding-right: var(--ca-stack-inset);
   padding-bottom: 8px;
-  padding-left: 14px;
+  padding-left: var(--ca-stack-inset);
   border-bottom: none;
   /* And no spine of its own: it paints the CARD's left edge instead, from the
      pseudo-element two rules down, which is where the argument is written. */
@@ -1232,7 +1240,7 @@ body.is-mobile
  * `>` AND BOTH CLASSES, so this cannot reach a links card inside a widget the
  * stack holds, and cannot reach a page banner that is not in a stack. */
 .ca-journal-page-banner.ca-journal-stack > .ca-journal-links-card > .ca-journal-links-bar {
-  padding: 7px 14px;
+  padding: 7px var(--ca-stack-inset);
 }
 /* The live host the head is built inside carries no inset of its own — the same
    requirement `.ca-journal-overview-card > .ca-journal-live-widget` states one
@@ -1251,7 +1259,7 @@ body.is-mobile
      cannot: the strip reads as a second line of the name band rather than as
      its own row. The floor stays at 10 — it is the head's own top inset at the
      other end of the card, and the card's air is that number on both. */
-  padding: 6px 14px 10px;
+  padding: 6px var(--ca-stack-inset) 10px;
 }
 
 /* ── AND THE STRIP THAT SAYS WHICH NOTE THIS IS (1.0.10) ──────────────
@@ -1290,7 +1298,45 @@ body.is-mobile
   gap: 8px 16px;
   flex-wrap: wrap;
   margin: 0;
-  padding: 0 14px 4px;
+  padding: 0 var(--ca-stack-inset) 4px;
+}
+
+/* ── AND THE CHEVRON PILL RIDES THAT ROW (1.0.45) ──────────────────────
+ *
+ * ONE PILL IS NOT A BAND. A diary entry has exactly one weldable part — the
+ * logging grid — so the chevron strip is a single pill reading "📊 Trackers",
+ * and it took a full band of the card to say one word: `padding: 6px 14px 10px`
+ * between the date stepper above it and the grid's own rule below. The reader
+ * chose this shape off a mock of six: *"No strip — one pill rides the stepper
+ * row. Clearer separation of title and date picker makes it better."*
+ *
+ * THE ELEMENT DID NOT CHANGE, ITS PARENT DID. `widgets/index.ts` draws the same
+ * `ca-journal-reveal-bar` into the page-context strip when the bar would hold
+ * exactly one button, so `RevealBar` fills it, `:empty` still hides it, and the
+ * store, the labels and the claim/release are untouched. All this rule does is
+ * put it at the row's far end and take away the air it no longer needs.
+ *
+ * NOT `>` ON THE BAR ITSELF, BECAUSE IT IS NOT THE STACK'S CHILD ANY MORE. The
+ * `.ca-journal-stack > .ca-journal-reveal-bar` rule above states the band's
+ * inset and floor, and it correctly stops matching the moment the bar moves
+ * inside the strip — so the two shapes cannot both apply and neither has to
+ * cancel the other.
+ *
+ * AND THE ROW TAKES THE FLOOR THE BAND GAVE UP. `jec-nav-only`'s four-class
+ * override further up states `padding-bottom: 4px`, and four is right while a
+ * band with six of its own opens beneath it — *"the pair is the same ten
+ * measured across the seam"*. With the strip gone what opens beneath is the
+ * grid's hairline, so this row states the whole ten itself. */
+.ca-journal-entry-context > .ca-journal-reveal-bar,
+.ca-journal-note-context > .ca-journal-reveal-bar {
+  margin: 0 0 0 auto;
+  padding: 0;
+}
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-entry-context.ca-jec-shared,
+.ca-journal-widget-block.ca-journal-stack
+  > .ca-journal-note-context.ca-jec-shared {
+  padding-bottom: 10px;
 }
 
 /* ── AND THE NAVIGATOR COMES BACK TO ITS OWN SCALE (1.0.10) ────────────
@@ -1313,6 +1359,16 @@ body.is-mobile
  * THE GEOMETRY IS THE READER'S AND IS UNCHANGED. The arrows keep the card's two
  * edges and the picker keeps the middle, which is the shape the unwelded card
  * has and the one they asked to keep. What comes out is the height.
+ *
+ * AND THAT HELD FOR AS LONG AS THE ROW HELD NOTHING ELSE (1.0.45). The chevron
+ * strip is one pill on an entry, so it moved onto this row, and the full width
+ * is the one thing a shared row cannot spend: the navigator comes back to the
+ * capsule `jeh-seg` names and the pill takes the end it frees. The block at the
+ * foot of this file is where that is drawn; `jec-shared` is the class the
+ * dispatcher stamps, and it guards the five `jec-nav-only` rules in
+ * `50-entry-header.css` rather than cancelling them here — an override naming
+ * four of a rule's five properties is not an override, it is a rule waiting for
+ * the fifth to change under it.
  *
  * FOUR CLASSES, to outrank `.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-…`
  * from a later file — the same arithmetic, and the same reason, as the welded
@@ -1418,13 +1474,13 @@ body.is-mobile
  * no margin the bar's border box IS the card's padding box. */
 .ca-journal-widget-block.ca-journal-stack
   > .ca-journal-sec-l1.ca-journal-header-bar {
-  padding: 8px 14px 6px;
+  padding: 8px var(--ca-stack-inset) 6px;
   margin: 0 0 7px;
 }
 /* And everything the section drew under its bar. */
 .ca-journal-stack > .ca-journal-sec-l1 ~ * {
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-left: var(--ca-stack-inset);
+  padding-right: var(--ca-stack-inset);
 }
 .ca-journal-stack > .ca-journal-sec-l1 ~ *:last-child {
   padding-bottom: 10px;

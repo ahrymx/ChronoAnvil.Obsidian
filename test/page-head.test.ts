@@ -274,7 +274,11 @@ describe("the head is drawn as the page, not as another card", () => {
       "border-left: calc(var(--ca-head-spine) * var(--ca-head-spine-k)) solid"
     );
     expect(head).toContain("var(--ca-grain-spine)");
-    expect(head).toContain("padding-left: 14px");
+    // THE CARD'S INSET, NAMED (1.0.45). It was `14px` as a literal here and in
+    // `30-header-bars.css`, each with a comment saying the two had to agree;
+    // `--ca-stack-inset` is where the number lives now. See the token's own
+    // essay in `00-tokens.css` for why the spacing scale cannot state it.
+    expect(head).toContain("padding-left: var(--ca-stack-inset)");
     // AND THE GATE IS GONE RATHER THAN WIDENED. What is left in the presets
     // file is the token BINDING — a custom property inherits, so a grain or a
     // journal reaches the head wherever the attribute landed, which is what the

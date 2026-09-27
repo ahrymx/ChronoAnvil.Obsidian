@@ -6,16 +6,13 @@ journal: Yearly Entry
 ---
 `chronoanvil:spacer`
 ```chronoanvil
+stack
 entry-header
 actions
-```
-
-```chronoanvil
+stack
 # chronoanvil:trackers:start
 # chronoanvil:trackers:end
 ```
-
----
 
 ```chronoanvil
 note:focus#line:What's the theme for this year?|Focus

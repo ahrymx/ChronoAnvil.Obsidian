@@ -1062,14 +1062,34 @@ export function composeEntryTemplate(
   // exception and always was: there is no daily dashboard, so a daily entry's
   // parent is the diary root itself.
   //
-  return (
+  // ── AND NO RULE BETWEEN THE CARD AND THE WRITING (1.0.45) ─────────
+  //
+  // A literal `---` sat here from 4.20, when there were two cards above it and
+  // the rule was what said *the chrome stops here*. The entry welds into ONE
+  // card now, and a card's edge already says that — so the rule is the third
+  // device in a row making one statement: the card's border, an `<hr>`, then
+  // the gap before the first field. The reader's words for the pair of screens
+  // that showed it: *"the writing below it sits in a rhythm the card sets,
+  // rather than behind three different separation devices in a row."*
+  //
+  // AND NOTHING READ IT. Every `---` this codebase parses is a frontmatter
+  // delimiter, asked for at line 0 — `note-sections.ts`, `entry-trackers.ts`
+  // and `trackers.ts` all index from the top of the file. This one was a
+  // rendered hairline and nothing else, which is why it can go by deletion
+  // rather than by a stylesheet rule reaching across Obsidian's block wrappers
+  // to hide it.
+  //
+  // ENTRIES ALREADY IN THE VAULT KEEP THEIRS, deliberately: no repair pass
+  // rewrites an entry, so a note written before this release still has the line
+  // in its markdown and still draws it. It is one hairline in a file the reader
+  // can edit, and rewriting every entry in a vault to remove a horizontal rule
+  // is not a trade this release makes.
+  const composed =
     [
       ...frontmatter(ctx),
       "`chronoanvil:spacer`",
       ...bandFences(own),
       ...trackerFence,
-      "---",
-      "",
       ...bandFences(shared),
       "",
     ].join("\n") +
@@ -1077,8 +1097,31 @@ export function composeEntryTemplate(
       .filter((s) => s.ownsRegion !== false)
       .map((s) => region(s.id))
       .join("\n\n") +
-    "\n"
-  );
+    "\n";
+
+  // ── AND AN ENTRY ARRIVES WELDED (1.0.45) ──────────────────────────
+  //
+  // THE STACK IS WHAT A DIARY ENTRY *IS*, not an option most notes never take.
+  // `weldable` has defaulted to true for the tracker section since 5.30 and the
+  // weld has been one press of *Edit sections… → Stack* since 1.0.10 — but a
+  // shape nobody finds is a shape nobody has, and the banner, the date stepper
+  // and the logging grid are one object on every entry in every vault.
+  //
+  // THROUGH THE WELD, NOT BESIDE IT, AND THAT IS THE WHOLE POINT. Writing a
+  // second spelling of the welded fence here would be two authorities on where
+  // a `stack` line goes, and they would disagree the first time either moved.
+  // `weldEntryFences` is already a pure function over composed text, so piping
+  // the composition through it makes a composed entry BYTE-IDENTICAL to a
+  // hand-welded one by construction. That is the property `detect`, `parseEntry`
+  // and `splitEntryFences` all rely on: each of them already handles a
+  // reader-welded entry, and 1.0.10 taught the repair pass to leave one alone.
+  //
+  // `?? composed` IS THE HONEST FALLBACK, not a formality. The weld declines on
+  // a grain whose tracker section composed no fence at all — `trackerFence` is
+  // empty, the next fence is the shared band's, and `isTrackerFence` is false —
+  // and an entry still has to compose. Every shipped template does weld; a
+  // future one that does not gets the two-card shape rather than an exception.
+  return weldEntryFences(composed) ?? composed;
 }
 
 // Whether this section may be removed from an entry.

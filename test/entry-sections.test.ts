@@ -31,7 +31,7 @@ import {
   addableEntrySections,
   entrySectionModel,
 } from "../src/diary/entry-sections";
-import { weldEntryFences } from "../src/trackers/entry-trackers";
+import { unweldEntryFences, weldEntryFences } from "../src/trackers/entry-trackers";
 import { WIDGETS } from "../src/core/widget-registry";
 import { isPageWidgetId } from "../src/core/widget-sections";
 import { blockTitle, fieldBand } from "../src/ui/widgets/index";
@@ -287,7 +287,7 @@ describe("locked means unremovable, not unmovable", () => {
     // the widgets, or a notes field above it.
     for (const g of TRACKER_CLASSES) {
       const out = composeEntryTemplate(g);
-      const rule = out.indexOf("\n---\n", out.indexOf("`chronoanvil:spacer`"));
+      const rule = readersHalf(out);
       expect(out.indexOf("entry-header"), g).toBeLessThan(rule);
       expect(out.indexOf("tasks:todo"), g).toBeGreaterThan(rule);
     }
@@ -579,6 +579,42 @@ const structuralFence = (text: string): string[] => {
   return lines.slice(open + 1, close);
 };
 
+// ── WHERE THE READER'S HALF BEGINS (1.0.45) ───────────────────────────
+//
+// The composer wrote a literal `---` between the structural half and the
+// reader's from 4.20 until 1.0.45, and the tests below read the boundary as
+// `text.indexOf("\n---\n", …)`. An entry welds into ONE card now and the card's
+// own edge is what says *the chrome stops here*, so the rule is not composed and
+// that landmark is gone.
+//
+// THE BOUNDARY IT STOOD FOR IS UNCHANGED, and still exactly locatable: it is the
+// open of the fence holding the `shared` band, which on a composed entry is the
+// SECOND ```chronoanvil fence — the first being the welded structural one. Every
+// test that asked "above or below the rule" is asking this, and asking it of the
+// composition rather than of a character the composition happens to contain.
+const readersHalf = (text: string): number => {
+  const lines = text.split("\n");
+  const opens = lines
+    .map((l, i) => (l.trim() === "```chronoanvil" ? i : -1))
+    .filter((i) => i >= 0);
+  expect(opens.length).toBeGreaterThanOrEqual(2);
+  return lines.slice(0, opens[1]).join("\n").length;
+};
+
+// The `stack` parts of the welded structural fence — the banner's lines, then
+// the tracker grid's. What 4.20 separated into two FENCES and 1.0.45 composes as
+// two PARTS of one; `weldEntryFences` is the function that made the two shapes
+// the same bytes.
+const structuralParts = (text: string): string[][] => {
+  const out: string[][] = [];
+  for (const raw of structuralFence(text)) {
+    const l = raw.trim();
+    if (l === "stack") out.push([]);
+    else if (out.length) out[out.length - 1].push(l);
+  }
+  return out;
+};
+
 // A pre-3.2 entry: the same directives, split back into a fence apiece with no
 // blank line between them, which is exactly what 3.1's composer wrote.
 // A pre-3.2 entry: the same directives, split back into a fence apiece with no
@@ -586,8 +622,13 @@ const structuralFence = (text: string): string[] => {
 const legacyEntry = (grain: TrackerClass = "daily"): string => {
   const text = composeEntryTemplate(grain);
   return text.replace(
-    "```chronoanvil\nentry-header\n",
-    "```chronoanvil\nlinks:home,today,scopes#diary\n```\n```chronoanvil\nentry-header\n"
+    // `stack` IS THE FENCE'S FIRST LINE AS OF 1.0.45, and it has to be in the
+    // literal: a composed entry welds, so a replace keyed on
+    // "```chronoanvil\nentry-header" matches nothing and this helper silently
+    // returned the composition unchanged — a legacy fixture that was not legacy,
+    // in a test asserting the parser ignores a legacy fence.
+    "```chronoanvil\nstack\nentry-header\n",
+    "```chronoanvil\nlinks:home,today,scopes#diary\n```\n```chronoanvil\nstack\nentry-header\n"
   );
 };
 
@@ -600,43 +641,58 @@ describe("the structural half is one fence", () => {
     }
   });
 
-  it("and there are exactly two of them above the rule (4.20)", () => {
+  it("and there are exactly two of them above the rule (4.20 → 1.0.45)", () => {
     // ONE UNTIL 4.20, AND THE SECOND IS THE POINT OF THAT RELEASE. The banner is
     // the file's name, its navigation and the control that edits it; the tracker
     // grid is the note's most-used content and was in that fence only because
     // the fence was the only place above the rule for its markers to live.
     //
-    // STILL EXACTLY TWO, not "at least". A third fence above the rule means
-    // something has been composed there without an argument, and the rule this
-    // guards — that the reader's own writing is what lives below — is easiest to
-    // erode by adding structure a line at a time.
+    // STILL EXACTLY TWO, not "at least". A third above the rule means something
+    // has been composed there without an argument, and the rule this guards —
+    // that the reader's own writing is what lives below — is easiest to erode by
+    // adding structure a line at a time.
+    //
+    // AND THEY ARE TWO PARTS OF ONE FENCE AS OF 1.0.45. An entry composes
+    // welded, so 4.20's separation is a `stack` line rather than a fence close —
+    // which is the same separation said in the grammar that the reveal chevron,
+    // `flatBlocks` and the section editor all already read. This asserted the
+    // fence count and would have gone on passing at 2 while the shared band's
+    // fence took the second slot, so it counts BOTH: one fence above the
+    // boundary, two parts in it.
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
-      const rule = text.indexOf("\n---\n", text.indexOf("`chronoanvil:spacer`"));
-      const above = text.slice(0, rule);
-      expect((above.match(/```chronoanvil/g) ?? []).length, g).toBe(2);
+      const above = text.slice(0, readersHalf(text));
+      expect((above.match(/```chronoanvil/g) ?? []).length, g).toBe(1);
+      expect(structuralParts(text).length, g).toBe(2);
     }
   });
 
-  it("keeps the tracker markers out of the banner and in a block of their own", () => {
+  it("keeps the tracker markers out of the banner and in a part of their own", () => {
     // The inverse of what this asserted until 4.20, and for the argument in the
     // test above. What has NOT changed is that the markers are composed at all
     // and are above the rule — `locateTrackerRegion` needs them to exist and
     // `EntrySection.fence` needs them to be structure rather than writing.
+    //
+    // OUT OF THE BANNER'S PART, WHICH IS THE 1.0.45 SPELLING OF THE SAME CLAIM.
+    // This read `structuralFence(text)` — the whole fence — and that fence now
+    // holds both parts, so the assertion had become "the markers are not in the
+    // structural half", which is the opposite of true. The separation to guard is
+    // the one the card draws: the banner's part says nothing about trackers.
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
-      expect(structuralFence(text), g).not.toContain("# chronoanvil:trackers:start");
-      const rule = text.indexOf("\n---\n", text.indexOf("`chronoanvil:spacer`"));
-      const above = text.slice(0, rule);
-      expect(above, g).toContain("# chronoanvil:trackers:start");
-      expect(above, g).toContain("# chronoanvil:trackers:end");
+      const [banner, trackers] = structuralParts(text);
+      expect(banner, g).not.toContain("# chronoanvil:trackers:start");
+      expect(banner, g).toContain("entry-header");
+      expect(trackers, g).toContain("# chronoanvil:trackers:start");
+      expect(trackers, g).toContain("# chronoanvil:trackers:end");
+      expect(trackers, g).not.toContain("entry-header");
     }
   });
 
   it("still puts the reader's own sections below the rule", () => {
     for (const g of TRACKER_CLASSES) {
       const text = composeEntryTemplate(g);
-      const rule = text.indexOf("\n---\n", text.indexOf("`chronoanvil:spacer`"));
+      const rule = readersHalf(text);
       expect(text.indexOf("entry-header"), g).toBeLessThan(rule);
       expect(text.indexOf("tasks:todo"), g).toBeGreaterThan(rule);
     }
@@ -837,10 +893,9 @@ describe("the widget door, on an entry (5.26)", () => {
     const regions = (t: string): string[] =>
       [...t.matchAll(/<!--chronoanvil:([\w-]+)/g)].map((m) => m[1]);
     expect(regions(next)).toEqual(regions(base));
-    // The two structural fences above the rule are untouched.
-    expect(next.slice(0, next.indexOf("\n---\n\n"))).toBe(
-      base.slice(0, base.indexOf("\n---\n\n"))
-    );
+    // The structural half above the boundary is untouched. Read through
+    // `readersHalf` since 1.0.45 — the `---` it used to look for is not composed.
+    expect(next.slice(0, readersHalf(next))).toBe(base.slice(0, readersHalf(base)));
   });
 
   it("is found again by the parser, and refused a second copy", () => {
@@ -881,8 +936,8 @@ describe("the widget door, on an entry (5.26)", () => {
     // probe voting in that question would adopt the reader's navigation row as
     // the band the editor rewrites.
     const legacy = composeEntryTemplate("daily").replace(
-      "```chronoanvil\nentry-header\n",
-      "```chronoanvil\nlinks:home,today,scopes#diary\n```\n```chronoanvil\nentry-header\n"
+      "```chronoanvil\nstack\nentry-header\n",
+      "```chronoanvil\nlinks:home,today,scopes#diary\n```\n```chronoanvil\nstack\nentry-header\n"
     );
     expect(offered()).toContain("w:links#1");
     expect(detectEntrySections(legacy, ctx)).not.toContain("w:links#1");
@@ -972,13 +1027,21 @@ describe("an entry's blocks and the weld that changes them", () => {
     // `rowRuns(weld: true)` read backwards: an unrowed member joins the run
     // before it, so the fence they happen to share is not a fact about their
     // arrangement.
+    // ── AND THE BANNER AND THE GRID ARE ONE BLOCK AS OF 1.0.45 ────────
+    //
+    // An entry composes welded, so the two are `stack` parts of one fence and
+    // this reports one block holding both — which is the shape the section
+    // window has to offer back, and the reason `flatBlocks` carries a `stack`
+    // flag at all. The `every(b => b.stack)` line below was vacuous while no
+    // block was a stack: `false` is what it returns whether none is or only
+    // some are. It asks the two questions separately now.
     const blocks = model().blocks!(composeEntryTemplate("daily"));
     expect(blocks.map((b) => b.ids)).toEqual([
-      ["banner"],
-      ["trackers"],
+      ["banner", "trackers"],
       ...fieldsOf("daily").map((id) => [id]),
     ]);
-    expect(blocks.every((b) => b.stack)).toBe(false);
+    expect(blocks[0].stack).toBe(true);
+    expect(blocks.slice(1).some((b) => b.stack)).toBe(false);
     expect(blocks.every((b) => b.pages.length === 0)).toBe(true);
   });
 
@@ -1026,11 +1089,83 @@ describe("an entry's blocks and the weld that changes them", () => {
     }
   });
 
-  it("welds the grid into the banner when the reader asks for a stack", () => {
+  // ── AND THE COMPOSITION IS THE WELDED SIDE NOW (1.0.45) ─────────────
+  //
+  // `composeEntryTemplate` welds, so `weldEntryFences(composed)` is null and the
+  // cases below have to name the two shapes explicitly. `apartFrom` is the
+  // unwelded one — what the composer wrote until this release, and what pressing
+  // *Break up* still gives — and it is derived through `unweldEntryFences` rather
+  // than written out, because deriving it is also the assertion that the two
+  // functions are exact inverses over exactly the text that ships.
+  const apartFrom = (grain: TrackerClass): string =>
+    unweldEntryFences(composeEntryTemplate(grain))!;
+
+  // ── AND AN ENTRY ARRIVES WELDED (1.0.45) ────────────────────────────
+  //
+  // *"A new entry arrives welded"* — the reader's second decision on the shape.
+  // The stack is what a diary entry IS rather than an option most notes never
+  // take, and the composer reaches it through `weldEntryFences` so that a
+  // composed entry and a hand-welded one are the same bytes.
+  it("composes welded on every grain, with the grid as the second part", () => {
     for (const grain of TRACKER_CLASSES) {
       const text = composeEntryTemplate(grain);
-      const out = model(grain).regroup!(text, [["banner", "trackers"]], [], ["trackers"]);
-      expect(out, grain).toBe(weldEntryFences(text));
+      // ONE STRUCTURAL FENCE, TWO PARTS. A second `chronoanvil` fence above the
+      // band would be the 4.20 shape back; one part would be the pre-4.20 shape,
+      // where the markers sat in the banner's fence with nothing saying where
+      // either section began.
+      const parts = structuralParts(text);
+      expect(parts.length, grain).toBe(2);
+      expect(parts[0], grain).toContain("entry-header");
+      expect(parts[1], grain).toContain("# chronoanvil:trackers:start");
+      // AND EVERY GRAIN, INCLUDING THE FOUR WITH AN EMPTY REGION. Weekly through
+      // yearly compose the markers with nothing between them, which is the case
+      // the weld's `isTrackerFence` has to answer on the markers alone — and the
+      // case that reads worst as a card, so it is the one to assert by name.
+      if (grain !== "daily") expect(parts[1].length, grain).toBe(2);
+    }
+  });
+
+  it("is byte-identical to a hand-welded entry, by construction", () => {
+    // THE PROPERTY THE REST OF THE CODEBASE RESTS ON. `detect`, `parseEntry` and
+    // `splitEntryFences` all already handle a reader-welded entry — 1.0.10 taught
+    // the repair pass to leave one alone — so composing through the same function
+    // means none of them can tell a new entry from one the reader welded, and
+    // none of them needed a second shape taught to it.
+    for (const grain of TRACKER_CLASSES) {
+      const composed = composeEntryTemplate(grain);
+      expect(weldEntryFences(unweldEntryFences(composed)!), grain).toBe(composed);
+      // And the composer's own call declines, which is what `?? composed` is for.
+      expect(weldEntryFences(composed), grain).toBeNull();
+    }
+  });
+
+  it("writes no rule under the card", () => {
+    // From 4.20 until 1.0.45 the composer wrote a literal `---` between the
+    // tracker fence and the reader's band, when there were two cards above it and
+    // the rule was what said *the chrome stops here*. One card says it with its
+    // own edge, and the two `---` left on a composed entry are the frontmatter's.
+    //
+    // ENTRIES ALREADY IN THE VAULT KEEP THEIRS. No repair pass rewrites an entry
+    // — the reader's third decision — so a note written earlier still has the
+    // line and still draws it.
+    for (const grain of TRACKER_CLASSES) {
+      const lines = composeEntryTemplate(grain).split("\n");
+      expect(lines.filter((l) => l.trim() === "---"), grain).toHaveLength(2);
+      expect(lines[0], grain).toBe("---");
+    }
+  });
+
+  it("welds the grid into the banner when the reader asks for a stack", () => {
+    for (const grain of TRACKER_CLASSES) {
+      const apart = apartFrom(grain);
+      const out = model(grain).regroup!(apart, [["banner", "trackers"]], [], ["trackers"]);
+      // AND IT LANDS ON THE COMPOSITION, BYTE FOR BYTE. This compared against
+      // `weldEntryFences(text)` — true, and one step short of the property the
+      // composer now depends on: a note the reader welds by hand is the same
+      // bytes as a note composed today, so `detect`, `parseEntry` and the repair
+      // pass cannot tell them apart and do not have to.
+      expect(out, grain).toBe(composeEntryTemplate(grain));
+      expect(out, grain).toBe(weldEntryFences(apart));
       expect(model(grain).blocks!(out!).map((b) => b.ids), grain).toEqual([
         ["banner", "trackers"],
         ...fieldsOf(grain).map((id) => [id]),
@@ -1041,23 +1176,28 @@ describe("an entry's blocks and the weld that changes them", () => {
 
   it("takes it back out again, byte for byte", () => {
     for (const grain of TRACKER_CLASSES) {
-      const text = composeEntryTemplate(grain);
-      const welded = weldEntryFences(text)!;
-      expect(model(grain).regroup!(welded, [["banner"], ["trackers"]], [], []), grain).toBe(
-        text
-      );
+      const welded = composeEntryTemplate(grain);
+      expect(
+        model(grain).regroup!(welded, [["banner"], ["trackers"]], [], []),
+        grain
+      ).toBe(apartFrom(grain));
     }
   });
 
   it("refuses a row, because the file has no spelling for one here", () => {
     // Same partition, no weld named: the reader would be asking for the grid
     // BESIDE the banner, which is not an arrangement this surface composes.
-    const text = composeEntryTemplate("daily");
+    //
+    // ASKED OF THE UNWELDED SHAPE, so the refusal is the one this names. Asked
+    // of the composition it would be refused for a second reason — the partition
+    // already describes the note — and a test that two reasons both return null
+    // cannot tell which one fired.
+    const text = apartFrom("daily");
     expect(model().regroup!(text, [["banner", "trackers"]], [], [])).toBeNull();
   });
 
   it("refuses a block the banner does not open, or one with a second guest", () => {
-    const text = composeEntryTemplate("daily");
+    const text = apartFrom("daily");
     // The banner is not on `WELDS_INTO_BANNER`, so a block it does not open
     // offers it as a guest of something else.
     expect(model().regroup!(text, [["trackers", "banner"]], [], ["banner"])).toBeNull();
@@ -1079,7 +1219,7 @@ describe("an entry's blocks and the weld that changes them", () => {
     // Asked of a WELDED note, so the refusal is visible: without it the
     // banner's own block reads as "take it apart" and the Save would unweld
     // while quietly dropping the group the reader asked for.
-    const welded = weldEntryFences(composeEntryTemplate("daily"))!;
+    const welded = composeEntryTemplate("daily");
     expect(
       model().regroup!(welded, [["banner"], ["trackers", "focus"]], [], ["focus"])
     ).toBeNull();
@@ -1088,7 +1228,7 @@ describe("an entry's blocks and the weld that changes them", () => {
   it("leaves the arrangement alone when nobody mentions one", () => {
     // `undefined` is not an empty list — see `SectionModel.regroup`. A caller
     // written before stacks existed must not have this note taken apart.
-    const welded = weldEntryFences(composeEntryTemplate("daily"))!;
+    const welded = composeEntryTemplate("daily");
     expect(model().regroup!(welded, [["banner"], ["trackers"]], [])).toBeNull();
   });
 });
@@ -1130,18 +1270,23 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     ) ?? t;
   const text = shown(composeEntryTemplate("daily"));
   const apart = fields.map((id) => [id]);
-  // A whole-note partition: the two blocks above the rule, then the band's.
+  // A whole-note partition: the welded block above the rule, then the band's.
+  //
+  // ONE BLOCK, NOT TWO, AS OF 1.0.45. An entry composes welded, so the banner
+  // and the grid are two `stack` parts of ONE fence and `bandBlocks` reports
+  // them as one block — which is what a stack is and what the window has to
+  // offer back. This was `["banner"], ["trackers"]`, the two-fence shape.
   const partition = (...groups: string[][]): string[][] => [
-    ["banner"],
-    ["trackers"],
+    ["banner", "trackers"],
     ...groups,
   ];
-  // The band's fences, as their non-blank lines. The first two fences of an
-  // entry are the banner's and the grid's.
+  // The band's fences, as their non-blank lines. The welded structural fence is
+  // the FIRST of an entry's fences (`slice(2)` past the prefix and it) — it was
+  // the first two until 1.0.45 made them one.
   const bandFences = (out: string): string[][] =>
     out
       .split("```chronoanvil\n")
-      .slice(3)
+      .slice(2)
       .map((f) => f.split("\n```")[0].split("\n").filter((l) => l.trim() !== ""));
 
   it("composes them one fence, one block each", () => {

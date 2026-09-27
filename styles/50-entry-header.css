@@ -582,14 +582,34 @@
 /* THE STRIP WITH ITS TITLE ELSEWHERE. The vault banner draws the
    entry's title, so this row keeps only the navigator between entries.
    It spans the full width of the tracker card top row with arrows on both
-   sides and the date selector centered and enlarged. */
-.ca-journal-entry-context.ca-jec-nav-only {
+   sides and the date selector centered and enlarged.
+
+   ── AND ONLY WHILE THE ROW IS ITS OWN (1.0.45) ───────────────────────
+
+   "It spans the full width" is the premise of every rule below, and 1.0.45 took
+   it away: a welded entry's chevron strip is one pill, so the dispatcher draws
+   it into this row instead of giving it a band, and stamps `jec-shared` to say
+   it did. A row with two occupants cannot hand one of them the full width, and
+   the shape that is right there is the one `jeh-seg` already names — a capsule
+   holding the two arrows and the picker, ending where its contents end.
+
+   SO THE GUARD IS ON THE EXPLOSION, NOT A CANCELLATION AFTER IT. Every rule
+   here is scoped `:not(.ca-jec-shared)`, and with them out of the way the base
+   `.ca-jeh-nav.ca-jeh-seg` rule 470 lines up simply applies. Restating a border,
+   a radius, a width and a ground back onto four exploded controls would be four
+   overrides waiting for a fifth property to change under them — the 1.0.44
+   finding, written down in `94-native-tables.css`.
+
+   THE HOVER PAIR IS NOT GUARDED, deliberately: a ground under the picker on
+   hover is right in both shapes, and the `border-color` beside it is inert on a
+   segment whose border the capsule draws. */
+.ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) {
   width: 100%;
   min-height: 0;
   padding-top: 0;
   padding-bottom: 0;
 }
-.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-nav.ca-jeh-seg {
+.ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-nav.ca-jeh-seg {
   width: 100%;
   display: flex;
   align-items: center;
@@ -597,18 +617,18 @@
   border: none;
   border-radius: 0;
 }
-.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-navpill {
+.ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-navpill {
   width: 2.2em;
   height: 2.2em;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--ca-radius-sm);
 }
-.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav {
+.ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-datenav {
   flex: 1;
   display: flex;
   justify-content: center;
 }
-.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger {
+.ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-datenav-trigger {
   height: 2.2em;
   padding: 0 14px;
   border: 1px solid var(--background-modifier-border);
@@ -618,7 +638,7 @@
   font-weight: 600;
   gap: 8px;
 }
-.ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger .ca-jeh-datenav-label {
+.ca-journal-entry-context.ca-jec-nav-only:not(.ca-jec-shared) .ca-jeh-datenav-trigger .ca-jeh-datenav-label {
   font-size: var(--ca-text-base);
 }
 .ca-journal-entry-context.ca-jec-nav-only .ca-jeh-datenav-trigger:hover,
@@ -693,7 +713,12 @@
      three lines `.ca-journal-entry-banner` takes, for the same reason. */
   gap: 0;
   padding: 10px 12px;
-  margin: 0 0 0.9em;
+  /* THE PAGE'S GAP, NOT A SIZE OF ITS OWN (1.0.45). `0.9em` is 14.4px at the
+     note's font size and was a third number beside the 10px every other pair of
+     cards on the page uses — see the stack's own rule in `30-header-bars.css`,
+     which took the same change in the same release and states the argument. The
+     two blocks read as siblings, so they take the same gap under them. */
+  margin: 0 0 var(--ca-widget-gap);
   background: var(--background-secondary);
   border: var(--ca-rule) solid var(--background-modifier-border);
   border-radius: var(--ca-radius-md);

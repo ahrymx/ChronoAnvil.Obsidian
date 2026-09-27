@@ -100,10 +100,18 @@ describe("above the rule, an entry and an overview are the same object", () => {
     // each catalogue in one place.
     //
     // The rows are still asserted to differ by that one id and nothing else.
+    //
+    // AND `stack` OPENS THE FENCE AS OF 1.0.45. An entry composes welded, so the
+    // fence's first line is the arrangement keyword and the banner's directives
+    // begin under it. The claim is about which SECTION names the note, not about
+    // which character starts the fence, so the arrangement line is dropped
+    // before the comparison — the same thing `stackParts` does for every other
+    // reader of a welded fence.
     for (const grain of TRACKER_CLASSES) {
-      expect(banner(composeEntryTemplate(grain))[0], grain).toBe(
-        "entry-header"
+      const body = banner(composeEntryTemplate(grain)).filter(
+        (l) => l.trim() !== "stack"
       );
+      expect(body[0], grain).toBe("entry-header");
     }
     for (const grain of DASHBOARD_GRAINS) {
       const body = banner(composeDiaryDashboard(grain));
