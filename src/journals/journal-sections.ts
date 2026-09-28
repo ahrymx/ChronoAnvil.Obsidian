@@ -15,8 +15,14 @@ import {
   JournalLevel,
   JournalType,
   kindAllowsTracker,
+  variantKinds,
 } from "./journal";
 import { JOURNAL_CHARTS_FENCE } from "../charts/journal-charts";
+// TYPE-ONLY, and it has to stay that way: `custom-journal.ts` is where a
+// journal's stored shape lives and it reads this module's section catalogue, so
+// a value import here would close the loop. Erased at compile time, so it does
+// not.
+import type { JournalKindConfig, JournalVariantConfig } from "./custom-journal";
 import { plural } from "../core/util";
 import type { FlagQuestion, SectionQuestion } from "../core/section-model";
 import {
@@ -3390,6 +3396,74 @@ export function splitLayoutTargets(
   if (targets.includes(LAYOUT_SURFACE_INDEX)) surfaces.push("index");
   if (targets.includes(LAYOUT_SURFACE_PAGE)) surfaces.push("page");
   return { kinds: targets.filter((t) => have.has(t)), surfaces };
+}
+
+// Every target a saved template is currently offered on, as the ids
+// `layoutTargetsFor` draws and `targetIdFor` derives.
+//
+// `splitLayoutTargets` READ BACKWARDS, and the one place the two storage fields
+// are put together again. They are stored apart because their defaults are
+// opposite — absent `kinds` means every kind, absent `surfaces` means none —
+// and `variantKinds` is what resolves the first of those, so asking it rather
+// than reading `variant.kinds` is what keeps this agreeing with the create
+// dropdown and the template-file allocator.
+export function templateTargetsOf(
+  cfg: { kinds: JournalKindConfig[] },
+  variant: JournalVariantConfig
+): string[] {
+  const out = variantKinds(cfg, variant);
+  if (variant.surfaces?.includes("index")) out.push(LAYOUT_SURFACE_INDEX);
+  if (variant.surfaces?.includes("page")) out.push(LAYOUT_SURFACE_PAGE);
+  return out;
+}
+
+// ── TAKING A SAVED TEMPLATE AWAY FROM ONE TARGET (1.0.46) ─────────────────
+//
+// WHAT THIS REPAIRS. A template may be offered on several note types and both
+// surfaces, and there were two Remove buttons that disagreed about what that
+// means. The settings rail's `deleteVariant` got it right in 3.18: *"removing
+// “Two column” from Practice would silently take it off Lesson too, from a row
+// that never mentioned Lesson"* — so a shared template is WITHDRAWN from the
+// target the reader is standing on, and only the last holder is removed. The
+// Template window's `deleteLayout` was three lines with no such guard, and
+// removed a shared template outright from a window that named one note type.
+//
+// SO THE DECISION IS ONE PURE FUNCTION AND THE TWO DOORS APPLY IT. That is
+// `EntryTemplates.saveLayout`'s own stated rule — *"ONE FUNCTION, TWO DOORS"* —
+// and the reason it is a decision rather than a write is that neither caller
+// writes to the same place: the rail edits an unsaved draft config, the manager
+// edits `plugin.settings`. What they can share is the answer.
+//
+// OVER TARGET IDS RATHER THAN KIND IDS, because the Template window can be
+// standing on a front page or a page, which are not kinds. The rail only ever
+// shows kind rows and passes one; nothing about it changes.
+//
+// `kinds` IS ALWAYS WRITTEN EXPLICITLY ON A WITHDRAWAL, even empty. Absent
+// means every kind, so a shared template that shed one kind and kept saying
+// nothing would come straight back on the kind just removed.
+export type TemplateRemoval =
+  | {
+      kind: "withdraw";
+      // What to store, ready to assign.
+      kinds: string[];
+      surfaces: ("index" | "page")[];
+      // The targets it stays on, for the sentence that says so.
+      others: string[];
+    }
+  | { kind: "remove" };
+
+export function planTemplateRemoval(
+  cfg: { kinds: JournalKindConfig[] },
+  variant: JournalVariantConfig,
+  target: string
+): TemplateRemoval {
+  const others = templateTargetsOf(cfg, variant).filter((t) => t !== target);
+  if (!others.length) return { kind: "remove" };
+  const split = splitLayoutTargets(
+    cfg.kinds.map((k) => k.id),
+    others
+  );
+  return { kind: "withdraw", ...split, others };
 }
 
 // The overrides a type declares for one section of one template, if any.

@@ -124,7 +124,7 @@ export function buildKindOptions(
 //
 // THE FIRST ROW IS THE JOURNAL'S OWN ANSWER AND IT IS A CHOICE LIKE THE OTHERS.
 // Without it the only way back from an override would be to guess which tracker
-// the note type names, which is `pageLayoutChoices`' argument for its own
+// the note type names, which is `pageTemplateChoices`' argument for its own
 // ⭐ default row — and that row names the value too, so a reader can see what
 // they would be going back to before they go.
 function addRatingRows(

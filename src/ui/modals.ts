@@ -114,17 +114,16 @@ export function promptText(
   });
 }
 
-// One template option offered in the "Layout" field below — the id selects
+// One template option offered in the "Template" field below — the id selects
 // which template file gets read, the label is what the dropdown shows.
 //
-// "LAYOUT" IS THE USER-FACING WORD for what the code calls a
-// JournalTemplateVariant, and the two names are a wart worth admitting to
-// rather than papering over. 2.54.7 shipped three words for one concept —
-// "variant" in the code, "Template type" in this popup, "layout" in the docs —
-// which is two too many for a thing a reader has to recognise in three places.
-// The strings are unified; the type name is not, because renaming it touches
-// six files for no behaviour and this comment is the whole of the mapping.
-// If it ever grows a fourth name, rename the type instead of adding to this.
+// ONE WORD SINCE 1.0.46, AND THIS COMMENT IS WHAT IT REPLACES. 2.54.7 shipped
+// three words for one concept — "variant" in the code, "Template type" in this
+// popup, "layout" in the docs — and unified the strings on "layout" while the
+// window that managed them was called Template. The reader's call settled it the
+// other way: a template is a saved arrangement, there is no second noun, and
+// `core/vocabulary.ts` holds the definition and the boundary. The stored
+// spellings (`variants`, `cfg.layout`) are format tokens and stay.
 export interface TemplateChoice {
   id: string;
   label: string;
@@ -149,9 +148,10 @@ export interface NewNoteDetails {
 export interface NewNotePrompt {
   heading: string;
   titlePlaceholder: string;
-  // What this note is built from. `label` names the surface — "Layout" on a
-  // title, "Layout" on a page — and the rows are the surface's own list.
-  layoutLabel: string;
+  // What this note is built from. `label` names the surface — "Template" on a
+  // title, "Page template" on the pages field — and the rows are the surface's
+  // own list.
+  templateLabel: string;
   templates: TemplateChoice[];
   // Which row opens selected. Absent is the first, which is every default.
   templateId?: string;
@@ -175,7 +175,7 @@ export interface NewNotePrompt {
 //
 // ── EVERY FIELD IS DRAWN, INCLUDING AT ONE OPTION (4.50 §1) ──────────────
 //
-// The Layout field was gated on `templates.length > 1`, and the reason given was
+// The Template field was gated on `templates.length > 1`, and the reason given was
 // a real one: *"a required dropdown with one option labelled Generic on every
 // new-note popup in the plugin — a control that looks like a decision and is
 // not."*
@@ -187,9 +187,9 @@ export interface NewNotePrompt {
 // thing the `⋯` on its row then changes.
 //
 // AND HALF A PAIR IS WORSE THAN NEITHER HALF. Under the old gate, a journal with
-// one title layout and two page layouts drew *Page layout* alone, and a reader
-// could not tell whether *Layout* was missing because there was nothing to
-// choose or because the plugin had chosen for them.
+// one title template and two page templates drew *Page template* alone, and a
+// reader could not tell whether *Template* was missing because there was nothing
+// to choose or because the plugin had chosen for them.
 //
 // What survives of 2.54.7 is the half about the WORD: the default row is named
 // after the thing it makes ("Title", "⭐ Page default"), never "Generic", which
@@ -204,7 +204,7 @@ class NewNoteModal extends Modal {
   constructor(app: App, private prompt: NewNotePrompt) {
     super(app);
     // The asked-for row where there is one, else the first — which is the
-    // default on every list this window is given, because `pageLayoutChoices`
+    // default on every list this window is given, because `pageTemplateChoices`
     // and `kind.templates` both put it there.
     this.templateId = prompt.templateId ?? prompt.templates[0]?.id ?? "";
     this.pageTemplateId = prompt.pages?.templateId ?? "";
@@ -234,7 +234,7 @@ class NewNoteModal extends Modal {
 
     // Both fields, at every count — see the block above this class for why the
     // `length > 1` gate that used to be here is gone.
-    this.dropdown(contentEl, prompt.layoutLabel, prompt.templates, this.templateId, (v) => {
+    this.dropdown(contentEl, prompt.templateLabel, prompt.templates, this.templateId, (v) => {
       this.templateId = v;
     });
     if (prompt.pages) {
@@ -293,140 +293,14 @@ class NewNoteModal extends Modal {
 }
 
 
-// ── saving an arrangement under a name ────────────────────────────────
-//
-// What a layout is called, and which note kinds may be created from it.
-// 3.18 follow-ups §5.
-//
-// ONE WINDOW, EVERY FIELD VISIBLE, which is the move `NewNoteModal` above
-// already makes and for the same reason: the alternative here was a name prompt
-// followed by a second modal asking about kinds, and a reader who cancels the
-// second one has already committed to the first. Naming a layout and saying
-// where it applies are two halves of one decision.
-//
-// THE KIND LIST IS HIDDEN AT ONE KIND, the rule the "Layout" dropdown above
-// spells out: a control whose value cannot change spends a reader's attention
-// and returns nothing. A journal with a single kind gets exactly the name prompt
-// it had before this existed, which is what makes this additive rather than a
-// new step in an old path.
-//
-// THE SAVING KIND IS TICKED AND CANNOT BE UNTICKED. A layout saved from a
-// Lesson is a Lesson layout; letting it be saved applying to nothing would
-// store a recipe nothing can cook, and letting it apply to Practice ALONE would
-// silently move the arrangement off the note the reader is looking at. So the
-// origin is fixed and the others are the opt-in.
-export interface LayoutKindChoice {
-  id: string;
-  label: string;
-}
-
-export interface LayoutSaveDetails {
-  label: string;
-  kinds: string[];
-}
-
-class LayoutSaveModal extends Modal {
-  private resolve!: (value: LayoutSaveDetails | null) => void;
-  private submitted = false;
-  private label = "";
-  private picked: Set<string>;
-
-  constructor(
-    app: App,
-    private heading: string,
-    private placeholder: string,
-    private kinds: LayoutKindChoice[],
-    private originId: string
-  ) {
-    super(app);
-    this.picked = new Set([originId]);
-  }
-
-  openAndGetValue(resolve: (value: LayoutSaveDetails | null) => void): void {
-    this.resolve = resolve;
-    this.open();
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.heading });
-
-    new Setting(contentEl).setName("Name").addText((t) => {
-      t.setPlaceholder(this.placeholder).onChange((v) => {
-        this.label = v;
-      });
-      t.inputEl.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          this.submit();
-        }
-      });
-      window.setTimeout(() => t.inputEl.focus(), 0);
-    });
-
-    if (this.kinds.length > 1) {
-      new Setting(contentEl)
-        .setName("Available for")
-        .setDesc(
-          "Which kinds of note can be created from this layout. Each gets its own template file."
-        );
-      for (const kind of this.kinds) {
-        const origin = kind.id === this.originId;
-        new Setting(contentEl).setName(kind.label).addToggle((tg) => {
-          tg.setValue(this.picked.has(kind.id));
-          tg.setDisabled(origin);
-          tg.onChange((v) => {
-            if (v) this.picked.add(kind.id);
-            else this.picked.delete(kind.id);
-          });
-        });
-      }
-    }
-
-    const btnRow = contentEl.createDiv({ cls: "modal-button-container" });
-    const ok = btnRow.createEl("button", { text: "Save", cls: "mod-cta" });
-    ok.addEventListener("click", () => this.submit());
-    const cancel = btnRow.createEl("button", { text: "Cancel" });
-    cancel.addEventListener("click", () => this.close());
-  }
-
-  private submit(): void {
-    this.submitted = true;
-    this.close();
-  }
-
-  onClose(): void {
-    this.contentEl.empty();
-    // The origin is re-added rather than trusted: a disabled toggle cannot be
-    // turned off through the UI, and this is the invariant rather than the
-    // control's behaviour.
-    this.picked.add(this.originId);
-    this.resolve(
-      this.submitted
-        ? { label: this.label, kinds: [...this.picked] }
-        : null
-    );
-  }
-}
-
-export function promptLayoutSave(
-  app: App,
-  heading: string,
-  placeholder: string,
-  kinds: LayoutKindChoice[],
-  originId: string
-): Promise<LayoutSaveDetails | null> {
-  return new Promise((resolve) => {
-    new LayoutSaveModal(
-      app,
-      heading,
-      placeholder,
-      kinds,
-      originId
-    ).openAndGetValue(resolve);
-  });
-}
-
+// The section editor's Template pane is where an arrangement is saved under a
+// name, and `LayoutSaveModal` used to be a second door onto the same write
+// (1.0.46). It was a modal over a modal — opened from the section editor's footer
+// and from both Template windows — and every word it drew is now drawn inline in
+// the pane, beside the wireframe of what is about to be saved. Its two rules are
+// kept there and worth restating, because they were the reasons it existed:
+// the origin target is ticked and cannot be unticked, and it is re-added at
+// submit rather than trusted from a disabled control.
 
 // ── renaming a note type from its heading ─────────────────────────────
 //

@@ -75,7 +75,7 @@ import {
   metaFor,
   renderCrumb,
 } from "../journals/study-header";
-import { entryDateLabel, TITLE_PROP } from "../diary/entryheader";
+import { entryBannerMenu, entryDateLabel, TITLE_PROP } from "../diary/entryheader";
 import { entryContext } from "../diary/nav";
 import { paintJournalRung, journalTypeAtPath } from "../journals/journal";
 import { paintRung, pageIconOf } from "./rung";
@@ -721,7 +721,7 @@ export class VaultBanner {
     // its `type:` frontmatter against the journal's own levels and kinds. These
     // three pages are composed by `composeFlatNote` and write no frontmatter at
     // all, so it answers null for every one of them — correctly, since there is
-    // no Template… and no tracker to offer. It used
+    // no Templates… and no tracker to offer. It used
     // to be read as "no menu", and the cog opened on *Banner art & settings…*
     // alone: three pages with a full section catalogue, a section model and a
     // working `editSectionsHere`, and no door to any of it.
@@ -729,14 +729,32 @@ export class VaultBanner {
     // `??`, SO THE JOURNAL LIST STILL WINS WHERE THERE IS ONE. A journal note
     // never falls through — `canEditSections` would say yes about it too, and
     // the flat list would then offer *Wide page* on a Lesson and drop
-    // *Template…* from it. The fallthrough is for the pages the first resolver
+    // *Templates…* from it. The fallthrough is for the pages the first resolver
     // was right to refuse, and `sectionsMenuFor` refuses in turn — returning
     // null on a note nothing recognises — so a stray file under a journal root
     // still draws no list rather than one that opens and apologises.
+    //
+    // ── AND THE DIARY'S OWN MENU, 1.0.46 ──────────────────────────────
+    //
+    // The same `??` for the same reason, one surface over. `sectionsMenuFor`
+    // was answering for every diary note, so an ENTRY's cog offered *Add a
+    // section…* and *Wide page* and nothing about the diary — no *Templates…*,
+    // no tracker items, no month. It was not that the menu had never been
+    // written: `entryheader.ts` has held it since 2.56, hanging off a band
+    // 4.51.6 stopped rendering when the head moved to `page-head.ts`. So the
+    // items had a home and no door, on the one surface that takes the most
+    // daily traffic.
+    //
+    // `entryBannerMenu` refuses on anything that is not an entry — the four
+    // period dashboards included, which share a folder with them — so the
+    // fallthrough is still what answers for the diary's dashboards, its index
+    // and the homepage.
     const build =
       (surface === "journal"
         ? journalBannerMenu(this.plugin, file.path)
-        : null) ??
+        : surface === "diary"
+          ? entryBannerMenu(this.plugin, file.path)
+          : null) ??
       sectionsMenuFor(this.plugin, file.path, () =>
         host.hasClass(WIDE_PAGE_CLASS)
       );

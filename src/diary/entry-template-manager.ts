@@ -23,7 +23,6 @@
 
 import { App, Notice } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
-import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import { composeEntryTemplate, offerableEntrySections } from "./entry-sections";
 import type { EntrySectionContext } from "./entry-sections";
@@ -36,7 +35,6 @@ import type { EntryLayoutConfig, EntryLoss } from "./entry-template";
 import { getFile, slugify } from "../core/util";
 import { diffText } from "../core/line-diff";
 import { openRepairWindow } from "../ui/repair-modal";
-import { promptLayoutSave } from "../ui/modals";
 import { idsOf } from "../core/section-model";
 import type { SectionChoice } from "../core/section-model";
 import { notify } from "../core/notify";
@@ -61,6 +59,18 @@ export class EntryTemplates {
       s.entrySections[grain] ?? [],
       s.entrySectionBand[grain] ?? []
     );
+  }
+
+  // What a new entry of this grain WOULD be composed from if nobody had ever
+  // pressed "Save this note as the default" — the 🔒 row's content. 1.0.46.
+  //
+  // THE STORED OVERRIDE REMOVED, LITERALLY. `DEFAULT_SETTINGS` ships
+  // `entrySections: {}` and `entrySectionBand: {}`, and `entrySectionBand`'s own
+  // comment pins that an absent grain "composes byte-for-byte what it composed
+  // before this key existed" — so `[]`/`[]` IS what the plugin ships, and
+  // spelling it any other way would be a second answer to the same question.
+  shippedFor(grain: TrackerClass): string {
+    return composeEntryTemplate(grain, [], []);
   }
 
   // What this layout composes to on this grain, and what it could not carry
@@ -132,6 +142,45 @@ export class EntryTemplates {
     await this.plugin.scaffold.refreshTemplates();
   }
 
+  // A saved template — or the arrangement ChronoAnvil ships — becomes this
+  // grain's default. 1.0.46.
+  //
+  // BOTH KEYS, ALWAYS TOGETHER, for `saveDefault`'s reason above; and `null`
+  // DELETES BOTH rather than writing today's composition back, because an
+  // absent grain is what "shipped" means here and a written-out copy would
+  // freeze this version's catalogue into the settings.
+  async useAsDefault(
+    grain: TrackerClass,
+    layout: EntryLayoutConfig | null
+  ): Promise<void> {
+    const s = this.plugin.settings;
+    if (!layout) {
+      delete s.entrySections[grain];
+      delete s.entrySectionBand[grain];
+    } else {
+      s.entrySections[grain] = layout.sections.map((id) =>
+        layout.options?.[id] ? { id, options: { ...layout.options[id] } } : { id }
+      );
+      s.entrySectionBand[grain] = [...layout.sections];
+    }
+    await this.plugin.saveSettings();
+    await this.plugin.scaffold.refreshTemplates();
+  }
+
+  // A saved template's name changes; its id does not — `saveLayout` suffixes ids
+  // to keep them unique and nothing would repair a collision introduced here.
+  async renameLayout(id: string, label: string): Promise<boolean> {
+    const s = this.plugin.settings;
+    const layout = (s.entryLayouts ?? []).find((l) => l.id === id);
+    const next = label.trim();
+    if (!layout || !next || next === layout.label) return false;
+    s.entryLayouts = (s.entryLayouts ?? []).map((l) =>
+      l.id === id ? { ...l, label: next } : l
+    );
+    await this.plugin.saveSettings();
+    return true;
+  }
+
   // This page becomes a named layout.
   //
   // ONE FUNCTION, TWO DOORS — the Template window and the section editor's
@@ -146,7 +195,7 @@ export class EntryTemplates {
     // Suffixed rather than rejected, the same repair `saveVariant` makes: a
     // reader naming two layouts "Mondays" wants two layouts, not an error.
     const taken = new Set((s.entryLayouts ?? []).map((l) => l.id));
-    const stem = slugify(label) || "layout";
+    const stem = slugify(label) || "template";
     let id = stem;
     let n = 2;
     while (taken.has(id)) id = `${stem}-${n++}`;
@@ -170,40 +219,36 @@ export class EntryTemplates {
     notify.ok(`ChronoAnvil: saved “${label}” ✅`);
   }
 
-  // The name-and-where prompt, then the save. The two are one decision and so
-  // one window — `promptNewNote`'s rule, and the reason this is not a name
-  // prompt followed by a second modal a reader can cancel half-way through.
-  async promptSaveLayout(grain: TrackerClass, notePath: string): Promise<boolean> {
-    const file = getFile(this.app, notePath);
-    if (!file) return false;
-    const text = await this.app.vault.read(file);
-    const { want } = wantFromEntry(text, this.ctxFor(grain));
-    if (!want.length) {
-      new Notice("ChronoAnvil: this note has no sections to save.");
-      return false;
-    }
-    const details = await promptLayoutSave(
-      this.app,
-      "Save as layout",
-      "e.g. Quiet Monday",
-      TRACKER_CLASSES.map((g) => ({ id: g, label: CLASS_DEFS[g].label })),
-      grain
-    );
-    if (!details || !details.label.trim()) return false;
-    await this.saveLayout(
-      details.label.trim(),
-      want,
-      details.kinds.filter((k): k is TrackerClass =>
-        (TRACKER_CLASSES as readonly string[]).includes(k)
-      )
-    );
-    return true;
-  }
-
-  async deleteLayout(id: string): Promise<void> {
+  // A saved template is taken off THIS grain — and removed only if this was the
+  // last grain it was offered on. 1.0.46.
+  //
+  // THE JOURNAL SIDE'S RULE, AND THE SAME DEFECT IT FIXES: this used to delete
+  // outright, so removing a template from Daily took it off Weekly too, from a
+  // window that named one grain. `planTemplateRemoval` is the shared decision
+  // where there is one to share; here there is not, because `grains` is a plain
+  // required list — no "absent means every grain" default and no second field
+  // for surfaces — so the whole decision is the filter below and a plan object
+  // would be ceremony around one line.
+  //
+  // RETURNS WHAT IT DID so the notice can say it.
+  async deleteLayout(
+    id: string,
+    grain: TrackerClass
+  ): Promise<{ removed: boolean; others: TrackerClass[] } | null> {
     const s = this.plugin.settings;
-    s.entryLayouts = (s.entryLayouts ?? []).filter((l) => l.id !== id);
+    const layout = (s.entryLayouts ?? []).find((l) => l.id === id);
+    if (!layout) return null;
+
+    const others = layout.grains.filter((g) => g !== grain);
+    if (!others.length) {
+      s.entryLayouts = (s.entryLayouts ?? []).filter((l) => l.id !== id);
+    } else {
+      s.entryLayouts = (s.entryLayouts ?? []).map((l) =>
+        l.id === id ? { ...l, grains: others } : l
+      );
+    }
     await this.plugin.saveSettings();
+    return { removed: !others.length, others };
   }
 
   // ── reloading ────────────────────────────────────────────────────────
@@ -248,7 +293,7 @@ export class EntryTemplates {
 
     const next = reloadEntryBody(text, composed);
     if (next == null) {
-      new Notice("ChronoAnvil: this entry already matches that layout.");
+      new Notice("ChronoAnvil: this entry already matches that template.");
       return false;
     }
 

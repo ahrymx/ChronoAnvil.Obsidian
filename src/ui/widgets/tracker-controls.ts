@@ -29,7 +29,7 @@
 // inversion that the charts/trackers split was arranged to avoid. So they stay
 // here, next to ./controls.ts, which is what they are a specialisation of.
 
-import { MarkdownPostProcessorContext, setIcon } from "obsidian";
+import { MarkdownPostProcessorContext, MarkdownRenderChild, setIcon } from "obsidian";
 import type { EntryControlHost } from "./controls";
 import { CAPTURE_NOTE_KEY } from "../../core/constants";
 import { readNoteRegion } from "../../core/notestore";
@@ -563,6 +563,101 @@ export function buildTrackerAddCell(
 }
 
 
+// ── HOW MANY TAG CHIPS FIT, ASKED OF THE LAYOUT (1.0.46) ────────────────
+
+/** Rows of chips the cell has room for — `max-height: 40px` on
+    `.ca-journal-tags-chips`, in `94-native-tables.css`, expressed as rows. */
+const TAG_ROWS = 2;
+
+/** How far apart two centres must be to be different rows. A chip is about
+    17px tall, so half a row is the widest this can safely be. */
+const TAG_ROW_SLOP = 6;
+
+// Which rows a set of visible elements occupies.
+//
+// BY THE CENTRE, NOT BY `offsetTop`, and the difference is the whole bug this
+// function shipped with. `block-drag.ts` compares `offsetTop` to decide "same
+// line", and it is right to: the blocks it drags are full-width rows of equal
+// height. These are not. The box is `align-items: center`
+// (`94-native-tables.css`), so every item on a line is centred against the
+// TALLEST item on it — and the pencil is `0.8em` against a chip's ~17px, so it
+// sits three pixels lower than the chips beside it and reported an `offsetTop`
+// of its own. One phantom row per measurement, always; the fitter read two real
+// rows as three and shrank the cell to one row of tags and a `+N` until the
+// count came back under the cap. Which is exactly what it did in the vault.
+//
+// Centres coincide under `align-items: center` however tall the items are, so
+// the centre is the thing that actually identifies a line. Sub-pixel heights
+// and the odd half-pixel baseline mean it has to be a proximity test rather
+// than an equality one.
+function tagRows(els: HTMLElement[]): number[] {
+  const rows: number[] = [];
+  for (const el of els) {
+    const mid = el.offsetTop + el.offsetHeight / 2;
+    if (!rows.some((r) => Math.abs(r - mid) <= TAG_ROW_SLOP)) rows.push(mid);
+  }
+  return rows;
+}
+
+// Show the chips that fit in the cell, count the ones that do not.
+//
+// EVERYTHING IS SHOWN FIRST, every time. The pass has to measure the unhidden
+// arrangement or it measures its own previous answer — which on a cell that
+// got wider would keep hiding chips that now fit.
+//
+// COUNTED, NOT COMPARED AGAINST A REMEMBERED OFFSET. The box centres its rows
+// (`align-content: center`), so hiding a chip moves the rows that are left and
+// an offset measured before the hide means nothing after it. Every decision
+// below is "how many rows is this arrangement", asked of the arrangement it is
+// about.
+//
+// THE `+N` AND THE PENCIL ARE MEASURED WITH THE CHIPS. Both are in flow and
+// both sit at the end, so revealing the count can push it — or the pencil
+// behind it — onto a third row, where `overflow: hidden` eats it. The loop
+// gives back one chip at a time until the whole control lands, and stops at
+// none rather than spinning on a cell too narrow for any of it. The pencil
+// matters here in a way it did not under the old fixed cap of five: the rows
+// are now filled to the edge, so it is the thing most likely to fall off, and
+// it is the only hint that the readout is a button.
+export function fitTagChips(
+  chips: HTMLElement,
+  chipEls: HTMLElement[],
+  more: HTMLElement,
+  pencil: HTMLElement
+): void {
+  if (!chips.isConnected) return;
+
+  for (const c of chipEls) c.style.removeProperty("display");
+  more.style.display = "none";
+  if (tagRows([...chipEls, pencil]).length <= TAG_ROWS) return;
+
+  // A starting count from the full arrangement rather than one hide per tag
+  // from the end: the chips are the same width whether or not the ones after
+  // them are drawn, so the number that reach the second row is already known.
+  // What is not known is whether the `+N` fits beside them, and that is what
+  // the loop settles.
+  const rows = tagRows(chipEls);
+  const floor = rows[TAG_ROWS - 1] + TAG_ROW_SLOP;
+  let shown = Math.min(
+    chipEls.length,
+    rows.length <= TAG_ROWS
+      ? chipEls.length
+      : chipEls.filter((c) => c.offsetTop + c.offsetHeight / 2 <= floor).length
+  );
+  more.style.removeProperty("display");
+  for (;;) {
+    for (let i = 0; i < chipEls.length; i += 1) {
+      chipEls[i].style.display = i < shown ? "" : "none";
+    }
+    more.setText(`+${chipEls.length - shown}`);
+    if (shown === 0) return;
+    if (tagRows([...chipEls.slice(0, shown), more, pencil]).length <= TAG_ROWS) {
+      return;
+    }
+    shown -= 1;
+  }
+}
+
 // The Tags control: what this note carries, and the door to the window that
 // changes it.
 //
@@ -636,8 +731,15 @@ function buildTagsField(
     ).open();
   };
 
+  // The observer behind `fitTagChips`, held so a repaint disposes of the one
+  // watching the chips it is about to destroy.
+  let watch: ResizeObserver | null = null;
+  ctx.addChild(new TagsFit(wrap, () => watch?.disconnect()));
+
   const paint = (): void => {
     wrap.empty();
+    watch?.disconnect();
+    watch = null;
     const tags = read();
 
     // EMPTY IS ONE CONTROL, NOT AN EMPTY STATE PLUS A CONTROL. The first cut
@@ -666,24 +768,47 @@ function buildTagsField(
         "aria-label": `Manage ${def.label.toLowerCase()} (${tags.length})`,
       },
     });
-    const maxVisibleTags = 5;
-    const visibleTags = tags.length > maxVisibleTags ? tags.slice(0, 4) : tags;
-    const overflowCount = tags.length - visibleTags.length;
-
-    for (const tag of visibleTags) {
-      chips.createSpan({ cls: "ca-journal-tags-chip", text: `#${tag}` });
-    }
-    if (overflowCount > 0) {
-      chips.createSpan({
-        cls: "ca-journal-tags-chip ca-journal-tags-overflow",
-        text: `+${overflowCount}`,
-      });
-    }
-    setIcon(
-      chips.createSpan({ cls: "ca-journal-btn-icon ca-journal-tags-pencil" }),
-      "pencil"
+    // EVERY TAG IS DRAWN, AND THE FIT DECIDES WHAT SHOWS (1.0.46).
+    //
+    // `const maxVisibleTags = 5` STOOD HERE, with `tags.slice(0, 4)` behind it.
+    // A count is the one thing the answer does not depend on: the cell holds two
+    // rows of chips (`max-height: 40px` on `.ca-journal-tags-chips`), a chip is
+    // as wide as its tag, and the cell is as wide as the tracker grid makes it.
+    // Six short tags went four on the first row and `+2` alone on the second
+    // with room for both beside it — reported from a daily entry, and the same
+    // arithmetic hides three of eight on a phone.
+    //
+    // So the chips all go in and `fitTagChips` hides the ones that did not
+    // land, which is a question only layout can answer.
+    const chipEls = tags.map((tag) =>
+      chips.createSpan({ cls: "ca-journal-tags-chip", text: `#${tag}` })
     );
+    const more = chips.createSpan({
+      cls: "ca-journal-tags-chip ca-journal-tags-overflow",
+    });
+    const pencil = chips.createSpan({
+      cls: "ca-journal-btn-icon ca-journal-tags-pencil",
+    });
+    setIcon(pencil, "pencil");
     chips.addEventListener("click", () => openWindow(paint));
+
+    // ON A RESIZE, NOT ON A FRAME (1.0.46). A `requestAnimationFrame` is a
+    // duration standing in for an event, which is the shape `headerbar.ts`
+    // argued its way out of in 3.13 — and it would answer once, for the width
+    // the cell happened to have when the note opened. A `ResizeObserver` fires
+    // on the first layout AND on every later one, so *Wide page*, a split pane
+    // and a rotated phone each re-ask the question instead of keeping an answer
+    // from a width that is gone.
+    //
+    // HIDING A CHIP DOES NOT RESIZE THE BOX — it is `height: 100%` inside a
+    // fixed cell — so there is no feedback loop to guard against. The previous
+    // observer went at the top of `paint`, with the chips it was watching.
+    const fit = () => fitTagChips(chips, chipEls, more, pencil);
+    if (typeof ResizeObserver === "undefined") fit();
+    else {
+      watch = new ResizeObserver(fit);
+      watch.observe(chips);
+    }
   };
 
   paint();
@@ -732,5 +857,20 @@ export function buildTracker(
       return buildSelect(deps, `${def.id}:${def.options ?? ""}`, ctx);
     default:
       return null;
+  }
+}
+
+// The unload hook behind the chips' `ResizeObserver`.
+//
+// A PLAIN OBJECT WOULD NOT DO: Obsidian unloads a block's children when the
+// block is rebuilt or the note is closed, and an observer left watching a
+// detached element is a reference the view cannot drop. `reveal.ts` gives the
+// same reason for its two.
+class TagsFit extends MarkdownRenderChild {
+  constructor(el: HTMLElement, private readonly stop: () => void) {
+    super(el);
+  }
+  onunload(): void {
+    this.stop();
   }
 }

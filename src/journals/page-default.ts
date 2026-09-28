@@ -29,19 +29,32 @@
 // here reaches the allocator, the rail, the repair path or the wizard.
 
 import type { JournalConfig, JournalVariantConfig } from "./custom-journal";
+import type { TemplateLayout } from "./journal-sections";
 
 // The frontmatter key a title carries when its pages are NOT built from the
 // journal's own page template.
 //
 // ONE LOWERCASE WORD, matching `created`, `status`, `parent` and `order` — the
 // four other properties this plugin writes into a note and reads back.
-export const PAGE_LAYOUT_KEY = "pagelayout";
+export const PAGE_TEMPLATE_KEY = "pagetemplate";
+
+// WHAT THE SAME PROPERTY WAS CALLED UNTIL 1.0.46, AND WHY IT IS STILL READ.
+//
+// The word "layout" is retired as a name for a saved arrangement — see
+// `vocabulary.ts` — and this key was the one place the old spelling was in a
+// reader's own file rather than in the plugin's. So it moves, and the old
+// spelling survives exactly as `almanac:` does: read by code, written by
+// nothing, absent from every sentence. `pageTemplateOf` prefers the new key,
+// `setPageTemplate` deletes this one whenever it writes, and
+// `tools/migrate-vault.mjs` does the bulk pass for a reader who would rather
+// not wait to touch each title.
+export const LEGACY_PAGE_TEMPLATE_KEY = "pagelayout";
 
 // The id meaning "the journal's page default". EMPTY, not a word: an id is a
-// stored layout's own id, and the default is the absence of one — so the value
-// that means "no layout named" is the value the property has when it is not
-// there. A sentinel word would be a fifth spelling of absent.
-export const PAGE_LAYOUT_DEFAULT = "";
+// stored template's own id, and the default is the absence of one — so the
+// value that means "no template named" is the value the property has when it is
+// not there. A sentinel word would be a fifth spelling of absent.
+export const PAGE_TEMPLATE_DEFAULT = "";
 
 // The stored config a journal id names.
 //
@@ -59,6 +72,39 @@ export function configOfJournal(
   id: string
 ): JournalConfig | null {
   return (configs ?? []).find((j) => j.id === id) ?? null;
+}
+
+// ── WHAT THE PLUGIN SHIPS FOR ONE TEMPLATE TARGET (1.0.46) ────────────────
+//
+// "Save this page as the default" writes `cfg.layout[key]` and the refresh
+// rewrites the template file, so until now the arrangement ChronoAnvil shipped
+// was gone the first time anybody pressed it. The Template window draws a
+// permanent 🔒 row so that putting it back is one press, and this is the row's
+// content.
+//
+// TWO ANSWERS AND BOTH ARE HONEST. A journal installed from a preset keeps the
+// preset's own id (`presetConfig` says why: `type: lesson` in a reader's notes
+// is matched through the journal that declares it, so Study cannot be installed
+// under a fresh one), so its shipped arrangement is the preset's own
+// `layout[key]` — which for Study's Topic index carries an `order` the
+// catalogue does not. Every other journal shipped no arrangement at all, and
+// `undefined` is exactly how `composeTemplate` spells "the catalogue's own".
+//
+// IT TAKES THE PRESET LIST RATHER THAN IMPORTING IT, which is `configOfJournal`'s
+// own shape one function up and for its reasons: `JOURNAL_PRESETS` lives in
+// `journal.ts`, which imports this module, so a value import back would be a
+// real cycle — and a table that takes its table stays checkable without one.
+//
+// A JOURNAL STARTED FROM A PRESET IS NOT A PRESET. `startFrom` re-slugs the id
+// (settings.ts), so "Study 2" falls to the catalogue's arrangement. That is the
+// truthful answer rather than a near-miss: nothing records what a draft was
+// copied from, and guessing from the name would be a link the reader never made.
+export function shippedLayoutOf(
+  presets: readonly { id: string; config: JournalConfig }[],
+  typeId: string,
+  key: string
+): TemplateLayout | undefined {
+  return presets.find((p) => p.id === typeId)?.config.layout?.[key];
 }
 
 // ── WHERE A PAGE SITS IN ITS NOTE (5.20) ────────────────────────────────
@@ -166,30 +212,30 @@ function baseOf(path: string): string {
   return (path.split("/").pop() ?? path).replace(/\.md$/, "");
 }
 
-/** One row of a layout dropdown. Structurally `TemplateChoice`, without the UI import. */
-export interface LayoutChoice {
+/** One row of a template dropdown. Structurally `TemplateChoice`, without the UI import. */
+export interface PageTemplateChoice {
   id: string;
   label: string;
 }
 
-// The layouts a page of this journal can be built from: the default, then every
-// saved layout that says it belongs on a page.
+// The templates a page of this journal can be built from: the default, then
+// every saved template that says it belongs on a page.
 //
-// THE SAME MEMBERSHIP TEST `layoutsFor` USES, and deliberately the narrow half
+// THE SAME MEMBERSHIP TEST `templatesFor` USES, and deliberately the narrow half
 // of it. `JournalVariantConfig` states the asymmetry: `kinds` absent means EVERY
-// kind, and `surfaces` absent means NONE — *"a layout saved from a Lesson has no
-// business being offered on a Subject Index by default"*. A layout reaches this
-// list only by naming `page`, which is a reader having said so.
+// kind, and `surfaces` absent means NONE — *"a template saved from a Lesson has
+// no business being offered on a Subject Index by default"*. A template reaches
+// this list only by naming `page`, which is a reader having said so.
 //
 // `label` IS THE PAGE NOUN, not the word "Default". A journal that calls its
 // pages Chapters offers "⭐ Chapter default", so the field names the thing it
 // is about rather than restating that it is a default.
-export function pageLayoutChoices(
+export function pageTemplateChoices(
   cfg: JournalConfig | null,
   pagesLabel: string
-): LayoutChoice[] {
-  const rows: LayoutChoice[] = [
-    { id: PAGE_LAYOUT_DEFAULT, label: `⭐ ${pagesLabel} default` },
+): PageTemplateChoice[] {
+  const rows: PageTemplateChoice[] = [
+    { id: PAGE_TEMPLATE_DEFAULT, label: `⭐ ${pagesLabel} default` },
   ];
   for (const v of cfg?.variants ?? []) {
     if (v.surfaces?.includes("page")) rows.push({ id: v.id, label: v.label });
@@ -197,8 +243,8 @@ export function pageLayoutChoices(
   return rows;
 }
 
-// The saved layout an id names, or null for the default.
-export function pageLayoutById(
+// The saved template an id names, or null for the default.
+export function pageTemplateById(
   cfg: JournalConfig | null,
   id: string
 ): JournalVariantConfig | null {
@@ -210,28 +256,34 @@ export function pageLayoutById(
   );
 }
 
-// What a note's `pagelayout` property means, as a string.
+// What a note's `pagetemplate` property means, as a string.
 //
 // ANYTHING THAT IS NOT A NON-EMPTY STRING IS THE DEFAULT. A property a reader
 // typed by hand can be a number, a list or a bare `true`, and none of those
-// names a layout.
-export function pageLayoutOf(fm: Record<string, unknown>): string {
-  const raw = fm[PAGE_LAYOUT_KEY];
-  return typeof raw === "string" ? raw.trim() : PAGE_LAYOUT_DEFAULT;
+// names a template.
+//
+// THE NEW KEY WINS OVER THE OLD ONE, and a note carrying both is not a state
+// this plugin writes — `setPageTemplate` deletes the legacy key whenever it
+// touches a note. It is a state a reader can hand-make, and preferring the
+// spelling the plugin writes is the answer that matches what every other
+// control on the note shows them.
+export function pageTemplateOf(fm: Record<string, unknown>): string {
+  const raw = fm[PAGE_TEMPLATE_KEY] ?? fm[LEGACY_PAGE_TEMPLATE_KEY];
+  return typeof raw === "string" ? raw.trim() : PAGE_TEMPLATE_DEFAULT;
 }
 
 // The id to DRAW as chosen, given what the note stores and what still exists.
 //
-// A STORED ID NAMING A LAYOUT THAT IS GONE FALLS BACK RATHER THAN REFUSING. A
-// reader who deletes a saved layout has not asked for every title that named it
-// to stop making pages — and a dropdown opening on a value not in its own list
-// shows the first row while reporting the missing one, which is two lies at
-// once.
-export function pageLayoutShown(
+// A STORED ID NAMING A TEMPLATE THAT IS GONE FALLS BACK RATHER THAN REFUSING. A
+// reader who removes a saved template has not asked for every title that named
+// it to stop making pages — and a dropdown opening on a value not in its own
+// list shows the first row while reporting the missing one, which is two lies
+// at once.
+export function pageTemplateShown(
   cfg: JournalConfig | null,
   stored: string
 ): string {
-  return pageLayoutById(cfg, stored) ? stored : PAGE_LAYOUT_DEFAULT;
+  return pageTemplateById(cfg, stored) ? stored : PAGE_TEMPLATE_DEFAULT;
 }
 
 // ── What a bin takes ─────────────────────────────────────────────────────

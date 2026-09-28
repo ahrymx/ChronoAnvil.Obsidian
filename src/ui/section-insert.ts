@@ -742,14 +742,15 @@ export class SectionInserter {
         ...surface.ctx,
         hostFolder: this.hostFolderOf(notePath),
       };
-      // THE SECOND DOOR ONTO "Save as layout…" (3.18 §6). The button is the
-      // section editor's and has existed since 3.0; until now only the settings
+      // THE SECOND DOOR ONTO SAVING A TEMPLATE (3.18 §6). The control is the
+      // section editor's and has existed since 3.0 — a footer button until
+      // 1.0.46, the Template pane's own form since; until 3.18 only the settings
       // rail passed the callback that makes it appear, so a reader arranging a
       // note in front of them could not keep the arrangement.
       //
       // PASSED UNCONDITIONALLY SINCE 4.33. It used to be gated on
       // `variantEligible`, which refused an index and a page; all three note
-      // kinds can carry a layout now, so the gate became a tautology and was
+      // kinds can carry a template now, so the gate became a tautology and was
       // deleted rather than left as a function that always says yes. See the
       // note where it used to live in template-editor.ts.
       await openTemplateEditor(
@@ -782,26 +783,24 @@ export class SectionInserter {
     await openSectionEditor(this.app, this.plugin, notePath, {
       model: modelForSurface(surface, this.hostFolderOf(notePath), this.vault())
         .model,
-      // THE SECOND DOOR ONTO SAVING A DIARY LAYOUT (4.29), and the seam it uses
+      // THE SECOND DOOR ONTO SAVING A DIARY TEMPLATE (4.29), and the seam it uses
       // is the one 3.0 built agnostic and 3.18 gave a single caller. A reader
       // who has just dragged an entry's sections into the order they want is
       // standing in the window where that arrangement exists and nowhere else;
       // until now the only way to keep it was to close this, open the cog again
       // and pick Template.
       //
-      // ONE FUNCTION, TWO DOORS — `entryTemplates.saveLayout` is what the
-      // Template window calls too. The journal side set exactly this precedent
-      // when the settings rail and the banner both gained "Save as layout…".
+      // ONE FUNCTION, ONE DOOR SINCE 1.0.46 — the Template window's own "Save
+      // this note as a layout…" button is gone, and this pane is where an
+      // arrangement is named. `saveLayout` is still the one writer.
       //
       // THE TARGETS ARE THE FIVE GRAINS, which is what makes this the diary's
       // own version of the same control rather than a copy: a journal offers a
-      // layout to its kinds, and a grain's neighbours are the other grains.
+      // template to its kinds, and a grain's neighbours are the other grains.
       ...(surface.kind === "entry"
         ? {
             arrangement: {
-              buttonLabel: "Save as layout…",
-              promptTitle: "Save as layout",
-              promptPlaceholder: "e.g. Quiet Monday",
+              namePlaceholder: "e.g. Quiet Monday",
               targets: TRACKER_CLASSES.map((g) => ({
                 id: g,
                 label: CLASS_DEFS[g].label,

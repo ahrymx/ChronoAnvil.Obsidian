@@ -122,27 +122,29 @@ export async function openTemplateEditor(
     ...(onSaveVariant
       ? {
           arrangement: {
-            buttonLabel: "Save as layout…",
-            promptTitle: "Save as layout",
-            promptPlaceholder: "e.g. Math Lesson",
-            // WHERE THIS LAYOUT MAY BE OFFERED (3.18 follow-ups §5; the two
+            // THE ONLY LABEL LEFT (1.0.46). It carried a button label and a
+            // prompt title too, back when the save was a modal over the section
+            // editor and the two surfaces disagreed about the noun. The pane
+            // draws every other word now, because "template" is both surfaces'.
+            namePlaceholder: "e.g. Math Lesson",
+            // WHERE THIS TEMPLATE MAY BE OFFERED (3.18 follow-ups §5; the two
             // surfaces added in 4.33). Resolved here for the same reason the
             // overrides are: they are a journal concept and the modal holds no
             // context to look one up with. It draws the labels and hands back
             // the ids.
             //
             // EVERY KIND OF THIS JOURNAL, not just the current one — the whole
-            // point of the storage move is that a layout is no longer the
+            // point of the storage move is that a template is no longer the
             // property of the kind it was saved from — plus Front page, plus
             // Page where the journal has any. Cross-JOURNAL is not offered,
-            // deliberately: a layout names section ids and an `options` entry
+            // deliberately: a template names section ids and an `options` entry
             // keyed by kind id cannot survive a journey to a journal whose kind
             // ids differ by construction.
             targets: layoutTargetsFor(ctx.type),
             // WAS `ctx.kind?.id ?? ""`, WHICH WAS EMPTY ON THE TWO SURFACES
             // THAT COULD NOT REACH HERE. Now that they can, an empty origin
             // would leave the box the reader is standing in unticked and
-            // un-disabled — so `promptLayoutSave`'s "the one you saved it from
+            // un-disabled — so the Template pane's "the one you saved it from
             // is always included" rule would quietly not apply on exactly the
             // two new cases. Derived by `targetIdFor`, which is `templateKeyFor`
             // asked about the same three-value question, so the origin and the
@@ -157,7 +159,7 @@ export async function openTemplateEditor(
             // runs on: surface-shaped work lives with the surface.
             //
             // Only the overrides that EXIST. Storing an entry per section would
-            // put a wall of empty objects in data.json and make a variant that
+            // put a wall of empty objects in data.json and make a template that
             // differs by one label look like it differs by everything.
             save: async (
               label: string,

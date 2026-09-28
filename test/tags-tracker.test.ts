@@ -30,6 +30,7 @@ import {
   surfaceKey,
 } from "../src/trackers/trackers";
 import { readSrc } from "./sources";
+import { fitTagChips } from "../src/ui/widgets/tracker-controls";
 
 const tagsDef = () =>
   normalizeTrackers([], false).find((t) => t.builtin === "tags");
@@ -315,5 +316,216 @@ describe("the Tags built-in", () => {
     expect(readSrc("tracker-controls")).toContain(
       "processFrontMatter(file, (fm)"
     );
+  });
+});
+
+
+// ── HOW MANY CHIPS FIT (1.0.46) ────────────────────────────────────────
+//
+// `const maxVisibleTags = 5` decided this until 1.0.46, and a count is the one
+// thing the answer does not depend on. Reported from a daily entry: six short
+// tags drew four on the first row and `+2` alone on the second, with room for
+// both of them beside it.
+//
+// THE SUITE HAS NO LAYOUT, so the rows are modelled rather than measured: a
+// box of a fixed width, elements of known widths packed into it in order, and
+// `offsetTop` derived from where the packing puts each one. That is the only
+// thing `fitTagChips` reads, so the model exercises the real decision — which
+// is which chips to hide and what the count says — without asserting anything
+// about how a browser wraps.
+describe("the tags cell fills the rows it has", () => {
+  const BOX = 100;
+  const ROW = 20;
+  // The tallest thing on a line, which is what the others are centred against:
+  // a chip, at about 17px. The pencil is `0.8em` and therefore shorter — the
+  // fact the first cut of the fitter tripped over, so the model has to carry
+  // it or the test cannot see the bug.
+  const CHIP_H = 17;
+  const PENCIL_H = 10;
+
+  class Fake {
+    display = "";
+    readonly style = {
+      set display(v: string) {
+        /* set through the proxy below */
+      },
+    };
+    constructor(
+      readonly width: number,
+      readonly box: Fake[],
+      readonly offsetHeight = CHIP_H,
+      public text = ""
+    ) {}
+    setText(t: string): void {
+      this.text = t;
+    }
+    // `align-items: center`, modelled: a line is CHIP_H tall and every item on
+    // it is centred in that, so a short item reports a LARGER `offsetTop` than
+    // the chips beside it while sharing their centre.
+    get offsetTop(): number {
+      let x = 0;
+      let row = 0;
+      for (const el of this.box) {
+        if (el.display === "none") continue;
+        if (x > 0 && x + el.width > BOX) {
+          row += 1;
+          x = 0;
+        }
+        if (el === this) return row * ROW + (CHIP_H - el.offsetHeight) / 2;
+        x += el.width;
+      }
+      return row * ROW + (CHIP_H - this.offsetHeight) / 2;
+    }
+  }
+
+  // `style` with the two operations the fitter uses, over the flat `display`.
+  const el = (width: number, box: Fake[], height = CHIP_H): HTMLElement => {
+    const f = new Fake(width, box, height);
+    box.push(f);
+    return new Proxy(f, {
+      get(t, k) {
+        if (k === "style") {
+          return {
+            set display(v: string) {
+              t.display = v;
+            },
+            get display() {
+              return t.display;
+            },
+            removeProperty: () => {
+              t.display = "";
+            },
+          };
+        }
+        return Reflect.get(t, k);
+      },
+      set(t, k, v) {
+        return Reflect.set(t, k, v);
+      },
+    }) as unknown as HTMLElement;
+  };
+
+  const shownOf = (chips: HTMLElement[]) =>
+    chips.filter((c) => (c as unknown as Fake).display !== "none").length;
+
+  function build(widths: number[]) {
+    const box: Fake[] = [];
+    const chipEls = widths.map((w) => el(w, box));
+    const more = el(20, box);
+    const pencil = el(10, box, PENCIL_H);
+    const host = { isConnected: true } as unknown as HTMLElement;
+    return { box, chipEls, more, pencil, host };
+  }
+
+  it("shows every tag when they all land inside the cell", () => {
+    // Four 25px chips: two rows of two, and the pencil on the second.
+    const { host, chipEls, more, pencil } = build([25, 25, 25, 25]);
+    fitTagChips(host, chipEls, more, pencil);
+    expect(shownOf(chipEls)).toBe(4);
+    expect((more as unknown as Fake).display).toBe("none");
+  });
+
+  it("fills the second row before it starts counting", () => {
+    // THE REPORTED CASE, in the model's terms: the old cap stopped at four
+    // whatever the cell could hold, so a second row with room for two more sat
+    // holding `+2` alone. Six 25px chips all fit here and none is counted.
+    const six = build([25, 25, 25, 25, 25, 25]);
+    fitTagChips(six.host, six.chipEls, six.more, six.pencil);
+    expect(shownOf(six.chipEls)).toBe(6);
+    expect((six.more as unknown as Fake).display).toBe("none");
+
+    // And where they genuinely do not all fit, more than four still show.
+    const ten = build(Array(10).fill(25));
+    fitTagChips(ten.host, ten.chipEls, ten.more, ten.pencil);
+    const shown = shownOf(ten.chipEls);
+    expect(shown).toBeGreaterThan(4);
+    expect((ten.more as unknown as Fake).text).toBe(`+${10 - shown}`);
+  });
+
+  it("counts every tag it hid, not every tag past a fixed number", () => {
+    const { host, chipEls, more, pencil } = build(Array(20).fill(25));
+    fitTagChips(host, chipEls, more, pencil);
+    const shown = shownOf(chipEls);
+    expect((more as unknown as Fake).text).toBe(`+${20 - shown}`);
+    expect(shown).toBeGreaterThan(0);
+  });
+
+  it("gives back a chip so the count and the pencil have somewhere to land", () => {
+    // The `+N` is a chip like the others and the pencil trails it, so both are
+    // measured with the rest — under the old cap they were not, and the rows
+    // are now filled to the edge.
+    const { host, chipEls, more, pencil } = build(Array(8).fill(25));
+    fitTagChips(host, chipEls, more, pencil);
+    const visible = [
+      ...chipEls.filter((c) => (c as unknown as Fake).display !== "none"),
+      more,
+      pencil,
+    ];
+    // BY THE CENTRE, which is what a line is under `align-items: center`. The
+    // first cut of the fitter counted `offsetTop`, and the pencil — shorter
+    // than a chip and therefore centred lower on the same line — read as a row
+    // of its own every time. Two real rows measured as three, so the loop kept
+    // giving chips back until one row was left: the vault showed three tags
+    // and `+3` on a cell with room for two rows of four.
+    const mid = (v: HTMLElement) => {
+      const f = v as unknown as Fake;
+      return f.offsetTop + f.offsetHeight / 2;
+    };
+    const rows = new Set(visible.map(mid));
+    expect(rows.size).toBeLessThanOrEqual(2);
+    // And the pencil shares a line with chips rather than owning one.
+    expect(new Set(visible.map((v) => (v as unknown as Fake).offsetTop)).size)
+      .toBeGreaterThan(rows.size);
+  });
+
+  it("keeps both rows when the pencil sits on the second (1.0.46)", () => {
+    // THE REGRESSION THE FIRST CUT SHIPPED. Eight 25px chips in a 100px box is
+    // four to a row, so seven chips and a `+1` is what fits. Counting
+    // `offsetTop` instead of centres gave the pencil a row of its own, the
+    // fitter saw three rows where there were two, and it gave chips back until
+    // only one row was left — three tags and `+3` in a cell with room for
+    // eight.
+    const { host, chipEls, more, pencil } = build(Array(8).fill(25));
+    fitTagChips(host, chipEls, more, pencil);
+    expect(shownOf(chipEls)).toBeGreaterThan(4);
+  });
+
+  it("re-measures from everything shown, so a widened cell gets its tags back", () => {
+    // The pass that measures its own previous answer keeps hiding chips that
+    // now fit. Running the fitter twice on the same arrangement must not shrink
+    // it further.
+    const { host, chipEls, more, pencil } = build(Array(8).fill(25));
+    fitTagChips(host, chipEls, more, pencil);
+    const once = shownOf(chipEls);
+    fitTagChips(host, chipEls, more, pencil);
+    expect(shownOf(chipEls)).toBe(once);
+  });
+
+  it("stops at none rather than spinning on a cell nothing fits in", () => {
+    const { host, chipEls, more, pencil } = build([95, 95, 95]);
+    fitTagChips(host, chipEls, more, pencil);
+    expect((more as unknown as Fake).text).toMatch(/^\+\d+$/);
+  });
+
+  it("does nothing at all before the cell is in the document", () => {
+    const { chipEls, more, pencil } = build(Array(8).fill(25));
+    const host = { isConnected: false } as unknown as HTMLElement;
+    fitTagChips(host, chipEls, more, pencil);
+    expect(shownOf(chipEls)).toBe(8);
+  });
+
+  it("asks the layout rather than a number, and disposes of its observer", () => {
+    const src = readSrc("tracker-controls");
+    // CODE ONLY. The comment beside the fitter names the constant it replaced,
+    // which is the record of the decision rather than a use of it — the
+    // distinction `vocabulary.test.ts` draws.
+    const code = src
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    expect(code).not.toContain("maxVisibleTags");
+    expect(src).toContain("new ResizeObserver(fit)");
+    expect(src).toContain("watch?.disconnect();");
+    expect(src).toContain("class TagsFit extends MarkdownRenderChild");
   });
 });

@@ -6,7 +6,8 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// Rewrite a vault written by Almanac (<= 4.84) into ChronoAnvil's token names.
+// Rewrite a vault written by Almanac (<= 4.84) into ChronoAnvil's token names,
+// and bring the one property this plugin has since renamed along with it.
 //
 // WHY THIS EXISTS RATHER THAN JUST BACK-COMPAT. The plugin reads both spellings
 // at the four places where losing content would be silent — body regions, the
@@ -64,6 +65,28 @@ export const FILE_RENAMES = [
   ["Almanac.canvas", "ChronoAnvil.canvas"],
 ];
 
+// ── The 1.0.46 property rename ─────────────────────────────────────────────
+//
+// A SECOND TABLE RATHER THAN THREE MORE ROWS IN `RULES`, because it is a
+// different migration. That table is the Almanac → ChronoAnvil brand rewrite
+// and every row in it is a token the OLD PLUGIN wrote; this is one property the
+// CURRENT plugin wrote until "layout" stopped being a word for a saved
+// arrangement (see `vocabulary.ts`). Folding them together would make the two
+// indistinguishable to anyone reading either, and would put a row in the brand
+// table that has nothing to do with the brand.
+//
+// FRONTMATTER ONLY, WHICH IS WHAT THE COLON BUYS. The key is written as
+// `pagelayout: <id>` at the top of a title note and appears nowhere else the
+// plugin emits, so matching the key WITH its colon cannot touch a sentence that
+// happens to use the word.
+//
+// THE PLUGIN READS BOTH WITHOUT THIS. `pageTemplateOf` prefers the new key and
+// falls back to the old one, and `setPageTemplate` deletes the old one whenever
+// it writes — so a vault that never runs this migrates itself, one title at a
+// time, as the reader touches them. This is the bulk pass for a reader who
+// would rather not wait.
+export const RULES_1_0_46 = [["pagelayout:", "pagetemplate:"]];
+
 export const TEXT_EXT = new Set([".md", ".canvas", ".base", ".json"]);
 
 // Apply the token map to one file's text. Exported so a test can drive the
@@ -71,6 +94,7 @@ export const TEXT_EXT = new Set([".md", ".canvas", ".base", ".json"]);
 export function migrateText(text) {
   let out = text;
   for (const [from, to] of RULES) out = out.split(from).join(to);
+  for (const [from, to] of RULES_1_0_46) out = out.split(from).join(to);
   return out;
 }
 

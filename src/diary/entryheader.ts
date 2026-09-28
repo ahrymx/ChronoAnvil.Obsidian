@@ -339,19 +339,51 @@ function buildDatePicker(
 function attachEntryMenu(
   plugin: ChronoAnvilPlugin,
   host: HTMLElement,
-  notePath: string,
-  grain: TrackerClass
+  notePath: string
 ): void {
-  // §2.2's rule, unchanged: the control is not drawn where the menu would be
-  // empty. On a managed template both tracker items refuse with a warning
-  // (`isManagedTemplate` — the template is rewritten from the catalogue, so an
-  // edit here is a change about to be overwritten), and with those two gone a
-  // daily template's menu holds one navigation item and a monthly template's
-  // holds nothing. A control that opens a menu to say no is worse than no
-  // control.
-  if (isManagedTemplate(plugin, notePath)) return;
+  const build = entryBannerMenu(plugin, notePath);
+  if (build) settingsButton(host, "ca-jeh-more", build);
+}
 
-  settingsButton(host, "ca-jeh-more", (menu: Menu) => {
+// What the cog offers on a DIARY ENTRY, as a builder rather than as a button.
+// 1.0.46.
+//
+// SPLIT OUT FOR THE REASON `journalBannerMenu` WAS, AND ONE RELEASE LATE. That
+// function's own header states it: *a reader who learns "Templates…" on a note
+// before turning the banner on has to find it in the same place after.* The
+// journal side was split in 4.51 and the diary side was not, and 4.51.6 then
+// replaced `buildEntryHeader`'s LiveWidget with `page-head.ts` — so the band
+// this menu hangs off stopped rendering, and with it went the only door to
+// *Templates…*, *Remove a tracker…* and *Open this month's entry* on an entry.
+// The vault banner drew a cog on those notes the whole time; it was opening
+// `sectionsMenuFor`, which knows nothing about the diary.
+//
+// NULL WHERE THERE IS NOTHING TO OFFER, which is `sectionsMenuFor`'s rule and
+// `discoverability.test.ts`'s: *a menu that opens and then explains it cannot
+// help is worse than no menu.* Two things make it null:
+//
+//   §2.2's rule, unchanged: on a managed template both tracker items refuse
+//   with a warning (`isManagedTemplate` — the template is rewritten from the
+//   catalogue, so an edit here is a change about to be overwritten), and with
+//   those two gone a daily template's menu holds one navigation item and a
+//   monthly template's holds nothing;
+//
+//   and the note not being an entry at all. `entryContextFor` is the resolver
+//   the section editor already asks — it goes through `noteKindOf` and then
+//   rules out the four period dashboards, which share a folder with the
+//   entries — so this cannot drift from what the editor believes about the
+//   same file, and a diary DASHBOARD still falls through to `sectionsMenuFor`
+//   and keeps its *Add a section…* and *Wide page*.
+export function entryBannerMenu(
+  plugin: ChronoAnvilPlugin,
+  notePath: string
+): ((menu: Menu) => void) | null {
+  if (isManagedTemplate(plugin, notePath)) return null;
+  const grain: TrackerClass | null =
+    plugin.sections.entryContextFor(notePath)?.grain ?? null;
+  if (!grain) return null;
+
+  return (menu: Menu) => {
     menu.addItem((i: MenuItem) =>
       i
         .setTitle("Edit sections…")
@@ -367,7 +399,7 @@ function attachEntryMenu(
     // WITH AN ELLIPSIS, like every other item on this menu that opens a window.
     menu.addItem((i: MenuItem) =>
       i
-        .setTitle("Template…")
+        .setTitle("Templates…")
         .setIcon("layout-template")
         .onClick(() => openEntryTemplateWindow(plugin.app, plugin, notePath, grain))
     );
@@ -394,7 +426,7 @@ function attachEntryMenu(
           .onClick(() => void plugin.diary.openThisMonth())
       );
     }
-  });
+  };
 }
 
 // ── THE ENTRY BANNER'S TITLE BAND (4.21) ─────────────────────────────
@@ -435,7 +467,6 @@ export function buildEntryHeader(
 
   const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
   if (!(file instanceof TFile)) return wrap;
-  const c = entryContext(plugin, file);
 
   const titleWrap = wrap.createDiv({
     cls: "ca-jeh-title-wrap ca-journal-banner-title",
@@ -445,7 +476,7 @@ export function buildEntryHeader(
   // THE COG COMES UP FROM THE FOOTER. A banner carries the control that edits
   // the page — `settingsButton` says so — and until 4.21 an entry's sat under
   // the logging grid, which is neither the banner nor near the name it acts on.
-  attachEntryMenu(plugin, wrap, ctx.sourcePath, c.grain);
+  attachEntryMenu(plugin, wrap, ctx.sourcePath);
 
   return wrap;
 }

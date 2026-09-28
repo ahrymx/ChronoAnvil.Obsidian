@@ -568,12 +568,43 @@ describe("the diary entry offers its own commands", () => {
     // refuse on a managed template, and with those gone a monthly template's
     // menu holds nothing. A control that opens a menu to say no is worse than
     // no control.
+    //
+    // THE GUARD MOVED INTO THE BUILDER IN 1.0.46, with the list, and the rule is
+    // unchanged — it is now stated once for two callers instead of once for the
+    // band. `entryBannerMenu` answers null, and each caller draws nothing on a
+    // null: `attachEntryMenu` here, `menuFor` on the vault banner. Asserting
+    // both halves rather than the old "guard before `settingsButton`", because
+    // that spelling would now pass on a file where the button is drawn
+    // unconditionally from a builder that was never asked for.
     const t = entry();
-    const fn = t.slice(t.indexOf("function attachEntryMenu("));
-    const guard = fn.indexOf("if (isManagedTemplate(plugin, notePath)) return;");
-    const draw = fn.indexOf("settingsButton(");
+    const fn = t.slice(t.indexOf("export function entryBannerMenu("));
+    const guard = fn.indexOf("if (isManagedTemplate(plugin, notePath)) return null;");
+    const list = fn.indexOf("return (menu: Menu) => {");
     expect(guard).toBeGreaterThan(0);
-    expect(draw).toBeGreaterThan(guard);
+    expect(list).toBeGreaterThan(guard);
+
+    const attach = t.slice(
+      t.indexOf("function attachEntryMenu("),
+      t.indexOf("export function entryBannerMenu(")
+    );
+    expect(attach).toContain("const build = entryBannerMenu(plugin, notePath);");
+    expect(attach).toContain('if (build) settingsButton(host, "ca-jeh-more", build);');
+  });
+
+  it("refuses on a note that is not an entry at all (1.0.46)", () => {
+    // The four period dashboards share a folder with the entries, so the grain
+    // alone cannot tell them apart — and the vault banner's cog now asks this
+    // builder for every note in the diary half. `entryContextFor` is the
+    // resolver the section editor already uses, and it rules the dashboards out
+    // itself, so this cannot grow a second opinion about which notes are
+    // entries.
+    const t = entry();
+    expect(t).toContain("plugin.sections.entryContextFor(notePath)?.grain");
+    const fn = t.slice(t.indexOf("export function entryBannerMenu("));
+    const resolve = fn.indexOf("entryContextFor(notePath)");
+    const list = fn.indexOf("return (menu: Menu) => {");
+    expect(fn.indexOf("if (!grain) return null;")).toBeGreaterThan(resolve);
+    expect(list).toBeGreaterThan(resolve);
   });
 
   it("does not pretend the two menus are one", () => {

@@ -540,12 +540,21 @@ describe("the banner's hook", () => {
     // 4.51 got the journal half right and wrote its own two items for the
     // dashboard half — which silently dropped **Wide page**, the one setting on
     // that menu with no other door (4.51.1).
+    //
+    // AND THE DIARY GOT ITS OWN HALF IN 1.0.46, which is the same fault one
+    // surface over and it lasted longer. `sectionsMenuFor` answered for every
+    // diary note, so an ENTRY's cog offered *Add a section…* and *Wide page*
+    // and nothing about the diary — no *Templates…*, no tracker items, no
+    // month. The list existed the whole time, in `entryheader.ts`, hanging off
+    // a band 4.51.6 stopped rendering when the head moved to `page-head.ts`.
     const t = banner();
     expect(t).toContain("journalBannerMenu(this.plugin, file.path)");
+    expect(t).toContain("entryBannerMenu(this.plugin, file.path)");
     expect(t).toContain("sectionsMenuFor(this.plugin, file.path,");
-    // And neither list is re-spelled here.
+    // And no list is re-spelled here.
     expect(t).not.toContain('.setTitle("Edit sections…")');
     expect(t).not.toContain('.setTitle("Wide page")');
+    expect(t).not.toContain('.setTitle("Templates…")');
   });
 
   it("falls through to the flat list on a journal page that is not a journal note (5.20)", () => {
@@ -560,9 +569,14 @@ describe("the banner's hook", () => {
     // `??` RATHER THAN A SECOND SURFACE TEST, so a journal NOTE never falls
     // through: `canEditSections` would say yes about a Lesson too, and the flat
     // list would then offer it *Wide page* and drop *Template…*.
+    //
+    // THE SAME `??`, NOW WITH A DIARY ARM (1.0.46). `entryBannerMenu` refuses on
+    // anything that is not an entry — the four period dashboards included — so
+    // the fallthrough is still what answers for the diary's dashboards, its
+    // index and the homepage.
     const t = banner();
     expect(t).toMatch(
-      /\(surface === "journal"\s*\?\s*journalBannerMenu\(this\.plugin, file\.path\)\s*:\s*null\)\s*\?\?/
+      /\(surface === "journal"\s*\?\s*journalBannerMenu\(this\.plugin, file\.path\)\s*:\s*surface === "diary"\s*\?\s*entryBannerMenu\(this\.plugin, file\.path\)\s*:\s*null\)\s*\?\?/
     );
   });
 

@@ -936,7 +936,7 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
     });
     repairBtn.setAttr(
       "title",
-      "Audit and repair vault files: create missing folders, sync templates, refresh layouts"
+      "Audit and repair vault files: create missing folders, sync templates, refresh shipped dashboards"
     );
     repairBtn.setAttr("aria-label", "Audit and repair vault");
     setIcon(repairBtn.createSpan(), "wrench");

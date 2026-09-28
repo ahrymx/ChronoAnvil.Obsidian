@@ -29,16 +29,25 @@ import type {
   JournalVariantConfig,
 } from "./custom-journal";
 import {
-  layoutTargetsFor,
+  planTemplateRemoval,
   sectionContext,
   sectionsFor,
-  splitLayoutTargets,
   targetIdFor,
   templateKeyFor,
 } from "./journal-sections";
-import type { SectionContext, TemplateLayout } from "./journal-sections";
+import type {
+  SectionContext,
+  SectionOverrides,
+  TemplateLayout,
+  TemplateRemoval,
+} from "./journal-sections";
 import type { JournalKind, JournalType } from "./journal";
-import { configOfJournal, pageLayoutById } from "./page-default";
+import { JOURNAL_PRESETS } from "./journal";
+import {
+  configOfJournal,
+  pageTemplateById,
+  shippedLayoutOf,
+} from "./page-default";
 import {
   journalReloadLoss,
   wantFromJournalNote,
@@ -48,7 +57,6 @@ import { replaceBody } from "../core/note-sections";
 import { getFile } from "../core/util";
 import { diffText } from "../core/line-diff";
 import { openRepairWindow } from "../ui/repair-modal";
-import { promptLayoutSave } from "../ui/modals";
 import { notify } from "../core/notify";
 
 export class JournalTemplates {
@@ -85,12 +93,12 @@ export class JournalTemplates {
   // TOKENS AND ALL. `composeTemplate` writes `{{title}}`, `{{parent}}`,
   // `{{order}}` — it is a TEMPLATE, not a note — so its output goes through the
   // same `fillTemplate` the file's does and the caller cannot tell them apart.
-  pageLayoutText(
+  pageTemplateText(
     type: JournalType,
     kind: JournalKind,
     layoutId: string
   ): string | null {
-    const layout = pageLayoutById(this.configForType(type), layoutId);
+    const layout = pageTemplateById(this.configForType(type), layoutId);
     if (!layout) return null;
     return this.composedFrom(sectionContext(type, { page: kind }), layout).text;
   }
@@ -102,6 +110,27 @@ export class JournalTemplates {
       undefined,
       ctx.type.layout?.[templateKeyFor(ctx)]
     );
+  }
+
+  // What a new note of this target WOULD be composed from if nobody had ever
+  // pressed "Save this page as the default" — the 🔒 row's content.
+  //
+  // READS THE PRESET, NOT THE SETTINGS, which is the whole point: `ctx.type` is
+  // built from the stored config and so already carries whatever was saved over
+  // the shipped arrangement. `shippedLayoutOf` says why it takes the table.
+  shippedFor(ctx: SectionContext): string {
+    return composeTemplate(
+      ctx,
+      undefined,
+      shippedLayoutOf(JOURNAL_PRESETS, ctx.type.id, templateKeyFor(ctx))
+    );
+  }
+
+  // The preset this journal was installed from, for the 🔒 row's subtitle, or
+  // null when it is a journal the reader defined and the shipped arrangement is
+  // the catalogue's own.
+  shippedNameFor(ctx: SectionContext): string | null {
+    return JOURNAL_PRESETS.find((p) => p.id === ctx.type.id)?.name ?? null;
   }
 
   // The saved layouts this target may be reloaded from.
@@ -183,17 +212,7 @@ export class JournalTemplates {
       return false;
     }
 
-    const key = templateKeyFor(ctx);
-    const prev = cfg.layout?.[key];
-    const next: TemplateLayout = {
-      ...(prev ?? {}),
-      ...(prev?.order ? { order: [...sections] } : {}),
-      sections: [...sections],
-      ...(Object.keys(options).length
-        ? { options: { ...(prev?.options ?? {}), ...options } }
-        : {}),
-    };
-    cfg.layout = { ...(cfg.layout ?? {}), [key]: next };
+    this.writeDefault(cfg, templateKeyFor(ctx), sections, options);
     await this.plugin.saveSettings();
 
     if (drops.length) {
@@ -213,50 +232,139 @@ export class JournalTemplates {
     return true;
   }
 
-  // This page becomes a named layout.
+  // The merge rule itself, shared by the two doors that write a default.
   //
-  // THROUGH `JournalManager.saveVariant`, WHICH IS THE ONE WRITER. The section
-  // editor's "Save as layout…" lands there too, from two doors, and a third
-  // spelling of "append a variant and write its file" is how the three would
-  // start disagreeing about id collisions.
-  async promptSaveLayout(
-    notePath: string,
-    ctx: SectionContext
+  // EXTRACTED IN 1.0.46 BECAUSE `useAsDefault` ARRIVED. It is the same write —
+  // this arrangement becomes the target's default — reached from the page rather
+  // than from a saved template, and a second spelling of it is how `order` comes
+  // to survive one door and not the other. Everything the long comment above
+  // says applies to both callers.
+  private writeDefault(
+    cfg: JournalConfig,
+    key: string,
+    sections: readonly string[],
+    options: Record<string, SectionOverrides>
+  ): void {
+    const prev = cfg.layout?.[key];
+    const next: TemplateLayout = {
+      ...(prev ?? {}),
+      ...(prev?.order ? { order: [...sections] } : {}),
+      sections: [...sections],
+      ...(Object.keys(options).length
+        ? { options: { ...(prev?.options ?? {}), ...options } }
+        : {}),
+    };
+    cfg.layout = { ...(cfg.layout ?? {}), [key]: next };
+  }
+
+  // A saved template — or the arrangement ChronoAnvil ships — becomes this
+  // target's default. 1.0.46.
+  //
+  // `null` IS THE 🔒 ROW, and it does not write the shipped arrangement over
+  // the stored one: it DELETES the stored key, which is the only spelling that
+  // leaves the journal in the state it installed in. Writing the composed
+  // sections back would freeze today's catalogue into the config, so a section
+  // added by a later version would never reach a journal somebody had once
+  // pressed "put it back" on — the exact fault `TemplateLayout.order` exists to
+  // avoid. A preset's own `layout[key]` comes back because it is the preset's,
+  // read through `ctx.type` on the next build.
+  //
+  // THROUGH `refreshJournalTemplates` LIKE EVERY OTHER DEFAULT WRITE, for the
+  // reason this file's header gives: the reader sees the template FILE, not the
+  // config, so the file has to be rewritten and the reader has to be shown the
+  // lines before it is.
+  async useAsDefault(
+    ctx: SectionContext,
+    layout: JournalVariantConfig | null
   ): Promise<boolean> {
-    const file = getFile(this.app, notePath);
-    if (!file) return false;
-    const text = await this.app.vault.read(file);
-    const { sections, options } = wantFromJournalNote(text, ctx);
-    if (!sections.length) {
-      new Notice("ChronoAnvil: this note has no sections to save.");
+    const cfg = this.configFor(ctx);
+    if (!cfg) {
+      new Notice(
+        "ChronoAnvil: templates are stored on a journal you defined, and this journal is not one of them."
+      );
       return false;
     }
-    const details = await promptLayoutSave(
-      this.app,
-      "Save as layout",
-      "e.g. Math Lesson",
-      layoutTargetsFor(ctx.type),
-      targetIdFor(ctx)
-    );
-    if (!details || !details.label.trim()) return false;
-
-    const split = splitTargets(ctx, details.kinds);
-    await this.plugin.journals.saveVariant(
-      ctx.type.id,
-      details.label.trim(),
-      sections,
-      options,
-      split.kinds,
-      split.surfaces
-    );
+    const key = templateKeyFor(ctx);
+    if (!layout) {
+      if (cfg.layout && key in cfg.layout) {
+        const rest = { ...cfg.layout };
+        delete rest[key];
+        cfg.layout = rest;
+        if (!Object.keys(rest).length) delete cfg.layout;
+      }
+    } else {
+      this.writeDefault(cfg, key, layout.sections ?? [], layout.options ?? {});
+    }
+    await this.plugin.saveSettings();
+    await this.plugin.scaffold.refreshJournalTemplates();
     return true;
   }
 
-  async deleteLayout(ctx: SectionContext, id: string): Promise<void> {
+  // A saved template's name changes; its id does not. 1.0.46.
+  //
+  // THE ID IS HALF A FILENAME. `templateTargets` allocates `<kind>-<variant>.md`
+  // per saved template, so re-slugging on a rename would orphan the file the
+  // reader has open and write a second one beside it. `deleteVariant`'s comment
+  // in the settings rail states the same rule for the same reason.
+  async renameLayout(
+    ctx: SectionContext,
+    id: string,
+    label: string
+  ): Promise<boolean> {
     const cfg = this.configFor(ctx);
-    if (!cfg) return;
-    cfg.variants = (cfg.variants ?? []).filter((v) => v.id !== id);
+    const variant = (cfg?.variants ?? []).find((v) => v.id === id);
+    const next = label.trim();
+    if (!cfg || !variant || !next || next === variant.label) return false;
+    cfg.variants = (cfg.variants ?? []).map((v) =>
+      v.id === id ? { ...v, label: next } : v
+    );
     await this.plugin.saveSettings();
+    await this.plugin.scaffold.refreshJournalTemplates();
+    return true;
+  }
+
+  // A saved template is taken off THIS target — and removed only if this was
+  // the last one it was offered on. 1.0.46.
+  //
+  // WAS THREE LINES AND A DEFECT. It deleted the template outright, from a
+  // window standing on one note type, so taking "Two column" off Practice took
+  // it off Lesson as well. `planTemplateRemoval` is the decision and states the
+  // whole case; the settings rail applies the same one.
+  //
+  // RETURNS WHAT IT DID so the notice can say it. A reader who pressed Remove
+  // and got "removed" when the template is still on two other kinds has been
+  // told the wrong thing.
+  async deleteLayout(
+    ctx: SectionContext,
+    id: string
+  ): Promise<TemplateRemoval | null> {
+    const cfg = this.configFor(ctx);
+    const variant = (cfg?.variants ?? []).find((v) => v.id === id);
+    if (!cfg || !variant) return null;
+
+    const plan = planTemplateRemoval(cfg, variant, targetIdFor(ctx));
+    if (plan.kind === "remove") {
+      cfg.variants = (cfg.variants ?? []).filter((v) => v.id !== id);
+      if (!cfg.variants.length) delete cfg.variants;
+    } else {
+      cfg.variants = (cfg.variants ?? []).map((v) =>
+        v.id === id
+          ? {
+              ...v,
+              // WRITTEN EVEN WHEN EMPTY — absent `kinds` means every kind, so a
+              // template that shed its last kind and kept saying nothing would
+              // come back on all of them.
+              kinds: plan.kinds,
+              ...(plan.surfaces.length
+                ? { surfaces: plan.surfaces }
+                : { surfaces: undefined }),
+            }
+          : v
+      );
+    }
+    await this.plugin.saveSettings();
+    await this.plugin.scaffold.refreshJournalTemplates();
+    return plan;
   }
 
   // ── reloading ────────────────────────────────────────────────────────
@@ -304,7 +412,7 @@ export class JournalTemplates {
 
     const next = replaceBody(text, composed);
     if (next == null) {
-      new Notice("ChronoAnvil: this note already matches that layout.");
+      new Notice("ChronoAnvil: this note already matches that template.");
       return false;
     }
 
@@ -343,15 +451,4 @@ export class JournalTemplates {
 // `applies(ctx)`, which is exactly the question "could this target render it".
 function sectionsOfferedOn(ctx: SectionContext): string[] {
   return sectionsFor(ctx).map((s) => s.id);
-}
-
-// Split the window's ticked ids the same way the two other doors do.
-function splitTargets(
-  ctx: SectionContext,
-  targets: string[]
-): { kinds: string[]; surfaces: ("index" | "page")[] } {
-  return splitLayoutTargets(
-    ctx.type.kinds.map((k) => k.id),
-    targets
-  );
 }

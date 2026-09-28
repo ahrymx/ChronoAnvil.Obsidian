@@ -5,6 +5,114 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.46] - 2026-09-28
+
+### Changed
+
+- **There is one word for a saved arrangement of sections, and it is
+  "template".** *"First we should define what the difference between layout and
+  template exactly is."* There wasn't one worth keeping. The plugin was spending
+  two words on three things: the markdown **file** in a journal's templates
+  folder, the **default arrangement** that file is composed from, and a **saved
+  named arrangement** — and it called the first and third "template" and
+  "layout" while the second had no name at all. The section editor drew a tab
+  called **Layout** that stored nothing, a few pixels from a footer button called
+  **Save as layout…** that stored everything, and the window that managed what
+  that button saved was called **Template…**.
+
+  So: a template is a saved arrangement of sections a note is built from or
+  rebuilt onto. Every note type has one default template; more are saved under
+  names. "Layout" is gone from every label, every notice and every sentence of
+  the documentation — it survives only as ordinary English for how something sits
+  on screen, and as stored keys nobody sees. `src/core/vocabulary.ts` carries the
+  definition and the boundary, and a new sweep over every string in the source
+  keeps the retirement from quietly un-retiring.
+
+- **The section editor's Layout tab is the Template tab, and it is where you save
+  one.** The wireframe it drew is unchanged — the blocks, the rows, the bands, the
+  shape of the note as you have arranged it — and it has stopped being decoration:
+  it is now the preview of the thing you are about to save. Under it sits the name
+  box, the **Available for** ticks and a **Save template** button.
+
+  The footer's **Save as layout…** is gone, and with it the modal it opened over
+  the window you were already in. Saving no longer closes anything either: the
+  form becomes a line confirming what was saved, so an arrangement you keep under
+  a name does not cost you the file changes you were still deciding about.
+
+- **The Template… window is a manager.** It had three bands and could do two
+  things. It now has two bands and lists every template for whatever the note is
+  — a Lesson, an index, a page, a daily entry — with **Apply to this note**, **Use
+  as default**, **Rename** and **Remove** on the rows that can take them. The menu
+  item is **Templates…**, plural, because that is what it opens.
+
+- **What ChronoAnvil ships is a permanent row.** 🔒 **ChronoAnvil default** sits
+  under your note type's current default and holds the arrangement the plugin came
+  with; it can be applied and made the default, and it can never be renamed or
+  removed. Until now, saving your own arrangement over a note type's default
+  overwrote the only copy of what it shipped with, and nothing anywhere could put
+  it back.
+
+- **A note you have written in no longer hides its templates.** The whole band
+  used to disappear the moment a note held a checklist you had ticked or a chart
+  you had added, because rebuilding was the only thing the window knew how to do.
+  Renaming and removing touch no markdown, so they stay; only **Apply** is omitted,
+  and the box above the list still names what is in the way and points at *Edit
+  sections…*.
+
+### Fixed
+
+- **Removing a shared template no longer deletes it everywhere.** A template
+  offered on both Lesson and Practice was deleted outright by the Template
+  window's **Remove**, from a window that named one note type — so taking "Two
+  column" off Practice silently took it off Lesson too. It is now withdrawn from
+  the one place you are standing on and kept for the others; only the last place
+  holding it removes it, and the notice says which of the two happened. The
+  settings rail had guarded this since 3.18 and the window never had; the decision
+  is one function now and both doors ask it.
+
+- **And that guard was itself incomplete.** It counted note types and knew nothing
+  about surfaces, so a template offered on one note type *and* a journal's index
+  was deleted outright when that type's row removed it — taking the index's copy
+  with it. Every place a template is offered now counts as a holder.
+
+- **`pagelayout:` is `pagetemplate:`.** The frontmatter property a title note
+  carries to say what its own pages open with is one you type, so it moved rather
+  than staying behind for compatibility's sake. A note carrying the old spelling
+  is read exactly as before; the next write of the property removes it, and
+  `tools/migrate-vault.mjs` does the whole vault at once.
+
+- **A diary entry's cog had no *Templates…* on it, and had not had for some
+  time.** The banner cog on a journal note opens `journalBannerMenu`; on a diary
+  entry it was opening `sectionsMenuFor`, which knows about sections and nothing
+  about the diary — so an entry's menu offered *Edit sections…*, *Add a
+  section…* and *Wide page*, and the entry's own list of *Templates…*, *Add a
+  tracker…*, *Remove a tracker…* and *Open this month's entry* was nowhere. That
+  list was not missing: it has been in `entryheader.ts` since 2.56, hanging off
+  a title band that stopped rendering in 4.51.6 when the head moved to
+  `page-head.ts`. It is now a builder the way the journal's has been since 4.51,
+  and the cog opens it. A diary DASHBOARD is not an entry and still gets the
+  flat list, with its *Add a section…* and *Wide page* intact.
+
+- **The Templates window printed the whole note back at you.** The refusal box
+  above the templates says what a rebuild would destroy, and that list is one
+  entry per line written outside a section — right for deciding *which* fact is
+  in the way, wrong for printing. A cheat sheet with fifteen headings, three
+  tables and a dozen display-maths blocks produced sixty-odd rows, each a raw
+  markdown line followed by the same eight words, and the window scrolled for a
+  page and a half before reaching the templates it manages. Rows that would read
+  identically are now collapsed: three of them, then a line counting the rest.
+
+- **The Tags tracker stopped at five tags however wide the cell was.** Six short
+  tags drew four on the first row and `+2` alone on the second, with room for
+  both of them beside it. A fixed count cannot answer a question about width, so
+  the chips are all drawn and the ones that do not land are hidden — measured
+  from the layout, re-measured whenever the cell changes size, and with the
+  count and the pencil measured alongside the chips so neither is pushed off the
+  bottom. A line is identified by its CENTRE rather than by `offsetTop`: the box
+  centres what sits on a line, so the pencil — shorter than a chip — reads as a
+  row of its own if you compare tops, and the first cut of this fix shrank the
+  cell to a single row for exactly that reason.
+
 ## [1.0.45] - 2026-09-27
 
 ### Changed

@@ -356,7 +356,7 @@ function attachBannerMenu(
 //
 // SPLIT OUT SO THE VAULT BANNER OFFERS THE SAME MENU. That banner draws the cog
 // itself, in its own corner, on its own surface — but what the cog DOES must not
-// fork: a reader who learns "Template…" on a note before turning the banner on
+// fork: a reader who learns "Templates…" on a note before turning the banner on
 // has to find it in the same place after. `attachBannerMenu` above is now three
 // lines and this is all of the behaviour, so there is one list.
 //
@@ -408,7 +408,7 @@ export function journalBannerMenu(
     // is regenerated anyway.
     menu.addItem((i: MenuItem) =>
       i
-        .setTitle("Template…")
+        .setTitle("Templates…")
         .setIcon("layout-template")
         .onClick(() =>
           openJournalTemplateWindow(plugin.app, plugin, notePath, ctx)

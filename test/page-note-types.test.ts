@@ -122,7 +122,7 @@ describe("what the page says it lists", () => {
   });
 
   it("declines to rewrite a note that already lists it", () => {
-    // `setPageLayout`'s posture: a second press of the same control moves no
+    // `setPageTemplate`'s posture: a second press of the same control moves no
     // bytes, so listing a type a page already lists is not a modification.
     expect(withPageType({ [PAGE_TYPES_KEY]: ["test"] }, "test")).toBeNull();
     expect(withPageType({}, "  ")).toBeNull();

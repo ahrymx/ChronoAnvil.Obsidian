@@ -23,7 +23,7 @@
 //
 // ── IN THE NOTE'S FRONTMATTER, ON `pagelayout`'S PRECEDENT ───────────────
 //
-// `setPageLayout` is the same shape one scope down: a per-NOTE override of a
+// `setPageTemplate` is the same shape one scope down: a per-NOTE override of a
 // journal-level default, written by a `⋯` on the thing it configures, stored as
 // one lowercase property. Everything that recommends it there recommends it
 // here, and the two alternatives are both worse in a way worth recording:
@@ -70,7 +70,7 @@ import {
 
 // The one property, spelled once.
 //
-// LOWERCASE AND UNSEPARATED, which is `PAGE_LAYOUT_KEY`'s shape and the only
+// LOWERCASE AND UNSEPARATED, which is `PAGE_TEMPLATE_KEY`'s shape and the only
 // other property this plugin owns on an index note. A `ca-` prefix is this
 // codebase's rule for CSS CLASSES and has never been its rule for frontmatter —
 // `type`, `date`, `status` and `pagelayout` are all bare.
@@ -135,7 +135,7 @@ export function pageTypesOf(app: App, file: TFile | null): string[] {
 // The list with one id added, or `null` where it is already there.
 //
 // `null` RATHER THAN THE SAME LIST, so the writer can decline to touch the file
-// at all — `setPageLayout`'s posture, and the reason a second press of the same
+// at all — `setPageTemplate`'s posture, and the reason a second press of the same
 // control moves no bytes.
 export function withPageType(
   fm: Record<string, unknown>,
@@ -174,7 +174,7 @@ export function withoutPageType(
 //
 // ABSENT IS NOT THIS. A kind with no `rated` entry inherits the journal's, which
 // is the state every index note in every vault is in today; `-` is the reader
-// saying no on this page. One word for each, because `setPageLayout`'s scar is
+// saying no on this page. One word for each, because `setPageTemplate`'s scar is
 // exactly the cost of giving one state two spellings.
 export const RATED_NONE = "-";
 
@@ -314,7 +314,7 @@ export function withRated(
 // The whole property, with one kind's entry replaced — or removed where the
 // entry has become blank.
 //
-// `undefined` MEANS DELETE THE PROPERTY, which is `setPageLayout`'s contract:
+// `undefined` MEANS DELETE THE PROPERTY, which is `setPageTemplate`'s contract:
 // absent is what "the journal's own answer" already spells everywhere else, so
 // an empty map left behind would be a second spelling of it sitting in the
 // reader's frontmatter for ever.

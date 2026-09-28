@@ -51,9 +51,9 @@ import { notify } from "../../core/notify";
 import type { JournalKind, JournalType } from "../../journals/journal";
 import {
   isPromotedPath,
-  pageLayoutChoices,
-  pageLayoutOf,
-  pageLayoutShown,
+  pageTemplateChoices,
+  pageTemplateOf,
+  pageTemplateShown,
   pagePathsOf,
 } from "../../journals/page-default";
 
@@ -98,7 +98,7 @@ export function attachKindRowMenu(
       );
       return;
     }
-    addPageLayoutRows(menu, table, live, path);
+    addPageTemplateRows(menu, table, live, path);
     addDeleteRows(menu, table, path);
   });
   // NAMED AFTER THE ROW IT ACTS ON, which is 4.48's rule for the same reason:
@@ -116,11 +116,11 @@ export function attachKindRowMenu(
 //
 // ── THE ROWS IT DOES *NOT* HAVE ──────────────────────────────────────────
 //
-// No layout rows. `addPageLayoutRows` answers *"what are THIS note's pages built
+// No template rows. `addPageTemplateRows` answers *"what are THIS note's pages built
 // from"*, and on a page that question is about its sub-pages — a real question,
 // and one the reader has not asked for. It is also stored on the note that HOLDS
 // the pages, so a page's answer would be read from a page, which is a second
-// place `pageLayoutOf` would have to be taught about. Left out until asked for,
+// place `pageTemplateOf` would have to be taught about. Left out until asked for,
 // rather than half-wired.
 //
 // THE THREE IT DOES HAVE ARE THE THREE THE READER NAMED: rename, a new page
@@ -203,7 +203,7 @@ async function renamePage(table: KindRowContext, path: string): Promise<void> {
 
 // ── What this title's pages are built from ───────────────────────────────
 
-function addPageLayoutRows(
+function addPageTemplateRows(
   menu: Menu,
   { plugin, type, kind }: KindRowContext,
   file: TFile,
@@ -212,39 +212,39 @@ function addPageLayoutRows(
   const label = kind.pages.label;
   const cfg = plugin.journals.configOf(type);
   const fm = frontmatterOf(plugin.app, file);
-  // TICKED ON WHAT WOULD BE USED, NOT ON WHAT IS STORED. A note naming a layout
+  // TICKED ON WHAT WOULD BE USED, NOT ON WHAT IS STORED. A note naming a template
   // that has since been deleted makes its pages from the default, and a menu
   // ticking the missing row would be describing a state the plugin will not
-  // honour. `pageLayoutShown` is the one place that resolution lives.
-  const shown = pageLayoutShown(cfg, pageLayoutOf(fm));
+  // honour. `pageTemplateShown` is the one place that resolution lives.
+  const shown = pageTemplateShown(cfg, pageTemplateOf(fm));
 
   menu.addItem((item) =>
     item.setTitle(`New ${plural(label).toLowerCase()} use…`).setIsLabel(true)
   );
-  for (const row of pageLayoutChoices(cfg, label)) {
+  for (const row of pageTemplateChoices(cfg, label)) {
     menu.addItem((item) =>
       item
         .setTitle(row.label)
         .setChecked(row.id === shown)
         // BY PATH AGAIN, for the reason at `attachKindRowMenu`: this click is a
         // second one, and between the two the note may have moved.
-        .onClick(() => void setLayout(plugin, path, row.id))
+        .onClick(() => void setPageTemplate(plugin, path, row.id))
     );
   }
   menu.addSeparator();
 }
 
-async function setLayout(
+async function setPageTemplate(
   plugin: ChronoAnvilPlugin,
   path: string,
-  layoutId: string
+  templateId: string
 ): Promise<void> {
   const file = getFile(plugin.app, path);
   if (!file) {
     notify.info("That note has already moved — this list is out of date.");
     return;
   }
-  await plugin.journals.setPageLayout(file, layoutId);
+  await plugin.journals.setPageTemplate(file, templateId);
 }
 
 // ── Deleting it ──────────────────────────────────────────────────────────

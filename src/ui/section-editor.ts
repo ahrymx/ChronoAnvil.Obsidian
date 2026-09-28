@@ -58,14 +58,13 @@
 // The Changes tab is item 2 made visible. It is not decoration: it is the
 // reason "generates, never regenerates" was allowed to stop being the rule.
 
-import { App, Notice, TFile, setIcon } from "obsidian";
+import { App, Notice, Setting, TFile, setIcon } from "obsidian";
 import { EditorModal } from "./editor-modal";
 import { createListRow, type ListRowOptions } from "./list-row";
 import {
   only,
   promptChoice,
   promptDetailedSuggester,
-  promptLayoutSave,
 } from "./modals";
 import type ChronoAnvilPlugin from "../main";
 import { getFile } from "../core/util";
@@ -135,7 +134,7 @@ import { notify } from "../core/notify";
 // never read at once. You arrange, then you check what that would do. So each
 // pane gets the whole width and the reader moves between them, which is also
 // what makes this work on a phone.
-type Pane = "sections" | "changes" | "markdown" | "layout";
+type Pane = "sections" | "changes" | "markdown" | "template";
 
 // Storing the arrangement under a name, where the surface has somewhere to
 // store one.
@@ -147,11 +146,11 @@ type Pane = "sections" | "changes" | "markdown" | "layout";
 // is supposed to be agnostic. The caller knows its own context and can resolve
 // them from the id list.
 export interface ArrangementSink {
-  // The button's own words, because "layout" and "variant" are the journal's
-  // vocabulary and another surface may not share it.
-  buttonLabel: string;
-  promptTitle: string;
-  promptPlaceholder: string;
+  // The only word that still differs between surfaces: "e.g. Math Lesson"
+  // against "e.g. Quiet Monday". It had three label fields until 1.0.46, when
+  // both surfaces started calling the thing a template and the other two became
+  // the same string twice — see `core/vocabulary.ts`.
+  namePlaceholder: string;
   // Where else this arrangement may be offered, and which of those the caller
   // is saving FROM. 3.18 follow-ups §5.
   //
@@ -294,6 +293,13 @@ export class SectionEditorModal extends EditorModal {
   // it was the half you could not see. Now it is a pane like the others and the
   // reader came here to arrange, so that is what the window opens on.
   private pane: Pane = "sections";
+  // The Template pane's form. `templateSaved` holds the name of the last
+  // arrangement saved in this session, which is what turns the form into a
+  // confirmation — the window stays open, so a success has to be visible
+  // somewhere and a Notice that has already faded is not it.
+  private templateName = "";
+  private templateTargets = new Set<string>();
+  private templateSaved: string | null = null;
   // Which rows share a block with the row above them. 4.8 §2.
   //
   // A FLAG PER ROW RATHER THAN A LIST OF BLOCKS, and the reason is `rows`
@@ -914,7 +920,7 @@ export class SectionEditorModal extends EditorModal {
     if (this.pane === "sections") this.renderList(pane);
     else if (this.pane === "changes") this.renderChanges(pane);
     else if (this.pane === "markdown") this.renderMarkdown(pane);
-    else this.renderLayout(pane);
+    else this.renderTemplate(pane);
   }
 
   private renderTabs(host: HTMLElement): void {
@@ -938,7 +944,7 @@ export class SectionEditorModal extends EditorModal {
     // they press and the tab is where they would go to check.
     tab("changes", n === 0 ? "Changes" : `Changes (${n})`);
     tab("markdown", "Markdown");
-    tab("layout", "Layout");
+    tab("template", "Template");
   }
 
   // The rows, in bands.
@@ -2855,7 +2861,30 @@ export class SectionEditorModal extends EditorModal {
     });
   }
 
-  private renderLayout(pane: HTMLElement): void {
+  // ── THE TEMPLATE PANE (1.0.46) ─────────────────────────────────────────
+  //
+  // IT WAS A TAB THAT STORED NOTHING BESIDE A BUTTON THAT STORED EVERYTHING.
+  // The tab was called Layout and drew a read-only wireframe; the footer carried
+  // *Save as layout…*, which opened a modal over this modal and wrote a saved
+  // arrangement. One word, two controls, no relation — and the window that
+  // managed what the button saved was called Template. There is one word now,
+  // and the wireframe is what it was always closest to being: the PREVIEW of the
+  // thing about to be saved.
+  //
+  // THE WIREFRAME IS UNCHANGED. Same `groupsOf(idsOf(this.want))` walk, same
+  // blocks, same band headings. It is the shape of the note as arranged, which
+  // is exactly what the name will be attached to.
+  //
+  // NO SINK, NO FORM. A surface with nowhere to store an arrangement (a diary
+  // dashboard) gets the wireframe alone rather than a greyed form — *nothing
+  // dead is drawn*, which is this window's rule and the Template windows'.
+  private renderTemplate(pane: HTMLElement): void {
+    this.renderWireframe(pane);
+    const sink = this.spec.arrangement;
+    if (sink) this.renderSaveForm(pane, sink);
+  }
+
+  private renderWireframe(pane: HTMLElement): void {
     let band: string | null | undefined;
     // IDS, because this pane draws the SHAPE of the note — which blocks, in
     // which bands, in which order — and an answer changes what a block says
@@ -2886,28 +2915,118 @@ export class SectionEditorModal extends EditorModal {
     }
   }
 
+  // Keep what is drawn above under a name. 1.0.46.
+  //
+  // READS THE ROWS, NOT THE FILE, which is what the footer button did and the
+  // reason this belongs in a pane rather than behind Save: a reader can arrange,
+  // keep the arrangement under a name, and leave this file exactly as it was —
+  // which is the common case. You want the template, not the change.
+  //
+  // IT STAYS OPEN. The old modal closed the whole editor on success, which was
+  // defensible for a modal-over-modal and is wrong for a pane: there may be
+  // pending changes on the Sections tab that the reader still means to Save, and
+  // closing the window would throw them away as the reward for saving a
+  // template. So the form is replaced by a line naming what was saved.
+  //
+  // THE ORIGIN TARGET IS TICKED AND CANNOT BE UNTICKED, and it is re-added at
+  // submit rather than trusted from a disabled control. A template saved from a
+  // Lesson is a Lesson template: saving it applying to nothing would store a
+  // recipe nothing can cook, and letting it apply to Practice ALONE would
+  // silently move the arrangement off the note the reader is looking at.
+  private renderSaveForm(pane: HTMLElement, sink: ArrangementSink): void {
+    pane.createDiv({
+      cls: "ca-tpl-band",
+      text: "Save this note as a template",
+    });
+
+    if (this.templateSaved) {
+      pane.createDiv({
+        cls: "ca-tpl-note",
+        text: `Saved as “${this.templateSaved}”. This file hasn't been changed — open Templates… on the banner to apply it, rename it or make it the default.`,
+      });
+      const again = pane.createEl("button", {
+        text: "Save another",
+        cls: "ca-tpl-toggle",
+      });
+      again.addEventListener("click", () => {
+        this.templateSaved = null;
+        this.templateName = "";
+        this.refreshBody();
+      });
+      return;
+    }
+
+    pane.createDiv({
+      cls: "ca-tpl-note",
+      text: "Keeping this arrangement under a name doesn't change this file. New notes can be built from it, and it can be applied to an empty one.",
+    });
+
+    const targets = sink.targets ?? [];
+    const origin = sink.originTarget ?? targets[0]?.id ?? "";
+    if (!this.templateTargets.size) this.templateTargets.add(origin);
+
+    // BOTH HOSTS FIRST, THEN THE BUTTON, THEN THE FIELDS. The name field has to
+    // enable and disable the Save button, so the button must exist before the
+    // field is drawn — and the fields must sit above it on screen. Creating the
+    // two containers in reading order and filling them out of order is what
+    // gets both without a forward-declared `let`.
+    const fields = pane.createDiv();
+    const actions = pane.createDiv({ cls: "ca-tpl-actions" });
+    const save = actions.createEl("button", {
+      text: "Save template",
+      cls: "mod-cta",
+    });
+    save.disabled = !this.templateName.trim();
+    save.addEventListener("click", () => void this.saveArrangement(sink, origin));
+
+    new Setting(fields).setName("Name").addText((t) => {
+      t.setPlaceholder(sink.namePlaceholder)
+        .setValue(this.templateName)
+        .onChange((v) => {
+          this.templateName = v;
+          save.disabled = !v.trim();
+        });
+      t.inputEl.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        if (this.templateName.trim()) void this.saveArrangement(sink, origin);
+      });
+    });
+
+    // HIDDEN AT ONE TARGET, the rule the create dialogue's own fields spell out:
+    // a control whose value cannot change spends attention and returns nothing.
+    if (targets.length > 1) {
+      new Setting(fields)
+        .setName("Available for")
+        .setDesc(
+          "Which notes can be created from this template. Each gets its own template file."
+        );
+      for (const target of targets) {
+        const fixed = target.id === origin;
+        new Setting(fields).setName(target.label).addToggle((tg) => {
+          tg.setValue(this.templateTargets.has(target.id));
+          tg.setDisabled(fixed);
+          tg.onChange((v) => {
+            if (v) this.templateTargets.add(target.id);
+            else this.templateTargets.delete(target.id);
+          });
+        });
+      }
+    }
+  }
+
   // ── footer ────────────────────────────────────────────────────────────
 
   protected renderFooter(footer: HTMLElement): void {
     const cancel = footer.createEl("button", { text: "Cancel" });
     cancel.addEventListener("click", () => this.close());
 
-    // SAVE THE ARRANGEMENT — what is on screen, kept under a name.
-    //
-    // The one place an arrangement is persisted, and the reason it is allowed
-    // to be: it is a recipe for a note that does not exist yet, so there is no
-    // file to be the record. Once that file has been written, it is the truth
-    // and this window edits it like any other. The stored arrangement is only
-    // ever the seed.
-    //
-    // Reads the rows rather than the file, so a reader can arrange, save the
-    // arrangement under a name, and leave this file untouched — which is the
-    // common case: you want the variant, not the change.
-    const sink = this.spec.arrangement;
-    if (sink) {
-      const b = footer.createEl("button", { text: sink.buttonLabel });
-      b.addEventListener("click", () => void this.saveArrangement(sink));
-    }
+    // THE ARRANGEMENT IS SAVED FROM THE TEMPLATE PANE, NOT FROM HERE (1.0.46).
+    // A *Save as layout…* button stood between Cancel and Save, which put two
+    // different saves a few pixels apart — one writing the file, one writing a
+    // recipe for files that do not exist yet — and named them with two different
+    // words for the same thing. The footer is Cancel and Save again; the pane
+    // that draws what is about to be saved is where it is saved.
 
     const n = this.changeCount();
     const save = footer.createEl("button", {
@@ -2918,22 +3037,18 @@ export class SectionEditorModal extends EditorModal {
     save.addEventListener("click", () => void this.trySubmit());
   }
 
-  private async saveArrangement(sink: ArrangementSink): Promise<void> {
-    // THE NAME AND WHERE IT APPLIES ARE ONE DECISION, so they are one window —
-    // `promptNewNote`'s rule, and the reason this is not a name prompt followed
-    // by a second modal a reader can cancel half-way through. With one target
-    // the kind list is not drawn and this is the name prompt it has always been.
-    const targets = sink.targets ?? [];
-    const origin = sink.originTarget ?? targets[0]?.id ?? "";
-    const details = await promptLayoutSave(
-      this.app,
-      sink.promptTitle,
-      sink.promptPlaceholder,
-      targets,
-      origin
-    );
-    const label = details?.label;
-    if (!label?.trim()) return;
+  private async saveArrangement(
+    sink: ArrangementSink,
+    origin: string
+  ): Promise<void> {
+    const label = this.templateName;
+    if (!label.trim()) return;
+    // THE ORIGIN IS RE-ADDED RATHER THAN TRUSTED: a disabled toggle cannot be
+    // turned off through the UI, and this is the invariant rather than the
+    // control's behaviour. It was `LayoutSaveModal.onClose`'s line and it is
+    // still the reason the form can be believed.
+    const targets = new Set(this.templateTargets);
+    targets.add(origin);
     // IDS, NOT CHOICES, and `ArrangementSink.save` still says so in its type.
     // An arrangement is a recipe for a note that does not exist yet and is
     // named by ids for the reason `SectionChoice`'s header gives: an id is
@@ -2943,8 +3058,9 @@ export class SectionEditorModal extends EditorModal {
     // sections ask nothing — so nothing is dropped here today, and the day one
     // does, the honest thing is to widen the sink rather than to have this
     // window quietly store half an answer.
-    await sink.save(label.trim(), idsOf(this.want), details!.kinds);
-    this.close();
+    await sink.save(label.trim(), idsOf(this.want), [...targets]);
+    this.templateSaved = label.trim();
+    this.refreshBody();
   }
 
   protected validate(): string | null {

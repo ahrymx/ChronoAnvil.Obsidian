@@ -1456,7 +1456,7 @@ export class Scaffold {
       // Null here would mean plan and apply disagreed, which is a bug rather
       // than a no-op — planLayout found work and applyLayout found none.
       if (next == null) {
-        console.error(`[ChronoAnvil] layout plan/apply disagreed for ${dest}`);
+        console.error(`[ChronoAnvil] shipped-page plan/apply disagreed for ${dest}`);
         continue;
       }
       await this.app.vault.modify(file, next.join("\n"));
@@ -1818,7 +1818,7 @@ export class Scaffold {
         if (titled !== original) {
           ops.push({
             kind: "migrate",
-            detail: "bring the Trends section up to the self-titled layout",
+            detail: "bring the Trends section up to the self-titled shape",
           });
         }
         if (respelled !== titled) {

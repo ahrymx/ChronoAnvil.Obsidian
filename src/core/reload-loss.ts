@@ -265,3 +265,82 @@ export function reloadLoss(
 
   return out;
 }
+
+// ── WHAT THE BOX SHOWS, WHICH IS NOT THE WHOLE LIST (1.0.46) ─────────────
+//
+// `journalReloadLoss` answers a question about the FILE and answers it one
+// thing at a time, which is the contract stated at the top of this module: a
+// boolean "cannot rebuild" is untestable in the way that matters, because it
+// cannot say WHICH of several unrelated facts broke. That is still right and
+// nothing below changes it.
+//
+// It is the wrong list to PRINT. Prose is emitted one entry per loose line, so
+// a note somebody actually wrote in — a cheat sheet of fifteen headings, tables
+// and display maths — produced sixty-odd rows, each one a raw markdown line
+// with `— written outside any section` after it, in a box above the templates
+// it was there to introduce. The window scrolled for a page and a half before
+// reaching the thing it manages, and every row after the third said the same
+// sentence.
+//
+// SO THE SUMMARY IS A VIEW, and it lives here rather than in either modal for
+// the reason the list itself does: both windows draw the same box, and the
+// journal one is where the fifteen-heading page turns up. One implementation,
+// two doors.
+//
+// GROUPED BY `detail` RATHER THAN BY `kind`. The detail is the sentence the row
+// prints, so a group is exactly the set of rows that would read identically —
+// which is the thing being collapsed. Grouping by kind would merge a chart you
+// added with a stray directive, and those say different things.
+//
+// FIRST APPEARANCE ORDER, so the contract order at the top of this module —
+// regions, then trackers, then the surface's own, then prose — survives into
+// what the reader sees. Prose is last, which is also the group most likely to
+// be the one that got cut.
+//
+// AND THE CAP IS PER GROUP, not over the whole list. A global cap would let
+// forty prose lines push a region's `holds your writing` off the bottom, and
+// that row is the one a reader can act on.
+
+/** How many rows of one kind the box prints before it starts counting. */
+export const LOSS_SHOWN = 3;
+
+/** Longest label printed before it is cut — a loose line can be a whole table row. */
+const LABEL_MAX = 72;
+
+// One line of the box, ready to print.
+//
+// NOTHING IS PLURALISED INTO THE DETAIL. "3 sections holds your writing" is
+// what building the count into that sentence produces, and the fix is not five
+// plural forms in a table — it is to leave every printed row in the shape it
+// already had (`label — detail`) and add ONE row that counts the rest. See
+// `RETIRED_WORDS`' own grammar traps in `vocabulary.ts`: a sentence assembled
+// from parts is where this codebase keeps meeting the same bug.
+export function summariseLoss(loss: ReloadLoss[]): string[] {
+  const groups: { detail: string; labels: string[] }[] = [];
+  for (const l of loss) {
+    const at = groups.find((g) => g.detail === l.detail);
+    if (at) at.labels.push(l.label);
+    else groups.push({ detail: l.detail, labels: [l.label] });
+  }
+
+  const out: string[] = [];
+  for (const g of groups) {
+    for (const label of g.labels.slice(0, LOSS_SHOWN)) {
+      out.push(`${cut(label)} — ${g.detail}`);
+    }
+    const rest = g.labels.length - LOSS_SHOWN;
+    if (rest > 0) {
+      out.push(`…and ${rest} more like ${rest === 1 ? "it" : "these"}`);
+    }
+  }
+  return out;
+}
+
+// A label short enough to read, with the cut marked.
+//
+// TRIMMED FIRST, because a loose line keeps its indentation and a row that
+// begins with four spaces looks like a broken list rather than a quoted line.
+function cut(label: string): string {
+  const s = label.trim();
+  return s.length <= LABEL_MAX ? s : `${s.slice(0, LABEL_MAX - 1).trimEnd()}…`;
+}

@@ -47,13 +47,14 @@ import { SCOPE_JOURNAL } from "../core/directive-grammar";
 import { notify } from "../core/notify";
 import { repaintOpenNotes } from "../ui/livewidget";
 import {
-  PAGE_LAYOUT_DEFAULT,
-  PAGE_LAYOUT_KEY,
+  PAGE_TEMPLATE_DEFAULT,
+  PAGE_TEMPLATE_KEY,
+  LEGACY_PAGE_TEMPLATE_KEY,
   configOfJournal,
   nextPageOrder,
-  pageLayoutChoices,
-  pageLayoutOf,
-  pageLayoutShown,
+  pageTemplateChoices,
+  pageTemplateOf,
+  pageTemplateShown,
   pageOrderOf,
 } from "./page-default";
 import {
@@ -2157,22 +2158,22 @@ export class JournalManager {
     if (!folderPath) return;
 
     // BOTH FIELDS, ALWAYS (4.50 §1). `kind.templates` always holds at least the
-    // default variant, and `pageLayoutChoices` always holds at least the page
+    // default variant, and `pageTemplateChoices` always holds at least the page
     // default — so neither list is ever empty and neither field is ever hidden.
     //
     // AND THE PAGES HALF IS NO LONGER CONDITIONAL. It was absent, not empty, for
     // a kind that could not hold pages; every kind can (1.0.23), so every kind's
-    // create dialogue asks which layout its pages open with.
-    const pageRows = pageLayoutChoices(this.configOf(type), kind.pages.label);
+    // create dialogue asks which template its pages open with.
+    const pageRows = pageTemplateChoices(this.configOf(type), kind.pages.label);
     const details = await promptNewNote(this.app, {
       heading: `${kind.emoji} New ${kind.label.toLowerCase()}`,
       titlePlaceholder: `${kind.label} title`,
-      layoutLabel: "Layout",
+      templateLabel: "Template",
       templates: kind.templates.map((t) => ({ id: t.id, label: t.label })),
       pages: {
-        label: `${kind.pages.label} layout`,
+        label: `${kind.pages.label} template`,
         templates: pageRows,
-        templateId: PAGE_LAYOUT_DEFAULT,
+        templateId: PAGE_TEMPLATE_DEFAULT,
       },
     });
     if (!details?.title.trim()) return;
@@ -2219,7 +2220,7 @@ export class JournalManager {
       created: nowTimestamp(),
     });
     const file = await createFileEnsuringFolders(this.app, notePath, content);
-    await this.setPageLayout(file, details.pageTemplateId);
+    await this.setPageTemplate(file, details.pageTemplateId);
     await openFile(this.app, file);
     notify.ok(`${kind.label} created!`);
   }
@@ -2240,19 +2241,29 @@ export class JournalManager {
   // contract and `cardStat`'s shape before it — so writing an id meaning "no
   // id" would give one state two spellings and leave every note in every vault
   // in the other one.
-  async setPageLayout(file: TFile, layoutId: string): Promise<void> {
-    const id = layoutId.trim();
+  //
+  // AND IT MIGRATES THE OLD SPELLING ON ITS WAY PAST (1.0.46). The property was
+  // `pagelayout:` until "layout" stopped being a word for a saved arrangement,
+  // and `pageTemplateOf` reads both — so a note is never broken by the rename.
+  // What it must not become is a note carrying both keys, because the two would
+  // then be two records of one answer with nothing keeping them equal. So every
+  // write of the new key deletes the old one in the same transaction, and a
+  // title touched once is migrated whether or not the id changed.
+  async setPageTemplate(file: TFile, templateId: string): Promise<void> {
+    const id = templateId.trim();
     const fm = frontmatterOf(this.app, file);
-    if (!id && !(PAGE_LAYOUT_KEY in fm)) return;
+    const legacy = LEGACY_PAGE_TEMPLATE_KEY in fm;
+    if (!id && !(PAGE_TEMPLATE_KEY in fm) && !legacy) return;
     await this.app.fileManager.processFrontMatter(file, (front) => {
-      if (id) front[PAGE_LAYOUT_KEY] = id;
-      else delete front[PAGE_LAYOUT_KEY];
+      if (id) front[PAGE_TEMPLATE_KEY] = id;
+      else delete front[PAGE_TEMPLATE_KEY];
+      delete front[LEGACY_PAGE_TEMPLATE_KEY];
     });
   }
 
   // What ONE INDEX NOTE says about one of its note types' tables. 1.0.33.
   //
-  // `setPageLayout`'S SHAPE, AND ITS DELETE. An entry that has become blank is
+  // `setPageTemplate`'S SHAPE, AND ITS DELETE. An entry that has become blank is
   // taken out and a property with nothing left in it goes with it, because
   // absent is what "the journal's own answer" already spells — see
   // `kind-tables.ts`, which holds the whole argument and the merge.
@@ -2284,7 +2295,7 @@ export class JournalManager {
   // nothing and the reader presses a button that does nothing visible.
   //
   // A SECOND PRESS MOVES NO BYTES, which is `withPageType` returning null —
-  // `setPageLayout`'s posture, and the reason listing a type a page already
+  // `setPageTemplate`'s posture, and the reason listing a type a page already
   // lists is not a modification of the file.
   // RESOLVES TO THE LIST THE FILE NOW CARRIES, which is not a convenience.
   // `frontmatterOf` reads Obsidian's metadata cache, and the cache is updated
@@ -2346,7 +2357,7 @@ export class JournalManager {
   // as another kind moves no bytes and the row reappears under a different head at
   // the next repaint, which the live widget does by itself.
   //
-  // `setPageLayout`'S SHAPE, WITH ONE DIFFERENCE. That one DELETES its key for the
+  // `setPageTemplate`'S SHAPE, WITH ONE DIFFERENCE. That one DELETES its key for the
   // default, because absent means "the journal's page default" there and one state
   // must not have two spellings. A kind has no default — absent means the note is
   // not one of the journal's at all — so this always writes.
@@ -2556,13 +2567,13 @@ export class JournalManager {
     // dependency, and stating it is what keeps someone from restoring the old
     // order to "have the host handy".
     const cfg = this.configOf(type);
-    const rows = pageLayoutChoices(cfg, pages.label);
+    const rows = pageTemplateChoices(cfg, pages.label);
     const details = await promptNewNote(this.app, {
       heading: `${pages.label} in ${file.basename}`,
       titlePlaceholder: `${pages.label} title`,
-      layoutLabel: "Layout",
+      templateLabel: "Template",
       templates: rows,
-      templateId: pageLayoutShown(cfg, pageLayoutOf(fm)),
+      templateId: pageTemplateShown(cfg, pageTemplateOf(fm)),
     });
     if (!details?.title.trim()) return;
     const safeTitle = details.title.trim().replace(/[\\/:"*?<>|]/g, "-");
@@ -2584,10 +2595,10 @@ export class JournalManager {
 
     // A saved layout is COMPOSED; the default is the file on disk. Both are
     // templates carrying `{{tokens}}`, so `fillTemplate` below cannot tell them
-    // apart — see `JournalTemplates.pageLayoutText`, which is the only thing
+    // apart — see `JournalTemplates.pageTemplateText`, which is the only thing
     // that knows a layout exists.
     const tpl =
-      this.plugin.journalTemplates.pageLayoutText(
+      this.plugin.journalTemplates.pageTemplateText(
         type,
         kind,
         details.templateId
@@ -2756,13 +2767,13 @@ export class JournalManager {
   }
 
 
-  // Store an arrangement as one of a kind's saved layouts. 3.18 §6.
+  // Store an arrangement as one of a kind's saved templates. 3.18 §6.
   //
   // MOVED OFF THE SETTINGS MODAL, unchanged in what it does. It lived on
   // `JournalEditModal` and wrote into that window's draft config, which meant
-  // the only way to save a layout was to have the settings window open — while
-  // the button that calls it, "Save as layout…", is rendered by the section
-  // editor, which is also reachable from the banner on any note. The feature
+  // the only way to save a template was to have the settings window open — while
+  // the control that calls it — the section editor's Template pane since 1.0.46 —
+  // is reachable from the banner on any note. The feature
   // was built and the door was a fourth argument (`onSaveVariant`) that one
   // caller in two passed.
   //
@@ -2792,8 +2803,8 @@ export class JournalManager {
   // when the id was not a real kind — and the second is a Save button that does
   // nothing on two of the three surfaces the window can now be opened from.
   // `splitLayoutTargets` does the splitting, in one place, for both doors; the
-  // origin is not a parameter at all because `promptLayoutSave` already
-  // guarantees the surface it was saved from is ticked.
+  // origin is not a parameter at all because the section editor's Template pane
+  // already guarantees the surface it was saved from is ticked.
   async saveVariant(
     typeId: string,
     label: string,
@@ -2805,7 +2816,7 @@ export class JournalManager {
     const cfg = configOfJournal(this.plugin.settings.customJournals, typeId);
     if (!cfg) {
       new Notice(
-        "Saved layouts are stored on a journal you defined, and this journal is not one of them."
+        "Saved templates are stored on a journal you defined, and this journal is not one of them."
       );
       return;
     }
@@ -2813,7 +2824,7 @@ export class JournalManager {
       // SAID, NOT SWALLOWED. The old spelling was a bare `return` on an
       // unrecognised kind, which a reader cannot tell from a save that worked.
       new Notice(
-        "ChronoAnvil: pick at least one note type or surface to offer this layout on."
+        "ChronoAnvil: pick at least one note type or surface to offer this template on."
       );
       return;
     }
@@ -2950,7 +2961,7 @@ export function pageKindOf(
 // and hands the same value to every kind, which is the fact that makes a page
 // answerable at all. So for a page the config is the journal's, full stop.
 //
-// THE KIND IS STILL RESOLVED, by walking up. `pageLayoutText` composes a page
+// THE KIND IS STILL RESOLVED, by walking up. `pageTemplateText` composes a page
 // against `sectionContext(type, { page: kind })`, which reads the kind's rating
 // and noun — so a sub-page of a Lesson must compose as a Lesson's page and not
 // as an arbitrary one. The walk asks each folder above for its folder note and

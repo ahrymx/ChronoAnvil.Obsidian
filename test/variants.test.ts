@@ -217,12 +217,16 @@ describe("Study is unchanged", () => {
 });
 
 describe("one word for one thing", () => {
-  it("calls a saved layout a layout in every user-facing string", () => {
+  it("calls a saved arrangement a template in every user-facing string", () => {
     // 2.54.7 shipped three words for one concept — "variant" in the code,
-    // "Template type" in the new-note popup, "layout" in the docs — which is
-    // two too many for something a reader meets in three places. The type name
-    // is still JournalTemplateVariant and that is admitted to in modals.ts;
-    // what a reader SEES is unified, and this is what keeps it that way.
+    // "Template type" in the new-note popup, "layout" in the docs — which is two
+    // too many for something a reader meets in three places. It unified them on
+    // "layout" while the window that MANAGED them was called Template…, and
+    // 1.0.46 settled it the other way: a template is a saved arrangement of
+    // sections, full stop. `src/core/vocabulary.ts` carries the definition and
+    // the boundary; `test/template-vocabulary.test.ts` sweeps every string in
+    // `src/` for the retired noun. What is left here is the other half — the
+    // CODE's word must not leak either.
     const src = [
       readSrc("template-editor"),
       readSrc("settings-editors"),
@@ -236,7 +240,8 @@ describe("one word for one thing", () => {
       (q) => /^"[A-Z]/.test(q) && !q.includes("./")
     );
     expect(uiish).toEqual([]);
-    expect(src).toContain('"Save as layout…"');
-    expect(src).toContain('"Layout"');
+    // And the word a reader does see, on the field the create dialogue draws.
+    expect(src).toContain('"Template"');
+    expect(src).toContain('"Rename template"');
   });
 });

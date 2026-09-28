@@ -42,14 +42,14 @@ its items drop the prefix — the group is said once per surface, never twice.
 - **Diary: quick capture**, **Diary: search**, and the four **Diary: open the weekly / monthly / quarterly / yearly overview** commands, each of which sets the dashboard to *now* rather than leaving it wherever you last browsed
 - **Study: new journal (subject)** — creates a subject folder + index note. Study is one of four **presets** (Settings → Journals → Presets), alongside **Projects**, **Exercise & Diet** and **Media**; a fresh vault installs none of them, and these commands appear only once a journal that declares them exists.
 - **Study: new topic** — pick a subject, name a topic; creates the topic folder + index
-- **Study: new lesson** / **Study: new practice** — created in the current topic folder (or pick one). The popup also asks which **Layout** to use, when the kind has more than one — arrange a template's sections however you like, press **Save as layout…**, and it becomes a choice here. That button is on the note itself as well as in Settings — arrange the note in front of you, then keep the arrangement from the same window. (Saved layouts live on journals you defined; the built-in Study journal has nowhere to store one.) A layout is not a new kind: a Math Lesson is still a Lesson, with the same trackers, the same review queue and the same tables.
+- **Study: new lesson** / **Study: new practice** — created in the current topic folder (or pick one). The popup also asks which **Template** to use — arrange a note's sections however you like, then open **Note: edit sections…**, go to its **Template** tab and give the arrangement a name, and it becomes a choice here. The tab shows the shape you are about to save above the name box, and saving it does not change the note you saved it from. (Saved templates live on journals you defined; a journal with no stored definition has nowhere to keep one.) A template is not a new note type: a Math Lesson is still a Lesson, with the same trackers, the same review queue and the same tables.
 - **Note: edit sections…** — the note's whole section list: add from the catalogue (Find, Review queue, Charts, Progress, Open tasks, Recall cards, a Notes field, Resources, a Path…), reorder, rename, or remove. Nothing reaches the note until you save, and the button counts what it is about to do. Some sections — the Task Manager, Resources, and the table of what's below a folder note — carry a title box in their row: leave it empty for the heading the plugin writes, or type your own. A dashboard that is missing a note table, because its journal gained a note type after the dashboard was written, shows up here as one entry offering to add it; your own notes are never touched this way. Works on a journal note or on one of its templates — both are just markdown, and the directives don't care which. The list offered is filtered to what belongs on that note's surface (a review queue is an index-note thing, recall cards are a leaf-note thing) and leaves out anything the note already has.
 - **Note: trackers for this entry…** — one list with the state in it: what this entry carries is shown first and marked, then what could be added, then *New tracker…*. Picking a present row removes it; picking an absent one adds it.
 - **Note: new page** and **Note: convert to a dashboard** — offered only on a note that is inside a journal.
 - **Note: next page in this widget group** / **Note: previous page in this widget group** — switch which page of a tabbed group is on screen (see `tab` under the widgets). Offered only on a note that has one. These are the two commands worth **binding a key to** in Settings → Hotkeys; nothing ships bound, because a default would collide with whatever you already use. They act on the group you last clicked in and wrap at both ends.
 - **Diary: new special event…** — add a birthday, holiday, trip or sick day
 - **Diary: open the special events note**
-- **Maintenance: refresh journals on the homepage** — re-reads every journal's folders and repaints the Journals banner, which is also what the **Refresh** button in the banner's hero does. On a homepage still carrying an older layout it additionally replaces that whole generated section — the `📚 Journals` header bar, the per-type bars and the subject callouts — with the single `journals` directive that draws it now. That migration runs once; afterwards the section is live and nothing on the page is rewritten.
+- **Maintenance: refresh journals on the homepage** — re-reads every journal's folders and repaints the Journals banner, which is also what the **Refresh** button in the banner's hero does. On a homepage still carrying an older arrangement it additionally replaces that whole generated section — the `📚 Journals` header bar, the per-type bars and the subject callouts — with the single `journals` directive that draws it now. That migration runs once; afterwards the section is live and nothing on the page is rewritten.
 - **Maintenance: find unregistered journals** — restores any journal folder that carries its own manifest, and opens Settings on the list of any that would have to be reconstructed. Runs automatically on load; this is the button for when you have just copied a folder in and don't want to reload. See *Moving and importing a journal*.
 - **Maintenance: sync trackers into vault**, **Maintenance: refresh entry templates (overwrites)**, **Maintenance: refresh journal templates**
 - **Maintenance: set up / repair vault** — shown in red on the ribbon menu, because it is the one item there that writes to notes you cannot easily get back.
@@ -422,6 +422,62 @@ edit → Sections** lists the templates themselves — pressing *Edit sections* 
 one opens the same window over the template, which is where the Pages tick lives
 once the wizard is behind you.
 
+### Templates
+
+**A template is a saved arrangement of sections.** Every note type has one
+default template — what a new note of that type is built from — and you can save
+more under names. That is the whole of the vocabulary: there is no second word
+for it, and the same idea covers a journal's note types and the five diary
+grains.
+
+**You save one from the note in front of you.** Arrange it however you like in
+*Edit sections…*, then open that window's **Template** tab: it draws the shape
+you have arranged — the blocks, the rows, the bands — and under it a name box and
+a **Save template** button. Saving does not touch the note. Where a journal has
+more than one place a template can be offered, an **Available for** list lets you
+tick the others; the note type you saved it from is always included and cannot be
+unticked.
+
+**And you manage them from the note's banner.** The **⋯** menu's **Templates…**
+opens the manager for whatever the note is — a Lesson, an index, a page, a
+daily entry. It lists:
+
+- **⭐ Lesson default** — what a new note of this type is built from today. The
+  row is named after whatever the note is: *Subject index default*, *Page
+  default*, *Daily default*.
+- **🔒 ChronoAnvil default** — the arrangement the plugin ships. It cannot be
+  renamed or removed, which is what makes *put it back the way it came* always
+  one press away.
+- **🧩 each template you saved**, by name.
+
+Every row carries **Apply to this note** — it rebuilds the note from that
+template, showing you the change first — and every row but the first carries
+**Use as default**, which is what every new note of the type will be built from
+afterwards. Your own rows also carry **Rename** and **Remove**.
+
+**Remove takes it off one place, not everywhere.** A template offered on both
+Lesson and Practice is withdrawn from the one you are standing on and stays
+available for the other; only the last place holding it removes it. Either way
+the notes you built from it are untouched, and so is its template file — removing
+a template never deletes markdown.
+
+**A note you have written in cannot be rebuilt**, so *Apply* is not drawn on it
+at all rather than drawn and refusing. The window says what is standing in the
+way — a checklist you ticked, a chart you added, prose under a heading — and
+points at *Edit sections…*, which changes a note's sections without losing any of
+it. Renaming and removing still work: neither touches markdown.
+
+Below the list, **Save this note as the default** makes what is in front of you
+what every future note of the type is built from. It asks first, and it rewrites
+the type's template file through the same survey that shows you every added and
+removed line. Notes you already have keep what they have.
+
+**One thing that moved in 1.0.46.** A title note can say what its own pages open
+with, in a frontmatter property. That property used to be `pagelayout:` and is
+now **`pagetemplate:`**; a note still carrying the old spelling is read exactly
+as before, and the next time anything writes the property the old key goes. The
+bulk pass is `tools/migrate-vault.mjs` if you would rather not touch each note.
+
 Study's own Subject and Topic dashboards are built from this same catalogue —
 they hold no prose, so there was nothing to hand-write. Its Lesson, Practice and
 Page templates stay markdown files, because their substance *is* prose you fill
@@ -432,8 +488,8 @@ opens with a few `##` headings — Overview, Notes, Next steps, or whatever the
 journal's own preset says. They are real markdown headings rather than plugin
 fields, so they show in the outline, fold like any heading, and read the same if
 you ever uninstall ChronoAnvil. Retitle them, add them, remove them in any note;
-then **Save as layout…** on that note writes those headings into every note of
-that kind you make afterwards. Titles only — the words you wrote under a heading
+then **Templates…** on that note's banner → **Save this note as the default**
+writes those headings into every note of that kind you make afterwards. Titles only — the words you wrote under a heading
 stay in the note you wrote them in.
 
 **And it is drawn as a section now.** The writing between those markers sits on
@@ -466,13 +522,13 @@ exactly the rule above: untouched scaffolding goes, a heading you have written
 under stays with everything beneath it, and the change list names each one it is
 keeping. Untick it on a note you have not written in and nothing is left behind.
 A note written before those markers existed has none, so its skeleton is prose the
-plugin cannot pick out — the box is not drawn and the row says why. **Reload
-this note**, from the template window or the note's own command, composes the
-skeleton again with its markers and gives you both.
+plugin cannot pick out — the box is not drawn and the row says why. **Apply to this
+note**, in the Templates… window, composes the skeleton again with its markers
+and gives you both.
 
 **The templates are written once, at Create, and then they're yours.** Nothing
-regenerates them, there's no saved layout behind them and no "your layout has
-drifted" nag — the markdown *is* the design. Editing them afterwards is editing
+regenerates them, there's no saved arrangement behind them and no "your template
+has drifted" nag — the markdown *is* the design. Editing them afterwards is editing
 markdown, and adding a section later is the **Note: edit sections…**
 command, which shows the change before it writes anything. (Existing journals have no Sections step
 for exactly this reason: it could only either do nothing or overwrite a file
@@ -938,7 +994,7 @@ both grids always line up.
 
 A title card and three rows. The card at the top is the page's own name with a cog at its right — the cog opens the section editor, and clicking the name renames the note itself. Obsidian's own title above the note is hidden while that card is there, so the name is said once — remove the block and it comes back. **Every ChronoAnvil page has a banner now**: the homepage, Search, the diary and journals folder notes, the four period overviews, and — as they always did — diary entries and journal notes. A banner is one block that says which note this is and where it goes, and one row in the section editor. On the dashboards and Search it carries the page's name, a row of destinations — Home, Diary, Journals — and the Today/scope pills beneath them, all in one card. The homepage's banner keeps just the name, because its **Go to** grid is already that row. Entries and journal notes carry no separate name line: their banner already names the note and renames it. Those two are drawn by one **slim banner**, so there are two banner formats in the plugin, a large one for pages you land on and a slim one for pages you write in, and both open with the note's name and put the row of destinations under it. Under the slim banner sits the **page-context section**: on a diary entry the title you give the day, set large, with the navigator between entries at the far edge, then a caption row carrying the entry's date opposite **Tracking:**, then a hairline and the logging grid; on a journal note the note's level and kind above the same caption row and grid. Clicking the title opens a field the same size as the words in it, and a date ChronoAnvil cannot read is left blank rather than replaced with the name of the grain. The banner cannot be removed — it is the way out of the page. On a folder note the name is the folder's, so a default vault reads **02 - Diary** there, and renaming it renames the folder too. Then the top row is two columns — the diary card on the left, and a grid of shortcuts (**Go to**) with your open tasks and this date in previous years stacked on the right; then the journals card; then the vault's charts. The top row is a single `chronoanvil` block with a `row` line in it, which is what puts those three next to each other. A row wraps rather than squeezing: each cell asks for a minimum width, so the three are three across on a wide window, two and one on a half-width pane, and a plain column on a phone.
 
-You can rearrange any of it from **Edit this note's sections…**. Unticking one widget of a row removes just that widget and leaves the row, whether it stood alone in a column or was stacked with another; a member whose lines cannot be told apart from its neighbours' cannot use **Take out of the group**, and the control says so on hover rather than sitting there greyed with no explanation. **The homepage's diary card can be unticked.** Its destination pills are that page's only time navigation, but the ribbon, the palette and the diary dashboard are all still ways in — a homepage of journals and charts is a coherent thing to want. The diary dashboard's copy of the card is still required. A homepage you already have is not changed by any of this: ChronoAnvil writes that note only when it is missing, so to take the new layout, remove it and run **Set up / repair vault**.
+You can rearrange any of it from **Edit this note's sections…**. Unticking one widget of a row removes just that widget and leaves the row, whether it stood alone in a column or was stacked with another; a member whose lines cannot be told apart from its neighbours' cannot use **Take out of the group**, and the control says so on hover rather than sitting there greyed with no explanation. **The homepage's diary card can be unticked.** Its destination pills are that page's only time navigation, but the ribbon, the palette and the diary dashboard are all still ways in — a homepage of journals and charts is a coherent thing to want. The diary dashboard's copy of the card is still required. A homepage you already have is not changed by any of this: ChronoAnvil writes that note only when it is missing, so to take the new arrangement, remove it and run **Set up / repair vault**.
 
 ## How wide the homepage is
 

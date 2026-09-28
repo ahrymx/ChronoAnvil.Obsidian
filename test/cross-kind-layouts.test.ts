@@ -236,26 +236,32 @@ describe("the door a reader actually uses", () => {
   const editor = () => readCode("section-editor");
   const tpl = () => readCode("template-editor");
 
-  it("asks the name and the kinds in one window", () => {
-    // `promptNewNote`'s rule: naming a layout and saying where it applies are
-    // two halves of one decision, and a reader who cancels a second modal has
+  it("asks the name and the kinds in one place", () => {
+    // ONE DECISION, ONE SURFACE: naming a template and saying where it applies
+    // are two halves of one thing, and a reader who cancels a second window has
     // already committed to the first.
-    expect(editor()).toContain("promptLayoutSave(");
-    expect(editor()).not.toContain("promptText(\n      this.app,\n      sink.promptTitle");
+    //
+    // THE PLACE MOVED IN 1.0.46, AND THE CLAIM DID NOT. It was `LayoutSaveModal`,
+    // a modal over the section editor opened from a footer button; it is the
+    // Template pane's own form now, under the wireframe of the arrangement about
+    // to be saved. The modal is deleted, so its absence is asserted too — a
+    // second door onto one write is what this release closed.
+    expect(editor()).toContain("private renderSaveForm(");
+    expect(editor()).not.toContain("promptLayoutSave(");
+    expect(readCode("modals")).not.toContain("class LayoutSaveModal");
   });
 
   it("hides the kind list when there is nothing to choose", () => {
     // A control whose value cannot change spends attention and returns nothing
-    // — the complaint the "Layout" dropdown earned in 2.54.7.
-    expect(readCode("modals")).toContain("if (this.kinds.length > 1)");
+    // — the complaint the "Template" dropdown earned in 2.54.7.
+    expect(editor()).toContain("if (targets.length > 1)");
   });
 
-  it("cannot save a layout that applies to nothing", () => {
-    // The origin is ticked and disabled, and re-added on close rather than
+  it("cannot save a template that applies to nothing", () => {
+    // The origin is ticked and disabled, and re-added at SUBMIT rather than
     // trusted — the invariant rather than the control's behaviour.
-    const src = readCode("modals");
-    expect(src).toContain("tg.setDisabled(origin)");
-    expect(src).toContain("this.picked.add(this.originId)");
+    expect(editor()).toContain("tg.setDisabled(fixed)");
+    expect(editor()).toContain("targets.add(origin)");
   });
 
   it("offers every kind of the journal, and no other journal's", () => {
@@ -360,9 +366,16 @@ describe("removing a shared layout", () => {
     // THE CROSS-KIND HALF'S FIRST WAY TO LOSE WORK: deleting "Two column" from
     // Practice's row would otherwise take it off Lesson too, from a row that
     // never mentioned Lesson.
+    // THE DECISION IS SHARED SINCE 1.0.46. `planTemplateRemoval` is the pure
+    // answer and this rail is one of its two callers; the banner's Templates…
+    // window is the other, and it had no guard at all until it started asking.
     const src = readCode("settings-editors");
-    expect(src).toContain("variant.kinds = others;");
+    expect(src).toContain("planTemplateRemoval(this.draft, variant, kindId)");
+    expect(src).toContain("variant.kinds = plan.kinds;");
     expect(src).toMatch(/shared[\s\S]{0,400}Stop offering it/);
+    expect(readCode("journal-template-manager")).toContain(
+      "planTemplateRemoval(cfg, variant, targetIdFor(ctx))"
+    );
   });
 
   it("writes the remaining kinds explicitly, never leaving it absent", () => {

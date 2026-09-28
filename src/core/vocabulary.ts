@@ -10,7 +10,7 @@
 // WHY THIS FILE EXISTS
 //
 // ChronoAnvil asks a reader to learn ten nouns before they can create one note —
-// journal, level, kind, layout, section, tracker, scope, event, index, page —
+// journal, level, kind, template, section, tracker, scope, event, index, page —
 // and three of them contradicted each other:
 //
 //   `type` meant two things, and the frontmatter said the wrong one. A
@@ -91,11 +91,53 @@ export const FOLDER_LEVELS = "folder levels";
 export const SECTION = "section";
 export const SECTIONS = "sections";
 
-// A saved arrangement of sections, offered when creating a note. Unified in
-// 2.54.8 after shipping as three words at once; see modals.ts.
-export const LAYOUT = "layout";
-export const LAYOUTS = "layouts";
-export const LAYOUT_TITLE = "Layout";
+// ── A SAVED ARRANGEMENT OF SECTIONS (1.0.46) ──────────────────────────────
+//
+// A TEMPLATE is a saved arrangement of sections a note is built from or rebuilt
+// onto. Every note type has one default template; more are saved under names.
+// That is the whole of the definition, and it is one word.
+//
+// IT WAS TWO WORDS FOR THREE THINGS. "Template" meant the markdown file in a
+// journal's templates folder; "the default" meant `cfg.layout[key]`, the
+// arrangement that file is composed from; and "layout" meant a named saved
+// arrangement in `cfg.variants` / `settings.entryLayouts`. A reader was asked
+// to hold all three apart while the section editor drew a tab called *Layout*
+// that stored nothing beside a button called *Save as layout…* that stored
+// everything, and the window that MANAGED those saved arrangements was called
+// *Template…*.
+//
+// They are one thing seen from three distances: the recipe, the file the recipe
+// writes, and the one of them a new note reaches for. Naming them separately
+// bought nothing and cost the reader the ability to guess where anything was.
+//
+// ── WHAT "LAYOUT" MAY STILL MEAN ─────────────────────────────────────────
+//
+// The word is retired as a NOUN FOR A SAVED THING and nothing more. It stays:
+//
+//   • as ordinary English for how something is arranged on screen — *Mobile
+//     layout options*, a CSS grid, a widget's compact layout. Nobody has ever
+//     confused that sense with a stored object, because it is not a countable
+//     one.
+//   • as the name of `core/layout.ts`, which reconciles a dashboard note onto a
+//     shipped asset. Same word, no shared code, and no reader ever sees it.
+//   • as lucide icon ids: `layout-list`, `layout-template`, `layout-dashboard`.
+//   • as STORED KEYS — `cfg.layout`, `cfg.variants`, `settings.entryLayouts`,
+//     `LAYOUT_SURFACE_INDEX`, `LAYOUT_SURFACE_PAGE`. Those are format tokens on
+//     `almanac:`'s precedent: read by code, absent from prose. Renaming them
+//     would be a `data.json` migration with a compatibility surface to maintain
+//     and not one sentence changed for the reader.
+//
+// `test/template-vocabulary.test.ts` sweeps every string literal in `src/` and
+// is what keeps the retirement from quietly un-retiring. A comment reserving a
+// word is not reserving it — see the `page` paragraph at the top of this file
+// for what that cost last time.
+//
+// ONE EXCEPTION MOVED. `pagelayout:` was the only place the old spelling sat in
+// a reader's own file, so it became `pagetemplate:` with read-compatibility —
+// `page-default.ts` holds both keys and the argument.
+export const TEMPLATE = "template";
+export const TEMPLATES = "templates";
+export const TEMPLATE_TITLE = "Template";
 
 // A sub-note of a long note. Unchanged and RESERVED: this word means only this,
 // and "a note that gets created" is a note.

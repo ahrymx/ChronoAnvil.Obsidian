@@ -43,7 +43,14 @@ import {
 } from "../src/core/notestore";
 import { decodeRegistryMirror } from "../src/core/registry-mirror";
 import { decodeJournalManifest } from "../src/journals/journal-manifest";
-import { RULES, migrateText } from "../tools/migrate-vault.mjs";
+import { RULES, RULES_1_0_46, migrateText } from "../tools/migrate-vault.mjs";
+import { readCode } from "./sources";
+import {
+  LEGACY_PAGE_TEMPLATE_KEY,
+  PAGE_TEMPLATE_DEFAULT,
+  PAGE_TEMPLATE_KEY,
+  pageTemplateOf,
+} from "../src/journals/page-default";
 import { STUDY_JOURNAL } from "../src/journals/journal";
 import { journalTemplateFiles } from "../src/journals/custom-journal";
 import {
@@ -278,5 +285,83 @@ describe("the prose marker's own rename", () => {
     ]) {
       expect(migrateText(marker), marker).toBe(marker);
     }
+  });
+});
+
+// ── `pagelayout:` became `pagetemplate:` (1.0.46) ──────────────────────────
+//
+// THE ONE RETIRED SPELLING THAT MOVED RATHER THAN STAYING. Everything else in
+// this file is an `almanac` token kept in code and absent from prose, because
+// renaming a stored key buys a compatibility surface and changes nothing a
+// reader sees. This key is different: the reader TYPES it. It is a frontmatter
+// property they add by hand to say what a title's pages open with, and it said
+// "layout" — the word 1.0.46 retired, with `core/vocabulary.ts` now stating that
+// a saved arrangement is a template and nothing else. A property the reader
+// writes in a vocabulary the plugin no longer speaks is a contradiction the
+// `almanac:` argument does not cover.
+//
+// SO: BOTH READ, ONE WRITTEN, AND EVERY WRITE MIGRATES. `setPageTemplate`
+// deletes the legacy key in the same `processFrontMatter` edit that writes the
+// new one, so a note touched once never carries both — and `migrate-vault.mjs`
+// does it in bulk for a reader who would rather not touch each note.
+describe("a title's page template key", () => {
+  it("reads the new spelling", () => {
+    expect(pageTemplateOf({ [PAGE_TEMPLATE_KEY]: "wide" })).toBe("wide");
+  });
+
+  it("still reads a note written before 1.0.46", () => {
+    // THE FAILURE THIS PREVENTS IS SILENT. A vault where this regressed does not
+    // error; every title falls back to the page default, and the reader's choice
+    // is simply ignored on notes they set years ago.
+    expect(LEGACY_PAGE_TEMPLATE_KEY).toBe("pagelayout");
+    expect(pageTemplateOf({ [LEGACY_PAGE_TEMPLATE_KEY]: "wide" })).toBe("wide");
+  });
+
+  it("prefers the new spelling when a note somehow carries both", () => {
+    expect(
+      pageTemplateOf({
+        [PAGE_TEMPLATE_KEY]: "wide",
+        [LEGACY_PAGE_TEMPLATE_KEY]: "narrow",
+      })
+    ).toBe("wide");
+  });
+
+  it("falls back to the default for anything that is not a non-empty string", () => {
+    for (const bad of [undefined, null, 42, "", "   ", {}, []]) {
+      expect(pageTemplateOf({ [LEGACY_PAGE_TEMPLATE_KEY]: bad })).toBe(
+        PAGE_TEMPLATE_DEFAULT
+      );
+    }
+  });
+
+  it("deletes the legacy key on every write, so no note carries both", () => {
+    // Source-scoped: `processFrontMatter` is Obsidian's and the suite has no
+    // vault. What is asserted is that the delete is in the same edit as the
+    // write — two edits would be two file revisions and a window in which the
+    // note carries both keys.
+    const src = readCode("journal");
+    const at = src.indexOf("async setPageTemplate(");
+    expect(at).toBeGreaterThan(0);
+    const body = src.slice(at, at + 700);
+    expect(body).toContain("front[PAGE_TEMPLATE_KEY] = id");
+    expect(body).toContain("delete front[LEGACY_PAGE_TEMPLATE_KEY]");
+  });
+
+  it("is migrated in bulk by the vault tool, and idempotently", () => {
+    expect(migrateText("pagelayout: wide")).toBe("pagetemplate: wide");
+    const once = migrateText("---\npagelayout: wide\n---\n");
+    expect(migrateText(once)).toBe(once);
+    // AND IT IS A SEPARATE TABLE FROM THE BRAND REWRITE. `RULES` is the
+    // `almanac` → `chronoanvil` map and `test/product-name.test.ts` sweeps this
+    // file; folding an unrelated 1.0.46 key into it would make that sweep's
+    // subject two migrations wearing one name.
+    for (const [from] of RULES as [string, string][]) {
+      expect(from).not.toContain("pagelayout");
+    }
+    expect(RULES_1_0_46).toContainEqual(["pagelayout:", "pagetemplate:"]);
+  });
+
+  it("leaves the new spelling alone", () => {
+    expect(migrateText("pagetemplate: wide")).toBe("pagetemplate: wide");
   });
 });

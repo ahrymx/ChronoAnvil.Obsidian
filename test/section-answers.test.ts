@@ -280,7 +280,17 @@ describe("patch 4: seven entries, and the surfaces that cannot answer", () => {
     );
     expect(src).toContain('q.kind === "folder" && q.hostFolder == null');
     // And no surface ever named in this window.
-    for (const word of ["template", "journal", "dashboard", "diaryRoot"]) {
+    //
+    // "template" LEFT THE LIST IN 1.0.46, and it is the word changing rather
+    // than the rule relaxing. It stood here as a proxy for a journal concept —
+    // `templateId`, the templates folder — back when a saved arrangement was
+    // called a layout on one surface and a template on the other. Both surfaces
+    // call it a TEMPLATE now (`core/vocabulary.ts`), so the window's own
+    // Template pane says the word legitimately and the proxy has stopped
+    // separating agnostic vocabulary from surface knowledge. The three below
+    // still do, and `test/template-vocabulary.test.ts` is what keeps the noun
+    // itself honest.
+    for (const word of ["journal", "dashboard", "diaryRoot"]) {
       expect(src.toLowerCase(), word).not.toContain(`"${word}`);
     }
   });

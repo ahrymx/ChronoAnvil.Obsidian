@@ -70,7 +70,6 @@ import {
 import {
   countNotesOfKind,
   registeredJournalTypes,
-  variantKinds,
 } from "../journals/journal";
 import {
   JournalConfig,
@@ -87,6 +86,8 @@ import {
   TemplateLayout,
   TemplateTarget,
   chosenSectionIds,
+  layoutTargetsFor,
+  planTemplateRemoval,
   sectionsFor,
   templateTargets,
   splitLayoutTargets,
@@ -1483,16 +1484,21 @@ export class JournalEditModal extends SteppedEditorModal {
       const open = actions.createEl("button", { text: "Edit sections" });
       open.disabled = true;
 
-      // Rename and delete, on a saved layout only. "Layout" is the word every
-      // user-facing string uses for these — see the note in modals.ts.
+      // Rename and remove, on a saved template only.
       //
       // HERE RATHER THAN IN THE KINDS SECTION, which is the other plausible
       // home. Kinds are about identity — the `type:` value, the trackers, the
-      // rating — and a layout is about a file. This is also where the layout
-      // was created (Save as variant, from the editor this row opens) and where
-      // it is already listed, so it is where a reader will look for it. Two
-      // places to manage one thing is the drift this subsystem keeps declining
-      // to build.
+      // rating — and a template is about a file. This is also where it is
+      // already listed, so it is where a reader will look for it.
+      //
+      // TWO DOORS, ONE WRITER (1.0.46). A note's banner has carried a Templates…
+      // window since 4.33 and it manages the same objects, which for a while
+      // this comment read as the drift it was declining to build. The objection
+      // was always to two IMPLEMENTATIONS: this rail's Remove guarded a shared
+      // template and the window's did not, so the same button meant two things.
+      // The decision is `planTemplateRemoval` now and both doors apply it. What
+      // stays here alone is **Copy to…**, which needs the other journals and so
+      // belongs where the journals are.
       const variantId = target.ctx.variantId;
       if (variantId && variantId !== "default" && target.ctx.kind) {
         const kindId = target.ctx.kind.id;
@@ -1593,8 +1599,8 @@ export class JournalEditModal extends SteppedEditorModal {
   // two writers that had to move. It is also the one that made the old address
   // dangerous: this window's own `commit` runs `normaliseKinds`, which rebuilds
   // every kind row from the fields it knows about and did not know about
-  // `variants`, so a layout saved here and a journal edited afterwards were a
-  // saved layout and its deletion.
+  // `variants`, so a template saved here and a journal edited afterwards were a
+  // saved template and its deletion.
   //
   // TAKES SPLIT LISTS SINCE 4.33, the same shape and for the same reason as
   // `JournalManager.saveVariant` — the `kindId` parameter's silent `return` on
@@ -1609,7 +1615,7 @@ export class JournalEditModal extends SteppedEditorModal {
   ): Promise<void> {
     if (!kinds.length && !surfaces.length) {
       new Notice(
-        "ChronoAnvil: pick at least one note type or surface to offer this layout on."
+        "ChronoAnvil: pick at least one note type or surface to offer this template on."
       );
       return;
     }
@@ -1617,7 +1623,7 @@ export class JournalEditModal extends SteppedEditorModal {
     // Ids unique within the JOURNAL now rather than within the kind, derived
     // from the label like every other id in this plugin, and suffixed rather
     // than rejected on a collision — the same repair normaliseKinds makes. A
-    // reader naming two layouts "Math" wants two layouts, not an error.
+    // reader naming two templates "Math" wants two templates, not an error.
     const taken = new Set((this.draft.variants ?? []).map((v) => v.id));
     const stem = slugify(label) || "variant";
     let id = stem;
@@ -1633,7 +1639,7 @@ export class JournalEditModal extends SteppedEditorModal {
         ...(Object.keys(options).length ? { options } : {}),
         // Always written, even empty — see the note on `kinds` in
         // JournalVariantConfig: an absent list means "every kind" to
-        // `variantKinds`, which is the wrong answer for a surface layout.
+        // `variantKinds`, which is the wrong answer for a surface template.
         kinds: [...kinds],
         ...(surfaces.length ? { surfaces } : {}),
       },
@@ -1651,37 +1657,37 @@ export class JournalEditModal extends SteppedEditorModal {
     this.refreshBody();
   }
 
-  // Rename a saved layout.
+  // Rename a saved template.
   //
-  // The label only. The id stays, because it is what the layout's template file
+  // The label only. The id stays, because it is what the template file
   // is named from — re-deriving it would orphan the file and leave a config
   // pointing at nothing. The same reason renaming a kind preserves its id,
   // and for once the consequence is cosmetic rather than a declassification.
-  // Offer this layout to another journal, and say what will not survive.
+  // Offer this template to another journal, and say what will not survive.
   //
   // THE REPORT IS THE POINT. `sectionsFor` already drops what a surface cannot
-  // compose, silently — right when composing a template from a layout that
-  // belongs where it is, and wrong when carrying one somewhere new. A layout
+  // compose, silently — right when composing a file from a template that
+  // belongs where it is, and wrong when carrying one somewhere new. A template
   // names section ids, and which sections exist is a function of the surface;
   // an override keyed by kind id cannot cross at all, because kind ids are per
   // journal by construction. The follow-up settled the question in advance:
   // drop silently, drop loudly, or refuse — "and silence is the wrong one".
   //
   // So the reader sees exactly what is lost before anything is written, and a
-  // layout that loses nothing says so too rather than opening a dialogue about
+  // template that loses nothing says so too rather than opening a dialogue about
   // an empty list.
   private offerLayoutCopy(evt: MouseEvent, variantId: string): void {
     const variant = this.draft.variants?.find((v) => v.id === variantId);
     if (!variant) return;
 
     // Every OTHER journal in the vault. Copying within a journal is what the
-    // cross-kind half already does, from the layout's own `kinds` list.
+    // cross-kind half already does, from the template's own `kinds` list.
     const others = this.plugin.settings.customJournals.filter(
       (j) => j.id !== this.draft.id
     );
     if (!others.length) {
       new Notice(
-        "There's no other journal to copy this to. Add one, then copy the layout across."
+        "There's no other journal to copy this to. Add one, then copy the template across."
       );
       return;
     }
@@ -1703,7 +1709,7 @@ export class JournalEditModal extends SteppedEditorModal {
     target: JournalConfig
   ): Promise<void> {
     const type = buildJournalType(target);
-    // RESOLVED AGAINST THE TARGET'S OWN FIRST KIND, because a layout has to
+    // RESOLVED AGAINST THE TARGET'S OWN FIRST KIND, because a template has to
     // land on a surface to be resolvable at all and the first kind is what the
     // copy will be offered on. A kind the reader picks later that cannot host
     // it is the cross-KIND question, which `sectionsFor` already answers by
@@ -1731,11 +1737,11 @@ export class JournalEditModal extends SteppedEditorModal {
       this.app,
       `Copy “${variant.label}” to ${target.name}?`,
       dropped.length
-        ? `It becomes a new layout on ${target.name}, offered when creating a ` +
+        ? `It becomes a new template on ${target.name}, offered when creating a ` +
             `${kind.label.toLowerCase()}. Some of it names things ${target.name} ` +
             `does not have, and those are listed below — everything else comes across. ` +
             `Nothing in ${this.draft.name} changes.`
-        : `It becomes a new layout on ${target.name}, offered when creating a ` +
+        : `It becomes a new template on ${target.name}, offered when creating a ` +
             `${kind.label.toLowerCase()}. All of it can be composed there. ` +
             `Nothing in ${this.draft.name} changes.`,
       [
@@ -1758,7 +1764,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
     // A NEW ID IN THE TARGET, derived from the label like every other. The
     // source's id means nothing here and reusing it would collide the moment
-    // the target already held a layout of that name.
+    // the target already held a template of that name.
     const taken = new Set((target.variants ?? []).map((v) => v.id));
     const stem = slugify(variant.label) || "variant";
     let id = stem;
@@ -1791,7 +1797,7 @@ export class JournalEditModal extends SteppedEditorModal {
 
     const next = await promptText(
       this.app,
-      "Rename layout",
+      "Rename template",
       "e.g. Math Lesson",
       variant.label
     );
@@ -1805,17 +1811,29 @@ export class JournalEditModal extends SteppedEditorModal {
     this.refreshBody();
   }
 
-  // Delete a saved layout.
+  // Take a saved template off one kind's row.
   //
   // LEAVES THE TEMPLATE FILE, and says so. The same rule removing a kind
   // follows: the plugin does not delete a reader's markdown, and a template is
   // markdown a reader may have spent an evening on. Naming the file is the
   // whole of the help that can be given.
   //
-  // Cheaper than removing a kind, and the confirmation says that too — a layout
-  // carries no identity, so nothing on disk stops being recognised. Notes
-  // created from it keep their `type:` and stay exactly as classified as they
-  // were, because a Math Lesson was always just a Lesson.
+  // Cheaper than removing a kind, and the confirmation says that too — a
+  // template carries no identity, so nothing on disk stops being recognised.
+  // Notes created from it keep their `type:` and stay exactly as classified as
+  // they were, because a Math Lesson was always just a Lesson.
+  //
+  // THE DECISION IS `planTemplateRemoval`'S SINCE 1.0.46, and this is the door
+  // that had it right: a template may be SHARED, so "remove" from one kind's row
+  // is only a removal when that row is the last one holding it — otherwise
+  // *"removing “Two column” from Practice would silently take it off Lesson too,
+  // from a row that never mentioned Lesson"*. The banner's Templates… window had
+  // no such guard, so the rule moved into the pure module and both doors ask it.
+  //
+  // WHICH ALSO CLOSED A HOLE HERE. This computed `others` from `variantKinds`
+  // alone, which knows nothing about `surfaces` — so a template offered on one
+  // kind AND the front page was DELETED when that kind's row removed it, taking
+  // the front page's offering with it. `planTemplateRemoval` counts every target.
   private async deleteVariant(
     kindId: string,
     variantId: string,
@@ -1825,25 +1843,25 @@ export class JournalEditModal extends SteppedEditorModal {
     const variant = this.draft.variants?.find((v) => v.id === variantId);
     if (!kind || !variant) return;
 
-    // A LAYOUT MAY NOW BE SHARED, so "delete" from one kind's row is only a
-    // deletion when that row is the last one holding it. 3.18 follow-ups §5.
-    //
-    // Deleting outright would be the cross-kind half's first way to lose a
-    // reader's work: removing "Two column" from Practice would silently take it
-    // off Lesson too, from a row that never mentioned Lesson. So the shared case
-    // withdraws this kind and says so, and only the sole-holder case deletes.
-    const others = variantKinds(this.draft, variant).filter((k) => k !== kindId);
-    const shared = others.length > 0;
-    const otherLabels = this.draft.kinds
-      .filter((k) => others.includes(k.id))
-      .map((k) => k.label.toLowerCase());
+    const plan = planTemplateRemoval(this.draft, variant, kindId);
+    const shared = plan.kind === "withdraw";
+    // THE OTHER TARGETS IN THE READER'S WORDS, surfaces included — the same
+    // labels the save form offers them under, so the sentence names what they
+    // ticked rather than an id.
+    const labels = new Map(
+      layoutTargetsFor(buildJournalType(this.draft)).map((t) => [t.id, t.label])
+    );
+    const otherLabels =
+      plan.kind === "withdraw"
+        ? plan.others.map((id) => (labels.get(id) ?? id).toLowerCase())
+        : [];
 
     const file = templatePath.split("/").pop() ?? templatePath;
     const ok = await confirmAction(
       this.app,
       shared
         ? `Stop offering “${variant.label}” for ${kind.label.toLowerCase()}?`
-        : `Remove the “${variant.label}” layout?`,
+        : `Remove the “${variant.label}” template?`,
       `It stops being offered when creating a ${kind.label.toLowerCase()}. ` +
         (shared
           ? `It stays available for ${listSentence(otherLabels)}.\n\n`
@@ -1852,16 +1870,18 @@ export class JournalEditModal extends SteppedEditorModal {
         `always just a ${kind.label.toLowerCase()}, with the same trackers and ` +
         `the same place in every table.\n\n` +
         `${file} stays in your templates folder. Remove it yourself if you want it gone.`,
-      shared ? "Stop offering it" : "Remove the layout",
+      shared ? "Stop offering it" : "Remove the template",
       true
     );
     if (!ok) return;
 
-    if (shared) {
+    if (plan.kind === "withdraw") {
       // Written as an explicit list rather than left absent: absent means every
-      // kind, so a shared layout that shed one kind and kept saying nothing
+      // kind, so a shared template that shed one kind and kept saying nothing
       // would come straight back on the kind just removed.
-      variant.kinds = others;
+      variant.kinds = plan.kinds;
+      if (plan.surfaces.length) variant.surfaces = plan.surfaces;
+      else delete variant.surfaces;
     } else {
       this.draft.variants = (this.draft.variants ?? []).filter(
         (v) => v.id !== variantId

@@ -367,7 +367,7 @@ describe("the window is tabbed, not columned", () => {
     const body = editor();
     expect(body).toContain('tab("sections", "In this file")');
     expect(body).toContain('tab("markdown", "Markdown")');
-    expect(body).toContain('tab("layout", "Layout")');
+    expect(body).toContain('tab("template", "Template")');
     for (const dead of ["ca-tpl-cols", "ca-tpl-preview", "ca-tpl-col-title"]) {
       expect(readCode("section-editor"), dead).not.toContain(dead);
     }
@@ -403,13 +403,30 @@ describe("the window is tabbed, not columned", () => {
 // ── the arrangement sink ──────────────────────────────────────────────
 
 describe("saving an arrangement under a name", () => {
-  it("is the caller's vocabulary, not the modal's", () => {
-    // "Layout" and "variant" are the journal's words. A modal that hardcoded
-    // them would be a modal that knows which surface it is on.
+  it("is the editor's own vocabulary now, bar the one word that differs", () => {
+    // IT WAS THE CALLER'S, ALL OF IT. The sink carried `buttonLabel`,
+    // `promptTitle` and `promptPlaceholder`, because "layout" and "variant" were
+    // the journal's words and a modal hardcoding them would be a modal that
+    // knows which surface it is on.
+    //
+    // 1.0.46 RETIRED THE DISAGREEMENT RATHER THAN THE SEAM. Both surfaces call a
+    // saved arrangement a TEMPLATE, so two of those three fields became the same
+    // string twice — and a label the caller must supply and can only supply one
+    // way is a seam that reads like a choice. What genuinely differs is the
+    // hint: "e.g. Math Lesson" against "e.g. Quiet Monday".
     const body = editor();
-    expect(body).toContain("buttonLabel");
+    expect(body).toContain("namePlaceholder: string;");
+    expect(body).not.toContain("buttonLabel");
+    expect(body).not.toContain("promptTitle");
+    // The words the pane now owns, and no surface's name among them.
+    expect(body).toContain('text: "Save template"');
+    // AND THE FOOTER NO LONGER CARRIES A SECOND SAVE. Two saves a few pixels
+    // apart — one writing the file, one writing a recipe for files that do not
+    // exist yet — is what this release took apart.
     expect(body).not.toContain('"Save as layout…"');
-    expect(readSrc("template-editor")).toContain('"Save as layout…"');
+    expect(readSrc("template-editor")).not.toContain('"Save as layout…"');
+    const footer = body.slice(body.indexOf("protected renderFooter("));
+    expect(footer.slice(0, 800)).not.toContain("this.spec.arrangement");
   });
 
   it("hands back ids and lets the caller resolve overrides", () => {

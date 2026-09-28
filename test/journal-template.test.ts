@@ -37,7 +37,8 @@ import { STUDY_PRESET } from "../src/journals/journal";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import type { ChronoAnvilSettings } from "../src/core/settings";
 import { readCode } from "./sources";
-import { looseLines, fenceLines } from "../src/core/reload-loss";
+import { looseLines, fenceLines, summariseLoss, LOSS_SHOWN } from "../src/core/reload-loss";
+import type { ReloadLoss } from "../src/core/reload-loss";
 
 // Every template target Study has, as the context it is written against.
 const targets = (): { key: string; ctx: SectionContext }[] => {
@@ -593,10 +594,10 @@ describe("where the window is reached from", () => {
     // is asserted is that the item exists in the same `settingsButton` callback
     // as the one it sits beside, and after it.
     const src = readCode("study-header");
-    expect(src).toContain('setTitle("Template…")');
+    expect(src).toContain('setTitle("Templates…")');
     expect(src).toContain("openJournalTemplateWindow(");
     expect(src.indexOf('setTitle("Edit sections…")')).toBeLessThan(
-      src.indexOf('setTitle("Template…")')
+      src.indexOf('setTitle("Templates…")')
     );
   });
 
@@ -606,7 +607,7 @@ describe("where the window is reached from", () => {
     const src = readCode("study-header");
     const tplBranch = src.indexOf("Preview template changes");
     expect(tplBranch).toBeGreaterThan(-1);
-    expect(tplBranch).toBeLessThan(src.indexOf('setTitle("Template…")'));
+    expect(tplBranch).toBeLessThan(src.indexOf('setTitle("Templates…")'));
   });
 
   it("leaves every judgement to the pure module", () => {
@@ -616,5 +617,98 @@ describe("where the window is reached from", () => {
     expect(src).toContain("this.manager.lossOf(");
     expect(src).not.toContain("allNoteRegions(");
     expect(src).not.toContain("parseSections(");
+  });
+});
+
+// ── THE BOX IS A SUMMARY, NOT THE LIST (1.0.46) ─────────────────────────
+//
+// The list is one entry per loose line, deliberately: it is the answer to
+// "which of several unrelated facts is in the way", and a boolean cannot say.
+// What it is not is the thing to print. A cheat sheet somebody had written —
+// fifteen headings, three tables, a dozen display-maths blocks — produced
+// sixty-odd rows, each a raw markdown line followed by the same eight words,
+// stacked above the templates the window exists to manage.
+describe("what the refusal box prints", () => {
+  const prose = (label: string): ReloadLoss => ({
+    kind: "prose",
+    label,
+    detail: "written outside any section",
+  });
+
+  it("prints a short list unchanged", () => {
+    const loss: ReloadLoss[] = [
+      { kind: "region", label: "Notes", detail: "holds your writing" },
+      prose("## A heading"),
+    ];
+    expect(summariseLoss(loss)).toEqual([
+      "Notes — holds your writing",
+      "## A heading — written outside any section",
+    ]);
+  });
+
+  it("counts the rest once the rows start repeating themselves", () => {
+    const lines = summariseLoss(
+      Array.from({ length: 60 }, (_, i) => prose(`line ${i}`))
+    );
+    expect(lines).toHaveLength(LOSS_SHOWN + 1);
+    expect(lines[0]).toBe("line 0 — written outside any section");
+    expect(lines.at(-1)).toBe(`…and ${60 - LOSS_SHOWN} more like these`);
+  });
+
+  it("says “it” rather than “these” when one row is left over", () => {
+    // The grammar trap this codebase keeps meeting — see RETIRED_WORDS. Nothing
+    // is pluralised INTO the detail sentence for the same reason: "3 sections
+    // holds your writing" is what that produces.
+    const lines = summariseLoss(
+      Array.from({ length: LOSS_SHOWN + 1 }, (_, i) => prose(`line ${i}`))
+    );
+    expect(lines.at(-1)).toBe("…and 1 more like it");
+  });
+
+  it("caps each group, so forty prose lines cannot bury a region", () => {
+    // A GLOBAL cap would: the contract order puts regions first, but it also
+    // puts prose last, and the region row is the one a reader can act on.
+    const loss: ReloadLoss[] = [
+      ...Array.from({ length: 40 }, (_, i) => prose(`line ${i}`)),
+      { kind: "region", label: "Notes", detail: "holds your writing" },
+    ];
+    expect(summariseLoss(loss)).toContain("Notes — holds your writing");
+  });
+
+  it("keeps the groups in first-appearance order", () => {
+    // Which is the contract order the module's head states: regions, then
+    // trackers, then the surface's own, then prose.
+    const loss: ReloadLoss[] = [
+      { kind: "region", label: "Notes", detail: "holds your writing" },
+      prose("a"),
+      { kind: "tracker", label: "Mood", detail: "added to this note only" },
+    ];
+    const lines = summariseLoss(loss);
+    expect(lines[0]).toContain("holds your writing");
+    // The tracker is regrouped to the end because its detail first appears
+    // there — the grouping follows the sentence, not the kind.
+    expect(lines.at(-1)).toContain("added to this note only");
+  });
+
+  it("cuts a label long enough to be a table row, and marks the cut", () => {
+    const long = "|Equivalent fractions|Same value, different form, e.g. $\\dfrac{1}{2} = \\dfrac{2}{4} = \\dfrac{3}{6}$|";
+    const [line] = summariseLoss([prose(long)]);
+    const label = line.slice(0, line.indexOf(" — "));
+    expect(label.length).toBeLessThan(long.length);
+    expect(label.endsWith("…")).toBe(true);
+    expect(line).toContain("— written outside any section");
+  });
+
+  it("trims a loose line's indentation before printing it", () => {
+    const [line] = summariseLoss([prose("    indented")]);
+    expect(line).toBe("indented — written outside any section");
+  });
+
+  it("is what both windows draw, rather than the list", () => {
+    for (const mod of ["journal-template-modal", "entry-template-modal"]) {
+      const src = readCode(mod);
+      expect(src, mod).toContain("for (const line of summariseLoss(loss))");
+      expect(src, mod).not.toContain("`${l.label} — ${l.detail}`");
+    }
   });
 });

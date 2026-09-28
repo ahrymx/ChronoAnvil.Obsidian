@@ -490,7 +490,7 @@ describe("saved layouts", () => {
     const mgr = new EntryTemplates(new App(), plugin);
     await mgr.saveLayout("First", [{ id: "log" }], ["daily"]);
     await mgr.saveLayout("Second", [{ id: "todo" }], ["daily"]);
-    await mgr.deleteLayout("first");
+    await mgr.deleteLayout("first", "daily");
     expect(settings.entryLayouts.map((l) => l.label)).toEqual(["Second"]);
   });
 
@@ -654,27 +654,34 @@ describe("the decisions are not re-spelled in the renderer", () => {
     expect(modal).not.toContain("allNoteRegions(");
   });
 
-  it("draws no reload control at all over a page that has been written in", () => {
-    // "Nothing dead is drawn" — a greyed Reload is a control that cannot do its
-    // job, and the block naming what is in the way takes its place instead. The
-    // early return is the whole of that rule, so it is what gets pinned.
+  it("draws no Apply control at all over an entry that has been written in", () => {
+    // "Nothing dead is drawn" — a greyed Apply is a control that cannot do its
+    // job, and the block naming what is in the way takes its place instead.
+    //
+    // THE GATE STOPPED HIDING THE LIST IN 1.0.46. It used to compute the loss and
+    // RETURN, so an entry with a line of writing in it showed no templates at
+    // all — and Rename and Remove touch no markdown, so the writing had nothing
+    // to do with them. The refusal is drawn above the rows now and Apply is the
+    // one thing omitted, which is the same rule applied per control.
     const src = readCode("entry-template-modal");
-    const at = src.indexOf("private drawLayouts(");
+    const at = src.indexOf("private drawTemplates(");
     expect(at).toBeGreaterThan(-1);
     const body = src.slice(at, src.indexOf("\n  }", at));
-    const gate = body.indexOf("if (loss.length)");
-    const bail = body.indexOf("return;", gate);
-    const rows = body.indexOf("drawReloadRow(");
-    expect(gate).toBeGreaterThan(-1);
-    expect(bail).toBeGreaterThan(gate);
-    expect(rows).toBeGreaterThan(bail);
+    expect(body).toContain("if (loss.length) this.drawLoss(host, loss);");
+    // The rows are drawn either way, and told whether Apply is available.
+    expect(body).toMatch(/drawRow\(host, row, loss\.length === 0\)/);
+    // And the refusal comes first, so it reads as the reason rather than an
+    // aside under the list.
+    expect(body.indexOf("drawLoss")).toBeLessThan(body.indexOf("drawRow"));
+    const draw = src.slice(src.indexOf("private drawRow("));
+    expect(draw.slice(0, 600)).toContain("if (canApply) this.addApply(actions, row);");
   });
 
-  it("offers Template on the entry banner, beside Edit sections", () => {
+  it("offers Templates on the entry banner, beside Edit sections", () => {
     const menu = readSrc("entryheader");
-    expect(menu).toContain('setTitle("Template…")');
+    expect(menu).toContain('setTitle("Templates…")');
     expect(menu.indexOf('setTitle("Edit sections…")')).toBeLessThan(
-      menu.indexOf('setTitle("Template…")')
+      menu.indexOf('setTitle("Templates…")')
     );
   });
 

@@ -245,7 +245,7 @@ describe("writing it back into the note", () => {
   });
 
   it("asks for the whole property to go when the last entry does", () => {
-    // `undefined` is the delete, which is `setPageLayout`'s contract: absent is
+    // `undefined` is the delete, which is `setPageTemplate`'s contract: absent is
     // already what "the journal's own answer" spells, and an empty map left
     // behind would be a second spelling of it sitting in the reader's note.
     const fm = fmWith({ lesson: { rated: "accuracy" } });
@@ -268,12 +268,12 @@ describe("where it is read and written", () => {
   it("is the frontmatter, written the way the other per-note override is", () => {
     const j = readSrc("journal");
     expect(j).toContain("async setKindTable(");
-    // `setPageLayout`'s two halves: the delete, and the refusal to write when
+    // `setPageTemplate`'s two halves: the delete, and the refusal to write when
     // there is nothing to write and nothing to take away.
     expect(j).toContain("delete front[KIND_TABLES_KEY]");
     expect(j).toContain("if (!next && !(KIND_TABLES_KEY in fm)) return;");
     expect(KIND_TABLES_KEY).toBe("kindtables");
-    // `PAGE_LAYOUT_KEY`'s shape, which is the precedent this follows.
+    // `PAGE_TEMPLATE_KEY`'s shape, which is the precedent this follows.
     expect(KIND_TABLES_KEY).toMatch(/^[a-z]+$/);
   });
 

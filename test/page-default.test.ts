@@ -18,14 +18,14 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  PAGE_LAYOUT_DEFAULT,
-  PAGE_LAYOUT_KEY,
+  PAGE_TEMPLATE_DEFAULT,
+  PAGE_TEMPLATE_KEY,
   configOfJournal,
   isPromotedPath,
-  pageLayoutById,
-  pageLayoutChoices,
-  pageLayoutOf,
-  pageLayoutShown,
+  pageTemplateById,
+  pageTemplateChoices,
+  pageTemplateOf,
+  pageTemplateShown,
   pagePathsOf,
   pathHoldsPages,
 } from "../src/journals/page-default";
@@ -40,7 +40,7 @@ function cfgWith(variants: JournalVariantConfig[]): JournalConfig {
   return { id: "media", name: "Media", variants } as unknown as JournalConfig;
 }
 
-const pageLayout = (id: string, label: string): JournalVariantConfig => ({
+const pageTemplate = (id: string, label: string): JournalVariantConfig => ({
   id,
   label,
   surfaces: ["page"],
@@ -48,60 +48,60 @@ const pageLayout = (id: string, label: string): JournalVariantConfig => ({
 
 describe("what a page can be built from", () => {
   it("always offers the journal's own page default, first", () => {
-    const rows = pageLayoutChoices(null, "Page");
+    const rows = pageTemplateChoices(null, "Page");
     expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe(PAGE_LAYOUT_DEFAULT);
+    expect(rows[0].id).toBe(PAGE_TEMPLATE_DEFAULT);
   });
 
   it("names the default after the page noun, not the word 'Default'", () => {
     // A journal that calls its pages Chapters says "Chapter default", so the
     // field names the thing it is about. This is the half of 2.54.7 that
     // survives 4.50: the option is drawn, and it is not called "Generic".
-    expect(pageLayoutChoices(null, "Chapter")[0].label).toContain("Chapter");
-    expect(pageLayoutChoices(null, "Chapter")[0].label).not.toContain("Page");
+    expect(pageTemplateChoices(null, "Chapter")[0].label).toContain("Chapter");
+    expect(pageTemplateChoices(null, "Chapter")[0].label).not.toContain("Page");
   });
 
   it("offers a saved layout that says it belongs on a page", () => {
-    const rows = pageLayoutChoices(cfgWith([pageLayout("wide", "Wide")]), "Page");
-    expect(rows.map((r) => r.id)).toEqual([PAGE_LAYOUT_DEFAULT, "wide"]);
+    const rows = pageTemplateChoices(cfgWith([pageTemplate("wide", "Wide")]), "Page");
+    expect(rows.map((r) => r.id)).toEqual([PAGE_TEMPLATE_DEFAULT, "wide"]);
   });
 
   it("keeps the default first however many layouts there are", () => {
-    const rows = pageLayoutChoices(
-      cfgWith([pageLayout("a", "A"), pageLayout("b", "B")]),
+    const rows = pageTemplateChoices(
+      cfgWith([pageTemplate("a", "A"), pageTemplate("b", "B")]),
       "Page"
     );
-    expect(rows[0].id).toBe(PAGE_LAYOUT_DEFAULT);
-    expect(rows.map((r) => r.id)).toEqual([PAGE_LAYOUT_DEFAULT, "a", "b"]);
+    expect(rows[0].id).toBe(PAGE_TEMPLATE_DEFAULT);
+    expect(rows.map((r) => r.id)).toEqual([PAGE_TEMPLATE_DEFAULT, "a", "b"]);
   });
 
   it("does NOT offer a layout saved for the index surface", () => {
     // `JournalVariantConfig` states the asymmetry this rests on: `surfaces`
     // absent means NONE, deliberately the opposite of `kinds`. A layout reaches
     // a page only by naming one.
-    const rows = pageLayoutChoices(
+    const rows = pageTemplateChoices(
       cfgWith([{ id: "front", label: "Front", surfaces: ["index"] }]),
       "Page"
     );
-    expect(rows.map((r) => r.id)).toEqual([PAGE_LAYOUT_DEFAULT]);
+    expect(rows.map((r) => r.id)).toEqual([PAGE_TEMPLATE_DEFAULT]);
   });
 
   it("does NOT offer a layout saved for a note kind", () => {
-    const rows = pageLayoutChoices(
+    const rows = pageTemplateChoices(
       cfgWith([{ id: "twocol", label: "Two column", kinds: ["title"] }]),
       "Page"
     );
-    expect(rows.map((r) => r.id)).toEqual([PAGE_LAYOUT_DEFAULT]);
+    expect(rows.map((r) => r.id)).toEqual([PAGE_TEMPLATE_DEFAULT]);
   });
 
   it("resolves an id to the layout it names", () => {
-    const cfg = cfgWith([pageLayout("wide", "Wide")]);
-    expect(pageLayoutById(cfg, "wide")?.label).toBe("Wide");
+    const cfg = cfgWith([pageTemplate("wide", "Wide")]);
+    expect(pageTemplateById(cfg, "wide")?.label).toBe("Wide");
   });
 
   it("resolves the default to no layout at all", () => {
-    const cfg = cfgWith([pageLayout("wide", "Wide")]);
-    expect(pageLayoutById(cfg, PAGE_LAYOUT_DEFAULT)).toBeNull();
+    const cfg = cfgWith([pageTemplate("wide", "Wide")]);
+    expect(pageTemplateById(cfg, PAGE_TEMPLATE_DEFAULT)).toBeNull();
   });
 
   it("resolves the default to no layout even against a config with an empty id", () => {
@@ -111,42 +111,42 @@ describe("what a page can be built from", () => {
     // composed from a layout nobody chose — which is `newPage` reading a
     // composition where it should have read the template file.
     const cfg = cfgWith([{ id: "", label: "", surfaces: ["page"] }]);
-    expect(pageLayoutById(cfg, PAGE_LAYOUT_DEFAULT)).toBeNull();
+    expect(pageTemplateById(cfg, PAGE_TEMPLATE_DEFAULT)).toBeNull();
   });
 
   it("will not resolve an id whose layout is not a page layout", () => {
     // Otherwise a title could name the Subject front page and every page under
     // it would compose sections a page cannot render.
     const cfg = cfgWith([{ id: "front", label: "Front", surfaces: ["index"] }]);
-    expect(pageLayoutById(cfg, "front")).toBeNull();
+    expect(pageTemplateById(cfg, "front")).toBeNull();
   });
 });
 
 describe("what a title stores", () => {
   it("reads the property a reader's note carries", () => {
-    expect(pageLayoutOf({ [PAGE_LAYOUT_KEY]: "wide" })).toBe("wide");
+    expect(pageTemplateOf({ [PAGE_TEMPLATE_KEY]: "wide" })).toBe("wide");
   });
 
   it("reads a note with no property as the default", () => {
     // Which is every title in every vault written before this release.
-    expect(pageLayoutOf({})).toBe(PAGE_LAYOUT_DEFAULT);
+    expect(pageTemplateOf({})).toBe(PAGE_TEMPLATE_DEFAULT);
   });
 
   it("reads a hand-typed non-string as the default", () => {
     // A property a reader edited by hand can be a number, a list or a bare
     // `true`, and none of those names a layout.
-    expect(pageLayoutOf({ [PAGE_LAYOUT_KEY]: 3 })).toBe(PAGE_LAYOUT_DEFAULT);
-    expect(pageLayoutOf({ [PAGE_LAYOUT_KEY]: ["wide"] })).toBe(PAGE_LAYOUT_DEFAULT);
-    expect(pageLayoutOf({ [PAGE_LAYOUT_KEY]: true })).toBe(PAGE_LAYOUT_DEFAULT);
+    expect(pageTemplateOf({ [PAGE_TEMPLATE_KEY]: 3 })).toBe(PAGE_TEMPLATE_DEFAULT);
+    expect(pageTemplateOf({ [PAGE_TEMPLATE_KEY]: ["wide"] })).toBe(PAGE_TEMPLATE_DEFAULT);
+    expect(pageTemplateOf({ [PAGE_TEMPLATE_KEY]: true })).toBe(PAGE_TEMPLATE_DEFAULT);
   });
 
   it("trims, so a stray space is not a different layout", () => {
-    expect(pageLayoutOf({ [PAGE_LAYOUT_KEY]: " wide " })).toBe("wide");
+    expect(pageTemplateOf({ [PAGE_TEMPLATE_KEY]: " wide " })).toBe("wide");
   });
 
   it("shows the stored layout when it still exists", () => {
-    const cfg = cfgWith([pageLayout("wide", "Wide")]);
-    expect(pageLayoutShown(cfg, "wide")).toBe("wide");
+    const cfg = cfgWith([pageTemplate("wide", "Wide")]);
+    expect(pageTemplateShown(cfg, "wide")).toBe("wide");
   });
 
   it("falls back to the default when the stored layout is gone", () => {
@@ -154,22 +154,22 @@ describe("what a title stores", () => {
     // named it to stop making pages — and a dropdown opening on a value not in
     // its own list shows the first row while reporting the missing one, which
     // is two lies at once.
-    expect(pageLayoutShown(cfgWith([]), "wide")).toBe(PAGE_LAYOUT_DEFAULT);
+    expect(pageTemplateShown(cfgWith([]), "wide")).toBe(PAGE_TEMPLATE_DEFAULT);
   });
 
   it("falls back for a stored id that names an index layout", () => {
     const cfg = cfgWith([{ id: "front", label: "Front", surfaces: ["index"] }]);
-    expect(pageLayoutShown(cfg, "front")).toBe(PAGE_LAYOUT_DEFAULT);
+    expect(pageTemplateShown(cfg, "front")).toBe(PAGE_TEMPLATE_DEFAULT);
   });
 
   it("what is shown is always a row that is offered", () => {
     // The property this pair exists to hold: the value the field opens on can
     // be selected in the field. Checked over both states rather than asserted
     // of one.
-    const cfg = cfgWith([pageLayout("wide", "Wide")]);
-    const ids = pageLayoutChoices(cfg, "Page").map((r) => r.id);
+    const cfg = cfgWith([pageTemplate("wide", "Wide")]);
+    const ids = pageTemplateChoices(cfg, "Page").map((r) => r.id);
     for (const stored of ["wide", "gone", "", "front"]) {
-      expect(ids).toContain(pageLayoutShown(cfg, stored));
+      expect(ids).toContain(pageTemplateShown(cfg, stored));
     }
   });
 });
@@ -285,11 +285,11 @@ describe("the new title dialogue", () => {
 
   it("stamps the chosen page layout onto the note it just made", () => {
     const text = src();
-    expect(text).toContain("await this.setPageLayout(file, details.pageTemplateId)");
+    expect(text).toContain("await this.setPageTemplate(file, details.pageTemplateId)");
     // AFTER the file exists and before it is opened: `processFrontMatter` needs
     // something to process.
     expect(text.indexOf("createFileEnsuringFolders(this.app, notePath, content)"))
-      .toBeLessThan(text.indexOf("this.setPageLayout(file, details.pageTemplateId)"));
+      .toBeLessThan(text.indexOf("this.setPageTemplate(file, details.pageTemplateId)"));
   });
 });
 
@@ -308,7 +308,7 @@ describe("the new page dialogue", () => {
   it("opens on what the title stores, resolved", () => {
     const at = src().indexOf("async newPage(");
     expect(src().slice(at, at + 3000)).toContain(
-      "templateId: pageLayoutShown(cfg, pageLayoutOf(fm))"
+      "templateId: pageTemplateShown(cfg, pageTemplateOf(fm))"
     );
   });
 
@@ -322,7 +322,7 @@ describe("the new page dialogue", () => {
   it("composes a saved layout and reads the file for the default", () => {
     const at = src().indexOf("async newPage(");
     const body = src().slice(at, at + 3000);
-    expect(body).toContain("pageLayoutText(");
+    expect(body).toContain("pageTemplateText(");
     // The `??` is the whole rule: a layout or the file, never both and never
     // neither.
     expect(body).toContain("readTemplate(");
@@ -331,14 +331,14 @@ describe("the new page dialogue", () => {
 
 describe("the default is absent rather than a word", () => {
   it("is the empty string, so there is one spelling of 'no layout named'", () => {
-    expect(PAGE_LAYOUT_DEFAULT).toBe("");
+    expect(PAGE_TEMPLATE_DEFAULT).toBe("");
   });
 
   it("clears the property rather than writing an id meaning 'no id'", () => {
     const text = readCode("journal.ts");
-    const at = text.indexOf("async setPageLayout(");
+    const at = text.indexOf("async setPageTemplate(");
     expect(at).toBeGreaterThan(0);
-    expect(text.slice(at, at + 600)).toContain("delete front[PAGE_LAYOUT_KEY]");
+    expect(text.slice(at, at + 600)).toContain("delete front[PAGE_TEMPLATE_KEY]");
   });
 
   it("writes nothing at all when the note had no property and wants none", () => {
@@ -346,15 +346,15 @@ describe("the default is absent rather than a word", () => {
     // default. A `processFrontMatter` call there would touch every new note's
     // mtime for no change.
     const text = readCode("journal.ts");
-    const at = text.indexOf("async setPageLayout(");
+    const at = text.indexOf("async setPageTemplate(");
     expect(text.slice(at, at + 600)).toContain(
-      "if (!id && !(PAGE_LAYOUT_KEY in fm)) return"
+      "if (!id && !(PAGE_TEMPLATE_KEY in fm) && !legacy) return"
     );
   });
 
   it("is one lowercase word, like every other property the plugin writes", () => {
-    expect(PAGE_LAYOUT_KEY).toBe("pagelayout");
-    expect(PAGE_LAYOUT_KEY).toMatch(/^[a-z]+$/);
+    expect(PAGE_TEMPLATE_KEY).toBe("pagetemplate");
+    expect(PAGE_TEMPLATE_KEY).toMatch(/^[a-z]+$/);
   });
 });
 
@@ -466,18 +466,18 @@ describe("the control on a title's row", () => {
   it("offers the page rows on every kind, unconditionally", () => {
     // THE GUARD WAS `if (kind.pages)`, and it is gone with the capability it
     // read: every kind holds pages as of 1.0.23, so every row in every kind
-    // table gets the layout rows. The menu is built from `kind.pages` directly
+    // table gets the template rows. The menu is built from `kind.pages` directly
     // now — a required field, so there is nothing left to branch on.
-    expect(src()).toContain("addPageLayoutRows(menu, table, live, path);");
+    expect(src()).toContain("addPageTemplateRows(menu, table, live, path);");
     expect(src()).not.toContain("if (kind.pages)");
     expect(src()).toContain("const label = kind.pages.label;");
   });
 
   it("ticks what would be used, not what is stored", () => {
-    // A note naming a layout that has since been deleted makes its pages from
+    // A note naming a template that has since been deleted makes its pages from
     // the default, and a menu ticking the missing row would describe a state
     // the plugin will not honour.
-    expect(src()).toContain("pageLayoutShown(cfg, pageLayoutOf(fm))");
+    expect(src()).toContain("pageTemplateShown(cfg, pageTemplateOf(fm))");
     expect(src()).toContain("setChecked(row.id === shown)");
   });
 
@@ -819,12 +819,12 @@ describe("a menu row identifies its note by path, never by TFile", () => {
 
   it("draws a stale row's menu as a sentence, not as rows that would throw", () => {
     // The guard has to sit BETWEEN the lookup and the row builders. Dropping it
-    // hands `null` to `addPageLayoutRows`, which is a thrown menu rather than a
+    // hands `null` to `addPageTemplateRows`, which is a thrown menu rather than a
     // refused one — and this is exactly the instant the reported bug lived in.
     const text = src();
     const lookup = text.indexOf("const live = getFile(table.plugin.app, path);");
     const guard = text.indexOf("if (!live) {", lookup);
-    const rows = text.indexOf("addPageLayoutRows(menu, table, live, path)", lookup);
+    const rows = text.indexOf("addPageTemplateRows(menu, table, live, path)", lookup);
     expect(lookup).toBeGreaterThan(0);
     expect(guard).toBeGreaterThan(lookup);
     expect(rows).toBeGreaterThan(guard);
@@ -836,7 +836,7 @@ describe("a menu row identifies its note by path, never by TFile", () => {
     // row clicks go through a function that takes the PATH — asserted at the
     // CALL SITE, because a helper that is defined and not called is exactly the
     // mutation this is here to catch.
-    expect(src()).toContain("void setLayout(plugin, path, row.id)");
+    expect(src()).toContain("void setPageTemplate(plugin, path, row.id)");
     expect(src()).toContain("void remove(table, path)");
   });
 
@@ -844,7 +844,7 @@ describe("a menu row identifies its note by path, never by TFile", () => {
     // THE BUG, stated as a rule: a stale row that ACTS is worse than a stale row
     // that says it is stale. Each resolve is immediately followed by its
     // refusal, so a mutation that keeps the lookup and drops the guard is red.
-    for (const fn of ["async function setLayout(", "async function remove("]) {
+    for (const fn of ["async function setPageTemplate(", "async function remove("]) {
       const at = src().indexOf(fn);
       expect(at, fn).toBeGreaterThan(0);
       const body = src().slice(at, at + 320);

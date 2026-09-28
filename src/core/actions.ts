@@ -476,7 +476,7 @@ export const ACTIONS: Action[] = [
     // inside a ```chronoanvil fence.
     //
     // NO ELLIPSIS. It opens nothing and asks nothing; the convention on this
-    // table is that `…` promises a window (`Edit sections…`, `Template…`).
+    // table is that `…` promises a window (`Edit sections…`, `Templates…`).
     //
     // WRITES NOTHING, which is why it needs no `warning` and no confirmation.
     id: "note-copy-plain-markdown",
