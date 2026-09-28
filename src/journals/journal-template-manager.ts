@@ -13,13 +13,20 @@
 // lives in `journal-template.ts`, which is pure and which the suite can reach;
 // what is here is the file I/O, the confirmation and the notices.
 //
-// WHY THE DEFAULT SAVE GOES THROUGH `refreshJournalTemplates`. Writing
-// `cfg.layout` alone changes nothing a reader can see: `newNote`, `newContainer`
-// and `newPage` all read the template FILE. The file therefore has to be
-// rewritten — and `refreshJournalTemplates` already surveys drift, shows the
-// exact added and removed lines and asks. Writing the file directly here would
-// be a second, quieter path to the same bytes, over a file the reader owns and
-// may have hand-edited.
+// WHY THE DEFAULT SAVE WRITES THE TEMPLATE FILE. Writing `cfg.layout` alone
+// changes nothing a reader can see: `newNote`, `newContainer` and `newPage` all
+// read the template FILE. The file therefore has to be rewritten too, and the
+// two writes are one gesture.
+//
+// ── AND WHY IT NO LONGER GOES THROUGH `refreshJournalTemplates` (1.0.46) ──
+//
+// `EntryTemplates`' header carries the whole argument and it is the same here.
+// The vault-wide command opens a window the reader can DECLINE, and declining
+// it does not undo the config write that has already happened — it leaves
+// `cfg.layout` and the template file describing two different notes, with the
+// Template window reporting the first and every new note built from the second.
+// Every door below writes straight through, scoped to the journal it changed,
+// via `refreshJournalTemplatesFor`.
 
 import { App, Notice } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
@@ -226,9 +233,14 @@ export class JournalTemplates {
       );
     }
 
-    // The preview and the write of the template FILE, through the one path that
-    // already does both.
-    await this.plugin.scaffold.refreshJournalTemplates();
+    // THE OTHER HALF OF THE GESTURE, straight through and scoped to this
+    // journal. See the header.
+    await this.plugin.scaffold.refreshJournalTemplatesFor(cfg);
+    // NO NOUN FOR THE TARGET IN HERE. The window derives one — "Lesson",
+    // "Subject index", "Page" — from `vocabulary.ts`, and a second derivation
+    // in the manager is how one object came to be called two things in 1.0.38.
+    // The sentence says what changed without naming the kind.
+    new Notice("ChronoAnvil: this note's sections are the default now.");
     return true;
   }
 
@@ -269,10 +281,9 @@ export class JournalTemplates {
   // avoid. A preset's own `layout[key]` comes back because it is the preset's,
   // read through `ctx.type` on the next build.
   //
-  // THROUGH `refreshJournalTemplates` LIKE EVERY OTHER DEFAULT WRITE, for the
-  // reason this file's header gives: the reader sees the template FILE, not the
-  // config, so the file has to be rewritten and the reader has to be shown the
-  // lines before it is.
+  // WRITES THE FILE LIKE EVERY OTHER DEFAULT WRITE, for the reason this file's
+  // header gives: the reader sees the template FILE, not the config, so the
+  // file has to be rewritten in the same gesture.
   async useAsDefault(
     ctx: SectionContext,
     layout: JournalVariantConfig | null
@@ -296,7 +307,15 @@ export class JournalTemplates {
       this.writeDefault(cfg, key, layout.sections ?? [], layout.options ?? {});
     }
     await this.plugin.saveSettings();
-    await this.plugin.scaffold.refreshJournalTemplates();
+    await this.plugin.scaffold.refreshJournalTemplatesFor(cfg);
+    // ITS OWN SENTENCE, for `saveDefault`'s reason above: a default change that
+    // needed no change to the template file used to report "journal templates
+    // are already current", which reads as a refusal of what just succeeded.
+    new Notice(
+      layout
+        ? `ChronoAnvil: “${layout.label}” is the default now — new notes are built from it.`
+        : "ChronoAnvil: back to the arrangement ChronoAnvil ships — new notes are built from it."
+    );
     return true;
   }
 
@@ -319,7 +338,13 @@ export class JournalTemplates {
       v.id === id ? { ...v, label: next } : v
     );
     await this.plugin.saveSettings();
-    await this.plugin.scaffold.refreshJournalTemplates();
+    // NO NOTICE AND, IN PRACTICE, NO WRITE: a rename keeps the id, the id is
+    // half the template filename, and the label reaches no byte of the file —
+    // so this converges a file that is already converged. It is called anyway
+    // because "every write to `cfg.variants` is followed by the file write for
+    // that journal" is a rule worth having no exception to, and the window is
+    // open and redraws the row under the new name.
+    await this.plugin.scaffold.refreshJournalTemplatesFor(cfg);
     return true;
   }
 
@@ -363,7 +388,11 @@ export class JournalTemplates {
       );
     }
     await this.plugin.saveSettings();
-    await this.plugin.scaffold.refreshJournalTemplates();
+    // NO NOTICE: the caller names what happened — withdrawn from here, or
+    // removed outright — and it is the only one that can tell those apart. The
+    // write still matters, because a withdrawal changes which kinds compose the
+    // template and so what its file holds.
+    await this.plugin.scaffold.refreshJournalTemplatesFor(cfg);
     return plan;
   }
 

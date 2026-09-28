@@ -51,9 +51,10 @@ import {
 import type { TrackerClass } from "../trackers/trackers";
 import type { SectionChoice } from "./section-model";
 import { ENTRY_SECTIONS, entrySectionMatrix } from "../diary/entry-sections";
-import { bandWithSection } from "../diary/entry-template";
+import { bandWithSection, groupsWithSection } from "../diary/entry-template";
 import type { EntryLayoutConfig } from "../diary/entry-template";
 import type {
+  EntryBandGroup,
   EntrySection,
   EntrySectionContext,
 } from "../diary/entry-sections";
@@ -361,6 +362,24 @@ export interface ChronoAnvilSettings {
   // (`test/entry-template.test.ts`), because five template files are written
   // from the function that reads it.
   entrySectionBand: Partial<Record<TrackerClass, string[]>>;
+  // The groups a grain's shared band is arranged into, where the reader made
+  // any (1.0.46).
+  //
+  // THE THIRD HALF OF THE SAME SAVE, and a key of its own for
+  // `entrySectionBand`'s reason one paragraph up. That one carries the ORDER and
+  // nothing else because `entrySections` is additive and cannot; this carries
+  // WHICH FIELDS SHARE A FENCE, which neither of the other two can express — a
+  // partition is a fact about the band rather than about any member of it. See
+  // `EntryBandGroup`.
+  //
+  // WRITTEN AND DELETED WITH THE BAND, never on its own: a partition read
+  // against an order it does not cover is one `regroupBand` refuses, so the two
+  // are stored by the same gesture and cleared by the same one.
+  //
+  // Sparse, and an absent grain composes byte-for-byte what it composed before
+  // this key existed — `entrySectionBand`'s contract, asserted for the same
+  // reason and in the same test.
+  entrySectionGroups: Partial<Record<TrackerClass, EntryBandGroup[]>>;
   // Named entry layouts the reader saved, offered on the grains they chose.
   //
   // A SEPARATE ARRAY FROM `customJournals[].variants`, WHICH IS THE SAME IDEA.
@@ -432,6 +451,7 @@ export const DEFAULT_SETTINGS: ChronoAnvilSettings = {
   collapsedSettingsGroups: {},
   entrySections: {},
   entrySectionBand: {},
+  entrySectionGroups: {},
   entryLayouts: [],
   installedVersion: undefined,
 };
@@ -2022,6 +2042,16 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       else delete s.entrySections[grain];
       const band = bandWithSection(s.entrySectionBand[grain], section.id, next != null);
       if (band) s.entrySectionBand[grain] = band;
+      // AND THE PARTITION WITH IT (1.0.46). All three stores move together or
+      // the groups stop covering the band and the reader's rows quietly
+      // flatten on the next compose — see `groupsWithSection`.
+      const groups = groupsWithSection(
+        s.entrySectionGroups[grain],
+        section.id,
+        next != null
+      );
+      if (groups) s.entrySectionGroups[grain] = groups;
+      else delete s.entrySectionGroups[grain];
       await this.plugin.saveSettings();
       await this.plugin.scaffold.refreshDiaryTemplate(grain);
       this.refresh();

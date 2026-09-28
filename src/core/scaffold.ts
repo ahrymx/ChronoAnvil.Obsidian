@@ -31,6 +31,7 @@ import { mergeBannerFences } from "./note-sections";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import type { SectionWant } from "./section-model";
+import type { EntryBandGroup } from "../diary/entry-sections";
 import {
   composeEntryTemplate,
   ENTRY_SECTIONS,
@@ -312,7 +313,11 @@ export function shippedNotes(
   types: readonly JournalType[],
   books: readonly LogbookDef[],
   extras: Partial<Record<TrackerClass, readonly SectionWant[]>> = {},
-  bands: Partial<Record<TrackerClass, readonly string[]>> = {}
+  bands: Partial<Record<TrackerClass, readonly string[]>> = {},
+  // THE BAND'S GROUPS, `bands`' third half (1.0.46). Optional on its terms and
+  // for its reason: every caller that passes nothing composes byte-for-byte
+  // what it composed before this parameter existed.
+  groups: Partial<Record<TrackerClass, readonly EntryBandGroup[]>> = {}
 ): ShippedNote[] {
   return [
     // COMPOSED AS OF 3.11 §1, and `assets/home.md` is gone with it. The same
@@ -404,7 +409,12 @@ export function shippedNotes(
     // which is an edit to a template you cannot make to a file the plugin only
     // copies.
     ...TRACKER_CLASSES.map((cls) => ({
-      content: composeEntryTemplate(cls, extras[cls] ?? [], bands[cls] ?? []),
+      content: composeEntryTemplate(
+        cls,
+        extras[cls] ?? [],
+        bands[cls] ?? [],
+        groups[cls] ?? []
+      ),
       dest: `${p.templatesDiary}/${CLASS_DEFS[cls].templateFile}`,
       template: true,
     })),
@@ -839,12 +849,18 @@ export class Scaffold {
     const p = this.paths;
     const extras = this.plugin.settings.entrySections ?? {};
     const bands = this.plugin.settings.entrySectionBand ?? {};
+    const groups = this.plugin.settings.entrySectionGroups ?? {};
     const items: RepairFileChange[] = [];
     const files: { dest: string; content: string }[] = [];
 
     for (const cls of TRACKER_CLASSES) {
       const dest = `${p.templatesDiary}/${CLASS_DEFS[cls].templateFile}`;
-      const content = composeEntryTemplate(cls, extras[cls] ?? [], bands[cls] ?? []);
+      const content = composeEntryTemplate(
+        cls,
+        extras[cls] ?? [],
+        bands[cls] ?? [],
+        groups[cls] ?? []
+      );
       const existing = getFile(this.app, dest);
       if (!existing) continue;
       const disk = await this.app.vault.read(existing);
@@ -909,6 +925,17 @@ export class Scaffold {
   // custom frontmatter or prose to an entry template lost it with one click.
   // Now it surveys drift, previews exact added and removed lines, and requires
   // confirmation through the standard repair window.
+  //
+  // ── AND IT IS A COMMAND AGAIN, NOTHING ELSE (1.0.46) ──────────────────
+  //
+  // This was briefly two things: the vault-wide command, and the write behind
+  // *Use as default* / *Save this entry as the default*, with a `quiet` flag so
+  // the second caller could suppress notices that were the first one's. The
+  // notices were the smaller half of the problem. The window can be DECLINED,
+  // and a declined write leaves the setting saying one thing and the template
+  // file another — see `refreshDiaryTemplate`, which is what those callers use
+  // now. One subject per entry point: this one's is "your five template files
+  // have drifted", and its window and its notices are both about that.
   async refreshTemplates(): Promise<void> {
     const { items, files } = await this.surveyDiaryTemplatesDrift();
     if (items.length === 0) {
@@ -941,17 +968,55 @@ export class Scaffold {
         updated++;
       }
     }
-    notify.ok(`ChronoAnvil: refreshed ${updated} diary template${updated === 1 ? "" : "s"} ✅`);
+    notify.ok(
+      `ChronoAnvil: refreshed ${updated} diary template${updated === 1 ? "" : "s"} ✅`
+    );
   }
 
-  // Safely refresh a single diary template file if it exists in the vault.
+  // One grain's template file, written to match the settings. No window, no
+  // notice, no survey.
+  //
+  // ── THE WRITE A DEFAULT CHANGE OWES, AND WHY IT IS NOT THE COMMAND (1.0.46) ─
+  //
+  // `refreshTemplates` is the vault-wide *Refresh diary templates* command: it
+  // surveys all five grains, opens the repair window and lets the reader pick.
+  // That is right for a command whose whole subject is "your template files have
+  // drifted". It is wrong as the write behind *Save this entry as the default*,
+  // and the fault is not the extra click — it is that the click can say NO.
+  //
+  // A default change writes `entrySections` first and the FILE second. Decline
+  // the window and the two disagree: the manager reads the settings and reports
+  // the new default, every new entry is built from the stale file, and nothing
+  // on screen says which of the two is lying. The reader in that state has done
+  // the gesture the window exists for and watched it not happen. So the
+  // settings-side door has always written straight through (see
+  // `renderEntrySectionCell`), and as of 1.0.46 so does every other door that
+  // changes a default — one gesture, one write, no second gate on a decision
+  // the reader has already confirmed.
+  //
+  // WRITES A MISSING FILE RATHER THAN RETURNING. This used to return silently
+  // when the template was absent, which put the reader somewhere worse than
+  // stale: the survey SKIPS a missing file too (`if (!existing) continue`), so a
+  // vault whose `Daily.md` had been deleted reported "already current", accepted
+  // every default change without complaint, and then refused to make an entry at
+  // all with "Daily template missing — run 'Set up / repair vault'". The journal
+  // side has created since it was written; this is that rule, arrived at late.
   async refreshDiaryTemplate(grain: TrackerClass): Promise<void> {
     const dest = `${this.paths.templatesDiary}/${CLASS_DEFS[grain].templateFile}`;
     const extras = this.plugin.settings.entrySections ?? {};
     const bands = this.plugin.settings.entrySectionBand ?? {};
-    const content = composeEntryTemplate(grain, extras[grain] ?? [], bands[grain] ?? []);
+    const groups = this.plugin.settings.entrySectionGroups ?? {};
+    const content = composeEntryTemplate(
+      grain,
+      extras[grain] ?? [],
+      bands[grain] ?? [],
+      groups[grain] ?? []
+    );
     const existing = getFile(this.app, dest);
-    if (!existing) return;
+    if (!existing) {
+      await createFileEnsuringFolders(this.app, dest, content);
+      return;
+    }
     const disk = await this.app.vault.read(existing);
     if (disk !== content) {
       await this.app.vault.modify(existing, content);
@@ -1327,6 +1392,39 @@ export class Scaffold {
     );
   }
 
+  // `quiet` FOR THE SAME REASON THE DIARY TWIN TAKES IT (1.0.46): this is both
+  // the vault-wide command and the write behind a default change, and the two
+  // vault-wide notices are the command's.
+  // One journal's template files, written to match its config. No window, no
+  // notice, no survey.
+  //
+  // THE DIARY'S `refreshDiaryTemplate`, one surface over, and its long comment
+  // carries the whole case: a default change that routes its file write through
+  // the vault-wide command can be declined, and a declined write leaves
+  // `cfg.layout` and the template file describing two different notes with
+  // nothing on screen to say so. Every door that changes a default writes
+  // straight through as of 1.0.46.
+  //
+  // SCOPED TO ONE JOURNAL because that is what the caller changed. The command
+  // still surveys every journal in the vault; this writes the files of the one
+  // whose config was just edited, and leaves a reader's hand-edits to the other
+  // journals' templates exactly where they are.
+  async refreshJournalTemplatesFor(cfg: JournalConfig): Promise<void> {
+    for (const tpl of customTemplateFiles(cfg)) {
+      const dest = `${cfg.templatesFolder}/${tpl.name}`;
+      const existing = getFile(this.app, dest);
+      if (!existing) {
+        await createFileEnsuringFolders(this.app, dest, tpl.content);
+        continue;
+      }
+      const disk = await this.app.vault.read(existing);
+      if (disk !== tpl.content) await this.app.vault.modify(existing, tpl.content);
+    }
+  }
+
+  // A COMMAND AND NOTHING ELSE, for `refreshTemplates`' reason above: the
+  // default-writing doors call `refreshJournalTemplatesFor` instead, because a
+  // window a reader can decline is not a write.
   async refreshJournalTemplates(): Promise<void> {
     const journalFiles = await this.journalTemplateFiles();
     if (journalFiles.length === 0) {
@@ -1368,7 +1466,9 @@ export class Scaffold {
         updated++;
       }
     }
-    notify.ok(`ChronoAnvil: refreshed ${updated} journal template${updated === 1 ? "" : "s"} ✅`);
+    notify.ok(
+      `ChronoAnvil: refreshed ${updated} journal template${updated === 1 ? "" : "s"} ✅`
+    );
   }
 
   // Create all folders + any missing files. Never overwrites existing notes,
@@ -1398,7 +1498,8 @@ export class Scaffold {
       registeredJournalTypes(this.plugin),
       this.plugin.settings.logbooks,
       this.plugin.settings.entrySections,
-      this.plugin.settings.entrySectionBand
+      this.plugin.settings.entrySectionBand,
+      this.plugin.settings.entrySectionGroups
     )) {
       const { asset, dest } = note;
       if (!isReconcilable(note)) continue;
@@ -1573,7 +1674,8 @@ export class Scaffold {
       registeredJournalTypes(this.plugin),
       this.plugin.settings.logbooks,
       this.plugin.settings.entrySections,
-      this.plugin.settings.entrySectionBand
+      this.plugin.settings.entrySectionBand,
+      this.plugin.settings.entrySectionGroups
     )) {
       const { asset, dest } = note;
       if (getFile(this.app, dest)) continue; // don't overwrite

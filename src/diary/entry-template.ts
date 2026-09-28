@@ -53,10 +53,18 @@ import {
   sharedBody,
   isForeignBandLine,
 } from "./entry-sections";
-import type { EntrySection, EntrySectionContext } from "./entry-sections";
-import { answerInText } from "../core/section-model";
+import type {
+  EntryBandGroup,
+  EntrySection,
+  EntrySectionContext,
+} from "./entry-sections";
+import {
+  FLAG_OFF,
+  SECTION_FORM,
+  answerInText,
+} from "../core/section-model";
 import type { SectionChoice } from "../core/section-model";
-import { replaceBody } from "../core/note-sections";
+import { answersOn, replaceBody } from "../core/note-sections";
 import { reloadLoss } from "../core/reload-loss";
 import type { ReloadLoss } from "../core/reload-loss";
 import type { TrackerClass } from "../trackers/trackers";
@@ -81,6 +89,12 @@ export interface EntryLayoutConfig {
   // empty objects in data.json, which is the reasoning `saveVariant` already
   // gives for the same field.
   options?: Record<string, Record<string, unknown>>;
+  // The groups its shared band is arranged into, where the reader made any
+  // (1.0.46). Absent for a flat template, on `options`' rule one field up: a
+  // partition whose every block holds one field composes exactly what no
+  // partition composes, so storing it would be a wall of one-member arrays.
+  // See `EntryBandGroup` for why an order and a set of answers cannot say this.
+  groups?: EntryBandGroup[];
   // Which grains it may be reloaded onto. A layout saved from a weekly entry
   // naming `challenges` is meaningful on monthly too; one naming a section a
   // grain cannot compose is reported when it is applied, not filtered here,
@@ -179,19 +193,55 @@ export function wantFromEntry(
 }
 
 // One section's stored choice, with whatever the page already answers.
+//
+// ── TWO READS, BECAUSE THERE ARE TWO PLACES AN ANSWER LIVES (1.0.46) ─────
+//
+// There was one, and it could not see half the answers a diary field has.
+// `answerInText` searches the whole file for an argument span and **returns
+// null by name** for `form`, `lines` and `flag` — it says so itself: "its
+// callers fall back to the model's own `answered`, which is where `formAt` puts
+// the answer — see `answersOn`". Every other caller has that fallback. This one
+// did not, so a field drawn as a widget was read back as a plain id, stored as
+// a plain id, and composed back as a SECTION.
+//
+// That is the read half of the defect `answeredLine` fixes on the write side,
+// and it is why *Save this entry as the default* came back with Tasks in the
+// wrong form: the answer was lost before it ever reached the store.
+//
+// `answersOn` IS THE READ THE MODEL ALREADY USES — `entrySectionModel.sections`
+// asks it the same question with the same two arguments — so the box the editor
+// draws ticked and the choice this stores cannot disagree.
+//
+// A DEFAULT IS NOT STORED. `answersOn` answers every question it is asked, so
+// an untouched field would come back `{ form: "section" }` and the store would
+// fill with the catalogue's own answers written out. That is the rule
+// `kind-table-overrides-1.0.33` settled for headings — a value equal to its
+// default is absent — and it is what keeps a vault that changed nothing
+// composing byte-for-byte what it composed before this read existed.
 function choiceFor(
   text: string,
   section: EntrySection,
   ctx: EntrySectionContext
 ): SectionChoice {
+  const questions = section.questions?.(ctx) ?? [];
   const options: Record<string, unknown> = {};
-  for (const q of section.questions?.(ctx) ?? []) {
+  for (const q of questions) {
     const answer = answerInText(text, q);
     // EMPTY IS NOT AN ANSWER. An unset bridge writes `bridge-notes:` with
     // nothing after the colon, and storing `""` would make "the reader chose
     // nothing" indistinguishable from "the reader chose the empty string" — and
     // `directiveFor` already treats a blank target as unconfigured.
     if (answer != null && answer.trim() !== "") options[q.key] = answer.trim();
+  }
+  // AND THE ANSWERS WRITTEN ON THE SECTION'S OWN LINE, off the line `locate`
+  // found rather than off the fence — a band is one fence holding seven fields,
+  // so a fence-wide read would hand all seven one answer.
+  const onLine = answersOn(section.locate(text, ctx), questions, text);
+  for (const [key, value] of Object.entries(onLine)) {
+    if (key in options) continue;
+    if (value === SECTION_FORM || value === FLAG_OFF) continue;
+    if (value.trim() === "") continue;
+    options[key] = value;
   }
   return Object.keys(options).length ? { id: section.id, options } : { id: section.id };
 }
@@ -221,6 +271,41 @@ export function bandWithSection(
   if (!band) return undefined;
   const without = band.filter((x) => x !== id);
   return present ? [...without, id] : without;
+}
+
+// A saved partition with one section switched on or off. 1.0.46.
+//
+// `bandWithSection`'s TWIN, HERE FOR ITS REASON. The settings table decides
+// membership and the band carries the order; the groups carry the arrangement,
+// and all three have to move together or `regroupBand` refuses the partition —
+// "EVERY FIELD, EXACTLY ONCE" — and the reader's grouping silently degrades to a
+// flat band on the next compose. Ticking a box in Settings → Diary entries must
+// not cost somebody the row they arranged.
+//
+// `undefined` IN, `undefined` OUT, and a partition that empties out comes back
+// `undefined` rather than as an empty array: a grain with no groups is a grain
+// with no key, which is what keeps an untouched vault composing what it always
+// composed.
+//
+// APPENDED AS A BLOCK OF ITS OWN when it is switched on, which is
+// `bandWithSection`'s call one function up and the same reasoning: a new field
+// joins the band at the end, and putting it inside somebody's existing row would
+// be arranging their entry for them.
+//
+// AND A GROUP THAT LOSES ITS LAST MEMBER GOES, rather than staying as an empty
+// block with a title — a name for a row that no longer holds anything.
+export function groupsWithSection(
+  groups: readonly EntryBandGroup[] | undefined,
+  id: string,
+  present: boolean
+): EntryBandGroup[] | undefined {
+  if (!groups) return undefined;
+  const without = groups
+    .map((g) => ({ ...g, ids: g.ids.filter((x) => x !== id) }))
+    .map((g) => ({ ...g, ...(g.pages ? { pages: g.pages.filter((x) => x !== id) } : {}) }))
+    .filter((g) => g.ids.length > 0);
+  const next = present ? [...without, { ids: [id] }] : without;
+  return next.length ? next : undefined;
 }
 
 // The page with `composed`'s body and its own frontmatter.

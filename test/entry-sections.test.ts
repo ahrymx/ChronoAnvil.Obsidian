@@ -30,6 +30,8 @@ import {
   detectEntrySections,
   addableEntrySections,
   entrySectionModel,
+  entryBandGroups,
+  entryBandIsGrouped,
 } from "../src/diary/entry-sections";
 import { unweldEntryFences, weldEntryFences } from "../src/trackers/entry-trackers";
 import { WIDGETS } from "../src/core/widget-registry";
@@ -82,9 +84,15 @@ describe("the composer is what scaffold writes", () => {
     // survey would offer to undo every save the reader had made. That is the
     // same failure one field over, which is why it is the same assertion.
     const src = readSrc("scaffold");
+    // ALL THREE STORES, as of 1.0.46 — membership, order, and the partition the
+    // band is arranged into. A path that read two of the three would compose a
+    // template differing from the one on disk by a grouping, so the drift
+    // survey would offer to undo the arrangement on every refresh. Matched over
+    // the whole argument list rather than on one line, because the call no
+    // longer fits on one.
     expect(
       src.match(
-        /composeEntryTemplate\(cls, extras\[cls\] \?\? \[\], bands\[cls\] \?\? \[\]\)/g
+        /composeEntryTemplate\(\s*cls,\s*extras\[cls\] \?\? \[\],\s*bands\[cls\] \?\? \[\],\s*groups\[cls\] \?\? \[\]\s*\)/g
       )?.length
     ).toBe(2);
     expect(src).not.toContain("composeEntryTemplate(cls)");
@@ -1692,5 +1700,120 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     expect(over).not.toBe(text);
     expect(model.blocks!(over).map((b) => b.ids)).toEqual(partition());
     expect(model.regroup!(over, partition(...apart), [], [])).toBeNull();
+  });
+});
+
+// ── A TEMPLATE CARRIES THE ARRANGEMENT IT WAS SAVED FROM (1.0.46) ──────────
+//
+// *"Already matches that template? The sections are the same but the difference
+// is the template I'm trying to apply (to a daily entry) should have tasks and
+// captured in a group."*
+//
+// Three holes, compounding, and the report only shows the last one. A group
+// takes widgets only (1.0.42, the cases above) — so a template holding a group
+// composes to a grouped band ONLY IF the composer also writes the `#widget`
+// answer onto each field's line. It never did: `applyEntrySections` splices
+// those tokens when the EDITOR adds a field and `composeEntryTemplate` was the
+// one writer that never asked the section its questions. So every composed field
+// was a section, every group was refused, the template composed flat, and the
+// flat composition is what the note already was: *already matches*.
+describe("a template carries the arrangement it was saved from (1.0.46)", () => {
+  const ctx = { grain: "daily" as TrackerClass };
+  const model = entrySectionModel(ctx);
+  const fields = ["focus", "highlights", "challenges", "log", "attachments", "todo", "capture"];
+  const flat = composeEntryTemplate("daily");
+  // The same want a saved template carries: every field answered *Show as
+  // widget*, which is the state a reader is in when they reach for the link
+  // icon and the only state a group can be written from.
+  const want = fields.map((id) => ({ id, options: { form: "widget" } }));
+
+  it("writes a field's form answer onto the line it composes", () => {
+    expect(flat).toContain("tasks:todo|Tasks");
+    expect(flat).not.toContain("tasks:todo#widget");
+    const shown = composeEntryTemplate("daily", want);
+    expect(shown).toContain("tasks:todo#widget|Tasks");
+    expect(shown).toContain("note:capture#collapse#widget:");
+    // AND IT IS THE SAME WRITE THE EDITOR MAKES, which is the property that
+    // makes the round trip a round trip rather than two spellings that agree
+    // today. `applyEntrySections` over the flat composition is the editor's
+    // path; the composer's output must be that file.
+    expect(shown).toBe(applyEntrySections(flat, ctx, want));
+  });
+
+  it("asks nothing when nothing was answered", () => {
+    // BYTE-INERT WHEN ABSENT, which is what lets this reach the five template
+    // files: a want with no options is the 1.0.45 composition.
+    expect(composeEntryTemplate("daily", fields)).toBe(flat);
+    expect(composeEntryTemplate("daily", fields.map((id) => ({ id })))).toBe(flat);
+    // …and the default answers are absences in the grammar, so naming them
+    // writes nothing either.
+    expect(
+      composeEntryTemplate("daily", fields.map((id) => ({ id, options: { form: "section" } })))
+    ).toBe(flat);
+  });
+
+  it("reads a flat band back as one block per field, and calls it ungrouped", () => {
+    const groups = entryBandGroups(flat, ctx);
+    expect(groups.map((g) => g.ids)).toEqual(fields.map((id) => [id]));
+    // THE PARTITION HAS TO BE TOTAL and it still says nothing, so no caller
+    // stores it.
+    expect(entryBandIsGrouped(groups)).toBe(false);
+    expect(groups.some((g) => g.title != null || g.pages != null)).toBe(false);
+  });
+
+  it("composes the group the reader made, byte for byte", () => {
+    // THE WHOLE REPORT, END TO END. Compose with the answers, group the result
+    // the way the window does, read the groups off it as a template stores
+    // them, then compose again from the stored template — and get the file back.
+    const shown = composeEntryTemplate("daily", want);
+    const partition = [
+      ["banner", "trackers"],
+      ...fields.slice(0, 5).map((id) => [id]),
+      ["todo", "capture"],
+    ];
+    const grouped = model.regroup!(
+      shown,
+      partition,
+      ["capture"],
+      [],
+      new Map([["todo", "Evening review"]])
+    )!;
+    expect(grouped).not.toBeNull();
+
+    const groups = entryBandGroups(grouped, ctx);
+    expect(entryBandIsGrouped(groups)).toBe(true);
+    expect(groups.map((g) => g.ids)).toEqual([
+      ...fields.slice(0, 5).map((id) => [id]),
+      ["todo", "capture"],
+    ]);
+    expect(groups[groups.length - 1].title).toBe("Evening review");
+    expect(groups[groups.length - 1].pages).toEqual(["capture"]);
+
+    expect(composeEntryTemplate("daily", want, fields, groups)).toBe(grouped);
+    // AND IT IS NOT THE FILE IT WAS BEFORE, which is the sentence the reader
+    // was shown instead. Applying this template to a flat entry is a change.
+    expect(grouped).not.toBe(flat);
+  });
+
+  it("degrades a group it cannot write to the order it still carries", () => {
+    // `?? welded` — a stored group naming a field this grain does not compose,
+    // or one whose fields are sections rather than widgets, composes FLAT rather
+    // than composing nothing. The arrangement degrades to the order.
+    const groups = [
+      { ids: ["focus", "highlights"] },
+      ...fields.slice(2).map((id) => ({ ids: [id] })),
+    ];
+    // Sections, not widgets: `regroupBand` refuses the row, so the band is the
+    // one `band` alone composes.
+    expect(composeEntryTemplate("daily", fields, fields, groups)).toBe(flat);
+    // A field this grain has never heard of, with the answers in place: still
+    // the composition, never a throw and never an empty string.
+    const shown = composeEntryTemplate("daily", want);
+    expect(
+      composeEntryTemplate("daily", want, fields, [
+        { ids: ["todo", "nothing-like-this"] },
+        ...fields.filter((id) => id !== "todo").map((id) => ({ ids: [id] })),
+      ])
+    ).toBe(shown);
   });
 });

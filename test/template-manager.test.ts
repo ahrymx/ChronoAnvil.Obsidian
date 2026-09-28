@@ -52,6 +52,8 @@ import { composeEntryTemplate } from "../src/diary/entry-sections";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import type { ChronoAnvilSettings } from "../src/core/settings";
+import { settableRows } from "../src/ui/template-rows";
+import { readCode } from "./sources";
 
 // ── what the plugin ships ────────────────────────────────────────────────
 
@@ -84,8 +86,8 @@ describe("the arrangement ChronoAnvil ships is still reachable", () => {
 
   it("is not the same bytes as today's default once the reader has saved over it", () => {
     // THE WHOLE POINT OF THE 🔒 ROW. If `shippedFor` read the stored config it
-    // would return whatever was last saved, and the row would be a second copy
-    // of ⭐ that claims to undo something.
+    // would return whatever was last saved, and the row would be a copy of the
+    // current default that claims to undo something.
     const { plugin, cfg } = journalStub();
     const app = new App();
     const mgr = new JournalTemplates(app, plugin);
@@ -200,6 +202,86 @@ describe("a template becomes the default", () => {
     expect(settings.entrySections.daily).toBeUndefined();
     expect(settings.entrySectionBand.daily).toBeUndefined();
     expect(mgr.composedFor("daily")).toBe(mgr.shippedFor("daily"));
+  });
+
+  // ── THREE KEYS, NOT TWO (1.0.46) ───────────────────────────────────────
+  //
+  // A saved template carries the arrangement as well as the order, and
+  // `useAsDefault` is the door that copies one onto the grain. A copy that took
+  // two of the three would make the row that says *"Tasks and Captured in one
+  // group"* set a default with them side by side and apart.
+  it("copies a saved template's groups onto the grain, and deletes them for the shipped row", async () => {
+    const { plugin, settings } = entryStub();
+    const mgr = new EntryTemplates(new App(), plugin);
+    const layout = {
+      id: "quiet",
+      label: "Quiet Monday",
+      sections: ["log", "todo", "capture"],
+      options: { todo: { form: "widget" }, capture: { form: "widget" } },
+      groups: [
+        { ids: ["log"] },
+        { ids: ["todo", "capture"], title: "Evening review" },
+      ],
+      grains: ["daily" as const],
+    };
+
+    await mgr.useAsDefault("daily", layout);
+    expect(settings.entrySectionGroups.daily).toEqual(layout.groups);
+    // BY VALUE, NOT BY REFERENCE, which is `entrySections`' own rule on the two
+    // lines above: the stored template and the grain's default are two records,
+    // and an alias would let a rename of one edit the other.
+    expect(settings.entrySectionGroups.daily).not.toBe(layout.groups);
+    expect(settings.entrySectionGroups.daily![1]).not.toBe(layout.groups[1]);
+
+    // ALL THREE KEYS FOR THE 🔒 ROW, for the reason the other two are deleted
+    // rather than written back: what ChronoAnvil ships is the stored override
+    // REMOVED, and a partition left behind would group a band nobody arranged.
+    await mgr.useAsDefault("daily", null);
+    expect(settings.entrySectionGroups.daily).toBeUndefined();
+  });
+
+  it("writes no groups key for a template that has none", async () => {
+    const { plugin, settings } = entryStub();
+    const mgr = new EntryTemplates(new App(), plugin);
+    settings.entrySectionGroups.daily = [{ ids: ["log", "todo"] }];
+    await mgr.useAsDefault("daily", {
+      id: "quiet",
+      label: "Quiet Monday",
+      sections: ["log", "todo"],
+      grains: ["daily"],
+    });
+    // DELETED, NOT LEFT. The template says how its band is arranged — flat, in
+    // this case — and a stale partition read against a band it does not cover is
+    // one `regroupBand` refuses.
+    expect(settings.entrySectionGroups.daily).toBeUndefined();
+  });
+
+  it("composes a template's group rather than reporting the entry already matches", async () => {
+    // THE REPORT, AT THE DOOR THE READER PRESSED. `composedFrom` is what the 🧩
+    // row applies and what `settableRows` compares against the current file — so
+    // a template whose groups were dropped here composed the flat arrangement,
+    // which is what the note already was.
+    const { plugin } = entryStub();
+    const mgr = new EntryTemplates(new App(), plugin);
+    const fields = ["log", "todo", "capture"];
+    const flat = mgr.composedFrom("daily", {
+      id: "quiet",
+      label: "Quiet Monday",
+      sections: fields,
+      grains: ["daily"],
+    });
+    const group = mgr.composedFrom("daily", {
+      id: "quiet",
+      label: "Quiet Monday",
+      sections: fields,
+      options: Object.fromEntries(fields.map((id) => [id, { form: "widget" }])),
+      groups: [{ ids: ["log"] }, { ids: ["todo", "capture"], title: "Evening review" }],
+      grains: ["daily"],
+    });
+    expect(group.drops).toEqual([]);
+    expect(group.text).not.toBe(flat.text);
+    expect(group.text).toContain("header:Evening review");
+    expect(group.text).toContain("tasks:todo#widget|Tasks");
   });
 });
 
@@ -367,17 +449,18 @@ describe("removing a template takes it off ONE target", () => {
 
 // A plugin whose settings hold one journal and whose scaffold does nothing.
 //
-// THE SCAFFOLD IS A NO-OP RATHER THAN ABSENT, because every default write goes
-// through `refreshJournalTemplates` — that is this manager's header rule, the
-// reader sees the template FILE and not the config — so a stub without one
-// would be testing a code path the plugin does not take.
+// THE SCAFFOLD IS A NO-OP RATHER THAN ABSENT, because every write to
+// `cfg.layout` or `cfg.variants` is followed by the template-file write for
+// that journal — that is this manager's header rule, the reader sees the
+// template FILE and not the config — so a stub without one would be testing a
+// code path the plugin does not take.
 const buildPlugin = (
   cfg: JournalConfig
 ): ConstructorParameters<typeof JournalTemplates>[1] =>
   ({
     settings: { ...DEFAULT_SETTINGS, customJournals: [cfg] } as ChronoAnvilSettings,
     saveSettings: async (): Promise<void> => {},
-    scaffold: { refreshJournalTemplates: async (): Promise<void> => {} },
+    scaffold: { refreshJournalTemplatesFor: async (): Promise<void> => {} },
   }) as unknown as ConstructorParameters<typeof JournalTemplates>[1];
 
 const journalStub = (): {
@@ -423,6 +506,10 @@ const entryStub = (): {
     ...DEFAULT_SETTINGS,
     entrySections: {},
     entrySectionBand: {},
+    // FRESH PER STUB, not borrowed from `DEFAULT_SETTINGS` by the spread: these
+    // are the three keys these tests write, and sharing one object across the
+    // file would let one case's group reach the next one's assertion.
+    entrySectionGroups: {},
     entryLayouts: [],
     customJournals: [],
   } as ChronoAnvilSettings;
@@ -430,8 +517,215 @@ const entryStub = (): {
     plugin: {
       settings,
       saveSettings: async (): Promise<void> => {},
-      scaffold: { refreshTemplates: async (): Promise<void> => {} },
+      scaffold: { refreshDiaryTemplate: async (): Promise<void> => {} },
     } as unknown as ConstructorParameters<typeof EntryTemplates>[1],
     settings,
   };
 };
+
+// ── THE BUTTON WHOSE JOB IS DONE, AND THE NOTICE THAT SPOKE FOR IT ─────
+//
+// Reported from a diary entry: pressing *Use as default* produced
+// "ChronoAnvil: diary templates are already current" and nothing else. Two
+// faults behind one toast — a row offering to set a default that was already
+// set, and the vault-wide refresh command's notices standing in for feedback
+// the action never gave.
+describe("a row that is already the default", () => {
+  const row = (text: string, settable = true) => ({
+    settable,
+    compose: () => ({ text }),
+  });
+
+  it("stops being settable when it composes what the target already builds", () => {
+    const [a, b] = settableRows([row("same"), row("other")], "same");
+    expect(a.settable).toBe(false);
+    expect(b.settable).toBe(true);
+  });
+
+  it("leaves a row that was never settable alone", () => {
+    // A row can be false by construction — the ⭐ row was, until 1.0.46 removed
+    // it — and it must not be reasoned about twice: a rule that only looked at
+    // the bytes would reach the same answer, and one that flipped it would be a
+    // second opinion.
+    const [fixed] = settableRows([row("same", false)], "same");
+    expect(fixed.settable).toBe(false);
+  });
+
+  it("does not mutate the rows it was handed", () => {
+    const rows = [row("same")];
+    const out = settableRows(rows, "same");
+    expect(rows[0].settable).toBe(true);
+    expect(out[0]).not.toBe(rows[0]);
+  });
+
+  it("is asked by both windows, off one shared module", () => {
+    // A modal importing the rule from its TWIN would be the merge both
+    // headers refuse, arrived at sideways.
+    for (const mod of ["journal-template-modal", "entry-template-modal"]) {
+      const src = readCode(mod);
+      expect(src, mod).toContain('from "./template-rows"');
+      expect(src, mod).toContain("return settableRows(rows, current);");
+    }
+    expect(readCode("entry-template-modal")).not.toContain(
+      'from "./journal-template-modal"'
+    );
+  });
+});
+
+describe("a default change writes the file itself", () => {
+  // ── THE WINDOW THAT COULD SAY NO (1.0.46) ────────────────────────────
+  //
+  // Reported from a diary entry: an entry saved as the default, and the next
+  // day's entry built from something else. Both default doors wrote the
+  // setting and then called the VAULT-WIDE refresh, which surveys every
+  // template in the vault and opens the repair window. Decline that window —
+  // and it is easy to, since it is titled "Refresh diary templates", lists five
+  // files the reader was not asking after and warns that custom edits will be
+  // replaced — and the settings write stands while the file does not change.
+  // The Template window then reads the settings and reports the new default;
+  // every new entry is built from the stale file; nothing on screen says which
+  // is which.
+  //
+  // The same toast the reader saw first is the smaller half of it: a default
+  // change that needed no file change answered "diary templates are already
+  // current", which reads as a refusal of what had just succeeded.
+  //
+  // So the doors call the TARGETED writer — one grain, or one journal —
+  // straight through, and the commands go back to being commands.
+  it("calls the targeted writer, never the vault-wide command", () => {
+    const diary = readCode("entry-template-manager");
+    expect(diary).toContain("refreshDiaryTemplate(grain)");
+    expect(diary).not.toContain("refreshTemplates(");
+    expect(diary).toContain("ChronoAnvil: new ${CLASS_DEFS[grain].label.toLowerCase()} entries");
+
+    const journal = readCode("journal-template-manager");
+    expect(journal).not.toContain("refreshJournalTemplates(");
+    expect(journal).toContain("is the default now");
+    // ALL FOUR WRITERS, not just the two that change a default: a withdrawal
+    // changes which kinds compose a template, and a rename is included so that
+    // "every write to the config is followed by the file write" has no
+    // exception to remember.
+    expect(
+      journal.match(/refreshJournalTemplatesFor\(cfg\)/g) ?? []
+    ).toHaveLength(4);
+  });
+
+  it("leaves the two vault-wide commands to the command", () => {
+    const src = readCode("actions");
+    expect(src).toContain("p.scaffold.refreshTemplates()");
+    expect(src).toContain("p.scaffold.refreshJournalTemplates()");
+  });
+
+  it("gives the two commands their notices back, with no flag to silence them", () => {
+    const src = readCode("scaffold");
+    expect(src).toContain("async refreshTemplates(): Promise<void>");
+    expect(src).toContain("async refreshJournalTemplates(): Promise<void>");
+    expect(src).not.toContain("quiet");
+    expect(src).toContain(
+      'notify.ok("ChronoAnvil: diary templates are already current");'
+    );
+    expect(src).toContain(
+      'notify.ok("ChronoAnvil: journal templates are already current");'
+    );
+  });
+
+  it("writes a template file that is missing rather than returning", () => {
+    // THE STATE THAT WAS WORSE THAN STALE. `surveyDiaryTemplatesDrift` skips a
+    // missing file (`if (!existing) continue`), so a vault whose `Daily.md` had
+    // been deleted reported "already current", took every default change
+    // without complaint, and then refused to make an entry at all with "Daily
+    // template missing — run 'Set up / repair vault'".
+    const src = readCode("scaffold");
+    const at = src.indexOf("async refreshDiaryTemplate(");
+    expect(at).toBeGreaterThan(0);
+    const body = src.slice(at, at + 700);
+    expect(body).toContain("createFileEnsuringFolders(this.app, dest, content)");
+    expect(body).not.toContain("if (!existing) return;");
+    // The journal twin, scoped to one journal so a hand-edited template
+    // belonging to another is left where it is.
+    const jat = src.indexOf("async refreshJournalTemplatesFor(");
+    expect(jat).toBeGreaterThan(0);
+    const jbody = src.slice(jat, jat + 700);
+    expect(jbody).toContain("customTemplateFiles(cfg)");
+    expect(jbody).toContain("createFileEnsuringFolders");
+    expect(jbody).not.toContain("openRepairWindow");
+  });
+});
+
+// ── ONE SENTENCE ABOUT ONE ARRANGEMENT (1.0.46) ─────────────────────────
+//
+// Reported from the vault, as a screenshot of a Templates window in which the
+// ⭐ and 🔒 rows read "Focus, Highlights, Challenges, Notes, Attachments, Tasks
+// and Captured" and the two 🧩 rows read "Banner, Trackers, Focus, …". Four
+// rows, two sentences, one arrangement — and the two extra nouns make no
+// difference to a single byte, because `entry-header` and the tracker band are
+// composed on every entry whatever a template says.
+//
+// The rows had two derivations. The two default rows walked the catalogue and kept the
+// SHARED members whose id appeared in the composed text; 🧩 listed the stored
+// `sections` array, which the two save doors fill differently (`wantFromEntry`
+// keeps the shared band, the section editor's pane hands over its whole
+// model). The catalogue walk also discarded ORDER — which is the one thing
+// `entrySectionBand` exists to store, so a reader who reordered their sections
+// and saved was shown the catalogue's order back and could not tell whether
+// the save had landed.
+describe("every template row describes what it composes to", () => {
+  it("derives every subtitle from the composed text, on both surfaces", () => {
+    for (const mod of ["entry-template-modal", "journal-template-modal"]) {
+      const src = readCode(mod);
+      // GONE: the second derivation.
+      expect(src, mod).not.toContain("function describeTemplate");
+      expect(src, mod).not.toContain("describeTemplate(");
+      // The 🧩 rows compose once and describe what came back.
+      expect(src, mod).toContain("compose: () => composed,");
+      expect(src, mod).toContain("bandOf(composed.text");
+    }
+  });
+
+  // ── AND THERE IS ONE DEFAULT ROW, NOT TWO (1.0.46) ─────────────────────
+  //
+  // *"there is ChronoAnvil default and Daily default, there only needs to be
+  // one of these."* A ⭐ row naming what a new note is built from TODAY sat
+  // above the 🔒 row naming what ChronoAnvil ships. It composed `current` by
+  // definition, so it could never be settable, renamed or removed — and its
+  // sentence was the same list of nouns every row beneath it printed, because a
+  // row is described by the sections it composes and two ARRANGEMENTS of the
+  // same sections read alike. The reader was looking at a grain whose default
+  // held a group and a shipped row that did not, and could not tell them apart.
+  it("opens on the shipped row, with no second row for the current default", () => {
+    for (const mod of ["entry-template-modal", "journal-template-modal"]) {
+      const src = readCode(mod);
+      const at = src.indexOf("const rows: TemplateRow[] = [");
+      expect(at, mod).toBeGreaterThan(-1);
+      const first = src.slice(at, src.indexOf("];", at));
+      expect(first, mod).toContain('token: "🔒"');
+      // THE ROW IS GONE FROM THE LIST, not merely unreachable. A ⭐ still drawn
+      // and never settable is the control this window declines to draw.
+      expect(first, mod).not.toContain('token: "⭐"');
+      expect(src, mod).not.toContain('token: "⭐"');
+    }
+  });
+
+  it("still measures every row against what the target builds from now", () => {
+    // WHICH IS WHAT NAMES THE CURRENT DEFAULT NOW THE ⭐ ROW IS GONE. The row
+    // drawing no *Use as default* is the one the target is already on — so
+    // `composedFor` is not dead code left behind by the removal, it is the
+    // window's only remaining way to say which arrangement is in force.
+    for (const mod of ["entry-template-modal", "journal-template-modal"]) {
+      const src = readCode(mod);
+      expect(src, mod).toContain("this.manager.composedFor(");
+      expect(src, mod).toContain("return settableRows(rows, current);");
+    }
+  });
+
+  it("reads the band with the same parser the drift report uses", () => {
+    // `detectEntrySections` / `detectSections` return ids in FILE ORDER, and
+    // they are what `surveyDiaryTemplatesDrift` and `surveyJournalTemplatesDrift`
+    // describe drift with — so the sentence in this window and the diff in that
+    // one cannot describe one file two ways.
+    const diary = readCode("entry-template-modal");
+    expect(diary).toContain("detectEntrySections(composed, { grain })");
+    expect(diary).not.toContain("composed.includes(`:${section.id}`)");
+    expect(readCode("journal-template-modal")).toContain("detectSections(composed, ctx)");
+  });
+});

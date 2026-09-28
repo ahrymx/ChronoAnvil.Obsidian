@@ -438,22 +438,34 @@ more than one place a template can be offered, an **Available for** list lets yo
 tick the others; the note type you saved it from is always included and cannot be
 unticked.
 
+**A template keeps how the sections are arranged, not just which.** Fields you
+dragged into one card stay in one card, the card keeps the name you gave it, and
+its tabs stay where you put them. On a diary entry a card holds widgets only —
+fields ticked **Show as widget**, which is the state you are in when you reach
+for the link icon — and that tick travels with the template too. If a template
+names a grouping the note type cannot build, it still applies: you get its
+sections in its order, side by side rather than stacked.
+
 **And you manage them from the note's banner.** The **⋯** menu's **Templates…**
 opens the manager for whatever the note is — a Lesson, an index, a page, a
 daily entry. It lists:
 
-- **⭐ Lesson default** — what a new note of this type is built from today. The
-  row is named after whatever the note is: *Subject index default*, *Page
-  default*, *Daily default*.
 - **🔒 ChronoAnvil default** — the arrangement the plugin ships. It cannot be
   renamed or removed, which is what makes *put it back the way it came* always
   one press away.
 - **🧩 each template you saved**, by name.
 
 Every row carries **Apply to this note** — it rebuilds the note from that
-template, showing you the change first — and every row but the first carries
-**Use as default**, which is what every new note of the type will be built from
-afterwards. Your own rows also carry **Rename** and **Remove**.
+template, showing you the change first — and **Use as default**, which is what
+every new note of the type will be built from afterwards. Your own rows also
+carry **Rename** and **Remove**.
+
+**The row with no *Use as default* is the one you are already on.** That button
+is only drawn where it would change something, so the row missing it is the
+arrangement this note type builds from today — there is no separate row saying
+so. If every row has the button, your current default is one you saved straight
+off a note with **Save this note as the default** rather than from a template,
+and it has no row of its own.
 
 **Remove takes it off one place, not everywhere.** A template offered on both
 Lesson and Practice is withdrawn from the one you are standing on and stays

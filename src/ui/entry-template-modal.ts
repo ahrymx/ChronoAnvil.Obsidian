@@ -38,9 +38,10 @@ import { createListRow } from "./list-row";
 import { confirmAction, promptText } from "./modals";
 import { CLASS_DEFS } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
-import { ENTRY_SECTIONS } from "../diary/entry-sections";
+import { ENTRY_SECTIONS, detectEntrySections } from "../diary/entry-sections";
 import { entryReloadLoss } from "../diary/entry-template";
 import { summariseLoss } from "../core/reload-loss";
+import { settableRows } from "./template-rows";
 import type { EntryLayoutConfig, EntryLoss } from "../diary/entry-template";
 import { emptyCallout } from "./empty";
 
@@ -157,29 +158,38 @@ class EntryTemplateModal extends Modal {
   }
 
   private rows(): TemplateRow[] {
+    // What this grain builds from now — `settableRows` measures every row
+    // against it, and the row it matches is the one this grain is already on.
+    //
+    // ── AND THAT IS NOT A ROW OF ITS OWN ANY MORE (1.0.46) ─────────────
+    //
+    // *"there is ChronoAnvil default and Daily default, there only needs to be
+    // one of these."* A ⭐ row sat above 🔒 naming what a new entry is built
+    // from today. It composed `current` by definition, so it could never be
+    // settable, never be renamed and never be removed — an Apply button and a
+    // sentence — and the sentence was the same list of nouns every row under it
+    // printed, because a row is described by the sections it composes and two
+    // ARRANGEMENTS of the same sections read alike. Two rows saying one thing,
+    // which is the fault `bandOf` below was written to end, arriving one release
+    // later by the other door.
+    //
+    // WHICH ROW IS CURRENT IS NOW SHOWN BY THE ABSENCE OF A BUTTON, which is
+    // this window's own rule for a control whose job is done (`settableRows`,
+    // and the ⭐ row is where that rule was first written): the row with no
+    // *Use as default* is the one this grain already builds from.
+    //
+    // WHAT IT COST, STATED HERE SO IT IS NOT REDISCOVERED AS A BUG. A default
+    // saved straight off an entry — the button in the band below — is composed
+    // by no stored template, so no row matches it and the window offers no
+    // one-press rebuild from it. *Apply to this entry* on 🔒 or on a 🧩 row is
+    // then a change rather than a restore, which is what those rows say.
+    const current = this.manager.composedFor(this.grain);
     const rows: TemplateRow[] = [
-      {
-        token: "⭐",
-        title: `${this.noun} default`,
-        // Named sections rather than a count: "6 sections" tells a reader
-        // nothing they can check against the page they are looking at.
-        subtitle: `Every new ${this.noun.toLowerCase()} entry starts with ${listOf(
-          bandOf(this.manager.composedFor(this.grain))
-        )}.`,
-        compose: () => ({
-          text: this.manager.composedFor(this.grain),
-          drops: [],
-        }),
-        layout: null,
-        // IT IS ALREADY THE DEFAULT.
-        settable: false,
-        editable: false,
-      },
       {
         token: "🔒",
         title: "ChronoAnvil default",
         subtitle: `The arrangement ChronoAnvil ships with: ${listOf(
-          bandOf(this.manager.shippedFor(this.grain))
+          bandOf(this.manager.shippedFor(this.grain), this.grain)
         )}.`,
         compose: () => ({ text: this.manager.shippedFor(this.grain), drops: [] }),
         layout: null,
@@ -190,17 +200,23 @@ class EntryTemplateModal extends Modal {
       },
     ];
     for (const layout of this.manager.layoutsFor(this.grain)) {
+      // DESCRIBED BY WHAT IT COMPOSES TO, not by what it stores — see `bandOf`.
+      // The two doors that save a template store different id lists for the
+      // same arrangement (this one's `wantFromEntry` keeps the shared band; the
+      // section editor's pane hands over its whole model), and neither list is
+      // what a new entry is built from.
+      const composed = this.manager.composedFrom(this.grain, layout);
       rows.push({
         token: "🧩",
         title: layout.label,
-        subtitle: describeTemplate(layout),
-        compose: () => this.manager.composedFrom(this.grain, layout),
+        subtitle: `${listOf(bandOf(composed.text, this.grain))}.`,
+        compose: () => composed,
         layout,
         settable: true,
         editable: true,
       });
     }
-    return rows;
+    return settableRows(rows, current);
   }
 
   // ACTIONS ON THEIR OWN LINE, for the reason the journal twin states: the
@@ -386,22 +402,30 @@ class EntryTemplateModal extends Modal {
   }
 }
 
-// The shared band of a composed template, by label, for a sentence.
-function bandOf(composed: string): string[] {
-  const labels: string[] = [];
-  for (const section of ENTRY_SECTIONS) {
-    if (section.band !== "shared") continue;
-    if (!composed.includes(`:${section.id}`)) continue;
-    labels.push(section.label);
-  }
-  return labels;
-}
-
-function describeTemplate(layout: EntryLayoutConfig): string {
-  const labels = layout.sections.map(
-    (id) => ENTRY_SECTIONS.find((s) => s.id === id)?.label ?? id
-  );
-  return listOf(labels);
+// What a composed template holds, by label, in the order it holds it.
+//
+// ── ONE DERIVATION FOR ALL THREE KINDS OF ROW (1.0.46) ───────────────────
+//
+// There were two, and they disagreed in a way that made the window unreadable.
+// The default rows walked `ENTRY_SECTIONS` and kept the shared members whose
+// id appeared anywhere in the text; the 🧩 rows listed the stored `sections`
+// array. So a saved template read "Banner, Trackers, Focus, Highlights, …" and
+// the default it had been saved FROM read "Focus, Highlights, …" — two
+// sentences about one arrangement, differing by two nouns that make no
+// difference to a single byte of the composed file.
+//
+// Worse, the catalogue walk discarded ORDER, which is the one thing
+// `entrySectionBand` exists to store: a reader who moved Challenges above
+// Highlights, saved it as the default and opened this window was shown the
+// catalogue's order back and had no way to tell whether the save had landed.
+//
+// `detectEntrySections` is the journal twin's answer (`detectSections` there),
+// and it is the same parser `refreshTemplates` reports drift with — so the
+// sentence in this window and the diff in that one cannot describe the file
+// two ways.
+function bandOf(composed: string, grain: TrackerClass): string[] {
+  const byId = new Map(ENTRY_SECTIONS.map((sec) => [sec.id, sec.label]));
+  return detectEntrySections(composed, { grain }).map((id) => byId.get(id) ?? id);
 }
 
 // "a, b and c" — the plugin says lists this way everywhere a sentence holds one.

@@ -299,7 +299,7 @@ const entrySection = (decl: EntryDecl): EntrySection => {
         fence: ENTRY_FENCE,
         lines: [
           ...(decl.above?.(ctx) ?? []),
-          directiveFor(built, ctx, opts) as string,
+          answeredLine(built, ctx, opts, directiveFor(built, ctx, opts) as string),
           ...(decl.below?.(ctx) ?? []),
         ],
       }),
@@ -309,6 +309,56 @@ const entrySection = (decl: EntryDecl): EntrySection => {
     },
   };
   return built;
+};
+
+// The catalogue's line with the reader's answers written onto it. 1.0.46.
+//
+// ── THE COMPOSER WAS THE ONE WRITER THAT NEVER ASKED (1.0.46) ────────────
+//
+// Reported from the vault, twice before it was understood. A daily entry with
+// Tasks drawn as a widget was saved as the grain's default; the next day's
+// entry came out with Tasks drawn as a SECTION. Then: a saved template whose
+// Tasks and Captured sat in one group was refused with "this entry already
+// matches that template", because the template composed to the ungrouped
+// arrangement — a group takes widgets only, and no composed field was ever a
+// widget.
+//
+// Both are this. A field's form — *Show as section* / *Show as widget* — and
+// the flag tokens beside it are answered ON THE SECTION'S OWN LINE, in the `#`
+// grammar (`withFormTitle`, `withFlagToken`). `applyEntrySections` splices them
+// when the editor ADDS a field, and says so at length where it does; nothing
+// spliced them when a TEMPLATE was composed. So the answer went into
+// `entrySections[grain]` or a saved template's `options`, survived every round
+// trip, and was dropped at the last step by the one function that turns a
+// stored arrangement back into markdown.
+//
+// IN THE BUILDER, WHERE THE QUESTION IS APPENDED. `formToggleFor` gives every
+// field its toggle from here rather than from seven declarations — "seven
+// places to forget it, and the eighth field added later would be the one that
+// quietly had no toggle". A builder that hands out a question and does not
+// render its answer is that same eighth field, one level up.
+//
+// THE TWO KINDS WRITTEN ON THE SECTION'S OWN LINE, and only those:
+// `applyEntrySections`' filter, verbatim, because a one-line array is not a
+// fence and every other answer is a line beside this one.
+const answeredLine = (
+  section: EntrySection,
+  ctx: EntrySectionContext,
+  opts: Record<string, unknown> | undefined,
+  line: string
+): string => {
+  // The caller's own choice first, then the template's — `directiveFor`'s rule
+  // one line up, so the two cannot disagree about whose answer this is.
+  const chosen = opts ?? ctx.options?.[section.id];
+  if (!chosen || line == null) return line;
+  const [out] = withAnswers(
+    [line],
+    (section.questions?.(ctx) ?? []).filter(
+      (q) => q.kind === "form" || (q.kind === "flag" && q.token !== undefined)
+    ),
+    chosen
+  );
+  return out;
 };
 
 // The toggle this declaration may be offered, if any. 1.0.42.
@@ -878,6 +928,41 @@ function region(id: string): string {
 // Reproduces the shipped assets exactly as of 2.60.0: the spacer, the two
 // fences with no blank line between them, the `---` rule, the widget fence, and
 // the regions each separated by a blank line.
+// One group of the shared band, as a template stores it. 1.0.46.
+//
+// ── WHY A TEMPLATE NEEDED A THIRD FIELD (1.0.46) ─────────────────────────
+//
+// Reported from the vault: *"the template I'm trying to apply should have tasks
+// and captured in a group"*, against a window answering "this entry already
+// matches that template". It did match — the template composed the ungrouped
+// arrangement, because a stored template had ids, answers, and nowhere at all to
+// put the one fact the reader had arranged.
+//
+// A GROUP IS NOT DERIVABLE FROM THE OTHER TWO. `sections` is an order and
+// `options` are per-section answers; which fields SHARE A FENCE is a fact about
+// the band and belongs to no member of it. That is the same argument
+// `SectionModel.regroup` makes for being a write of its own — "a section moving
+// into or out of a row does not change WHICH sections the note has, or what
+// order they are in, and it rewrites the note".
+//
+// THE SHAPE IS `regroupBand`'s THREE ARGUMENTS, one object per block, because
+// that is the function this is handed back to. `pages` and `title` ride along
+// rather than getting stores of their own: they are facts about a block, they
+// are written by the same call, and a template that carried the row but not its
+// name would put back two thirds of what the reader arranged.
+export interface EntryBandGroup {
+  // The fields sharing one fence, in order. A group of one is a field on its
+  // own and is stored as such, so the partition is total and `regroupBand` can
+  // check it covers the band exactly.
+  ids: string[];
+  // Which of them begin a page of this block — the `tab` lines. Absent rather
+  // than empty for a block that has none, on `SectionModel.regroup`'s own
+  // convention.
+  pages?: string[];
+  // The head this block draws, where the reader gave it one.
+  title?: string;
+}
+
 export function composeEntryTemplate(
   grain: TrackerClass,
   extra: readonly SectionWant[] = [],
@@ -912,7 +997,22 @@ export function composeEntryTemplate(
   // `entry-header`, which `isMovable` therefore derives to be alone among its
   // band's movable members — every permutation of that band is the identity, so
   // there is nothing there for a band to say.
-  band: readonly string[] = []
+  band: readonly string[] = [],
+  // THE GRAIN'S SAVED BAND GROUPS, WHERE THERE ARE ANY (1.0.46).
+  //
+  // BYTE-INERT WHEN ABSENT, which is `band`'s own rule one parameter up and the
+  // reason this is safe to add to a function five template files are written
+  // from: no group, no regroup call, and the composition is the one 1.0.45
+  // shipped.
+  //
+  // APPLIED OVER THE COMPOSED TEXT rather than woven into the fence writer.
+  // `regroupBand` is already the one authority on what a band's fences look
+  // like — it refuses a partition that straddles the band's edge, one that
+  // names a titled field as a column, and one that does not cover every field
+  // exactly once — and a second spelling here would be two authorities that
+  // disagree the first time either moved. `composeEntryTemplate` pipes its
+  // output through `weldEntryFences` for exactly this reason and says so below.
+  groups: readonly EntryBandGroup[] = []
 ): string {
   // WHERE THE SETTING BECOMES A TEMPLATE, as of 3.8 patch 6. `extra` has been
   // documented since 2.60.1 as "a setting the composer reads" and was a
@@ -1121,7 +1221,33 @@ export function composeEntryTemplate(
   // empty, the next fence is the shared band's, and `isTrackerFence` is false —
   // and an entry still has to compose. Every shipped template does weld; a
   // future one that does not gets the two-card shape rather than an exception.
-  return weldEntryFences(composed) ?? composed;
+  const welded = weldEntryFences(composed) ?? composed;
+  // ── AND THE GROUPS THE READER ARRANGED (1.0.46) ────────────────────
+  //
+  // AFTER THE WELD AND OVER ITS OUTPUT, which is `regroupEntry`'s ordering and
+  // its reason: the weld moves the tracker fence above the rule and the band
+  // lives below it, so neither read disturbs the other's lines.
+  //
+  // `?? welded` IS THE HONEST FALLBACK, on `weldEntryFences`' terms above.
+  // `regroupBand` returns null both for "nothing would change" and for a
+  // partition it declines to write — a stored group naming a field this grain
+  // does not compose, say, or one that has since been given a title bar. Either
+  // way the flat composition is the right answer: the arrangement degrades to
+  // the order, which the template still carries, rather than to nothing.
+  if (!groups.length) return welded;
+  return (
+    regroupBand(
+      welded,
+      ctx,
+      groups.map((g) => g.ids),
+      groups.flatMap((g) => g.pages ?? []),
+      new Map(
+        groups
+          .filter((g) => g.title && g.ids.length)
+          .map((g) => [g.ids[0], g.title as string])
+      )
+    ) ?? welded
+  );
 }
 
 // Whether this section may be removed from an entry.
@@ -2716,6 +2842,58 @@ const bandBlocks = (text: string, ctx: EntrySectionContext): BlockView[] => {
       : f.ids.map((id) => block([id]))
   );
 };
+
+// This page's band, as the groups a template stores. 1.0.46.
+//
+// `bandBlocks`' WALK WITHOUT THE EDITOR'S TWO EXTRA FIELDS. That one answers a
+// window — which members can be taken out, which are the kind of thing a column
+// is — and neither question means anything to a store. What is left is the
+// partition, the page breaks and the name, which is exactly
+// `composeEntryTemplate`'s fourth argument.
+//
+// THE SAME `readBand` BOTH WAYS, which is the property that makes a saved group
+// the group the reader made: the walk that reads a fence back and the writer
+// that re-emits it are the two halves of one function, and a template saved
+// here composes through `regroupBand` to the bytes it was read from.
+//
+// A BLOCK OF ONE IS STILL A BLOCK. The partition has to be total or
+// `regroupBand` refuses it — "EVERY FIELD, EXACTLY ONCE" — so a band with no
+// groups at all comes back as one entry per field rather than as nothing. The
+// callers that store this drop it when no block has more than one member, which
+// is where "this reader arranged nothing" is decided.
+export function entryBandGroups(
+  text: string,
+  ctx: EntrySectionContext
+): EntryBandGroup[] {
+  const band = readBand(parseEntry(text, ctx), text.split("\n"));
+  if (!band) return [];
+  return band.fences.flatMap((f) =>
+    f.rowed
+      ? [
+          {
+            ids: [...f.ids],
+            ...(f.ids.some((id) => f.pages.has(id))
+              ? { pages: f.ids.filter((id) => f.pages.has(id)) }
+              : {}),
+            ...(f.title ? { title: f.title } : {}),
+          },
+        ]
+      : f.ids.map((id) => ({ ids: [id] }))
+  );
+}
+
+// Whether a partition says anything a flat band does not.
+//
+// THE TEST FOR STORING ONE AT ALL, asked here rather than in three callers. A
+// band whose every block holds one field composes byte-for-byte what it composes
+// with no groups at all, so storing it would write a wall of one-member arrays
+// into `data.json` and make every vault's settings differ from every other
+// vault's by nothing.
+export function entryBandIsGrouped(
+  groups: readonly EntryBandGroup[]
+): boolean {
+  return groups.some((g) => g.ids.length > 1 || g.title != null);
+}
 
 // The band, re-emitted as the partition `want` asks for.
 //

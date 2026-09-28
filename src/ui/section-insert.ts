@@ -809,7 +809,12 @@ export class SectionInserter {
               save: async (
                 label: string,
                 sections: string[],
-                targets: string[]
+                targets: string[],
+                arrangement: {
+                  blocks: string[][];
+                  pages: string[];
+                  titles: Map<string, string>;
+                }
               ): Promise<void> => {
                 // The window hands back ids and knows nothing about what they
                 // are, which is its contract. The options are resolved from the
@@ -821,6 +826,36 @@ export class SectionInserter {
                 const text = file ? await this.app.vault.read(file) : "";
                 const { want } = wantFromEntry(text, surface.ctx);
                 const options = new Map(want.map((w) => [w.id, w.options]));
+                // ── AND THE ARRANGEMENT, WHICH ONLY THE WINDOW HAS (1.0.46) ──
+                //
+                // TAKEN FROM THE WINDOW RATHER THAN FROM THE FILE, unlike the
+                // options above, and the difference is which of the two is a
+                // fact about the note. An answer is: the file says how that
+                // field is drawn, whether or not this pane is open. A grouping
+                // is not — the reader may have just dragged two fields together
+                // in the window they are standing in, and this form's own
+                // promise is that keeping the arrangement under a name does NOT
+                // change the file. Resolving it from disk would store the
+                // arrangement they had before they arranged it.
+                //
+                // THE SHARED BAND'S BLOCKS ONLY. The partition covers every
+                // band — the banner and the tracker grid are a block too — and
+                // those are composed unconditionally, so a stored group naming
+                // them would be an arrangement `composeEntryTemplate` writes
+                // whatever a template says. `sections` is the band, which is
+                // what makes the filter one line.
+                const band = new Set(sections);
+                const groups = arrangement.blocks
+                  .filter((b) => b.length > 0 && b.every((id) => band.has(id)))
+                  .map((b) => ({
+                    ids: [...b],
+                    ...(b.some((id) => arrangement.pages.includes(id))
+                      ? { pages: b.filter((id) => arrangement.pages.includes(id)) }
+                      : {}),
+                    ...(arrangement.titles.get(b[0])
+                      ? { title: arrangement.titles.get(b[0]) as string }
+                      : {}),
+                  }));
                 await this.plugin.entryTemplates.saveLayout(
                   label,
                   sections.map((id) =>
@@ -828,7 +863,8 @@ export class SectionInserter {
                   ),
                   targets.filter((t): t is TrackerClass =>
                     (TRACKER_CLASSES as readonly string[]).includes(t)
-                  )
+                  ),
+                  groups
                 );
               },
             },

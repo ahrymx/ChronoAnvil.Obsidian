@@ -227,6 +227,52 @@ describe("the fence walk the diary never needed", () => {
     expect(looseLines(text).some((l) => l.startsWith("jchart:"))).toBe(false);
     expect(fenceLines(text).some((l) => l.startsWith("jchart:"))).toBe(true);
   });
+
+  // ── THE HIDDEN GRAPH BLOCK IS NOT THE READER'S PROSE (1.0.46) ────────
+  //
+  // Reported from the vault: a diary entry refused every template with
+  //
+  //     %% chronoanvil-graph %% — written outside any section
+  //     %% [[Week-2026-W40]] %% — written outside any section
+  //
+  // and no entry could be rebuilt from a template at all, ever.
+  //
+  // `setGraphLinks` writes those two lines into every entry AT CREATION — its
+  // own comment calls them "the only text in an entry this plugin claims" —
+  // and `composeEntryTemplate` does not emit them, because the parent name
+  // depends on the entry's date and a template has no date. So they were on
+  // one side of the diff and not the other, and the walk read the plugin's own
+  // spine as something the reader had typed.
+  //
+  // Journals never saw it: `journal-plan.ts` composes `body +
+  // graphLinksSection(...)`, so the lines cancelled on both sides there. The
+  // skip is applied in `looseLines` regardless, so one walk does not give two
+  // answers depending on who is asking.
+  it("steps over the hidden graph block rather than reading it as prose", () => {
+    const text = [
+      "---",
+      "journal: Daily Notes",
+      "---",
+      "Real writing.",
+      "",
+      "%% chronoanvil-graph %%",
+      "%% [[Week-2026-W40]] %%",
+      "",
+    ].join("\n");
+    expect(looseLines(text)).toEqual(["Real writing."]);
+  });
+
+  it("skips only the one line the mark claims, not the rest of the note", () => {
+    const text = [
+      "---",
+      "journal: Daily Notes",
+      "---",
+      "%% chronoanvil-graph %%",
+      "%% [[Week-2026-W40]] %%",
+      "After the block.",
+    ].join("\n");
+    expect(looseLines(text)).toEqual(["After the block."]);
+  });
 });
 
 describe("what this page says", () => {
@@ -517,7 +563,7 @@ describe("saving a default", () => {
 
     const mgr = new JournalTemplates(app, plugin);
     (plugin as unknown as { scaffold: unknown }).scaffold = {
-      refreshJournalTemplates: async (): Promise<void> => {},
+      refreshJournalTemplatesFor: async (): Promise<void> => {},
     };
     await mgr.saveDefault("03 - Journals/Study/Maths/Maths.md", ctx);
 
@@ -546,7 +592,7 @@ describe("saving a default", () => {
     };
     const mgr = new JournalTemplates(app, plugin);
     (plugin as unknown as { scaffold: unknown }).scaffold = {
-      refreshJournalTemplates: async (): Promise<void> => {},
+      refreshJournalTemplatesFor: async (): Promise<void> => {},
     };
     await mgr.saveDefault("03 - Journals/Study/Maths/Algebra/page.md", ctx);
 
@@ -580,7 +626,7 @@ describe("saving a default", () => {
     const { plugin, cfg } = stubPlugin();
     const mgr = new JournalTemplates(app, plugin);
     (plugin as unknown as { scaffold: unknown }).scaffold = {
-      refreshJournalTemplates: async (): Promise<void> => {},
+      refreshJournalTemplatesFor: async (): Promise<void> => {},
     };
     await mgr.saveDefault("03 - Journals/Study/M/A/Q.md", ctx);
     expect(cfg.layout![key].sections?.length).toBeGreaterThan(0);

@@ -13,19 +13,39 @@
 // `entry-template.ts`, which is pure and which the suite can reach; what is
 // here is the file I/O, the confirmation and the notices.
 //
-// WHY THE DEFAULT SAVE GOES THROUGH `refreshTemplates`. Writing
+// WHY THE DEFAULT SAVE WRITES THE TEMPLATE FILE. Writing
 // `settings.entrySections` alone changes nothing a reader can see: the entry
 // openers read the template FILE, not the setting. The file therefore has to be
-// rewritten — and `refreshTemplates` already surveys drift, shows the exact
-// added and removed lines and asks. Writing the file directly here would be a
-// second, quieter path to the same bytes, with no preview, over a file a reader
-// may have hand-edited.
+// rewritten too, and the two writes are one gesture.
+//
+// ── AND WHY IT NO LONGER GOES THROUGH `refreshTemplates` (1.0.46) ────────
+//
+// It did, and the argument was that the vault-wide command already surveys
+// drift and shows the reader the exact added and removed lines before touching
+// a file they may have hand-edited. The argument is good about a command and
+// wrong about this: the reader has just pressed *Use as default* and confirmed
+// it. The window that follows can be DECLINED, and declining it does not undo
+// the settings write that has already happened — it leaves `entrySections`
+// describing one template and `Daily.md` another, with the Template window
+// reporting the first and every new entry built from the second. A reader in
+// that state did the gesture and watched it not take.
+//
+// So both doors below call `refreshDiaryTemplate(grain)`: one grain, straight
+// through, creating the file if it is missing. That is what the settings table
+// has always done (`renderEntrySectionCell`), and the objection was never to
+// two doors — it was to two writers.
 
 import { App, Notice } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
+import { CLASS_DEFS } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
-import { composeEntryTemplate, offerableEntrySections } from "./entry-sections";
-import type { EntrySectionContext } from "./entry-sections";
+import {
+  composeEntryTemplate,
+  entryBandGroups,
+  entryBandIsGrouped,
+  offerableEntrySections,
+} from "./entry-sections";
+import type { EntryBandGroup, EntrySectionContext } from "./entry-sections";
 import {
   entryReloadLoss,
   reloadEntryBody,
@@ -57,7 +77,8 @@ export class EntryTemplates {
     return composeEntryTemplate(
       grain,
       s.entrySections[grain] ?? [],
-      s.entrySectionBand[grain] ?? []
+      s.entrySectionBand[grain] ?? [],
+      s.entrySectionGroups?.[grain] ?? []
     );
   }
 
@@ -70,7 +91,7 @@ export class EntryTemplates {
   // before this key existed" — so `[]`/`[]` IS what the plugin ships, and
   // spelling it any other way would be a second answer to the same question.
   shippedFor(grain: TrackerClass): string {
-    return composeEntryTemplate(grain, [], []);
+    return composeEntryTemplate(grain, [], [], []);
   }
 
   // What this layout composes to on this grain, and what it could not carry
@@ -93,7 +114,12 @@ export class EntryTemplates {
     const want: SectionChoice[] = layout.sections.map((id) =>
       layout.options?.[id] ? { id, options: layout.options[id] } : { id }
     );
-    const text = composeEntryTemplate(grain, want, layout.sections);
+    const text = composeEntryTemplate(
+      grain,
+      want,
+      layout.sections,
+      layout.groups ?? []
+    );
     const offered = new Set(
       offerableEntrySections(this.ctxFor(grain)).map((s) => s.id)
     );
@@ -123,6 +149,19 @@ export class EntryTemplates {
       w.options ? { id: w.id, options: { ...w.options } } : { id: w.id }
     );
     s.entrySectionBand[grain] = idsOf(want);
+    // ── AND THE THIRD HALF: HOW THE BAND IS ARRANGED (1.0.46) ──────────
+    //
+    // WRITTEN AND DELETED WITH THE BAND, never left behind. A partition read
+    // against an order it does not cover is one `regroupBand` refuses, so a
+    // stale one would sit in `data.json` doing nothing until the day a reader
+    // saved a band it happened to fit.
+    //
+    // ONLY WHEN IT SAYS SOMETHING. `entryBandIsGrouped` is the test and carries
+    // the reason: a partition of singletons composes exactly what no partition
+    // composes.
+    const groups = entryBandGroups(text, this.ctxFor(grain));
+    if (entryBandIsGrouped(groups)) s.entrySectionGroups[grain] = groups;
+    else delete s.entrySectionGroups[grain];
     await this.plugin.saveSettings();
 
     if (drops.length) {
@@ -137,9 +176,13 @@ export class EntryTemplates {
         )}).`
       );
     }
-    // The preview and the write of the template FILE, through the one path that
-    // already does both.
-    await this.plugin.scaffold.refreshTemplates();
+    // THE OTHER HALF OF THE GESTURE. See the header: the setting is what the
+    // window reads and the file is what a new entry is built from, so a save
+    // that wrote one of them wrote nothing the reader asked for.
+    await this.plugin.scaffold.refreshDiaryTemplate(grain);
+    new Notice(
+      `ChronoAnvil: new ${CLASS_DEFS[grain].label.toLowerCase()} entries will use this note's sections.`
+    );
   }
 
   // A saved template — or the arrangement ChronoAnvil ships — becomes this
@@ -157,14 +200,34 @@ export class EntryTemplates {
     if (!layout) {
       delete s.entrySections[grain];
       delete s.entrySectionBand[grain];
+      // ALL THREE KEYS, for the reason the other two are deleted rather than
+      // written back: what ChronoAnvil ships is the stored override REMOVED,
+      // and a partition left behind would group a band nobody had arranged.
+      delete s.entrySectionGroups[grain];
     } else {
       s.entrySections[grain] = layout.sections.map((id) =>
         layout.options?.[id] ? { id, options: { ...layout.options[id] } } : { id }
       );
       s.entrySectionBand[grain] = [...layout.sections];
+      if (layout.groups?.length) {
+        s.entrySectionGroups[grain] = layout.groups.map((g) => ({
+          ids: [...g.ids],
+          ...(g.pages?.length ? { pages: [...g.pages] } : {}),
+          ...(g.title ? { title: g.title } : {}),
+        }));
+      } else {
+        delete s.entrySectionGroups[grain];
+      }
     }
     await this.plugin.saveSettings();
-    await this.plugin.scaffold.refreshTemplates();
+    await this.plugin.scaffold.refreshDiaryTemplate(grain);
+    // ITS OWN SENTENCE, for `saveDefault`'s reason above.
+    const noun = CLASS_DEFS[grain].label.toLowerCase();
+    new Notice(
+      layout
+        ? `ChronoAnvil: new ${noun} entries will use “${layout.label}”.`
+        : `ChronoAnvil: new ${noun} entries are back to the arrangement ChronoAnvil ships.`
+    );
   }
 
   // A saved template's name changes; its id does not — `saveLayout` suffixes ids
@@ -189,7 +252,11 @@ export class EntryTemplates {
   async saveLayout(
     label: string,
     sections: readonly SectionChoice[],
-    grains: TrackerClass[]
+    grains: TrackerClass[],
+    // HOW THE BAND IS ARRANGED, where the caller could see it (1.0.46). Both
+    // doors pass it now; the default is `[]` so the parameter is byte-inert for
+    // a caller that has no arrangement to hand.
+    groups: readonly EntryBandGroup[] = []
   ): Promise<void> {
     const s = this.plugin.settings;
     // Suffixed rather than rejected, the same repair `saveVariant` makes: a
@@ -212,6 +279,15 @@ export class EntryTemplates {
         label,
         sections: idsOf(sections),
         ...(Object.keys(options).length ? { options } : {}),
+        ...(entryBandIsGrouped(groups)
+          ? {
+              groups: groups.map((g) => ({
+                ids: [...g.ids],
+                ...(g.pages?.length ? { pages: [...g.pages] } : {}),
+                ...(g.title ? { title: g.title } : {}),
+              })),
+            }
+          : {}),
         grains: [...grains],
       },
     ];

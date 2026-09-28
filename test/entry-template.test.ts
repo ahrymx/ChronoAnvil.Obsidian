@@ -18,15 +18,18 @@ import {
   ENTRY_SECTIONS,
   composeEntryTemplate,
   detectEntrySections,
+  entrySectionModel,
   sectionsForEntry,
 } from "../src/diary/entry-sections";
 import {
   bandWithSection,
+  groupsWithSection,
   entryReloadLoss,
   reloadEntryBody,
   wantFromEntry,
 } from "../src/diary/entry-template";
 import { writeNoteRegion } from "../src/core/notestore";
+import { setGraphLinks } from "../src/core/note-sections";
 import { TRACKER_CLASSES } from "../src/trackers/trackers";
 import type { TrackerClass } from "../src/trackers/trackers";
 import { fillDailyTemplate } from "../src/core/util";
@@ -206,6 +209,54 @@ describe("the shared band's order", () => {
     expect(body).toContain("s.entrySectionBand[grain] = band;");
   });
 
+  // ── AND THE THIRD STORE, FOR THE SAME REASON (1.0.46) ──────────────────
+  //
+  // Membership, order, arrangement. `regroupBand` refuses a partition that does
+  // not cover every field exactly once, so a tick that reached two of the three
+  // would leave a stored group naming a field the band no longer has — and the
+  // reader's row would degrade to a flat band on the next compose, silently,
+  // from a checkbox that never mentioned it.
+  it("keeps the groups in step when the table ticks a section on", () => {
+    expect(
+      groupsWithSection([{ ids: ["log", "todo"], title: "Doing" }], "capture", true)
+    ).toEqual([{ ids: ["log", "todo"], title: "Doing" }, { ids: ["capture"] }]);
+  });
+
+  it("takes a section out of the group that held it, and its tab with it", () => {
+    expect(
+      groupsWithSection(
+        [{ ids: ["log"] }, { ids: ["todo", "capture"], pages: ["capture"] }],
+        "capture",
+        false
+      )
+    ).toEqual([{ ids: ["log"] }, { ids: ["todo"], pages: [] }]);
+  });
+
+  it("removes a group that loses its last member, name and all", () => {
+    // An empty block with a title is a name for a row that holds nothing, and
+    // `regroupBand` would refuse to write it.
+    expect(
+      groupsWithSection([{ ids: ["log"] }, { ids: ["capture"], title: "Caught" }], "capture", false)
+    ).toEqual([{ ids: ["log"] }]);
+    // AND A PARTITION THAT EMPTIES OUT IS NO PARTITION. `undefined` is what the
+    // caller writes as *delete the key*, so an untouched vault keeps composing
+    // what it always composed.
+    expect(groupsWithSection([{ ids: ["capture"] }], "capture", false)).toBeUndefined();
+  });
+
+  it("creates no groups for a grain that has none", () => {
+    expect(groupsWithSection(undefined, "capture", true)).toBeUndefined();
+  });
+
+  it("is the settings table's only spelling of that rule too", () => {
+    const src = readCode("settings");
+    const at = src.indexOf("const write = async (next: SectionChoice | null)");
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf("\n    };", at));
+    expect(body).toContain("groupsWithSection(");
+    expect(body).toContain("s.entrySectionGroups[grain] = groups;");
+  });
+
   it("does not change the regions or their order", () => {
     // The regions are emitted from the same list. If an order rearranged the
     // directives and not the regions the two would stop lining up, which is a
@@ -372,6 +423,48 @@ describe("reading a page back as a want", () => {
     expect(want.map((w) => w.id)).not.toContain("calendar:month");
   });
 
+  // ── INCLUDING THE ONES WRITTEN ON THE SECTION'S OWN LINE (1.0.46) ──────
+  //
+  // `answerInText` returns null BY NAME for `form`, `lines` and `flag`, and this
+  // was its only caller with no fallback — so a field the reader had drawn as a
+  // widget was read back as a bare id, stored as a bare id, and composed back as
+  // a section. *"Save this entry as the default"* silently undid the one change
+  // the reader was asking to keep.
+  it("carries a form answered on the directive itself", () => {
+    const text = composeEntryTemplate("daily", [
+      { id: "todo", options: { form: "widget" } },
+    ]);
+    expect(text).toContain("tasks:todo#widget|Tasks");
+    const { want } = wantFromEntry(text, ctxFor("daily"));
+    expect(want.find((w) => w.id === "todo")?.options).toEqual({ form: "widget" });
+  });
+
+  it("stores no answer for a field left as the catalogue composed it", () => {
+    // A DEFAULT IS NOT AN ANSWER. `answersOn` answers every question it is
+    // asked, so a bare read would fill the store with `{ form: "section" }` for
+    // seven fields and make every vault's settings differ from every other
+    // vault's by nothing.
+    const text = composeEntryTemplate("daily");
+    const { want } = wantFromEntry(text, ctxFor("daily"));
+    expect(want.find((w) => w.id === "todo")?.options).toBeUndefined();
+    expect(want.every((w) => w.options === undefined)).toBe(true);
+  });
+
+  it("round-trips a widget-form entry to the same bytes", () => {
+    // THE PROPERTY THE REPORT WAS ABOUT, on the read side: what a template
+    // stores has to compose back the file it was read from, form answers and
+    // all, or applying it is a change the reader did not ask for.
+    const fields = ["focus", "highlights", "challenges", "log", "attachments", "todo", "capture"];
+    const text = composeEntryTemplate(
+      "daily",
+      fields.map((id) => ({ id, options: { form: "widget" } }))
+    );
+    const { want, drops } = wantFromEntry(text, ctxFor("daily"));
+    expect(drops).toEqual([]);
+    const again = composeEntryTemplate("daily", want, want.map((w) => w.id));
+    expect(again).toBe(text);
+  });
+
   it("round-trips a page through a want and back to the same band", () => {
     // The property that makes "save this page as the default" mean what it
     // says: composing the want the page gave has to reproduce the page's band.
@@ -445,6 +538,10 @@ const stubPlugin = (): {
     ...DEFAULT_SETTINGS,
     entrySections: {},
     entrySectionBand: {},
+    // FRESH PER STUB, not borrowed from `DEFAULT_SETTINGS` by the spread: these
+    // are the three keys these tests write, and sharing one object across the
+    // file would let one case's group reach the next one's assertion.
+    entrySectionGroups: {},
     entryLayouts: [],
     customJournals: [],
   } as ChronoAnvilSettings;
@@ -500,6 +597,39 @@ describe("saved layouts", () => {
     await mgr.saveLayout("Weeks only", [{ id: "log" }], ["weekly"]);
     expect(mgr.layoutsFor("weekly")).toHaveLength(1);
     expect(mgr.layoutsFor("daily")).toHaveLength(0);
+  });
+
+  // ── AND THE ARRANGEMENT THE WINDOW HANDED OVER (1.0.46) ────────────────
+  //
+  // A saved template's fourth field. The section editor is the one place a
+  // grouping exists before it is written — the reader may have just dragged two
+  // fields together — so the sink carries it and this is where it lands.
+  it("keeps the group it was handed, by value", async () => {
+    const { plugin, settings } = stubPlugin();
+    const mgr = new EntryTemplates(new App(), plugin);
+    const groups = [{ ids: ["log"] }, { ids: ["todo", "capture"], title: "Evening" }];
+    await mgr.saveLayout("Grouped", [{ id: "log" }, { id: "todo" }, { id: "capture" }], ["daily"], groups);
+    expect(settings.entryLayouts[0].groups).toEqual(groups);
+    expect(settings.entryLayouts[0].groups).not.toBe(groups);
+    expect(settings.entryLayouts[0].groups![1]).not.toBe(groups[1]);
+  });
+
+  it("writes no groups field for an arrangement that says nothing", async () => {
+    // A PARTITION OF SINGLETONS COMPOSES WHAT NO PARTITION COMPOSES, so storing
+    // it would put a wall of one-member arrays in `data.json` and make a
+    // template that groups nothing look different from one that was saved before
+    // the field existed. `entryBandIsGrouped` is the one test, asked here and in
+    // `saveDefault`.
+    const { plugin, settings } = stubPlugin();
+    const mgr = new EntryTemplates(new App(), plugin);
+    await mgr.saveLayout("Flat", [{ id: "log" }, { id: "todo" }], ["daily"], [
+      { ids: ["log"] },
+      { ids: ["todo"] },
+    ]);
+    expect(settings.entryLayouts[0].groups).toBeUndefined();
+    // …and a caller with no arrangement at all is the same record.
+    await mgr.saveLayout("Flat too", [{ id: "log" }, { id: "todo" }], ["daily"]);
+    expect(settings.entryLayouts[1].groups).toBeUndefined();
   });
 
   it("reports a section the grain cannot carry rather than writing it", async () => {
@@ -581,12 +711,18 @@ describe("saving a page as the grain's default", () => {
   } => {
     const { plugin, settings } = stubPlugin();
     let refreshed = 0;
-    (plugin as unknown as { scaffold: { refreshTemplates: () => Promise<void> } }).scaffold =
-      {
-        refreshTemplates: async (): Promise<void> => {
-          refreshed += 1;
-        },
-      };
+    // ONE GRAIN, STRAIGHT THROUGH (1.0.46). The default doors used to call the
+    // vault-wide `refreshTemplates`, whose repair window the reader can decline
+    // — leaving the setting written and the file stale.
+    (
+      plugin as unknown as {
+        scaffold: { refreshDiaryTemplate: (g: unknown) => Promise<void> };
+      }
+    ).scaffold = {
+      refreshDiaryTemplate: async (): Promise<void> => {
+        refreshed += 1;
+      },
+    };
     return { plugin, settings, refreshed: () => refreshed };
   };
 
@@ -634,6 +770,78 @@ describe("saving a page as the grain's default", () => {
     const mgr = new EntryTemplates(app, plugin);
     await mgr.saveDefault("daily", "D/Day-2026-08-15.md");
     expect(sharedBand(mgr.composedFor("daily"))).toEqual(sharedBand(page));
+  });
+
+  // ── AND THE ARRANGEMENT, WHICH IS THE THIRD KEY (1.0.46) ───────────────
+  //
+  // *"the template I'm trying to apply (to a daily entry) should have tasks and
+  // captured in a group."* A group was the one thing about a diary entry that
+  // no save door could see: there was nowhere to put it, so *Save this entry as
+  // the default* kept the fields and threw away the row they sat in.
+  const grouped = (): string => {
+    const fields = ["log", "todo", "capture"];
+    const shown = composeEntryTemplate(
+      "daily",
+      fields.map((id) => ({ id, options: { form: "widget" } })),
+      fields
+    );
+    const model = entrySectionModel({ grain: "daily" });
+    const out = model.regroup!(
+      shown,
+      [["banner", "trackers"], ["log"], ["todo", "capture"]],
+      [],
+      [],
+      new Map([["todo", "Evening review"]])
+    );
+    if (!out) throw new Error("the fixture did not group — the code is wrong, not this");
+    return out;
+  };
+
+  it("stores the group the page was arranged into", async () => {
+    const { app } = appWith("D/Day-2026-08-15.md", grouped());
+    const { plugin, settings } = withScaffold();
+    await new EntryTemplates(app, plugin).saveDefault("daily", "D/Day-2026-08-15.md");
+    expect(settings.entrySectionGroups.daily).toEqual([
+      { ids: ["log"] },
+      { ids: ["todo", "capture"], title: "Evening review" },
+    ]);
+  });
+
+  it("round-trips: the saved default composes the grouped page byte for byte", async () => {
+    // THE WHOLE REPORT. The grouped page goes in, the three keys come out, and
+    // the composer has to be able to write that page back from them — otherwise
+    // the template composes flat, the flat composition is what the note already
+    // is, and the reader is told it "already matches that template".
+    const page = grouped();
+    const { app } = appWith("D/Day-2026-08-15.md", page);
+    const { plugin } = withScaffold();
+    const mgr = new EntryTemplates(app, plugin);
+    await mgr.saveDefault("daily", "D/Day-2026-08-15.md");
+    expect(mgr.composedFor("daily")).toBe(page);
+  });
+
+  it("stores no groups for a page nobody arranged, and clears a stale one", async () => {
+    // A PARTITION OF SINGLETONS SAYS NOTHING — it composes what no partition
+    // composes, so storing it would write a wall of one-member arrays into
+    // `data.json`. And it is DELETED alongside the band it was read against: a
+    // group naming a field the new band does not have is one `regroupBand`
+    // refuses, so leaving it would sit there doing nothing until the day a
+    // reader saved a band it happened to fit.
+    const { app } = appWith("D/Day-2026-08-15.md", grouped());
+    const { plugin, settings } = withScaffold();
+    const mgr = new EntryTemplates(app, plugin);
+    await mgr.saveDefault("daily", "D/Day-2026-08-15.md");
+    expect(settings.entrySectionGroups.daily).toBeDefined();
+
+    const flat = appWith(
+      "D/Day-2026-08-16.md",
+      composeEntryTemplate("daily", [], ["capture", "log"])
+    );
+    await new EntryTemplates(flat.app, plugin).saveDefault(
+      "daily",
+      "D/Day-2026-08-16.md"
+    );
+    expect(settings.entrySectionGroups.daily).toBeUndefined();
   });
 
   it("stores nothing and rewrites nothing for a page with no sections", async () => {
@@ -701,5 +909,79 @@ describe("the decisions are not re-spelled in the renderer", () => {
     const sink = src.slice(at, src.indexOf("\n            },", at));
     expect(sink).toContain("TRACKER_CLASSES.map(");
     expect(sink).toContain("this.plugin.entryTemplates.saveLayout(");
+  });
+
+  it("carries the window's arrangement through to the stored template", () => {
+    // ── AND FILTERED TO THE SHARED BAND (1.0.46) ─────────────────────────
+    //
+    // The partition the window hands back covers every band: the banner and the
+    // tracker grid are a block too, and `composeEntryTemplate` writes both
+    // unconditionally whatever a template says. A stored group naming them would
+    // be an arrangement nothing can apply — so the filter is the contract, and a
+    // pin on `groups` alone would pass without it.
+    const src = readCode("section-insert");
+    const at = src.indexOf("arrangement: {");
+    const sink = src.slice(at, src.indexOf("\n            },", at));
+    expect(sink).toContain("const band = new Set(sections);");
+    expect(sink).toContain("arrangement.blocks");
+    expect(sink).toContain("b.every((id) => band.has(id))");
+    // The page breaks and the name travel with the block they belong to, and
+    // the name is the OPENING member's — which is where `blockNames` puts it and
+    // where `regroupBand` reads it back.
+    expect(sink).toContain("arrangement.pages.includes(id)");
+    expect(sink).toContain("arrangement.titles.get(b[0])");
+    // AND IT REACHES THE ONE WRITER. Resolving the arrangement and then not
+    // passing it is the shape the band's own defect had.
+    expect(sink.slice(sink.indexOf("saveLayout("))).toContain("groups");
+  });
+
+  it("takes the arrangement from the window rather than from the file", () => {
+    // The options beside it are resolved from the note, because an answer is a
+    // fact about the file; a grouping is not — the reader may have just dragged
+    // two fields together in the pane this form sits in, and the form's promise
+    // is that naming the arrangement does not change the file. Reading it off
+    // disk would store the arrangement they had before they arranged it.
+    const src = readCode("section-insert");
+    const at = src.indexOf("arrangement: {");
+    const sink = src.slice(at, src.indexOf("\n            },", at));
+    expect(sink).toContain("wantFromEntry(text, surface.ctx)");
+    expect(sink).not.toContain("entryBandGroups(");
+  });
+});
+
+// ── THE ENTRY AS IT IS ACTUALLY WRITTEN TO DISK (1.0.46) ─────────────────
+//
+// Reported from the vault: a brand-new entry refused every template with
+// "%% chronoanvil-graph %% — written outside any section". No entry could be
+// rebuilt from a template, ever, and the window's whole templates band was
+// hidden behind the refusal.
+//
+// The cause is that an entry is not its template. `createDailyEntry` writes
+// `setGraphLinks(fillDailyTemplate(tpl, date), [parent])`, and those two lines
+// exist in no composed template because the parent name depends on the entry's
+// date. So the loss walk read the plugin's own spine as the reader's prose.
+//
+// TESTED THROUGH `setGraphLinks` rather than against a literal, because the
+// block's shape is that function's and a test spelling it out again would go
+// on passing after the shape changed.
+describe("a created entry holds nothing a reload would destroy", () => {
+  for (const grain of TRACKER_CLASSES) {
+    it(`sees no loss in a freshly created ${grain} entry`, () => {
+      const composed = composeEntryTemplate(grain, [], []);
+      const created = setGraphLinks(composed, ["Week-2026-W40"]);
+      expect(created).toContain("%% chronoanvil-graph %%");
+      expect(created).toContain("%% [[Week-2026-W40");
+      expect(entryReloadLoss(created, composed, { grain })).toEqual([]);
+    });
+  }
+
+  it("still sees the writing an entry holds beside the block", () => {
+    const composed = composeEntryTemplate("daily", [], []);
+    const created = setGraphLinks(`${composed}\nA thought I had.\n`, [
+      "Week-2026-W40",
+    ]);
+    const loss = entryReloadLoss(created, composed, { grain: "daily" });
+    expect(loss.map((l) => l.label)).toContain("A thought I had.");
+    expect(loss.some((l) => l.label.includes("chronoanvil-graph"))).toBe(false);
   });
 });

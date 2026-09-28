@@ -5,6 +5,129 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.47] - 2026-09-28
+
+### Fixed
+
+- **"Diary templates are already current" answered a button that had just
+  worked.** Two faults behind one toast. The 🔒 **ChronoAnvil default** row
+  offered *Use as default* even when the grain was already on the shipped
+  arrangement — a button whose job is done, which is the control this window has
+  declined to draw since it became a manager and which nothing was holding the
+  rows beneath it to. And the write behind every default change
+  borrowed the vault-wide *Refresh diary templates* command whole, notices
+  included, so a change that needed no change to the template file reported the
+  command's "already current" and nothing about what the reader had asked for.
+  A row is now settable only when it composes something different from what the
+  note type builds from today, and no default change goes near the vault-wide
+  command any more — see below. This also silences the same toast on every
+  RENAME: a rename keeps the template's id, the id is half its filename, so the
+  files never differed and the answer was always "already current".
+
+- **A default you saved could fail to take, and nothing said so.** *"28-09 saved
+  as default, but newly created 29-09 doesn't load with this new default."* A
+  default change is two writes — the setting, then the template FILE a new note
+  is actually built from — and the second one used to go through the vault-wide
+  *Refresh diary templates* command. That command opens the repair window, which
+  is correct for a command and wrong here: it is titled after five files you were
+  not asking about, it warns that custom edits will be replaced, and **you can
+  decline it**. Declining did not undo the setting. It left the Templates window
+  reporting your new default, every new entry built from the old file, and
+  nothing on screen to say which of the two was lying.
+
+  Both doors on both surfaces now write the file themselves, in the same
+  gesture, scoped to the one grain or the one journal you changed — which is
+  what the settings table has always done. The palette's two refresh commands
+  are unchanged and keep their window.
+
+- **A missing template file reported itself as up to date.** The drift survey
+  skips a file that is not there, so a vault whose `Daily.md` had been deleted
+  answered "diary templates are already current", accepted every default change
+  without complaint, and then refused to make an entry at all with "Daily
+  template missing — run 'Set up / repair vault'". A default change now writes
+  the file whether or not it exists, which is what the journal side has always
+  done.
+
+- **No diary entry could be rebuilt from a template. Any of them. Ever.** *"29-09
+  won't allow me to load a saved template."* Every entry refused, naming two
+  lines nobody wrote:
+
+  ```
+  %% chronoanvil-graph %% — written outside any section
+  %% [[Week-2026-W40]] %% — written outside any section
+  ```
+
+  That is the hidden block that joins an entry to its week, month, quarter and
+  year in the graph — the plugin's own spine, written into the entry when it is
+  created. It is in no template, because a template has no date and so no parent
+  to name; so it sat on one side of the comparison and not the other, and the
+  check that asks "what has the reader written here that a rebuild would
+  destroy?" answered with the plugin's own two lines. Journals never saw it
+  because they compose those lines into the template as well, and the two
+  cancelled. The block is now stepped over wherever that question is asked.
+
+- **The Templates window had two rows for one default.** *"There is ChronoAnvil
+  default and Daily default, there only needs to be one of these."* There does.
+  The ⭐ row named what a new note is built from today and the 🔒 row named what
+  ChronoAnvil ships — and the first could do nothing but describe itself: it
+  composes the current default by definition, so it could never be made the
+  default, never renamed and never removed. Worse, it described itself with the
+  same list of section names as every row under it, since a row is described by
+  the sections it composes and two different *arrangements* of the same sections
+  read alike. A grain whose default grouped two fields and a shipped row that did
+  not were two sentences no reader could tell apart.
+
+  The ⭐ row is gone from both Template windows. Which arrangement is in force is
+  shown the way this window already shows a button with nothing to do: **the row
+  with no *Use as default* is the one you are already on**. One consequence worth
+  knowing — a default you saved straight off a note with **Save this note as the
+  default** is composed by no stored template, so no row matches it and none of
+  them will rebuild a note from it.
+
+- **A saved template threw away the groups you had saved it for.** *"Already
+  matches that template? The sections are the same but the difference is the
+  template I'm trying to apply should have tasks and captured in a group."* It
+  should have, and the template no longer had any idea it was meant to. A
+  template stored which sections a note has and what order they sit in, and
+  nothing at all about how they are arranged — so a template saved from an entry
+  with Tasks and Captured side by side in one named card composed them apart, one
+  under the other, which is exactly the note you were standing on. Hence the
+  refusal: nothing would change, so nothing was offered to change.
+
+  A template now carries the arrangement as well: which fields share a card, where
+  its tabs begin, and what the card is called. Saving one from the Template tab
+  keeps what you can see in the wireframe in front of you; saving an entry as the
+  grain's default keeps it too; 🔒 **ChronoAnvil default** clears it, as it clears
+  everything else. A template that names a grouping the grain cannot build — a
+  field that grain does not have, say — still applies, with the order it carries
+  and a flat band, rather than failing.
+
+- **Saving an entry as the default changed how its fields were drawn.** Underneath
+  the above, and visible on its own: a diary entry's **Show as widget** tick and
+  the Tasks **Compact** flag are written onto the field's own line, because seven
+  fields share one fence and a fence-wide answer would answer for all seven. Every
+  writer in the plugin spliced those tokens except the one that composes a
+  template — so a daily entry with Tasks drawn as a widget, saved as the default,
+  came back the next morning with Tasks drawn as a section. The read had the same
+  hole in the other direction: the answer was dropped on its way INTO the store,
+  before anything could have written it out.
+
+  Both halves are closed, and the round trip is now byte-for-byte: what a template
+  stores composes the file it was read from. This is also what made the grouping
+  above possible at all — a group takes widgets only, so until a composed field
+  could be a widget, no composed template could hold a group.
+
+- **Four rows, two sentences, one arrangement.** The Templates window described
+  its two default rows by walking the catalogue and the 🧩 rows by listing what
+  they had stored — so a template saved from an entry read "Banner, Trackers, Focus,
+  Highlights…" directly under the default it had been saved FROM, reading "Focus,
+  Highlights…". The two extra nouns change no byte of the composed note. Worse,
+  the catalogue walk threw away the ORDER, which is the one thing saving an
+  arrangement is for: reorder your sections, save them as the default, open the
+  window, and you were shown the catalogue's order back with no way to tell
+  whether it had worked. Every row is now described by what it composes to, read
+  with the same parser the refresh command reports drift with.
+
 ## [1.0.46] - 2026-09-28
 
 ### Changed

@@ -429,6 +429,46 @@ describe("saving an arrangement under a name", () => {
     expect(footer.slice(0, 800)).not.toContain("this.spec.arrangement");
   });
 
+  it("hands the arrangement over as a fourth argument, and stays agnostic about it", () => {
+    // ── THE WIDENING THE SEAM PREDICTED (1.0.46) ─────────────────────────
+    //
+    // `saveArrangement` used to argue that ids alone were enough, and closed
+    // with what to do if that stopped being true: "the day one does, the honest
+    // thing is to widen the sink rather than to have this window quietly store
+    // half an answer". The diary's fields group, and a template saved from a
+    // window showing two fields in one card came back with them apart.
+    //
+    // OPAQUE, LIKE EVERY OTHER FIELD THAT CROSSES THIS SEAM. The window hands
+    // over a partition, the rows that begin a page and what each block is called
+    // — all three are facts it owns, because it draws the cards and the reader
+    // renames them here — and it learns nothing about what a caller does with
+    // them. So no store's vocabulary appears in the interface: no `groups`, no
+    // grain, no kind.
+    const body = editor();
+    const at = body.indexOf("export interface ArrangementSink {");
+    expect(at).toBeGreaterThan(-1);
+    const sink = body.slice(at, body.indexOf("\n}", at));
+    expect(sink).toContain("blocks: string[][];");
+    expect(sink).toContain("pages: string[];");
+    expect(sink).toContain("titles: Map<string, string>;");
+    expect(sink).not.toContain("EntryBandGroup");
+    expect(sink).not.toContain("TrackerClass");
+  });
+
+  it("lets a caller with nowhere to put an arrangement ignore it", () => {
+    // The journal producer. A kind's saved template has no room for a partition
+    // — `TemplateLayout` carries `sections` and `order` — so its `save` declares
+    // three parameters and the fourth goes unread. That is a producer's choice
+    // rather than a second shape of the seam, which is why the sink's argument is
+    // required and its consumers are not all obliged to want it.
+    const src = readSrc("template-editor");
+    const at = src.indexOf("save: async (");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, src.indexOf("): Promise<void> => {", at))).not.toContain(
+      "arrangement"
+    );
+  });
+
   it("hands back ids and lets the caller resolve overrides", () => {
     // Overrides are a journal concept and the modal holds no context to look
     // one up with.
@@ -444,20 +484,27 @@ describe("saving an arrangement under a name", () => {
     // The common case is that you want the variant, not the change: arrange,
     // save the arrangement under a name, leave this file untouched.
     //
-    // THROUGH `idsOf` AS OF 3.8 PATCH 7, and the sink's type is unchanged: it
-    // still takes `string[]`. An arrangement is a recipe for a note that does
+    // THROUGH `idsOf` AS OF 3.8 PATCH 7, and the sections argument is unchanged:
+    // it still takes `string[]`. An arrangement is a recipe for a note that does
     // not exist yet, and `SectionChoice`'s header is the argument for why it is
     // named in ids — an id is stable, its options are not part of it, and a
     // stored arrangement carrying an option would stop matching the day a
-    // reader renamed the thing it named. The one surface with a sink is the
-    // journals', whose sections ask nothing, so nothing is dropped here today.
-    // The sections argument specifically. Since 3.18 follow-ups §5 the sink also
-    // carries WHERE the arrangement applies — which kinds may be created from
-    // it — and that is a third argument rather than a change to what the second
-    // one is: still ids, still read from the rows.
-    expect(editor()).toMatch(
-      /await sink\.save\(label\.trim\(\), idsOf\(this\.want\)/
-    );
+    // reader renamed the thing it named. A caller that wants a section's answers
+    // resolves them from the note, where an answer is a fact.
+    //
+    // THE ARRANGEMENT IS A FOURTH ARGUMENT AS OF 1.0.46, on the third one's
+    // terms: `targets` carries WHERE this may be applied, and this carries HOW
+    // the sections sit — which share a card, where its pages begin, what it is
+    // called. Those are the one thing no caller can resolve from the file,
+    // because the reader may have just dragged them into place in the window
+    // this form is part of, and the form's own promise is that it does not
+    // change the file. Neither is a change to what the second argument IS.
+    const src = editor();
+    expect(src).toMatch(/const ids = idsOf\(this\.want\);/);
+    expect(src).toMatch(/await sink\.save\(label\.trim\(\), ids, \[\.\.\.targets\], \{/);
+    expect(src).toMatch(/blocks: this\.groupsOf\(ids\)/);
+    expect(src).toMatch(/pages: this\.pageBreaks\(ids\)/);
+    expect(src).toMatch(/titles: this\.blockNames\(ids\)/);
   });
 });
 

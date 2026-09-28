@@ -48,6 +48,7 @@ import {
 import type { SectionContext } from "../journals/journal-sections";
 import type { JournalVariantConfig } from "../journals/custom-journal";
 import { summariseLoss } from "../core/reload-loss";
+import { settableRows } from "./template-rows";
 import type { ReloadLoss } from "../core/reload-loss";
 import { INDEX } from "../core/vocabulary";
 
@@ -177,27 +178,24 @@ class JournalTemplateModal extends Modal {
     }
   }
 
-  // The rows, in the order the request names them: what this type builds from
-  // now, what ChronoAnvil shipped, then the reader's own.
+  // The rows: what ChronoAnvil shipped, then the reader's own.
   private rows(): TemplateRow[] {
     const preset = this.manager.shippedNameFor(this.ctx);
+    // WHAT THIS TYPE BUILDS FROM NOW, to measure every other row against. See
+    // `settableRows` below: the row that composes this is the one the type is
+    // already on, and it is the one that draws no *Use as default*.
+    //
+    // ── AND IT IS NOT A ROW ITSELF (1.0.46) ────────────────────────────
+    //
+    // A ⭐ row sat above 🔒 naming it. The diary twin was the surface it was
+    // reported on — *"there is ChronoAnvil default and Daily default, there only
+    // needs to be one of these"* — and the reasoning is the window's rather than
+    // the diary's, so both lose it: a row that composes `current` by definition
+    // can never be settable, renamed or removed, and its sentence is the same
+    // list of nouns the rows beneath it print. See the diary twin for the whole
+    // argument and for what it costs.
+    const current = this.manager.composedFor(this.ctx);
     const rows: TemplateRow[] = [
-      {
-        token: "⭐",
-        title: `${this.noun} default`,
-        subtitle: `What a new ${this.noun.toLowerCase()} is built from: ${listOf(
-          bandOf(this.manager.composedFor(this.ctx), this.ctx)
-        )}.`,
-        compose: () => ({
-          text: this.manager.composedFor(this.ctx),
-          drops: [],
-        }),
-        variant: null,
-        // IT IS ALREADY THE DEFAULT. A "use as default" on this row is a button
-        // whose job is done, which is the control this window declines to draw.
-        settable: false,
-        editable: false,
-      },
       {
         token: "🔒",
         title: "ChronoAnvil default",
@@ -222,17 +220,26 @@ class JournalTemplateModal extends Modal {
       },
     ];
     for (const variant of this.manager.layoutsFor(this.ctx)) {
+      // DESCRIBED BY WHAT IT COMPOSES TO, not by what it stores (1.0.46). The
+      // two rows above are, and a row listing `variant.sections` instead read
+      // as a different arrangement whenever the stored ids and the composed
+      // ones differ — which they routinely do, since an id the target cannot
+      // carry is stored and then dropped. `composedFrom` already tells us
+      // which; the sentence should not disagree with it.
+      const composed = this.manager.composedFrom(this.ctx, variant);
       rows.push({
         token: "🧩",
         title: variant.label,
-        subtitle: describeTemplate(variant),
-        compose: () => this.manager.composedFrom(this.ctx, variant),
+        subtitle: composed.text
+          ? `${listOf(bandOf(composed.text, this.ctx))}.`
+          : "the catalogue's own arrangement",
+        compose: () => composed,
         variant,
         settable: true,
         editable: true,
       });
     }
-    return rows;
+    return settableRows(rows, current);
   }
 
   // ACTIONS ON THEIR OWN LINE. The widest row carries four buttons and the
@@ -442,13 +449,6 @@ class JournalTemplateModal extends Modal {
 function bandOf(composed: string, ctx: SectionContext): string[] {
   const byId = new Map(JOURNAL_SECTIONS.map((s) => [s.id, s.label]));
   return detectSections(composed, ctx).map((id) => byId.get(id) ?? id);
-}
-
-function describeTemplate(variant: JournalVariantConfig): string {
-  const labels = (variant.sections ?? []).map(
-    (id) => JOURNAL_SECTIONS.find((s) => s.id === id)?.label ?? id
-  );
-  return labels.length ? listOf(labels) : "the catalogue's own arrangement";
 }
 
 // "a, b and c" — the plugin says lists this way everywhere a sentence holds one.

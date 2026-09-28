@@ -162,7 +162,34 @@ export interface ArrangementSink {
   // drawn at all.
   targets?: { id: string; label: string }[];
   originTarget?: string;
-  save: (name: string, sections: string[], targets: string[]) => Promise<void>;
+  save: (
+    name: string,
+    sections: string[],
+    targets: string[],
+    // ── AND HOW THOSE SECTIONS ARE ARRANGED (1.0.46) ──────────────────
+    //
+    // THE WIDENING THIS SEAM SAID IT WOULD TAKE. `saveArrangement` carried a
+    // paragraph arguing that ids alone were enough — "the one surface with a
+    // sink is the journals', whose sections ask nothing — so nothing is dropped
+    // here today, and the day one does, the honest thing is to widen the sink
+    // rather than to have this window quietly store half an answer". The diary
+    // got a sink in 4.29 and its fields group; a template saved from a window
+    // showing two fields in one card came back with them apart, and the window
+    // that refused to rebuild it said "this entry already matches that
+    // template", because it did.
+    //
+    // STILL OPAQUE, which is what keeps this window agnostic. A partition, the
+    // rows that begin a page, and what each block is called are facts THIS
+    // window owns — it draws the group cards and the reader renames them here —
+    // and it hands them over without learning what a caller does with them. A
+    // caller whose store has no room for an arrangement ignores the argument,
+    // which is what the journal producer does.
+    arrangement: {
+      blocks: string[][];
+      pages: string[];
+      titles: Map<string, string>;
+    }
+  ) => Promise<void>;
 }
 
 // ── A SECTION WHOSE GATE WAS CONFIG RATHER THAN TEXT (5.20–1.0.23) ───────
@@ -3049,16 +3076,28 @@ export class SectionEditorModal extends EditorModal {
     // still the reason the form can be believed.
     const targets = new Set(this.templateTargets);
     targets.add(origin);
-    // IDS, NOT CHOICES, and `ArrangementSink.save` still says so in its type.
-    // An arrangement is a recipe for a note that does not exist yet and is
-    // named by ids for the reason `SectionChoice`'s header gives: an id is
-    // stable and its options are not part of it, so a stored arrangement must
-    // not start disagreeing with the catalogue the day a reader renames a
-    // journal kind. The one surface with a sink is the journals', whose
-    // sections ask nothing — so nothing is dropped here today, and the day one
-    // does, the honest thing is to widen the sink rather than to have this
-    // window quietly store half an answer.
-    await sink.save(label.trim(), idsOf(this.want), [...targets]);
+    // IDS, NOT CHOICES. An arrangement is a recipe for a note that does not
+    // exist yet and is named by ids for the reason `SectionChoice`'s header
+    // gives: an id is stable and its options are not part of it, so a stored
+    // arrangement must not start disagreeing with the catalogue the day a
+    // reader renames a journal kind. A caller that wants a section's ANSWERS
+    // resolves them from the note, which is where an answer is a fact.
+    //
+    // THE ARRANGEMENT IS THIS WINDOW'S, THOUGH, AND IS HANDED OVER (1.0.46).
+    // Which sections share a card, where a card's pages begin, and what each
+    // card is called are not properties of any section and cannot be resolved
+    // from anywhere else — they are the thing the reader just dragged into
+    // place in front of this form. See `ArrangementSink.save`.
+    //
+    // READ THROUGH `want`, like every other write this window makes: a row on
+    // its way out is already gone from it, so a block whose first member is
+    // being removed is opened by the next one without needing a case.
+    const ids = idsOf(this.want);
+    await sink.save(label.trim(), ids, [...targets], {
+      blocks: this.groupsOf(ids),
+      pages: this.pageBreaks(ids),
+      titles: this.blockNames(ids),
+    });
     this.templateSaved = label.trim();
     this.refreshBody();
   }

@@ -182,9 +182,15 @@ describe("patch 6: the setting `extra` has been describing since 2.60.1", () => 
     // without the extras would strip every section a reader had added, on a
     // command whose whole job is to bring the template up to date.
     const src = readSrc("scaffold");
+    // ALL THREE STORES, as of 1.0.46 — membership, order, and the partition the
+    // band is arranged into. A path that read two of the three would compose a
+    // template differing from the one on disk by a grouping, so the drift
+    // survey would offer to undo the arrangement on every refresh. Matched over
+    // the whole argument list rather than on one line, because the call no
+    // longer fits on one.
     expect(
       src.match(
-        /composeEntryTemplate\(cls, extras\[cls\] \?\? \[\], bands\[cls\] \?\? \[\]\)/g
+        /composeEntryTemplate\(\s*cls,\s*extras\[cls\] \?\? \[\],\s*bands\[cls\] \?\? \[\],\s*groups\[cls\] \?\? \[\]\s*\)/g
       )?.length
     ).toBe(2);
   });
@@ -599,12 +605,19 @@ describe("patch 7: an option is set on the way in", () => {
     // carrying an answer would stop matching the day a reader renamed the
     // journal kind it named — the failure `SectionChoice`'s header rejects
     // `bridge-notes:meal`-as-an-id for.
-    // Still `idsOf(this.want)`, whatever else the sink came to carry — the
-    // claim is about what an arrangement IS, not about the call's arity, so it
-    // is asserted as the sections argument rather than as the whole line.
-    expect(readCode("section-editor")).toMatch(
-      /sink\.save\(label\.trim\(\), idsOf\(this\.want\)/
-    );
+    // Still the ids, whatever else the sink came to carry — the claim is about
+    // what an arrangement IS, not about the call's arity, so it is asserted as
+    // the sections argument rather than as the whole line.
+    const src = readCode("section-editor");
+    expect(src).toMatch(/const ids = idsOf\(this\.want\);/);
+    expect(src).toMatch(/sink\.save\(label\.trim\(\), ids, \[\.\.\.targets\]/);
+    // AND THE OPTIONS ARE STILL NOT IN IT (1.0.46). The sink widened to carry
+    // the ARRANGEMENT — which sections share a card, where its pages begin,
+    // what it is called — because those are facts this window owns and nothing
+    // else can resolve. A section's own answers are not: they are properties of
+    // the note, and the callers read them from there.
+    expect(src).not.toContain("sink.save(label.trim(), this.want");
+    expect(src).toContain("blocks: this.groupsOf(ids)");
   });
 });
 

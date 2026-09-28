@@ -29,7 +29,7 @@
 
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "./constants";
 import { allNoteRegions } from "./notestore";
-import { frontmatterEnd } from "./note-sections";
+import { frontmatterEnd, GRAPH_MARK } from "./note-sections";
 
 // One thing a recompose over this page would destroy.
 //
@@ -112,6 +112,7 @@ export function looseLines(text: string): string[] {
   const out: string[] = [];
   let fence = false;
   let region = false;
+  let graph = false;
   for (const raw of bodyLines(text)) {
     const line = raw.trim();
     if (fence) {
@@ -120,6 +121,43 @@ export function looseLines(text: string): string[] {
     }
     if (region) {
       if (line === "-->") region = false;
+      continue;
+    }
+    // ── THE HIDDEN GRAPH BLOCK IS NOT THE READER'S PROSE (1.0.46) ────
+    //
+    // `setGraphLinks` calls these two lines "the only text in an entry this
+    // plugin claims", and that is exactly what makes them poison here: an
+    // ENTRY is a template filled in once, and the parent's name depends on the
+    // entry's DATE — `Week-2026-W40` — so `composeEntryTemplate` cannot emit
+    // them and never has. Every diary entry in every vault therefore carried
+    // two lines that appear on the page and not in the composition, and this
+    // walk reported them as writing of the reader's:
+    //
+    //   %% chronoanvil-graph %% — written outside any section
+    //   %% [[Week-2026-W40]] %% — written outside any section
+    //
+    // Which meant NO diary entry could ever be rebuilt from a template. The
+    // refusal was true about the text and false about the reader, and it was
+    // invisible until 1.0.46 made the box legible and the window the place you
+    // go to apply one. Reported from a brand-new 29 September entry: untouched,
+    // and already refusing.
+    //
+    // A JOURNAL NOTE IS NOT AFFECTED and is skipped here anyway. Its composer
+    // DOES emit the block (`journal-plan.ts` appends `graphLinksSection`), so
+    // the lines cancelled on both sides — but they are this plugin's lines
+    // there too, and a walk that counts them as prose on one surface and not
+    // the other would be two answers to one question.
+    //
+    // THE MARKER TAKES THE LINE AFTER IT WITH IT, which is the block's shape
+    // wherever it is written: the marker, then one `%% … %%` line of links.
+    // Tracked with a flag rather than an index lookahead so it reads like the
+    // two skips above it.
+    if (graph) {
+      graph = false;
+      continue;
+    }
+    if (line === GRAPH_MARK) {
+      graph = true;
       continue;
     }
     if (FENCE_OPEN.test(line)) {
