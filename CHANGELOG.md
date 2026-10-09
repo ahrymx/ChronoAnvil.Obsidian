@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than to your reading font. On a phone, and at a large reading font, it holds
   one line and the **+N** accounts for the rest — the count is placed by
   measuring what the cell can actually show rather than by assuming.
+- **The Sleep cell is the right way up.** It drew its two time buttons first and
+  its caption underneath them behind a hairline rule, which made it the one cell
+  in the logging grid built upside down — every other tracker cell is a small
+  header over its control. The readout is now the cell's header: it names the
+  cell, the way **MOOD** and **HABITS** name theirs, and reports the night's
+  asleep/awake figures beside the name once both times are set.
+
 - **A habit chip no longer carries its own ×.** Removal is the window's, one
   per row, where you can read what you are taking off before it goes. The chips
   are small and sit shoulder to shoulder, and the delete was a hover-revealed
@@ -47,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be clicked freely. Habits is now the only tracker cell without a corner ×.
 
 ### Fixed
+
+- **The time picker opened in the corner of the window.** Pressing **BED** or
+  **WAKE** dropped the list of hours at the top-left of Obsidian rather than
+  under the button. The native input behind each button was hidden by being
+  given no size at all, and the browser positions the picker against that
+  input's box — handed an empty one, it fell back to the window's origin. The
+  input now covers its own button and is hidden by being transparent instead.
 
 - **A habit chip was app-control height, and nothing in its own styling could
   change that.** Obsidian gives every `<button>` an explicit height, so the

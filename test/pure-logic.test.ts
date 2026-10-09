@@ -241,7 +241,14 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { DEFAULT_PATHS, ROOT_CHILDREN, DEFAULT_TRACKERS } from "../src/core/constants";
 
-import { fnBody, readCode, readCss, readSrc, repoFile } from "./sources";
+import {
+  cssRule,
+  fnBody,
+  readCode,
+  readCss,
+  readSrc,
+  repoFile,
+} from "./sources";
 import { presetAsNewJournal } from "../src/journals/custom-journal";
 import { STUDY_PRESET } from "../src/journals/journal";
 // ── util.ts: fillTemplate ────────────────────────────────────────────────
@@ -7654,6 +7661,102 @@ describe("the tracker grid is editable per entry", () => {
     ]) {
       expect(css).toContain(cls);
     }
+  });
+
+  // ── THE SLEEP CELL IS THE RIGHT WAY UP (1.0.49) ────────────────────────
+  //
+  // It was the one cell in the grid built upside down: two buttons, then a
+  // caption under them behind a hairline rule, where every other tracker cell
+  // is an eyebrow over its control. The reader asked for the flip by name —
+  // *"flip the timer buttons with the text. It would fit in with regular
+  // tracker cells (which have proper headers)."*
+  describe("the sleep cell's head", () => {
+    const code = readCode("tracker-controls");
+    const sleepFn = code.slice(
+      code.indexOf("const wrap = createDiv({ cls: \"ca-journal-widget ca-journal-sleep\" })"),
+      code.indexOf("export function buildTrackerAddCell")
+    );
+
+    it("puts the readout before the buttons in the DOM", () => {
+      // ORDER IS THE WHOLE FIX, so it is pinned by position rather than by
+      // presence: both lines existed before and the readout came second.
+      const head = sleepFn.indexOf('createDiv({ cls: "ca-journal-sleep-readout" })');
+      const btns = sleepFn.indexOf('createDiv({ cls: "ca-journal-sleep-inputs" })');
+      expect(head).toBeGreaterThan(-1);
+      expect(btns).toBeGreaterThan(-1);
+      expect(head).toBeLessThan(btns);
+    });
+
+    it("names the cell in both states, the way its siblings do", () => {
+      // A head that only appears once a reading exists is not a head. The name
+      // is written before the `hrs == null` return, so it survives the branch.
+      const name = sleepFn.indexOf('cls: "ca-journal-sleep-name", text: "Sleep"');
+      const bail = sleepFn.indexOf("if (hrs == null)");
+      expect(name).toBeGreaterThan(-1);
+      expect(name).toBeLessThan(bail);
+    });
+
+    it("keeps the hint beside the name rather than replacing the line", () => {
+      expect(sleepFn).toContain('text: "set both times"');
+      // The sentence that had to carry the cell's identity as well as its
+      // instruction is retired; the name carries the identity now.
+      expect(sleepFn).not.toContain("Set both times to see your sleep.");
+    });
+
+    it("wraps the three figures so the row has exactly two children", () => {
+      // `space-between` is what puts the value on the far edge, and it only
+      // means that with two children — four would spread the figures apart.
+      expect(sleepFn).toContain('cls: "ca-journal-sleep-figures"');
+      for (const part of ["sleep-asleep", "sleep-divider", "sleep-awake"]) {
+        expect(sleepFn).toMatch(
+          new RegExp("figures\\.createSpan\\(\\{\\s*cls: \"ca-journal-" + part)
+        );
+      }
+    });
+
+    it("wears the eyebrow's type and drops the rule it used to sit under", () => {
+      const row = cssRule(".ca-journal-sleep-readout");
+      expect(row).toContain("justify-content: space-between");
+      // The rule belonged to a footnote. An eyebrow is separated by being one.
+      expect(row).not.toContain("border-top");
+      // The monospace moved down to the digits that earn it.
+      expect(row).not.toContain("font-family");
+      expect(cssRule(".ca-journal-sleep-figures")).toContain("font-monospace");
+      const name = cssRule(".ca-journal-sleep-name");
+      const label = cssRule(
+        ".ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label"
+      );
+      // Same thing wearing a different class, so the two must not drift.
+      for (const decl of ["text-transform: uppercase", "letter-spacing: 0.05em"]) {
+        expect(name).toContain(decl);
+        expect(label).toContain(decl);
+      }
+    });
+
+    it("gives the hidden time input a box for the picker to anchor to", () => {
+      // `showPicker()` is positioned against the INPUT's bounding box, so a
+      // `width: 0; height: 0` input — invisible, which was the intent — gave
+      // Chromium a degenerate rect and it dropped the time list at the window's
+      // top-left corner, nowhere near the button that was pressed. The input
+      // covers its button instead; `opacity: 0` does all the hiding it ever did.
+      const input = cssRule(".ca-journal-sleep-hidden-input");
+      expect(input).toContain("opacity: 0");
+      // Anchored to the line start: `min-width: 0` legitimately contains the
+      // substring, and it is there to stop the native control claiming width.
+      expect(input).not.toMatch(/\n\s*width: 0;/);
+      expect(input).not.toMatch(/\n\s*height: 0;/);
+      expect(input).toContain("width: 100%");
+      expect(input).toContain("height: 100%");
+      // The button is the positioned ancestor the box resolves against, and the
+      // thing that stays clickable.
+      expect(cssRule(".ca-journal-sleep-btn")).toContain("position: relative");
+      expect(input).toContain("pointer-events: none");
+    });
+
+    it("leaves the hint in sentence case beside an uppercased name", () => {
+      // Two uppercased runs side by side read as two labels, neither as a hint.
+      expect(cssRule(".ca-journal-sleep-hint")).toContain("text-transform: none");
+    });
   });
 
   it("draws no remove × on a habit chip at all", () => {

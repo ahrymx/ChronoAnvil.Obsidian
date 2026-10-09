@@ -574,6 +574,16 @@ export function buildSleep(
   }
 
   const wrap = createDiv({ cls: "ca-journal-widget ca-journal-sleep" });
+  // THE READOUT IS THE CELL'S HEAD, AND IT IS CREATED FIRST FOR THAT REASON.
+  // It used to sit under the two buttons behind a hairline rule, which made
+  // Sleep the one cell in the grid built upside down: every other tracker cell
+  // is an eyebrow over its control, and this was a control over a caption. The
+  // reader put it plainly — *"flip the timer buttons with the text. It would fit
+  // in with regular tracker cells (which have proper headers)."* Flipping the
+  // order is most of it; the rest is that a head has to be a head, so the row
+  // now names the cell the way `HABITS` and `MOOD` name theirs and reports the
+  // night beside the name rather than instead of it.
+  const readout = wrap.createDiv({ cls: "ca-journal-sleep-readout" });
   const buttonsRow = wrap.createDiv({ cls: "ca-journal-sleep-inputs" });
 
   const createSleepButton = (
@@ -670,28 +680,36 @@ export function buildSleep(
   // Bedtime first, then Wake-Up — the order a night runs.
   const bedCtrl = createSleepButton(bed, "🌙", "Bed");
   const wakeCtrl = createSleepButton(wake, "⏰", "Wake");
-  const readout = wrap.createDiv({ cls: "ca-journal-sleep-readout" });
 
+  // The name first and the night after it, so the head reads as a head in both
+  // states. The old sentence — *"Set both times to see your sleep."* — was the
+  // whole line and so had to carry the cell's identity as well as its
+  // instruction; it fits beside the name now that it is no longer alone, and
+  // what it says is the part the name cannot say. Two children exactly, which
+  // is what lets the row be `space-between` and put the figures on the far edge
+  // where a value belongs.
   const refresh = (): void => {
     readout.empty();
+    readout.createSpan({ cls: "ca-journal-sleep-name", text: "Sleep" });
     const hrs = sleepHours(bedCtrl.getValue(), wakeCtrl.getValue());
     if (hrs == null) {
       readout.createSpan({
         cls: "ca-journal-sleep-hint",
-        text: "Set both times to see your sleep.",
+        text: "set both times",
       });
       return;
     }
     const awake = awakeHours(bedCtrl.getValue(), wakeCtrl.getValue());
-    readout.createSpan({
+    const figures = readout.createSpan({ cls: "ca-journal-sleep-figures" });
+    figures.createSpan({
       cls: "ca-journal-sleep-asleep",
       text: `😴 ${formatSleepRatio(hrs)}`,
     });
-    readout.createSpan({
+    figures.createSpan({
       cls: "ca-journal-sleep-divider",
       text: "/",
     });
-    readout.createSpan({
+    figures.createSpan({
       cls: "ca-journal-sleep-awake",
       text: `${formatSleepRatio(awake)} ☀️`,
     });

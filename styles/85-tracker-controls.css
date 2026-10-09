@@ -544,36 +544,75 @@
   letter-spacing: 0.04em;
   font-size: var(--ca-text-2xs);
 }
+/* THE INPUT IS WHAT THE PICKER ANCHORS TO, SO IT HAS TO HAVE A BOX. This was
+   `width: 0; height: 0` at the button's corner — invisible, which was the whole
+   intent, and a degenerate rect, which was the cost: Chromium positions
+   `showPicker()` against the input's bounding box, and given an empty one it
+   gives up and drops the dropdown at the window's top-left corner. The reader
+   saw a time list in the far corner of Obsidian with nothing near the button
+   they had pressed.
+
+   `opacity: 0` over the button's own area is the fix and the hiding is
+   unchanged — the native control is still completely invisible, it simply has
+   somewhere to be. `pointer-events: none` is what keeps the button the thing
+   you click: the button opens the picker in its own handler, and an input
+   accepting clicks on top of it would be a second, differently-behaved target
+   covering the first. `appearance: none` and `min-width: 0` stop the native
+   control claiming an intrinsic width through the button's `overflow: hidden`. */
 .ca-journal-sleep-hidden-input {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  appearance: none;
   opacity: 0;
   pointer-events: none;
   margin: 0;
   padding: 0;
   border: none;
 }
+/* THE CELL'S HEAD, NOT A FOOTNOTE UNDER THE BUTTONS. This row was last in the
+   flow behind a hairline rule, which made Sleep the one cell in the grid built
+   upside down — every other tracker cell is an eyebrow over its control, and
+   this was a control over a caption. The rule went with the move: an eyebrow is
+   separated by being an eyebrow, and a line above the buttons would have drawn a
+   box around nothing.
+
+   The type here is the eyebrow's, and the monospace moved down to the figures
+   where it earns its place (digits that change shape as the night does are worse
+   than digits that do not). `space-between` with exactly two children is why
+   `refresh` wraps the three figure spans in one: the name takes the left edge
+   and the value the right, the way a labelled reading reads. */
 .ca-journal-sleep-readout {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: 6px;
+  flex: 0 0 auto;
   font-size: var(--ca-text-2xs);
-  font-family: var(--font-monospace, monospace);
   font-weight: 600;
-  margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 100%;
-  border-top-width: 1px;
-  border-top-style: solid;
-  border-top-color: var(--ca-border-inner);
-  padding-top: 1px;
+}
+/* `.ca-journal-widget-label`'s own metrics — this names a cell, so it is the
+   same thing wearing a different class, and the two must not drift. */
+.ca-journal-sleep-name {
+  flex: 0 0 auto;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ca-journal-sleep-figures {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-monospace, monospace);
 }
 .ca-journal-sleep-asleep {
   color: var(--ca-mood-5);
@@ -588,14 +627,18 @@
   color: var(--text-muted);
   font-weight: 500;
 }
+/* Beside the name rather than instead of it, so it stays a sentence fragment in
+   sentence case — uppercasing an instruction next to an uppercased name would
+   read as two labels and neither as a hint. */
 .ca-journal-sleep-hint {
   color: var(--text-faint);
   font-weight: 400;
   font-style: italic;
+  text-transform: none;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
 }
 
 /* ── Sleep summary (aggregate over daily entries) ──────────────────────── */
