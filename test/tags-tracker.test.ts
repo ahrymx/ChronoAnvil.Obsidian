@@ -30,7 +30,7 @@ import {
   surfaceKey,
 } from "../src/trackers/trackers";
 import { readSrc } from "./sources";
-import { fitTagChips } from "../src/ui/widgets/tracker-controls";
+import { fitChipRows } from "../src/ui/widgets/tracker-controls";
 
 const tagsDef = () =>
   normalizeTrackers([], false).find((t) => t.builtin === "tags");
@@ -330,7 +330,7 @@ describe("the Tags built-in", () => {
 // THE SUITE HAS NO LAYOUT, so the rows are modelled rather than measured: a
 // box of a fixed width, elements of known widths packed into it in order, and
 // `offsetTop` derived from where the packing puts each one. That is the only
-// thing `fitTagChips` reads, so the model exercises the real decision — which
+// thing `fitChipRows` reads, so the model exercises the real decision — which
 // is which chips to hide and what the count says — without asserting anything
 // about how a browser wraps.
 describe("the tags cell fills the rows it has", () => {
@@ -408,19 +408,23 @@ describe("the tags cell fills the rows it has", () => {
   const shownOf = (chips: HTMLElement[]) =>
     chips.filter((c) => (c as unknown as Fake).display !== "none").length;
 
-  function build(widths: number[]) {
+  // `clientHeight` is the stylesheet's cap, not the natural height, and a box
+  // that does not report one is unmeasurable — which is every case above, on
+  // purpose: those tests are about which chips to hide, and leaving the height
+  // off them keeps the design cap of two in force so they still assert that.
+  function build(widths: number[], clientHeight?: number) {
     const box: Fake[] = [];
     const chipEls = widths.map((w) => el(w, box));
     const more = el(20, box);
     const pencil = el(10, box, PENCIL_H);
-    const host = { isConnected: true } as unknown as HTMLElement;
+    const host = { isConnected: true, clientHeight } as unknown as HTMLElement;
     return { box, chipEls, more, pencil, host };
   }
 
   it("shows every tag when they all land inside the cell", () => {
     // Four 25px chips: two rows of two, and the pencil on the second.
     const { host, chipEls, more, pencil } = build([25, 25, 25, 25]);
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     expect(shownOf(chipEls)).toBe(4);
     expect((more as unknown as Fake).display).toBe("none");
   });
@@ -430,13 +434,13 @@ describe("the tags cell fills the rows it has", () => {
     // whatever the cell could hold, so a second row with room for two more sat
     // holding `+2` alone. Six 25px chips all fit here and none is counted.
     const six = build([25, 25, 25, 25, 25, 25]);
-    fitTagChips(six.host, six.chipEls, six.more, six.pencil);
+    fitChipRows(six.host, six.chipEls, six.more, six.pencil);
     expect(shownOf(six.chipEls)).toBe(6);
     expect((six.more as unknown as Fake).display).toBe("none");
 
     // And where they genuinely do not all fit, more than four still show.
     const ten = build(Array(10).fill(25));
-    fitTagChips(ten.host, ten.chipEls, ten.more, ten.pencil);
+    fitChipRows(ten.host, ten.chipEls, ten.more, ten.pencil);
     const shown = shownOf(ten.chipEls);
     expect(shown).toBeGreaterThan(4);
     expect((ten.more as unknown as Fake).text).toBe(`+${10 - shown}`);
@@ -444,7 +448,7 @@ describe("the tags cell fills the rows it has", () => {
 
   it("counts every tag it hid, not every tag past a fixed number", () => {
     const { host, chipEls, more, pencil } = build(Array(20).fill(25));
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     const shown = shownOf(chipEls);
     expect((more as unknown as Fake).text).toBe(`+${20 - shown}`);
     expect(shown).toBeGreaterThan(0);
@@ -455,7 +459,7 @@ describe("the tags cell fills the rows it has", () => {
     // measured with the rest — under the old cap they were not, and the rows
     // are now filled to the edge.
     const { host, chipEls, more, pencil } = build(Array(8).fill(25));
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     const visible = [
       ...chipEls.filter((c) => (c as unknown as Fake).display !== "none"),
       more,
@@ -486,7 +490,7 @@ describe("the tags cell fills the rows it has", () => {
     // only one row was left — three tags and `+3` in a cell with room for
     // eight.
     const { host, chipEls, more, pencil } = build(Array(8).fill(25));
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     expect(shownOf(chipEls)).toBeGreaterThan(4);
   });
 
@@ -495,22 +499,101 @@ describe("the tags cell fills the rows it has", () => {
     // now fit. Running the fitter twice on the same arrangement must not shrink
     // it further.
     const { host, chipEls, more, pencil } = build(Array(8).fill(25));
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     const once = shownOf(chipEls);
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     expect(shownOf(chipEls)).toBe(once);
   });
 
   it("stops at none rather than spinning on a cell nothing fits in", () => {
     const { host, chipEls, more, pencil } = build([95, 95, 95]);
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     expect((more as unknown as Fake).text).toMatch(/^\+\d+$/);
+  });
+
+  // The Habits cell's half of the problem, and the reason the cap stopped being
+  // a constant. `.ca-journal-habits-row`'s `max-height` is now `calc(100% - the
+  // eyebrow)`, so how many rows the box can show is the reader's font size
+  // talking, and on mobile a habit chip carries a 40px tap-target floor. Where
+  // there is room for one row, a fitter that still believed in two would put
+  // the `+N` on a second row nothing can see — the defect the reader reported
+  // as the plus icon disappearing, in the form that survived pinning the `+`.
+  describe("and only the rows the box can really show", () => {
+    const mid = (v: HTMLElement) => {
+      const f = v as unknown as Fake;
+      return Math.round(f.offsetTop + f.offsetHeight / 2);
+    };
+    const visibleOf = (chips: HTMLElement[]) =>
+      chips.filter((c) => (c as unknown as Fake).display !== "none");
+
+    it("collapses to one row when the box is one row tall", () => {
+      // Six 25px chips want three rows; a 20px box has room for one.
+      const six = build([25, 25, 25, 25, 25, 25], 20);
+      fitChipRows(six.host, six.chipEls, six.more, six.pencil);
+      const shown = visibleOf(six.chipEls);
+      expect(shown.length).toBeGreaterThan(0);
+      expect(new Set([...shown, six.more, six.pencil].map(mid)).size).toBe(1);
+      expect((six.more as unknown as Fake).text).toBe(
+        `+${six.chipEls.length - shown.length}`
+      );
+    });
+
+    it("still fills two rows when the box is two rows tall", () => {
+      // The same answer the unmeasured harness gives, which is what the
+      // `Math.min` is for: measuring must not cost the second row where the
+      // box has it.
+      const six = build([25, 25, 25, 25, 25, 25], 40);
+      fitChipRows(six.host, six.chipEls, six.more, six.pencil);
+      const flat = build([25, 25, 25, 25, 25, 25]);
+      fitChipRows(flat.host, flat.chipEls, flat.more, flat.pencil);
+      expect(shownOf(six.chipEls)).toBe(shownOf(flat.chipEls));
+      expect((six.more as unknown as Fake).text).toBe(
+        (flat.more as unknown as Fake).text
+      );
+      expect(shownOf(six.chipEls)).toBeGreaterThan(2);
+    });
+
+    it("never claims more rows than the design allows", () => {
+      // A tall box does not buy a third row: two is a cap in both directions.
+      const nine = build(Array(9).fill(25), 500);
+      fitChipRows(nine.host, nine.chipEls, nine.more, nine.pencil);
+      const shown = visibleOf(nine.chipEls);
+      expect(new Set([...shown, nine.more].map(mid)).size).toBeLessThanOrEqual(
+        2
+      );
+      expect(shown.length).toBeLessThan(nine.chipEls.length);
+    });
+
+    it("takes a row's span from the pitch, not from an element's own box", () => {
+      // BOTH HALVES IN THE SAME UNITS, at the height where it shows. The
+      // model's rows are 20 apart, so two rows need 40 and a 26px box has room
+      // for one. Reading the span off an element instead gives the chip's
+      // `offsetHeight` of 17 — and a chip wrapper is an inline box that reports
+      // the line box its font asks for rather than the pill's, so in a browser
+      // the two numbers disagree in opposite directions and the answer flips on
+      // nothing. The pitch carries the row gap with it, which errs toward one
+      // row fewer: the cost of that is a `+N`, and the cost of the other way is
+      // chips behind `overflow: hidden`.
+      const six = build([25, 25, 25, 25, 25, 25], 26);
+      fitChipRows(six.host, six.chipEls, six.more, six.pencil);
+      const shown = visibleOf(six.chipEls);
+      expect(new Set([...shown, six.more].map(mid)).size).toBe(1);
+    });
+
+    it("keeps one row even for a box too short for a single chip", () => {
+      // A box reporting no height is unmeasurable and falls back to the design
+      // cap; a short-but-real one must still draw something rather than empty
+      // itself, because a box that fits no chip is a layout to fix.
+      const six = build([25, 25, 25, 25, 25, 25], 4);
+      fitChipRows(six.host, six.chipEls, six.more, six.pencil);
+      expect(shownOf(six.chipEls)).toBeGreaterThan(0);
+    });
   });
 
   it("does nothing at all before the cell is in the document", () => {
     const { chipEls, more, pencil } = build(Array(8).fill(25));
     const host = { isConnected: false } as unknown as HTMLElement;
-    fitTagChips(host, chipEls, more, pencil);
+    fitChipRows(host, chipEls, more, pencil);
     expect(shownOf(chipEls)).toBe(8);
   });
 
@@ -526,6 +609,6 @@ describe("the tags cell fills the rows it has", () => {
     expect(code).not.toContain("maxVisibleTags");
     expect(src).toContain("new ResizeObserver(fit)");
     expect(src).toContain("watch?.disconnect();");
-    expect(src).toContain("class TagsFit extends MarkdownRenderChild");
+    expect(src).toContain("class ChipFit extends MarkdownRenderChild");
   });
 });

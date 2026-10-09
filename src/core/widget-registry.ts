@@ -633,9 +633,19 @@ export const WIDGETS: Record<string, WidgetSpec> = {
   "entry-rollup": {
     label: "Entry rollup",
     glyph: "📋",
-    bar: "📖 What the days said",
+    // "entries", NOT "days", SINCE 1.0.48 — the section catalogue's own word
+    // since 3.11 §5, and the card's was still the narrow one. The widget gathers
+    // days under a week, weeks under a month and months under a quarter, so a
+    // title naming days was wrong on two of the three pages that can host it.
+    //
+    // A NOTE THAT ALREADY CARRIES THE OLD LINE KEEPS IT, and that is correct:
+    // a composed `header:` is renameable in place, reconciliation never rewrites
+    // one, and the untick that takes a bar back off filters on `isHeaderLine`
+    // rather than on this string — so no note is left with a header it cannot
+    // remove.
+    bar: "📖 What the entries said",
     blurb:
-      "One dated line per day in this period that wrote something worth rolling up, oldest first.",
+      "One dated line per entry one rung under this period that wrote something worth rolling up, oldest first.",
     category: "diary",
     // IT REFUSES, IN ITS OWN WORDS. `buildEntryRollup` draws *"entry-rollup
     // needs a dashboard period — put it on a note carrying week-start,

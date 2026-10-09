@@ -794,6 +794,34 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
   color: var(--text-muted);
 }
 
+/* ── The Habits window (1.0.49) ───────────────────────────────────────────
+
+   WEARS THE TAGS WINDOW'S CLASSES, which is the point rather than a shortcut:
+   two cells in one tracker grid hold a LIST instead of a value, and
+   `tags-editor.ts`' argument for a dialogue is about lists rather than about
+   tags. A reader who has met one of these windows has met both, so the sections,
+   the rows, the add field and the toggling cloud are literally the same rules.
+   What follows is only what Habits has that Tags does not. */
+
+/* THE READING, IN THE ROW. The box is the entry's own `.ca-journal-habit-box`
+   at the size it already is — same glyphs, same three states, same accent when
+   done — so the box in the window and the box on the chip read as one control
+   in two places. It only has to be told not to stretch in a flex row. */
+.ca-habits-box {
+  flex: 0 0 auto;
+}
+
+/* What pressing Add is about to do, said before it happens. A tag is a string
+   in one note; a habit typed here becomes a row in Settings → Trackers, and a
+   reader is owed that sentence at the moment they are deciding whether to type
+   — not afterwards, from a Notice. */
+.ca-habits-note {
+  margin-top: var(--ca-space-2);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  line-height: 1.35;
+}
+
 /* A phone has no hover, so the pencil that trails the chips would never
    appear — and the chips would read as a static list rather than as the
    control they are. It rests visible there instead, which is the same answer

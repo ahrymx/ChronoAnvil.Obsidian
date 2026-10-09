@@ -50,8 +50,15 @@ import {
 import {
   describeDirective,
   isManagedTemplate,
+  noteSurfaceOf,
   surfacePathConfig,
 } from "../../trackers/entry-trackers";
+import {
+  habitsForSurface,
+  readHabitState,
+  type HabitRow,
+} from "../../trackers/habits";
+import { HabitsEditor } from "../habits-editor";
 import { locateEntry } from "../../diary/lineage";
 import { hasScaleNoteFor } from "../../journals/scale-notes";
 import { TagsEditor } from "../tags-editor";
@@ -192,12 +199,24 @@ export function buildCheckbox(
 }
 
 
+// NO × ON A CHIP, AND THAT IS A REVERSAL (1.0.49). Each chip used to carry the
+// cell's generic `attachTrackerRemove`, anchored to the chip and revealed on the
+// chip's own hover rather than the cell's. Two things retired it. The small one:
+// the `+` is pinned to the cell's top-right corner and the rightmost chip's ×
+// sits at the same corner, so the door and the delete overlapped — the reader saw
+// it immediately. The real one: a chip is now 14px and a row holds five or six of
+// them, which makes a hover-revealed 16px × a small target a pixel from the next
+// habit, on a control whose whole purpose is to be clicked by mistake-free habit.
+// Removal belongs where it can be read before it is taken: the Habits window
+// lists every habit on the entry with an × per row, and the reader asked for
+// exactly that — *"I dont think the individual habits need a 'x' to remove, so
+// perhaps just leave removing to the editor."* The chip keeps the one gesture it
+// is for, which is ticking.
 export function buildHabitChip(
   deps: EntryControlHost,
   cell: HTMLElement,
   def: TrackerDef,
   label: string,
-  directive: string,
   ctx: MarkdownPostProcessorContext
 ): void {
   const row = cell.querySelector(".ca-journal-habits-row");
@@ -210,7 +229,147 @@ export function buildHabitChip(
     chip.toggleClass("is-done", known === 1);
     chip.toggleClass("is-not-done", known === 0);
   });
-  attachTrackerRemove(deps, chip, directive, ctx);
+}
+
+
+// ── THE HABITS CELL'S DOOR, AND ITS OVERFLOW (1.0.49) ───────────────────
+//
+// What the cell was missing, in the order a reader meets it:
+//
+//   NO WAY IN. Every habit on an entry had to arrive through the generic
+//   "+ Add tracker" tile — a window about trackers in general, reached from the
+//   other end of the grid — while the Tags cell two cells away had "+ Add tags"
+//   written on it. The habit is the thing a reader came to the entry to tick,
+//   and it was the one cell with no verb on it.
+//
+//   NO WAY TO SEE WHAT DID NOT FIT. `.ca-journal-habits-row` is two rows tall
+//   and clips, so a tenth habit was not hidden, it was absent: no count, no
+//   scrollbar, nothing to press. The Tags cell answered the same question with
+//   `+N` in 1.0.46 and the fitter it did it with is now shared (see
+//   `fitChipRows`).
+//
+// Both are one element each at the end of the row, and both open the same
+// window — which is also what makes the collapse safe. A habit behind the `+7`
+// card is reachable, with its box, in the window's list; that is the reason the
+// window carries readings at all rather than only membership.
+//
+// CALLED ONCE, AFTER THE WHOLE FENCE IS WALKED, which is forced rather than
+// chosen: `buildHabitChip` runs per directive and these two have to come after
+// the last chip, and the fit cannot be measured until every chip is in. The
+// "+ Add tracker" tile is placed on the same argument one screen down in
+// `index.ts`.
+export interface HabitCellEntry {
+  def: TrackerDef;
+  // The note's line, verbatim, because it is what a remove has to match — a
+  // hand-written `tracker:Medication|Morning meds` is still that habit's line
+  // and rebuilding it from the id would hand the write a string the note does
+  // not contain.
+  directive: string;
+}
+
+export function finishHabitsCell(
+  deps: EntryControlHost,
+  cell: HTMLElement,
+  entries: readonly HabitCellEntry[],
+  ctx: MarkdownPostProcessorContext
+): void {
+  const row = cell.querySelector(".ca-journal-habits-row");
+  if (!(row instanceof HTMLElement)) return;
+
+  // READ AT THE MOMENT THE WINDOW OPENS, not when the cell was drawn. A chip
+  // ticked since the render has written a value the cell's own copy predates,
+  // and the window would then show the reading from before the tick — the same
+  // one-behind cache lag the Tags cell keeps a `known` list to dodge. Here
+  // there is nothing to keep: the thunk asks the question late.
+  const rowsNow = (): HabitRow[] =>
+    entries.map((e) => ({
+      id: e.def.id,
+      directive: e.directive,
+      label: e.def.label || e.def.id,
+      state: readHabitState(deps.currentValue(ctx, e.def.id)),
+    }));
+
+  const openWindow = (): void => {
+    const file = deps.fileOf(ctx);
+    if (!file) return;
+    const surface = noteSurfaceOf(deps.plugin.app, deps.plugin, ctx.sourcePath);
+    const before = rowsNow();
+    new HabitsEditor(
+      deps.plugin.app,
+      deps.plugin,
+      // The note's own folder, which is where `tagsInFolder` scopes its survey
+      // and for the same reason — the useful list when logging a Tuesday is
+      // what the rest of the week already tracks. `suggestionFolderFor` says
+      // nothing about tags; it is a note-to-folder rule, so it is shared.
+      suggestionFolderFor(file),
+      surface,
+      habitsForSurface(deps.plugin.settings.trackers, surface),
+      before,
+      async (draft) => {
+        await deps.plugin.entryTrackers.applyHabitDraft(
+          ctx.sourcePath,
+          before,
+          draft
+        );
+      }
+    ).open();
+  };
+
+  // The count of what did not fit. A button rather than a span: it is the only
+  // thing standing between a reader and the habits it is hiding.
+  const more = row.createEl("button", {
+    cls: "ca-journal-habits-overflow",
+    attr: { type: "button", "aria-label": "Show the habits that don't fit" },
+  });
+  more.addEventListener("click", openWindow);
+
+  // The door, ON THE CELL AND NOT IN THE ROW (1.0.49 follow-up).
+  //
+  // It went in at the end of the chip flow, beside the `+N`, and an entry whose
+  // two habits filled the row lost it: wrapped to a second line, cut by the
+  // row's own `overflow: hidden`, with the fitter satisfied because two rows is
+  // what it allows. Reported from the vault, and the arithmetic was never going
+  // to be the fix — a cell's two rows are as tall as the reader's font makes
+  // them and the cell's height is fixed, so there is a width at which the
+  // chips, the count and the door cannot all be in one box.
+  //
+  // So the door stops competing. It is a child of the CELL, pinned to its
+  // top-right corner by `85-tracker-controls.css` — the pattern the per-cell
+  // remove × already uses, and for the same reason: a control that acts on the
+  // whole cell does not belong in the flow of the cell's contents. It cannot be
+  // pushed off, it is not passed to `fitChipRows`, and the width it used to
+  // take goes back to the chips.
+  //
+  // On a managed template there is none — its tracker list is generated from
+  // Settings, so a control that edited it would be writing something the next
+  // sync deletes (`isManagedTemplate`). The overflow card stays: a template
+  // holding more habits than fit still has to say so.
+  const add = cell.createEl("button", {
+    cls: "ca-journal-habits-add",
+    attr: { type: "button", "aria-label": "Manage this entry's habits" },
+  });
+  setIcon(add.createSpan({ cls: "ca-journal-btn-icon" }), "plus");
+  if (isManagedTemplate(deps.plugin, ctx.sourcePath)) add.disabled = true;
+  else add.addEventListener("click", openWindow);
+
+  // ON A RESIZE, NOT ON A FRAME — the Tags cell's note applies unchanged: a
+  // `requestAnimationFrame` would answer once, for the width the cell happened
+  // to have when the note opened, and *Wide page*, a split pane and a rotated
+  // phone each change it.
+  const chipEls = Array.from(
+    row.querySelectorAll(".ca-journal-habit-chip")
+  ).filter((el): el is HTMLElement => el instanceof HTMLElement);
+  // THE `+N` IS THE ONLY THING LEFT TO PROTECT, which is the whole point of
+  // moving the door out: the fitter now keeps one element alive instead of two,
+  // and the one it keeps is the one the chips are hiding behind.
+  const fit = () => fitChipRows(row, chipEls, more);
+  if (typeof ResizeObserver === "undefined") {
+    fit();
+    return;
+  }
+  const watch = new ResizeObserver(fit);
+  watch.observe(row);
+  ctx.addChild(new ChipFit(cell, () => watch.disconnect()));
 }
 
 
@@ -563,15 +722,24 @@ export function buildTrackerAddCell(
 }
 
 
-// ── HOW MANY TAG CHIPS FIT, ASKED OF THE LAYOUT (1.0.46) ────────────────
+// ── HOW MANY CHIPS FIT, ASKED OF THE LAYOUT (1.0.46, SHARED 1.0.49) ─────
+//
+// TWO CELLS, ONE FITTER. This was written for the Tags cell and named for it;
+// the Habits cell has the same two-row box and had the other half of the
+// problem — `max-height: 40px; overflow: hidden` with nothing counting what it
+// ate, so a tenth habit simply was not there. The arithmetic does not care what
+// is in the chips, only that they wrap inside a centred box with one control
+// trailing them, so it is shared rather than copied: a second copy is how the
+// two cells would start disagreeing about what a row is.
 
-/** Rows of chips the cell has room for — `max-height: 40px` on
-    `.ca-journal-tags-chips`, in `94-native-tables.css`, expressed as rows. */
-const TAG_ROWS = 2;
+/** The DESIGN cap: no cell shows more than two rows of chips however much room
+    it is given. What a cell can actually show is a separate question and
+    `rowsVisible` measures it — see the note there. */
+const CHIP_ROWS = 2;
 
 /** How far apart two centres must be to be different rows. A chip is about
     17px tall, so half a row is the widest this can safely be. */
-const TAG_ROW_SLOP = 6;
+const CHIP_ROW_SLOP = 6;
 
 // Which rows a set of visible elements occupies.
 //
@@ -590,13 +758,60 @@ const TAG_ROW_SLOP = 6;
 // the centre is the thing that actually identifies a line. Sub-pixel heights
 // and the odd half-pixel baseline mean it has to be a proximity test rather
 // than an equality one.
-function tagRows(els: HTMLElement[]): number[] {
+function chipRows(els: HTMLElement[]): number[] {
   const rows: number[] = [];
   for (const el of els) {
     const mid = el.offsetTop + el.offsetHeight / 2;
-    if (!rows.some((r) => Math.abs(r - mid) <= TAG_ROW_SLOP)) rows.push(mid);
+    if (!rows.some((r) => Math.abs(r - mid) <= CHIP_ROW_SLOP)) rows.push(mid);
   }
   return rows;
+}
+
+// How many of those rows the box is actually tall enough to show.
+//
+// TWO IS A CAP, NOT A PROMISE, and conflating the two is what made the `+N`
+// vanish from the Habits cell. The fitter used to stop as soon as the chips
+// occupied two rows, because two rows was what the stylesheet's `max-height`
+// allowed — true while a chip's height was a constant the stylesheet also
+// chose. It is not: `.ca-journal-habits-row`'s cap is now `calc(100% - the
+// eyebrow)`, so the room is the reader's font size and the platform's doing,
+// and a habit chip carries a 40px tap-target floor on mobile. Under either, two
+// rows is a cap the box cannot honour, and a fitter that believed it would
+// leave the second row — the `+N` among it — behind `overflow: hidden`.
+//
+// So measure — and measure the two halves in the SAME units, which is the half
+// of this that shipped broken. The span of a row is taken from the distance
+// between two row centres, not from an element's own `offsetHeight`: a chip
+// wrapper is an inline box and reports the line-box height its font asks for
+// rather than the pill's, so a span read off one element and a limit read off
+// the box differ by a few pixels in opposite directions and the answer flips to
+// one row on nothing. The pitch includes the row gap, which errs toward showing
+// fewer rows — the safe direction, since the cost is a `+N` and the cost of the
+// other one is chips behind `overflow: hidden`.
+//
+// `clientHeight` is only the right limit because `.ca-journal-habits-row` and
+// `.ca-journal-tags-chips` are both `height: 100%` with the default shrink, so
+// it is the room the cell has left. A row sized by its content answers this
+// question with its own content's height, which is no answer at all.
+//
+// At least one row is always claimed: a box too short for even one chip is a
+// layout to fix, not a cell to empty. A box reporting no height is not
+// measurable — a detached node, a test stub with no layout — and the design cap
+// stands.
+function rowsVisible(chips: HTMLElement, els: HTMLElement[]): number {
+  const limit = chips.clientHeight;
+  if (!limit) return CHIP_ROWS;
+  const rows = chipRows(els);
+  if (rows.length === 0) return CHIP_ROWS;
+  const span =
+    rows.length > 1
+      ? rows[1] - rows[0]
+      : Math.max(...els.map((el) => el.offsetHeight));
+  let fit = 0;
+  for (const mid of rows) {
+    if (mid - rows[0] + span <= limit + CHIP_ROW_SLOP) fit += 1;
+  }
+  return Math.max(1, fit);
 }
 
 // Show the chips that fit in the cell, count the ones that do not.
@@ -611,36 +826,49 @@ function tagRows(els: HTMLElement[]): number[] {
 // below is "how many rows is this arrangement", asked of the arrangement it is
 // about.
 //
-// THE `+N` AND THE PENCIL ARE MEASURED WITH THE CHIPS. Both are in flow and
-// both sit at the end, so revealing the count can push it — or the pencil
-// behind it — onto a third row, where `overflow: hidden` eats it. The loop
-// gives back one chip at a time until the whole control lands, and stops at
-// none rather than spinning on a cell too narrow for any of it. The pencil
-// matters here in a way it did not under the old fixed cap of five: the rows
-// are now filled to the edge, so it is the thing most likely to fall off, and
-// it is the only hint that the readout is a button.
-export function fitTagChips(
+// WHATEVER ELSE IS IN THE FLOW IS MEASURED WITH THE CHIPS. The `+N` sits at the
+// end, so revealing it can push the control behind it onto a third row where
+// `overflow: hidden` eats it. The loop gives back one chip at a time until the
+// whole thing lands, and stops at none rather than spinning on a cell too
+// narrow for any of it. That mattered from the moment the fixed cap of five
+// went: the rows are now filled to the edge, so the last thing in flow is the
+// thing most likely to fall off.
+//
+// `trailing` IS OPTIONAL, AND THE HABITS CELL IS WHY (1.0.49 follow-up). Tags
+// passes its pencil, which is in flow after the chips. The Habits cell's `+`
+// was too, and it vanished on an entry whose two habits filled the row — the
+// reported defect. A control this function has to keep alive is a control one
+// long habit name can kill, so that one moved out of the flow to the cell's
+// corner and is not passed here at all: it cannot be pushed off something it is
+// not standing on. What is left to protect is the `+N`, which has to stay
+// reachable because it is the other door onto the window.
+export function fitChipRows(
   chips: HTMLElement,
   chipEls: HTMLElement[],
   more: HTMLElement,
-  pencil: HTMLElement
+  trailing?: HTMLElement
 ): void {
   if (!chips.isConnected) return;
 
   for (const c of chipEls) c.style.removeProperty("display");
   more.style.display = "none";
-  if (tagRows([...chipEls, pencil]).length <= TAG_ROWS) return;
+  const tail = trailing ? [trailing] : [];
+  // Measured with everything shown, which is the only arrangement in which
+  // every row exists to be measured. Both caps apply: the design's two, and
+  // however many the box can really display.
+  const cap = Math.min(CHIP_ROWS, rowsVisible(chips, [...chipEls, ...tail]));
+  if (chipRows([...chipEls, ...tail]).length <= cap) return;
 
   // A starting count from the full arrangement rather than one hide per tag
   // from the end: the chips are the same width whether or not the ones after
   // them are drawn, so the number that reach the second row is already known.
   // What is not known is whether the `+N` fits beside them, and that is what
   // the loop settles.
-  const rows = tagRows(chipEls);
-  const floor = rows[TAG_ROWS - 1] + TAG_ROW_SLOP;
+  const rows = chipRows(chipEls);
+  const floor = rows[cap - 1] + CHIP_ROW_SLOP;
   let shown = Math.min(
     chipEls.length,
-    rows.length <= TAG_ROWS
+    rows.length <= cap
       ? chipEls.length
       : chipEls.filter((c) => c.offsetTop + c.offsetHeight / 2 <= floor).length
   );
@@ -651,7 +879,9 @@ export function fitTagChips(
     }
     more.setText(`+${chipEls.length - shown}`);
     if (shown === 0) return;
-    if (tagRows([...chipEls.slice(0, shown), more, pencil]).length <= TAG_ROWS) {
+    if (
+      chipRows([...chipEls.slice(0, shown), more, ...tail]).length <= cap
+    ) {
       return;
     }
     shown -= 1;
@@ -731,10 +961,10 @@ function buildTagsField(
     ).open();
   };
 
-  // The observer behind `fitTagChips`, held so a repaint disposes of the one
+  // The observer behind `fitChipRows`, held so a repaint disposes of the one
   // watching the chips it is about to destroy.
   let watch: ResizeObserver | null = null;
-  ctx.addChild(new TagsFit(wrap, () => watch?.disconnect()));
+  ctx.addChild(new ChipFit(wrap, () => watch?.disconnect()));
 
   const paint = (): void => {
     wrap.empty();
@@ -778,7 +1008,7 @@ function buildTagsField(
     // with room for both beside it — reported from a daily entry, and the same
     // arithmetic hides three of eight on a phone.
     //
-    // So the chips all go in and `fitTagChips` hides the ones that did not
+    // So the chips all go in and `fitChipRows` hides the ones that did not
     // land, which is a question only layout can answer.
     const chipEls = tags.map((tag) =>
       chips.createSpan({ cls: "ca-journal-tags-chip", text: `#${tag}` })
@@ -803,7 +1033,7 @@ function buildTagsField(
     // HIDING A CHIP DOES NOT RESIZE THE BOX — it is `height: 100%` inside a
     // fixed cell — so there is no feedback loop to guard against. The previous
     // observer went at the top of `paint`, with the chips it was watching.
-    const fit = () => fitTagChips(chips, chipEls, more, pencil);
+    const fit = () => fitChipRows(chips, chipEls, more, pencil);
     if (typeof ResizeObserver === "undefined") fit();
     else {
       watch = new ResizeObserver(fit);
@@ -860,13 +1090,14 @@ export function buildTracker(
   }
 }
 
-// The unload hook behind the chips' `ResizeObserver`.
+// The unload hook behind either chip cell's `ResizeObserver` — Tags' and,
+// since 1.0.49, Habits'.
 //
 // A PLAIN OBJECT WOULD NOT DO: Obsidian unloads a block's children when the
 // block is rebuilt or the note is closed, and an observer left watching a
 // detached element is a reference the view cannot drop. `reveal.ts` gives the
 // same reason for its two.
-class TagsFit extends MarkdownRenderChild {
+class ChipFit extends MarkdownRenderChild {
   constructor(el: HTMLElement, private readonly stop: () => void) {
     super(el);
   }

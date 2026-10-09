@@ -7656,14 +7656,20 @@ describe("the tracker grid is editable per entry", () => {
     }
   });
 
-  it("reveals a habit chip's remove × per chip, not per cell", () => {
-    // The generic cell rule reveals .journal-tracker-remove on cell hover,
-    // which is right for a cell holding one tracker and wrong for this one:
-    // hovering anywhere in Habits would light up every × at once. The cell
-    // rule is cancelled and re-granted on the chip.
-    expect(css).toContain(".ca-journal-habit-chip:hover");
-    expect(css).toMatch(
-      /\.ca-journal-habits-cell:hover[\s\S]{0,120}\.ca-journal-tracker-remove\s*\{\s*opacity:\s*0;/
+  it("draws no remove × on a habit chip at all", () => {
+    // THE REVERSAL, 1.0.49. A chip used to carry the generic
+    // `.ca-journal-tracker-remove`, anchored to the chip and revealed on the
+    // chip's own hover rather than the cell's — hovering anywhere in Habits
+    // would otherwise have lit up every × at once. Both the anchor and the
+    // re-granted reveal are gone: the `+` door is pinned to the cell's
+    // top-right and the rightmost chip's × was at the same corner, and a 14px
+    // chip in a row of six is no place for a hover-revealed delete beside the
+    // next habit. Removal is the Habits window's, one × per row.
+    expect(css).not.toContain(
+      ".ca-journal-habits-cell .ca-journal-tracker-remove"
+    );
+    expect(css).not.toMatch(
+      /\.ca-journal-habit-chip:hover[\s\S]{0,80}\.ca-journal-tracker-remove/
     );
   });
 

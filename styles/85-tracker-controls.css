@@ -187,14 +187,62 @@
   justify-content: space-between;
   gap: 3px;
 }
+/* TWO ROWS OF CHIPS, AND THE ARITHMETIC THAT MAKES THEM FIT.
+
+   The reader asked for two lines of habits before the collapse, which the Tags
+   cell beside it already shows. It was never a fitter bug: a tracker cell is a
+   hard `--ca-tracker-cell-h` (66px) with a 1px border and 7px of padding, so
+   there are 50px of content box, and a habit chip was ~26px tall because its
+   text was `--ca-text-2xs` — a RELATIVE 0.7em that grows with the reader's font
+   — around a box of 1.15em. Two of those is 56px. No amount of measuring fits
+   56 into 50; the chips had to come down to the Tags chip's metrics, which are
+   absolute and which the reader has already accepted next door.
+
+   The budget, at a 16px base font:
+
+     content box                          50.0px
+     − eyebrow label  0.7em × 1.1         -11.0px
+     − the cell's own gap                  -3.0px
+     = the row's space                     36.0px
+     two chips 14.1px + a 2px row gap      30.2px   ✓
+
+   The chip is 11px rather than the Tags chip's 10px, which is the one number
+   here chosen by eye rather than by subtraction: 10px with no vertical padding
+   read as cramped next to the tag chips, and the row has the 6px. It is spent
+   up to the point where there is still about 6px in hand, because the last two
+   rounds of this were both lost to a budget with a pixel or two of slack.
+
+   THIS RULE AND THE LABEL'S line-height ARE ONE DECISION. The label's is pinned
+   because the inherited one (~1.5) spends 16.8px of the 50 on a single line of
+   11px uppercase text — a third of the cell for one word. 1.1 rather than 1: a
+   tracker label may lead with an emoji, and the label clips its overflow.
+
+   8px of headroom, and the first cut had 1.7px, which was not a margin but a
+   coincidence waiting to be a bug report — it was one. The row must also have a
+   HEIGHT rather than a `max-height`, and that is the other half of the same
+   fix: `height: 100%` with the default shrink hands it exactly the leftover
+   after the label, which is what `fitChipRows` needs to read. Sized by its
+   content instead, the row reports how tall the chips ALREADY made it, and a
+   fitter asking "is there room for a second row" gets back "there is as much
+   room as you are using" — a circular answer that tips to one row on a couple
+   of pixels. `.ca-journal-tags-chips` has had `height: 100%` all along, which is
+   why the Tags cell beside this one never had the problem.
+
+   Far enough into a large reading font the label still wins and one row is all
+   there is. That is not a clipped layout: `fitChipRows` counts the rows the box
+   can really show and puts the `+N` on the last visible one. Mobile is the same
+   story on purpose — a habit chip is a tap target and keeps its 40px floor from
+   `00-tokens.css`, so a phone shows one row and an honest count. */
 .ca-journal-habits-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   align-content: flex-start;
-  gap: 4px 5px;
+  gap: 2px 5px;
   max-width: 100%;
-  max-height: 40px;
+  /* The leftover, not the content — see the note above. */
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -217,14 +265,35 @@
   gap: 4px;
   min-width: 0;
   max-width: 100%;
-  padding: 2px 6px;
+  /* WHY NONE OF THE SIZING BELOW HAD EVER SIZED THIS CHIP. A habit chip is a
+     `<button>` and a tag chip is a `<span>`, and THAT — not the font — is the
+     difference between the two cells. Obsidian gives a `<button>` an explicit
+     `height: var(--input-height)` (30px), which no padding, font-size or
+     line-height here can reach; the whole rule was decorative and every habit
+     chip was app-control height. `30-header-bars.css` records the same trap on
+     the reveal toggle: *"the padding was decorative and the row was app-control
+     height"*. Two 30px chips are 62px against the 36px this cell has to give,
+     which is why the second row was unfittable by arithmetic nobody could see.
+     `auto` is what makes the rest of this rule mean anything.
+
+     `min-height: 0` goes with it, and the mobile list in `00-tokens.css` puts
+     it back to 40px with a higher specificity on purpose: a habit chip is a tap
+     target, so a phone keeps the floor and shows one row. */
+  height: auto;
+  min-height: 0;
+  padding: 0 6px;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--ca-radius-pill);
   background: var(--background-primary);
   box-shadow: none;
   color: var(--text-muted);
-  font-size: var(--ca-text-2xs);
-  line-height: 1.2;
+  /* ABSOLUTE, and that is the whole point — see the budget above the row.
+     `--ca-text-2xs` is 0.7em, so the chip used to grow with the reader's base
+     font and two of them stopped fitting the fixed-height cell at exactly the
+     sizes where the reader most wants the second line. 10px/1.15 is what
+     `.ca-journal-tags-chip` has shipped at all along. */
+  font-size: 11px;
+  line-height: 1.1;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
@@ -261,48 +330,122 @@
   text-decoration-thickness: 1px;
 }
 
-/* Per-chip removal. The generic cell rule already positions
-   .ca-journal-tracker-remove absolutely and hides it until hover — but the cell
-   here holds many trackers, so the anchor is the chip and the reveal is the
-   chip's own hover, or every × in the cell would light up at once. */
-.ca-journal-tracker-bar .ca-journal-habits-cell .ca-journal-tracker-remove {
-  top: -6px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
+/* ── The row's two end controls (1.0.49) ─────────────────────────────────
+
+   The cell had no verb on it and no account of what it was hiding: the row is
+   two rows tall and clips, so a tenth habit was absent rather than hidden. Both
+   are one element at the end of the flow, measured with the chips by
+   `fitChipRows` — which is why neither may be absolutely positioned or floated
+   out of the row. The fitter asks the layout how many rows the whole
+   arrangement occupies, and a control taken out of flow is one it cannot see
+   falling off the bottom. */
+
+/* The count of what did not fit, wearing the accent so it reads as the one
+   thing in the row that is not a habit. Shape and colour borrowed deliberately
+   from `.ca-journal-tags-overflow` — two cells in one grid collapsing the same
+   way should collapse into the same object. */
+.ca-journal-habits-overflow {
+  flex: 0 0 auto;
+  /* A `<button>` too, and the same 30px it would otherwise be — see the chip.
+     The count rides the chips' row, so one un-reset button here is enough to
+     make that row app-control height and cost the cell its second one. */
+  height: auto;
+  min-height: 0;
+  /* THE CHIP'S METRICS EXACTLY, because this rides the chips' row and the
+     tallest thing on a row sets that row's height — a `+N` a few pixels taller
+     than the chips beside it spends the cell's headroom on itself. */
+  padding: 0 6px;
+  border: 1px solid transparent;
   border-radius: var(--ca-radius-pill);
-  background: var(--background-secondary);
-  box-shadow: 0 0 0 1px var(--background-modifier-border);
+  background: var(--interactive-accent);
+  box-shadow: none;
+  color: var(--text-on-accent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
 }
-.ca-journal-tracker-bar .ca-journal-habits-cell .ca-journal-tracker-remove .svg-icon {
-  width: 10px;
-  height: 10px;
+
+/* The door. A `+` and nothing else: the cell is already titled HABITS, and
+   "+ Add habit" beside two chips would be the widest thing in a cell whose
+   whole problem was running out of room.
+
+   OUT OF THE FLOW, PINNED TO THE CELL'S CORNER, which is the fix for the defect
+   it shipped with. It went in at the end of the chip row and an entry whose two
+   habits filled that row lost it — wrapped to a second line and cut by the
+   row's `overflow: hidden`. No amount of fitting arithmetic closes that: the
+   cell's height is fixed, two rows of chips are as tall as the reader's font
+   makes them, and there is a width at which the chips, the count and the door
+   cannot all be in one box. A control that acts on the whole cell belongs on
+   the cell, which is what `.ca-journal-tracker-remove` has always done one rule
+   down. The chips get the width back.
+
+   ON THE EYEBROW'S LINE, where there is nothing: the label is short, left
+   aligned and `flex: 0 0 auto`, so the top-right corner of a Habits cell is
+   empty by construction.
+
+   AND BIGGER THAN IT WAS — 16px with a 10px glyph next to chips twice that tall
+   read as a speck. It is now the size of a chip, which is the thing it is
+   offering to add one of. */
+.ca-journal-habits-add {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: var(--ca-rule-hair) dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: var(--ca-surface-inset);
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
-/* Cancel the cell-wide reveal, then re-grant it per chip. */
-.ca-journal-tracker-bar
-  .ca-journal-habits-cell:hover
-  .ca-journal-habit-chip
-  .ca-journal-tracker-remove {
-  opacity: 0;
+.ca-journal-habits-add .svg-icon {
+  width: 14px;
+  height: 14px;
 }
-.ca-journal-tracker-bar
-  .ca-journal-habits-cell
-  .ca-journal-habit-chip:hover
-  .ca-journal-tracker-remove,
-.ca-journal-tracker-bar
-  .ca-journal-habits-cell
-  .ca-journal-habit-chip
-  .ca-journal-tracker-remove:focus-visible {
-  opacity: 1;
+.ca-journal-habits-add:hover,
+.ca-journal-habits-add:focus-visible {
+  border-style: solid;
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+  background: var(--ca-surface-raised);
 }
-@media (hover: none) {
-  .ca-journal-tracker-bar
-    .ca-journal-habits-cell
-    .ca-journal-habit-chip
-    .ca-journal-tracker-remove {
-    opacity: 0.45;
-  }
+/* The cell's own hover tint is what the button sits on, so it follows it
+   rather than staying a lighter patch when the cell lifts. */
+.ca-journal-tracker-bar .ca-journal-tracker-cell:hover .ca-journal-habits-add {
+  background: var(--ca-surface-raised);
 }
+/* A cell with a pinned control keeps its label clear of it, or a long habit
+   group name would run under the `+`. */
+/* The second half of the row's budget; the note above the row has the sum. */
+.ca-journal-habits-cell > .ca-journal-widget-label {
+  padding-right: 24px;
+  line-height: 1.1;
+}
+/* An entry template's tracker list is generated from Settings, so the control
+   is drawn and refused rather than hidden — the row still has to end in the
+   element the fitter measures. */
+.ca-journal-habits-add:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* NO × ON A HABIT CHIP (1.0.49), so the five rules that positioned and revealed
+   one are gone with it. They anchored the generic `.ca-journal-tracker-remove`
+   to the chip and swapped the cell-wide hover for the chip's own, which worked
+   — and then the `+` door was pinned to the cell's top-right corner, where the
+   rightmost chip's × already was. The overlap is what the reader saw; the
+   argument against it is that a 14px chip in a row of six is no place for a
+   hover-revealed 16px delete a pixel from the next habit. Removal is the Habits
+   window's, one × per row, where it can be read before it is taken. The chip
+   keeps the gesture it exists for. See `buildHabitChip`. */
 
 /* ── Derived value chip (Sleep, when shown as a bare tracker) ───────────── */
 .ca-journal-derived-chip {

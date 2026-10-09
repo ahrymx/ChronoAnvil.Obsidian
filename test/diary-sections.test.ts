@@ -1330,3 +1330,36 @@ describe("every cell of a composed row can be taken back out of it", () => {
     expect(next).toContain("header:📖 Inside this week\nentry-rollup");
   });
 });
+
+// ── THE MONTHLY ROLLUP READS THE WEEKS (1.0.48) ──────────────────────────
+//
+// THE BUG THIS IS THE GATE FOR. *"the diary section 'what the entries said'
+// does not look correct on the monthly overview dashboard, where it shows the
+// days for the entire month but should show the week grains."*
+//
+// The fix is not in this file — `rollupGrainOf` reads a bare directive as one
+// rung below the host note's period, and the registry declares a week's fields
+// rollupable. What IS in this file is the half that can silently undo it: the
+// month gathers weeks only because the line it composes is BARE. A later patch
+// writing `entry-rollup:day` here for clarity, or `entry-rollup:week` for
+// symmetry with the quarter, would in the first case revert the fix and in the
+// second leave every monthly dashboard already in a vault behind — a repair is
+// additive at the section level and never rewrites the lines of a section a note
+// already has.
+describe("the grain a composed dashboard asks its rollup for", () => {
+  it("is unstated on a week and a month, so the host note decides it", () => {
+    for (const grain of ["weekly", "monthly"] as const) {
+      const text = composeDiaryDashboard(grain);
+      expect(text, grain).toMatch(/^entry-rollup$/m);
+      expect(text, grain).not.toContain("entry-rollup:");
+    }
+  });
+
+  it("and is spelled out on a quarter, which is where it always was", () => {
+    // `:month` PREDATES THE DERIVED DEFAULT AND OUTLIVES IT. The default gives
+    // the same answer now, so this argument is redundant — and it stays, because
+    // every quarterly dashboard in every vault carries it and taking it out is a
+    // rewrite of a line nothing is wrong with.
+    expect(composeDiaryDashboard("quarterly")).toContain("entry-rollup:month");
+  });
+});

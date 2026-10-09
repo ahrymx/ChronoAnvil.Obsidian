@@ -722,6 +722,21 @@ export const DIARY_SECTIONS: DiarySection[] = [
           : {
               fence: "chronoanvil",
               lines: [
+                // ── BARE, AND THAT IS THE GRAIN ANSWER (1.0.48) ───────
+                //
+                // *"it shows the days for the entire month but should show the
+                // week grains."* A week composes this bare and gathers days; a
+                // month composes the SAME LINE and gathers weeks. That is not
+                // an omission — `rollupGrainOf` reads a bare directive as one
+                // rung below the host note's period, so the line says "whatever
+                // is under the page I am on" and the page says which.
+                //
+                // WRITING `:week` HERE WOULD HAVE FIXED NEW VAULTS ONLY. A
+                // repair is additive at the section level: it inserts a section
+                // a note lacks and never rewrites the lines of one it has, so
+                // every monthly dashboard already in a vault would have kept
+                // its bare line and kept gathering days. The full argument is on
+                // `RUNG_BELOW` in `entry-rollup.ts`.
                 ...(opts?.form === WIDGET_FORM ? [] : [rollupBar(ctx)]),
                 "entry-rollup",
               ],

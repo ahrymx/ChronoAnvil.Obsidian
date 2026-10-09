@@ -1184,6 +1184,89 @@ export async function removeDirectiveFromNote(
   return { removed: true, keptProperties };
 }
 
+// ── A BATCH OF DIRECTIVE EDITS, AS ONE NOTE WRITE (1.0.49) ───────────────
+//
+// The two functions above are the right shape for the two controls that have
+// always existed: a "+ Add tracker" tile adds one directive, a chip's × removes
+// one. The Habits window is the first caller that decides SEVERAL at once —
+// four habits ticked on, one taken off, all behind one Save — and running the
+// per-directive paths in a loop would be four reads of the same file, four
+// `vault.modify` calls and four Notices for one gesture, with every
+// intermediate state of the note observable by the renderer.
+//
+// So the arithmetic is one pure pass over one `lines` array, and the write is
+// one. `added` and `removed` are the directives that actually MOVED: a line
+// already present is not added twice (`insertTrackerDirective` dedupes against
+// the whole note) and one that was never there is not reported as removed, so
+// the caller can say what happened rather than what was asked for.
+//
+// A DIRECTIVE ON BOTH LISTS CANCELS, and the alternative is a defect rather
+// than a style. A reader who unticks a habit and then picks it straight back
+// out of the cloud hands this an identical string twice; honouring both leaves
+// the note's text exactly as it was — so nothing is written — while the report
+// claims the habit both arrived and left, and the housekeeping below then seeds
+// its property blank and immediately prunes the blank it just seeded. The habit
+// would still be on the entry with its reading deleted. Cancelling first is one
+// line and the two lists then describe real movement.
+export interface DirectiveEdits {
+  add: readonly string[];
+  remove: readonly string[];
+}
+
+export function planDirectiveEdits(
+  lines: string[],
+  edits: DirectiveEdits
+): { lines: string[]; added: string[]; removed: string[] } {
+  let next = lines;
+  const removed: string[] = [];
+  const added: string[] = [];
+  const asked = new Set(edits.add.map((d) => d.trim()));
+  const drops = edits.remove.filter((d) => !asked.has(d.trim()));
+  const kept = new Set(edits.remove.map((d) => d.trim()));
+  const grows = edits.add.filter((d) => !kept.has(d.trim()));
+  for (const d of drops) {
+    const cut = removeTrackerDirective(next, d);
+    if (cut) {
+      next = cut;
+      removed.push(d.trim());
+    }
+  }
+  for (const d of grows) {
+    const grown = insertTrackerDirective(next, d);
+    if (grown) {
+      next = grown;
+      added.push(d.trim());
+    }
+  }
+  return { lines: next, added, removed };
+}
+
+// The same, against the note on disk, with the property housekeeping the
+// single-directive paths do: a seed for each directive that arrived, a prune
+// for each that left. `keptProperties` is what a prune declined to delete
+// because it held a reading — the caller reports it, for the reason
+// `removeDirectiveFromNote` states: removing a widget must never look like it
+// removed a measurement.
+export async function applyDirectiveEdits(
+  app: App,
+  plugin: ChronoAnvilPlugin,
+  notePath: string,
+  edits: DirectiveEdits
+): Promise<{ added: string[]; removed: string[]; keptProperties: string[] }> {
+  let plan: { added: string[]; removed: string[] } = { added: [], removed: [] };
+  await editNote(app, notePath, (lines) => {
+    const out = planDirectiveEdits(lines, edits);
+    plan = { added: out.added, removed: out.removed };
+    return out.lines === lines ? null : out.lines;
+  });
+  for (const d of plan.added) await seedProperties(app, plugin, notePath, d);
+  const keptProperties: string[] = [];
+  for (const d of plan.removed) {
+    keptProperties.push(...(await pruneProperties(app, plugin, notePath, d)));
+  }
+  return { ...plan, keptProperties };
+}
+
 // A class template's tracker region is generated from Settings on every sync,
 // so a hand-added directive there would silently vanish on the next settings
 // change. Editing it per-note is therefore refused rather than half-supported

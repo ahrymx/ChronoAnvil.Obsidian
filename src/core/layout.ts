@@ -276,7 +276,7 @@ export interface AssetUnit {
 //
 // `header:` is not a unit. It repeats within a note, so it is not a unique key
 // — but it is never independent either: it sits in the same fence as the
-// directive it titles (`header:📖 What the days said` + `entry-rollup`) or in
+// directive it titles (`header:📖 What the entries said` + `entry-rollup`) or in
 // the fence immediately before it (`header:⏳ Open tasks`, then
 // `tasks-table:,period`). So it is an *attribute of the block it titles*, and
 // keying the content directive alone is enough. A header-only fence is held

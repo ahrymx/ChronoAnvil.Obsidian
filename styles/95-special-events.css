@@ -2333,6 +2333,39 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   text-decoration: none !important;
   cursor: pointer;
 }
+/* ── AND 42px WAS THE DAY'S WIDTH, NOT EVERY GRAIN'S (1.0.48) ─────────
+
+   The rule above is right and was measured against one kind of date. A day
+   draws "7" + "Mon" and fits; a month drew "Aug" + "2026" into the same 42px,
+   and because the column is `justify-content: flex-end` the overflow was cut
+   off the FRONT — so a quarter's rollup read "g 2026" and "p 2026", the tails
+   of two month names, which looks like a broken glyph rather than a narrow box.
+
+   THE WIDTH IS STILL FIXED AND STILL ONE PER LIST. Every row inside a single
+   rollup is the same grain — the widget gathers one kind of entry — so a width
+   chosen per grain keeps the text column's left edge as straight as it ever
+   was. The root wears the grain as a state class (`GRAIN_CLASS`, entry-rollup.ts)
+   so the sheet can say this once rather than the view carrying inline widths.
+
+   THE WEEK STACKS INSTEAD OF WIDENING. "28–4" beside "Sep–Oct" is 70-odd
+   pixels of a 320px cell, and that cell is the reading surface — so the span
+   sits over its month rather than beside it. It also reads better: two lines is
+   visibly a PERIOD, where one line of "7 Sep" was what made the first shipped
+   form look like a daily row that had lost its weekday. */
+.ca-jer-rollup.is-weekly .ca-jer-date {
+  width: 48px;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 0;
+  line-height: 1.25;
+}
+/* Just the month name, so the column shrinks rather than grows. The year it
+   used to carry could not vary inside one of these lists and the head above
+   already names the period. */
+.ca-jer-rollup.is-monthly .ca-jer-date {
+  width: 34px;
+}
 .ca-jer-date:hover .ca-jer-date-day {
   color: var(--ca-area-diary);
 }

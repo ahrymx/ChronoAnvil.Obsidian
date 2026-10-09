@@ -135,7 +135,7 @@ Directives:
 - `journal-recent[:<folder>|<N>]` — the notes you wrote most recently, newest first, with where each one lives. The folder is a journal folder or `all` for every journal; `N` is how many (the default is eight). The two are joined with a bar — `journal-recent:Study|4`.
 - `journals-header[:<journal>]` — the hero band on its own, for putting the numbers on another dashboard: at-a-glance numbers (active days, current and longest streak, open tasks) over a 53-week activity strip. Bare it covers *every* enabled journal at once, which is what it has always meant; name a journal and it covers that one, which is what each journal's own dashboard does — a band of the whole vault's figures under one journal's name is a plausible number about something else. `journals-header:all` is bare said out loud, and is what the sections editor writes when you pick **Every journal**. Unlike `activity-chart` it is a fixed window with no navigation and no day numbers — it answers "have I kept this up?" at a glance rather than being browsed — but it shares the same four-shade scale, so a colour means the same amount of work in both. A day with a note behind it opens that note, and the strip repaints as notes are added under any journal root. Renders nothing at all when no journals are enabled.
 - `tag-index[:<folder>]` — a table of tags, most-used first, counted under `<folder>`. The folder is optional and defaults to **the host note's own folder**, the same rule `tasks-table`, `review-queue` and `journal-search` follow — so a bare `tag-index` on a Subject Index covers every topic beneath it. Where the scope spans more than one folder, each row also names its **sources** — the first folder beneath the scope its notes live in, so a table over your journals root says which journal each tag came from. With one source, or none, that column isn't drawn. Available as the **Tags** section on the homepage, on journal index notes, and on the weekly, monthly, quarterly and yearly dashboards, where it is offered rather than added for you and writes the diary root out as its folder (the dashboards' own folders hold period notes, not tagged ones). Click a tag to search the **whole vault** for it; expand a row to see the notes counted in scope.
-- `entry-rollup[:day|:month]` — **What the entries said**: each entry inside the host dashboard's period that wrote something, oldest first, with its focus (and highlights and challenges, where the entry logged them). Bare gathers **days**; `entry-rollup:month` gathers **monthly entries**, which is what a Quarterly dashboard wants. Scoped by the host note's `week-start` / `month-start` / `quarter-start` property — put it on a note without one and it says so rather than guessing a window. Ships on the Weekly and Monthly dashboards and is offered on the Quarterly one, where it overlaps the Recap.
+- `entry-rollup[:day|:week|:month]` — **What the entries said**: each entry **one rung under** the host dashboard's period that wrote something, oldest first, with its focus (and highlights, challenges and goals, where the entry logged them). A Weekly dashboard gathers its **days**, a Monthly one its **weeks**, a Quarterly one its **months** — you do not have to say which, because the bare directive means "whatever is under the page I am on". Add an argument to override it: `entry-rollup:day` on a Monthly dashboard lists all thirty-one days instead of the four or five weeks. Scoped by the host note's `week-start` / `month-start` / `quarter-start` property — put it on a note without one and it says so rather than guessing a window. Ships on the Weekly and Monthly dashboards and on the Quarterly one, where it overlaps the Recap.
 - `tasks-table[:<folder>]` — the "Open Tasks" rollup: every still-open ChronoAnvil task from notes under `<folder>` (optional, defaults to the host note's own folder), grouped by source note with the note title linked. Tick a checkbox to complete a task in place; edit its text/priority/due in the source note's own Tasks field. Used on the Weekly, Monthly, Staging and Subject dashboards. It also accepts **`./` — the whole vault**, which is the only way to say that from a note that isn't at the top of one, since empty means the *host's* folder; the section editor offers it by name. On the **homepage** the two are the same thing, because the homepage's own folder is the vault root — bare `tasks-table` there means every note you have. Replaces the old Tasks-plugin `` ```tasks `` query blocks.
 
 All of the above read note metadata directly through Obsidian's own cache, so none of them need Dataview.
@@ -213,9 +213,40 @@ a scale takes a range and its faces.
 boolean on a note folds into a single cell titled **Habits**, each becoming a
 named chip inside it (a small box plus the tracker's label). Ten habits cost
 the grid one cell rather than ten, and the chips wrap. A chip cycles
-unset → done → not-done → unset just as the standalone checkbox does, and each
-carries its own **×** for taking that habit off this note. Nothing about the
-note changes: it's still one `tracker:<id>` line per habit.
+unset → done → not-done → unset just as the standalone checkbox does, and that
+is the only thing a chip does — taking a habit off the note is the **×** beside
+its row in the Habits window, where you can see what you're removing first.
+Nothing about the note changes: it's still one `tracker:<id>` line per habit.
+
+The chips wrap over **two rows**, and the ones that don't fit collapse into a
+**+N** card — they are not gone, and that card is one of the two doors into the
+Habits window. (Two rows is what the cell has room for; at a large reading font,
+and on a phone where a chip is sized to be tapped, it holds one and the **+N**
+accounts for the rest.) The
+other is the **+** in the cell's top-right corner, which sits beside the HABITS
+label rather than in the row so that no number or length of habit names can
+push it out of view.
+
+In the window — the Tags window's shape, for the same reason: each habit has
+its **box** (the same unset → done → not-done cycle, so the habits behind the
++N card are still tickable), can be **renamed** (pencil) or **removed from this
+entry** (×); an add box takes a new one; and below that is every habit the
+registry holds, as pills you can tap to put on this entry or take off, each
+with a count of how many notes **in this note's own folder** have logged it
+done. Two differences from Tags worth knowing:
+
+- **Renaming renames it everywhere.** A habit's name is its registry label, so
+  the pencil changes it in Settings → Trackers, on every entry, and in the
+  `Diary.base` column header.
+- **A new name defines a habit.** Typing one that doesn't exist creates a
+  boolean tracker in Settings → Trackers — surface set to this note's,
+  **not** added to the template, with a `Diary.base` column — and puts it on
+  this entry. Existing entries are untouched. Typing a name that already is a
+  habit adds that one rather than defining a second with the same label.
+
+Nothing is written until you press Save, Cancel included: the whole thing — the
+ticks, the renames, the habits defined, what came on and off the entry — is one
+write at the end.
 
 ### Tracker surfaces
 
@@ -306,8 +337,10 @@ onto every new entry by default, because "+ Add tracker" is the gesture for a
 thing that happened *today*. Turn that on in Settings if you want it everywhere.
 
 Each cell also carries a small **×** in its corner — hover a cell, or focus the
-button — which takes that module off this note again (a habit chip carries its
-own). Removing a widget **never removes a reading**: a property you've already
+button — which takes that module off this note again. The Habits cell is the one
+exception: it holds many trackers at once, so removal lives in the Habits window
+(the **+** in its corner) with an × per habit. Removing a widget **never removes
+a reading**: a property you've already
 logged into is kept and you're told so; only untouched keys are pruned.
 
 The surface and the "on every new entry" switch are separate questions, and it

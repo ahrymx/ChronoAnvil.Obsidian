@@ -5,6 +5,96 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.49] - 2026-10-09
+
+### Added
+
+- **The Habits cell has a window of its own, and a way in.** Every yes/no
+  tracker on a note folds into one cell titled **Habits**, and that cell was the
+  only one on the grid with no verb on it: a new habit had to arrive through the
+  generic *+ Add tracker* tile at the other end of the row, while the Tags cell
+  two cells away said *+ Add tags* on itself. There is now a **+** in the
+  cell's top-right corner, and it opens a window shaped like the Tags one —
+  every habit on the entry with its box, a pencil to rename it, an × to take it
+  off, a box to add one, and below that every habit already used elsewhere in
+  the folder with a count. Everything you change is **one write** when you
+  save, and you are told what moved.
+- **Typing a name that doesn't exist defines the habit.** It becomes a yes/no
+  tracker in Settings and goes onto the entry in the same save, rather than
+  sending you to Settings and back. Typing one that already exists — in any
+  letter case — joins that habit instead of defining a second with the same
+  name.
+- **Renaming a habit renames it everywhere.** The name on a chip is the
+  tracker's own, so the pencil reaches every entry that carries it and the
+  **Diary.base** column as well, not just the note you are looking at.
+- **Habits that don't fit collapse into a +N card rather than vanishing.** The
+  chip row clips, so a tenth habit used to be absent — no count, no scrollbar,
+  nothing to press. The card is the second door into the window, and the window
+  carries each habit's reading as well as its name, so a habit behind the count
+  can still be ticked.
+
+### Changed
+
+- **The chip row holds two lines of habits.** It held one, and the second line
+  is what the cell has room for once the chips are sized to the cell rather
+  than to your reading font. On a phone, and at a large reading font, it holds
+  one line and the **+N** accounts for the rest — the count is placed by
+  measuring what the cell can actually show rather than by assuming.
+- **A habit chip no longer carries its own ×.** Removal is the window's, one
+  per row, where you can read what you are taking off before it goes. The chips
+  are small and sit shoulder to shoulder, and the delete was a hover-revealed
+  target a pixel from the next habit — on the one control in the cell meant to
+  be clicked freely. Habits is now the only tracker cell without a corner ×.
+
+### Fixed
+
+- **A habit chip was app-control height, and nothing in its own styling could
+  change that.** Obsidian gives every `<button>` an explicit height, so the
+  chip's padding and text size had never sized it — two chips were taller than
+  the cell whatever those numbers said, which is why the second line of habits
+  was impossible rather than merely tight.
+
+## [1.0.48] - 2026-09-30
+
+### Fixed
+
+- **A Monthly Overview's *What the entries said* listed every day of the
+  month.** It should have listed the weeks. The rollup is the section you write
+  a review from, and the ladder it reads has one rung per grain — a week is
+  written from its days, a quarter from its months — but a month was reaching
+  two rungs down and gathering all thirty-one days, so the page you write a
+  month on was a list of the month rather than a review of it. A bare
+  `entry-rollup` now means *whatever is one rung under the page I am on*: days
+  on a Weekly dashboard, **weeks on a Monthly one**, months on a Quarterly one.
+  Every monthly dashboard already in your vault is fixed without being
+  rewritten, because the line in it did not have to change.
+- **A week's own writing reached nothing.** The registry declared every weekly
+  field as rolling up nowhere, on an argument about what sits *above* a week
+  that was applied one rung too far. A week's theme, highlights, challenges and
+  goals now gather into the month the same way a month's gather into the
+  quarter — so the four or five rows a Monthly Overview draws have something in
+  them.
+- **A weekly rollup would have gone stale as you wrote.** The widget watches one
+  folder and repaints when a file in it changes, and the folder was chosen by a
+  branch that knew two grains: anything that was not a month watched the *daily*
+  entries. A week's focus written underneath the rollup would not have appeared
+  until the note was reopened.
+- **A quarter's rollup showed `g 2026` and `p 2026`.** Those were "Aug" and
+  "Sep" with their fronts cut off. The date column is a fixed 42px so that every
+  line of text in the list starts on one edge, it was measured against a day's
+  `7` + `Mon`, and its overflow is clipped from the front — so a month name in
+  it lost everything but its last letter. A month's row is now the month name
+  alone: the year could never differ between rows of one list, and dropping it
+  is what makes room for the name.
+- **A week's row named one day of the week.** It said `7 Sep`, which is the
+  week's start date, so four rows under a *September 2026* heading read as a
+  list of Mondays. A row now says which days it covers — `7–13 Sep`, and
+  `28–4 Sep–Oct` for the week that crosses into the next month.
+
+- **Wanting the days back is one word.** `entry-rollup:day` on a Monthly
+  dashboard lists all thirty-one days, which is what it did before this release
+  and is now something you can ask for rather than the only thing on offer.
+
 ## [1.0.47] - 2026-09-28
 
 ### Fixed

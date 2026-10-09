@@ -10,6 +10,7 @@ import type ChronoAnvilPlugin from "../main";
 import { promptChoice } from "../ui/modals";
 import {
   addDirectiveToNote,
+  applyDirectiveEdits,
   describeDirective,
   describeSurfaceMismatch,
   directiveAllowedOn,
@@ -39,6 +40,8 @@ import { normalizeTrackers } from "./trackers";
 // no reason to know charts exist.
 import { syncTrackersIntoVault } from "./trackers";
 import { notify } from "../core/notify";
+import { habitWrites, type HabitDraft, type HabitRow } from "./habits";
+import { getFile } from "../core/util";
 
 // Drives the per-note tracker flows behind the "+ Add tracker" tile and the
 // per-cell remove button. The counterpart of charts-manager.ts, and the same
@@ -233,6 +236,102 @@ export class EntryTrackers {
     await syncTrackersIntoVault(this.app, this.plugin);
     notify.ok(`Created ${describeNewTracker(this.plugin, def)}.`);
     return trackerDirective(def.id);
+  }
+
+  // ── THE HABITS WINDOW'S ONE WRITE (1.0.49) ────────────────────────────
+  //
+  // `HabitsEditor` holds a draft and this applies it. Everything the window
+  // can change is in that draft and all of it lands here, in this order and
+  // for these reasons:
+  //
+  //   1. THE REGISTRY FIRST. A habit typed into the window does not exist yet,
+  //      and a directive naming a tracker the registry has never heard of
+  //      renders as "Unknown tracker". So new rows are defined and renames
+  //      applied before the note is touched, through the settings tab's own
+  //      write — push, normalize, save, sync — for the reason
+  //      `createAndDirective` gives one screen up: anything less would make a
+  //      habit created from a note a second-class one, present on the entry and
+  //      absent from the column list.
+  //
+  //   2. THEN THE NOTE'S MEMBERSHIP, as ONE edit. `applyDirectiveEdits` does
+  //      the whole batch in a single read-modify-write with the property
+  //      seeding and pruning the single-directive paths do.
+  //
+  //   3. THEN THE READINGS, in one frontmatter transaction, and only the ones
+  //      that changed (`habitWrites`). After the seeding, so a habit that
+  //      arrived ticked is written over its own blank rather than under it.
+  //
+  // ONE NOTICE AT THE END, counting what actually moved. Four habits behind one
+  // Save is one gesture, and four notices for it is the thing a reader reads as
+  // a bug.
+  async applyHabitDraft(
+    notePath: string,
+    before: readonly HabitRow[],
+    draft: HabitDraft
+  ): Promise<void> {
+    if (isManagedTemplate(this.plugin, notePath)) return warnManagedTemplate();
+
+    const renames = Object.entries(draft.renamed);
+    if (draft.created.length > 0 || renames.length > 0) {
+      const named = new Map(renames);
+      this.plugin.settings.trackers = normalizeTrackers(
+        [...this.plugin.settings.trackers, ...draft.created].map((t) => {
+          const next = named.get(t.id);
+          return next == null ? t : { ...t, label: next };
+        }),
+        this.plugin.settings.sleepEnabled
+      );
+      await this.plugin.saveSettings();
+      await syncTrackersIntoVault(this.app, this.plugin);
+    }
+
+    const { add, remove, values } = habitWrites(before, draft);
+    const { added, removed, keptProperties } = await applyDirectiveEdits(
+      this.app,
+      this.plugin,
+      notePath,
+      { add, remove }
+    );
+
+    if (values.length > 0) {
+      const file = getFile(this.app, notePath);
+      if (file) {
+        await this.app.fileManager.processFrontMatter(file, (fm) => {
+          for (const [key, value] of values) {
+            // Null DELETES the key rather than writing a zero, which is the
+            // difference between "not kept" and "not answered" — see
+            // `HabitState`. A habit cycled back to unset should leave the entry
+            // reading exactly as it did before anyone answered it.
+            if (value == null) delete fm[key];
+            else fm[key] = value;
+          }
+        });
+      }
+    }
+
+    const parts: string[] = [];
+    if (draft.created.length > 0) {
+      parts.push(
+        `${draft.created.length} defined`
+      );
+    }
+    if (added.length > 0) parts.push(`${added.length} added`);
+    if (removed.length > 0) parts.push(`${removed.length} removed`);
+    if (renames.length > 0) parts.push(`${renames.length} renamed`);
+    if (values.length > 0) parts.push(`${values.length} logged`);
+    if (parts.length === 0) {
+      // SAID RATHER THAN SWALLOWED. A Save that changed nothing is a reader
+      // who ticked something back to where it started, and silence there is
+      // indistinguishable from a write that failed.
+      notify.info("Nothing to change — this entry's habits are as they were.");
+      return;
+    }
+    notify.ok(`Habits updated — ${parts.join(", ")}.`);
+    if (keptProperties.length > 0) {
+      // Removing a widget must never remove a reading, and a property left in
+      // the panel looks like a failed delete unless it is named.
+      notify.info(`Logged values kept in ${keptProperties.join(", ")}.`);
+    }
   }
 
   // Remove a tracker from one entry. The widget's own × passes its directive;

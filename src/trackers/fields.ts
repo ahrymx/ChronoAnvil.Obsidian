@@ -142,11 +142,15 @@ export const DIARY_FIELDS: DiaryField[] = [
     // template with no declaration here is a region the rollup ladder cannot
     // see — which is the exact gap this module was written to close.
     //
-    // ROLLED UP AS `items`, matching the month's. `entry-rollup` on a monthly
+    // ROLLED UP AS `items`, matching the month's. `entry-rollup` on a WEEKLY
     // dashboard reads the days through `readRollup(regions, "daily")`, so a
-    // day's highlights now reach the page you write the month on. That is the
-    // whole point of the section: "to write August's Highlights you opened
-    // thirty-one notes."
+    // day's highlights reach the page you write the week on. That is the whole
+    // point of the section: "to write August's Highlights you opened thirty-one
+    // notes."
+    //
+    // A MONTH READS THE WEEKS, NOT THESE, as of 1.0.48 — see the rung block
+    // below the monthly fields. A day's highlights still reach a month, one
+    // rung at a time, through the week's.
     rollup: "items",
     rollupNoun: "Highlights",
   },
@@ -299,6 +303,36 @@ export const DIARY_FIELDS: DiaryField[] = [
   // there was no declaration — and those looked identical from the outside,
   // which is the confusion this module was built to end.
   //
+  // ── AND FOUR OF THE WEEKLY SIX ARE NOT, AS OF 1.0.48 ────────────────
+  //
+  // *"the diary section 'what the entries said' does not look correct on the
+  // monthly overview dashboard, where it shows the days for the entire month
+  // but should show the week grains."*
+  //
+  // The sentence quoted above answers the question ABOVE a week correctly and
+  // was then applied one rung too far. A quarter summarising four weekly
+  // reviews is a summary of summaries; a MONTH summarising four weekly reviews
+  // is the rung the ladder skipped. The month was reading its thirty-one days
+  // directly — the only rollup in the plugin that reached two rungs down — so
+  // the page you write a month on listed the whole month rather than reviewing
+  // it.
+  //
+  // SO A WEEK IS BOTH A SURFACE AND A SOURCE, and that is not a contradiction.
+  // `rollup` answers "what does the scope above this one do with the field";
+  // the scope above a week is a month, and a month wants from a week exactly
+  // what a quarter wants from a month. These four mirror the monthly block's
+  // four, noun for noun, because the question is the same question.
+  //
+  // THE OTHER TWO STAY `none` ON THE STANDING ARGUMENTS. `log` is free prose,
+  // and four weeks of it stacked is not a review — that is `log`'s answer at
+  // every grain. `attachments` is counted rather than read.
+  //
+  // QUARTERLY AND YEARLY ARE UNTOUCHED, and the paragraph above still holds of
+  // them: nothing gathers them. The section declines a year, `entry-rollup` on
+  // a year takes months, and the scope above a quarter reads `monthly` through
+  // `year-stats`. Twelve of the eighteen were `none` because nothing asks, and
+  // they still are.
+  //
   // The guard is the test, not the data: `fields.test.ts` reconstructs all five
   // templates now, so a placeholder edited in an asset without being edited
   // here fails on any grain rather than on two of them.
@@ -317,7 +351,11 @@ export const DIARY_FIELDS: DiaryField[] = [
     class: "weekly",
     label: "Focus",
     placeholder: "What's the theme for this week?",
-    rollup: "none",
+    rollup: "line",
+    // "Theme", as at the month, and for the same reason: the placeholder asks
+    // for one. The LABEL is the template's own word and stays "Focus" — see
+    // the per-grain wording note below.
+    rollupNoun: "Theme",
   },
   {
     id: "highlights",
@@ -325,7 +363,8 @@ export const DIARY_FIELDS: DiaryField[] = [
     class: "weekly",
     label: "Highlights",
     placeholder: "What went well?",
-    rollup: "none",
+    rollup: "items",
+    rollupNoun: "Highlights",
   },
   {
     id: "challenges",
@@ -333,7 +372,8 @@ export const DIARY_FIELDS: DiaryField[] = [
     class: "weekly",
     label: "Challenges",
     placeholder: "What got in the way?",
-    rollup: "none",
+    rollup: "items",
+    rollupNoun: "Challenges",
   },
   {
     id: "log",
@@ -355,7 +395,12 @@ export const DIARY_FIELDS: DiaryField[] = [
     kind: "tasks",
     class: "weekly",
     label: "Goals this week",
-    rollup: "none",
+    // `goals`, not `none`, on the month's own argument one rung down: a weekly
+    // goal accumulates instead of being ticked, so set-versus-met across four
+    // weeks is the question a month's page can answer and a week's cannot. The
+    // daily `todo` is still `none` — a day's tasks are ticked.
+    rollup: "goals",
+    rollupNoun: "Goals",
   },
   {
     id: "focus",

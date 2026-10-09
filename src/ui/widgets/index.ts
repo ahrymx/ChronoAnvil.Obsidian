@@ -14,7 +14,11 @@ import type ChronoAnvilPlugin from "../../main";
 import { buildYearSummary } from "../../review/year-view";
 import { buildQuarterSummary } from "../../review/quarter-view";
 import { buildPeriodRecap } from "../../review/recap-view";
-import { buildEntryRollup, rollupGrainOf } from "../../diary/entry-rollup";
+import {
+  buildEntryRollup,
+  ROLLUP_FOLDER,
+  rollupGrainOf,
+} from "../../diary/entry-rollup";
 import { keywordOf } from "../../core/layout";
 import { WIDGETS } from "../../core/widget-registry";
 import {
@@ -127,6 +131,8 @@ import { resolvePeriodBounds } from "../../charts/chart-widgets";
 import {
   attachTrackerRemove,
   buildHabitChip,
+  finishHabitsCell,
+  type HabitCellEntry,
   buildSleep,
   buildTracker,
   buildTrackerAddCell,
@@ -1120,6 +1126,12 @@ export class Widgets implements
       // still opens with Mood and Exercise — the later habits join the cell
       // rather than the cell moving to meet them.
       let habitsCell: HTMLElement | null = null;
+      // The habits that cell ended up holding, in the order the fence named
+      // them. Accumulated rather than re-read at the end because the directive
+      // line is what the window's membership writes have to match, and the loop
+      // is the only place that still has it — `finishHabitsCell` turns these
+      // into the window's rows.
+      const habitEntries: HabitCellEntry[] = [];
       let overviewGrain: PeriodGrain | null = null;
       // survives until the first entry is edited and then vanishes, with the
       // directive still in the file. So both of this bar's buttons are siblings
@@ -1527,7 +1539,8 @@ export class Widgets implements
             const override =
               barIdx === -1 ? "" : line.slice(barIdx + 1).trim();
             const label = override || habit.label || habit.id;
-            buildHabitChip(this, habitsCell, habit, label, line, ctx);
+            buildHabitChip(this, habitsCell, habit, label, ctx);
+            habitEntries.push({ def: habit, directive: line.trim() });
             continue;
           }
         }
@@ -1787,6 +1800,14 @@ export class Widgets implements
       }
       if (trackerBar && !isManagedTemplate(this.plugin, ctx.sourcePath)) {
         trackerBar.appendChild(buildTrackerAddCell(this, ctx));
+      }
+
+      // AND THE HABITS CELL GETS ITS DOOR AND ITS COUNT (1.0.49), on the same
+      // argument as the tile above and one more of its own: both controls sit
+      // at the END of the chip row, and the fit that decides how many chips
+      // show cannot be measured until the last chip is in.
+      if (habitsCell && habitEntries.length > 0) {
+        finishHabitsCell(this, habitsCell, habitEntries, ctx);
       }
 
       // ── AND EVERY *WHAT'S BELOW* CARD GETS THE ROW THAT ADDS A KIND ───
@@ -3188,18 +3209,35 @@ export class Widgets implements
         // than once at first paint. Live over the entries' own folder, so
         // writing a focus into today's entry updates the rollup.
         //
-        // `entry-rollup:month` GATHERS MONTHLY ENTRIES (3.11 §5); bare is
-        // `daily` as it always was. The live folder follows the grain — a
-        // month rollup watching the daily folder would never repaint when a
-        // monthly entry changed, which is the bug that comes free with adding
-        // an argument and forgetting the subscription under it.
-        const grain = rollupGrainOf(rest);
+        // `entry-rollup:month` GATHERS MONTHLY ENTRIES (3.11 §5). The live
+        // folder follows the grain — a month rollup watching the daily folder
+        // would never repaint when a monthly entry changed, which is the bug
+        // that comes free with adding an argument and forgetting the
+        // subscription under it.
+        //
+        // ── AND A BARE DIRECTIVE IS ONE RUNG BELOW THE HOST (1.0.48) ────
+        //
+        // So the period is resolved TWICE, and the two reads are not the same
+        // read. The one inside the closure is the bounds, deliberately late so a
+        // period-nav click re-reads them and repaints. This one is the note's
+        // period UNIT, which picks both the grain and the folder watched for it,
+        // and a subscription cannot be chosen late — it is made once, when the
+        // widget mounts.
+        //
+        // SAFE BECAUSE THE UNIT DOES NOT MOVE. `shiftPeriod` steps a dashboard
+        // within its own period — it writes `week-start` onto a week page — so
+        // the navigator changes which month this is and never changes it into a
+        // week. A gesture that COULD change the unit would be rewriting the
+        // frontmatter property this widget is keyed on, which is a different
+        // note, and Obsidian remounts the post-processor for that.
+        const grain = rollupGrainOf(
+          rest,
+          resolvePeriodBounds(this.plugin, ctx)?.unit ?? null
+        );
         return liveScopedWidget(
           this.plugin,
           ctx,
-          grain === "monthly"
-            ? this.plugin.settings.paths.diaryMonthly
-            : this.plugin.settings.paths.diaryDaily,
+          this.plugin.settings.paths[ROLLUP_FOLDER[grain]],
           () =>
             buildEntryRollup(
               this.plugin,
@@ -3684,9 +3722,10 @@ export class Widgets implements
   // ten cells of one.
   //
   // Nothing about the note changes: this is a rendering of the same
-  // `tracker:<id>` lines, each chip still carries its own remove ×, and a
-  // boolean rendered anywhere but a logging grid (an inline `chronoanvil:tracker:`,
-  // say) still gets the standalone checkbox above.
+  // `tracker:<id>` lines, and a boolean rendered anywhere but a logging grid (an
+  // inline `chronoanvil:tracker:`, say) still gets the standalone checkbox
+  // above. Taking a habit off the entry is the Habits window's × — a chip has
+  // no × of its own, see `buildHabitChip`.
   private habitsCell(): HTMLElement {
     const cell = createSpan({
       cls: "ca-journal-widget ca-journal-tracker-cell ca-journal-habits-cell",

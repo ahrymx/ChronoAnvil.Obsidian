@@ -91,24 +91,52 @@ describe("the registry matches the shipped templates", () => {
 });
 
 describe("which grains a scope gathers from", () => {
-  it("rolls up nothing from a week, a quarter or a year", () => {
-    // 3.12, and the argument behind eighteen `none`s rather than eighteen
+  it("rolls up nothing from a quarter or a year", () => {
+    // 3.12, and the argument behind twelve `none`s rather than twelve
     // omissions. `rollup` says what a scope ABOVE does with a field, not what
-    // the field contains — which is why `log` is `none` at both source grains
+    // the field contains — which is why `log` is `none` at every source grain
     // while holding perfectly rollupable prose.
     //
-    // Nothing reads these three as a source, by 3.11 §5's decision: a week and
-    // a month are written from their days and a quarter from its months, so
-    // weeks under a quarter and quarters under a year would be summaries of
-    // summaries. This pins that these grains declare their fields AND gather
-    // none of them, which is a different statement from having no fields.
-    for (const g of ["weekly", "quarterly", "yearly"] as const) {
+    // Nothing reads these two as a source: a quarter under a year would be a
+    // summary of summaries, and `year-stats` reads `monthly` for that reason.
+    // This pins that these grains declare their fields AND gather none of them,
+    // which is a different statement from having no fields.
+    //
+    // WAS THREE GRAINS UNTIL 1.0.48. A week was in this list on the same
+    // sentence, and the sentence was about what sits above a week — a quarter,
+    // a year — while the scope DIRECTLY above a week is a month. See the test
+    // below.
+    for (const g of ["quarterly", "yearly"] as const) {
       expect(fieldsForClass(g).length, g).toBeGreaterThan(0);
       expect(rollupFields(g).map((f) => f.id), g).toEqual([]);
     }
   });
 
-  it("keeps the two source grains gathering, so this is a claim not a blanket", () => {
+  it("rolls up a week the way it rolls up a month, because a month reads it", () => {
+    // THE REGISTRY HALF OF THE 1.0.48 FIX. *"it shows the days for the entire
+    // month but should show the week grains."* A monthly dashboard now gathers
+    // weeks, and with every weekly field declared `rollup: "none"` it would have
+    // gathered them into an empty list — "nothing to gather yet" printed over a
+    // month of written weekly reviews. The grain change and this declaration are
+    // one fix; either alone is a regression.
+    expect(rollupFields("weekly").map((f) => f.id)).toEqual([
+      "focus",
+      "highlights",
+      "challenges",
+      "todo",
+    ]);
+    expect(rollupFields("weekly").map((f) => f.id)).toEqual(
+      rollupFields("monthly").map((f) => f.id)
+    );
+    for (const id of ["log", "attachments"]) {
+      expect(getField(id, "weekly")?.rollup, id).toBe("none");
+    }
+    // A WEEKLY GOAL ACCUMULATES, like a month's and unlike a day's ticked task.
+    expect(getField("todo", "weekly")?.rollup).toBe("goals");
+    expect(getField("todo", "daily")?.rollup).toBe("none");
+  });
+
+  it("keeps the source grains gathering, so this is a claim not a blanket", () => {
     // If `rollupFields` ever returned nothing for everything, the test above
     // would pass for the wrong reason.
     expect(rollupFields("daily").map((f) => f.id)).toContain("highlights");
@@ -143,8 +171,8 @@ describe("registry shape", () => {
   });
 
   it("gives every rollupable field a noun to be gathered under", () => {
-    for (const f of rollupFields("daily")) expect(f.rollupNoun).toBeTruthy();
-    for (const f of rollupFields("monthly")) expect(f.rollupNoun).toBeTruthy();
+    for (const g of ["daily", "weekly", "monthly"] as const)
+      for (const f of rollupFields(g)) expect(f.rollupNoun, g).toBeTruthy();
   });
 
   it("keeps the monthly log out of every rollup, deliberately", () => {
