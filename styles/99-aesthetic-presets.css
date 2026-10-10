@@ -276,8 +276,7 @@ body.ca-preset-editorial .ca-vb-tile {
   border: 1px solid var(--ca-border-subtle);
 }
 
-body.ca-preset-editorial .ca-journal-mood-face.is-selected,
-body.ca-preset-editorial .ca-journal-scale-face.is-selected {
+body.ca-preset-editorial .ca-journal-mood-face.is-selected {
   background-color: var(--ca-surface-raised);
   border-color: var(--ca-grain-accent);
 }
@@ -382,8 +381,7 @@ body.ca-preset-technical .ca-jtt-tag {
   border-radius: 2px;
 }
 
-body.ca-preset-technical .ca-journal-mood-face.is-selected,
-body.ca-preset-technical .ca-journal-scale-face.is-selected {
+body.ca-preset-technical .ca-journal-mood-face.is-selected {
   background-color: var(--ca-surface-raised);
   border-color: var(--ca-grain-accent);
 }

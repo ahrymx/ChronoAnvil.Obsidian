@@ -20,7 +20,8 @@ note:focus#line:What's the theme for this month?|Monthly focus
 list:highlights:What went well?|Highlights
 list:challenges:What got in the way?|Challenges
 note:log:Notes, reflections & learnings…|Notes, reflections & learnings
-attach:attachments|Attachments
+attach:attachments|Files & Links
+attach:images|Images
 tasks:todo|Goals this month
 ```
 
@@ -37,6 +38,9 @@ tasks:todo|Goals this month
 -->
 
 <!--chronoanvil:attachments
+-->
+
+<!--chronoanvil:images
 -->
 
 <!--chronoanvil:todo

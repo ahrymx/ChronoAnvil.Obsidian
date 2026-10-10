@@ -48,6 +48,24 @@
 .ca-journal-scale-note-mark.has-note {
   color: var(--interactive-accent);
 }
+/* ── THE THIRD TIME THIS RELEASE, AND THE LAST BUTTON IT WAS TRUE OF ────
+   A face is a `<button>`, and Obsidian's app.css gives every button an
+   explicit `height: var(--input-height)` — THIRTY pixels. An explicit height
+   cannot be reached by padding, font-size, line-height or `min-height`, so
+   every metric below this comment was ornament: the row was 30px tall
+   whatever it said, inside a cell whose content box is 50px and whose
+   eyebrow and gap take 14 of them. `.is-selected`'s `scale(1.06)` then
+   painted 31.8px of it against the cell's `overflow: hidden`, which is the
+   clipped chin the report showed, and the note badge's `top: -4px` was
+   pressed into the same edge.
+
+   `height: auto; min-height: 0` is the whole fix and it is the same two
+   lines the habit chip and the overflow count took earlier in 1.0.49. THE
+   SIGNATURE TO REMEMBER IS "NO VISUAL CHANGE" after editing a chip's
+   metrics: that is an explicit host height, not a specificity problem.
+   With the reset the face is its own ~24px — `line-height: 1` on a 1.18em
+   glyph plus 6px of padding and 2px of border — and the scale and the badge
+   have somewhere to go. */
 .ca-journal-mood-face {
   position: relative;
   border: 1px solid transparent;
@@ -56,6 +74,8 @@
   padding: 3px 1px;
   font-size: 1.18em;
   line-height: 1;
+  height: auto;
+  min-height: 0;
   cursor: pointer;
   filter: grayscale(0.7) opacity(0.55);
   transition: filter 0.12s, transform 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
@@ -90,7 +110,10 @@
   filter: grayscale(0) opacity(1);
   transform: scale(1.06);
   background: var(--ca-surface-raised);
-  border-color: var(--interactive-accent);
+  /* The same softened edge the done habit chip takes: the glyph going from
+     grey to colour at full opacity is already the loudest thing in the cell,
+     so the ring around it does not have to be. */
+  border-color: var(--ca-border-accent-soft);
   overflow: visible;
 }
 .ca-journal-mood-face.is-selected .ca-journal-mood-face-glyph {
@@ -316,8 +339,13 @@
   border-color: var(--interactive-accent);
   color: var(--text-normal);
 }
+/* THE TICK SHOUTS, THE PILL DOES NOT (1.0.49). The box keeps the solid accent
+   below — it is the answer, and it is the one thing on the chip that should
+   carry it. The pill's own edge drops to `--ca-border-accent-soft`, because a
+   cell with four habits done was four full-strength hairlines reading as a
+   cell full of borders rather than as four ticks. */
 .ca-journal-habit-chip.is-done .ca-journal-habit-chip-btn {
-  border-color: var(--interactive-accent);
+  border-color: var(--ca-border-accent-soft);
   background: var(--background-modifier-hover);
   color: var(--text-normal);
   font-weight: 500;
@@ -423,11 +451,16 @@
   background: var(--ca-surface-raised);
 }
 /* A cell with a pinned control keeps its label clear of it, or a long habit
-   group name would run under the `+`. */
-/* The second half of the row's budget; the note above the row has the sum. */
+   group name would run under the `+`.
+
+   ITS `line-height: 1.1` MOVED TO THE SHARED EYEBROW IN 1.0.49, where it was
+   always the right rule: this cell was simply the first one whose budget was
+   measured, and the four pixels it bought are four pixels every tracker cell
+   was paying. The sum above the row is unchanged; it is now the shared rule
+   that supplies the 11px line. A second copy here would be the declaration
+   that later disagrees with it. */
 .ca-journal-habits-cell > .ca-journal-widget-label {
   padding-right: 24px;
-  line-height: 1.1;
 }
 /* An entry template's tracker list is generated from Settings, so the control
    is drawn and refused rather than hidden — the row still has to end in the

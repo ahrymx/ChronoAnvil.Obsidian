@@ -139,10 +139,10 @@ describe("the rule stated generally, not as a special case for titles", () => {
     // THE HALF A BLANKET REFUSAL WOULD HAVE LOST. "Title questions are
     // unreadable" would also have been green against the test above, and would
     // have given up on every note where the answer is perfectly unambiguous.
-    const lines = ["```chronoanvil", "header:📚 Resources", "attach:res|Docs", "```"];
+    const lines = ["```chronoanvil", "header:📎 Attachments", "attach:res|Docs", "```"];
     const span = soleArgSpanIn(lines, "header");
     expect(span).not.toBeNull();
-    expect(readArg(lines, span!)).toBe("📚 Resources");
+    expect(readArg(lines, span!)).toBe("📎 Attachments");
   });
 
   it("leaves every content directive exactly as it was", () => {
@@ -241,10 +241,10 @@ describe("a bar finding its own line back", () => {
     const span = headerTitleSpan(lines, {
       bounds: null,
       index: 0,
-      title: "📚 Resources",
+      title: "📎 Attachments",
     });
     expect(span).not.toBeNull();
-    expect(readArg(lines, span!)).toBe("📚 Resources");
+    expect(readArg(lines, span!)).toBe("📎 Attachments");
   });
 
   it("refuses rather than renaming the wrong section", () => {
@@ -290,16 +290,16 @@ describe("a bar finding its own line back", () => {
 
 describe("what a rename must not disturb", () => {
   it("keeps a level prefix, which is not part of the title", () => {
-    // `header:2:📚 Resources` — a naive splice of the typed text would move the
+    // `header:2:📎 Attachments` — a naive splice of the typed text would move the
     // bar to level 1 and change what it folds.
-    expect(retitledArgument("2:📚 Resources", "📚 Files")).toBe("2:📚 Files");
-    expect(retitledArgument("📚 Resources", "📚 Files")).toBe("📚 Files");
+    expect(retitledArgument("2:📎 Attachments", "📚 Files")).toBe("2:📚 Files");
+    expect(retitledArgument("📎 Attachments", "📚 Files")).toBe("📚 Files");
   });
 
   it("leaves a trailing label alone", () => {
     // `|label` is outside the argument span already; this asserts the splice
     // actually behaves that way rather than that it ought to.
-    const src = ["header:📚 Resources|Shown"];
+    const src = ["header:📎 Attachments|Shown"];
     const span = argSpanIn(src, "header")!;
     expect(spliceArg(src, span, "📚 Files")[0]).toBe("header:📚 Files|Shown");
   });
@@ -309,7 +309,7 @@ describe("what a rename must not disturb", () => {
     const span = headerTitleSpan(before, {
       bounds: null,
       index: 0,
-      title: "📚 Resources",
+      title: "📎 Attachments",
     })!;
     const after = spliceArg(before, span, "📚 Reading");
     expect(after.length).toBe(before.length);

@@ -230,7 +230,7 @@ export function computeSectionRuns(nodes: SecNode[]): SecMark[] {
       // carry `is-last` sets `margin-bottom: var(--ca-widget-gap)` — so a
       // section ending in one renders as a closed card, a gap, and then an
       // open-sided strip of empty surface hanging under it. Resources is where
-      // a reader meets it: `header:📚 Resources` and its `attach:` zones are one
+      // a reader meets it: `header:📎 Attachments` and its `attach:` zones are one
       // fence, and the three `<!--chronoanvil:res-*-->` regions that store the
       // links follow it as three blocks that draw nothing.
       //

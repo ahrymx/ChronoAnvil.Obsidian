@@ -17,6 +17,7 @@ import { existsSync } from "node:fs";
 import { readCode, readSrc } from "./sources";
 import { resolve } from "node:path";
 import {
+  ENTRY_ATTACH_CATEGORIES,
   ENTRY_SECTIONS,
   applyEntrySections,
   composeEntryTemplate,
@@ -32,6 +33,9 @@ import {
   entrySectionModel,
   entryBandGroups,
   entryBandIsGrouped,
+  isForeignBandLine,
+  parseEntry,
+  sharedBody,
 } from "../src/diary/entry-sections";
 import { unweldEntryFences, weldEntryFences } from "../src/trackers/entry-trackers";
 import { WIDGETS } from "../src/core/widget-registry";
@@ -159,6 +163,14 @@ describe("a section is a widget and its region", () => {
   it("pairs every directive with a region, and no region without one", () => {
     // The invariant that makes removal coherent: an orphaned region is text
     // nothing owns, and a directive with no region has nowhere to write.
+    //
+    // DIRECTIVE TO REGION, NOT SECTION TO REGION (1.0.49 §5). It read the
+    // catalogue's shared ids on both sides, which was the same list while every
+    // section was one field; Attachments composes a category list now, so the
+    // note is asked instead — every field line in the composed band, against
+    // every region the composed note carries. That is the invariant as it was
+    // always worded, and it is the only form of it that can still fail for the
+    // right reason.
     for (const grain of TRACKER_CLASSES) {
       const out = composeEntryTemplate(grain);
       const shared = sectionsForEntry({ grain }).filter(
@@ -170,7 +182,13 @@ describe("a section is a widget and its region", () => {
       const regions = [...out.matchAll(/<!--chronoanvil:([a-z-]+)/g)].map(
         (m) => m[1]
       );
-      expect(regions.sort()).toEqual(shared.map((s) => s.id).sort());
+      const keys = out
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => /^(note|list|tasks|attach):/.test(l))
+        .map((l) => l.split(":")[1].split("|")[0].split("#")[0]);
+      expect(keys.length).toBeGreaterThan(shared.length - 1);
+      expect(regions.sort()).toEqual([...keys].sort());
     }
   });
 });
@@ -1296,6 +1314,12 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
       .split("```chronoanvil\n")
       .slice(2)
       .map((f) => f.split("\n```")[0].split("\n").filter((l) => l.trim() !== ""));
+  // A FENCE HAS MORE LINES THAN IT HAS FIELDS, as of 1.0.49 §5: Attachments
+  // composes one `attach:` line per shipped category, and only the first is a
+  // field of the band — the rest travel with it (`tailOf`). Derived from the
+  // catalogue rather than written as a number, so the day a third category
+  // ships these counts are still about what they are about.
+  const TAIL = ENTRY_ATTACH_CATEGORIES.length - 1;
 
   it("composes them one fence, one block each", () => {
     expect(bandFences(text).length).toBe(1);
@@ -1312,7 +1336,7 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     expect(out).not.toBeNull();
     const band = bandFences(out!);
     expect(band.length).toBe(2);
-    expect(band[0].length).toBe(5);
+    expect(band[0].length).toBe(5 + TAIL);
     expect(band[0]).not.toContain("row");
     expect(band[1][0]).toBe("row");
     expect(band[1].length).toBe(3);
@@ -1348,7 +1372,7 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     expect(band.length).toBe(2);
     expect(band[0][0]).toBe("row");
     expect(band[0].length).toBe(3);
-    expect(band[1].length).toBe(5);
+    expect(band[1].length).toBe(5 + TAIL);
     expect(band[1]).not.toContain("row");
     expect(model.blocks!(out).map((b) => b.ids)).toEqual(want);
   });
@@ -1358,8 +1382,10 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     const out = model.regroup!(text, want, ["capture"], [])!;
     const band = bandFences(out);
     expect(band[1][0]).toBe("row");
-    expect(band[1][3]).toBe("tab");
-    expect(band[1][4]).toContain("note:capture");
+    // The group is Attachments, Tasks and Captured — and Attachments brings its
+    // category line, which is why the boundary is not at a fixed index.
+    expect(band[1][3 + TAIL]).toBe("tab");
+    expect(band[1][4 + TAIL]).toContain("note:capture");
     expect(
       model.blocks!(out).find((b) => b.ids.includes("capture"))!.pages
     ).toEqual(["capture"]);
@@ -1374,8 +1400,8 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     // never learns those ids, `placed` is false for every one of them, and the
     // disabled button says the sentence `whyNotColumn` keeps for this case.
     const foreign = text.replace(
-      "attach:attachments#widget|Attachments",
-      "attach:attachments#widget|Attachments\nmystery:mine"
+      "tasks:todo#widget|Tasks",
+      "mystery:mine\ntasks:todo#widget|Tasks"
     );
     expect(foreign).not.toBe(text);
     expect(model.blocks!(foreign).flatMap((b) => b.ids)).toEqual(["banner", "trackers"]);
@@ -1488,7 +1514,7 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     )!;
     expect(bandFences(withField).length).toBe(3);
     expect(bandFences(withField)[1][0]).toBe("row");
-    expect(bandFences(withField)[1][2]).toContain("tasks-table");
+    expect(bandFences(withField)[1][2 + TAIL]).toContain("tasks-table");
     expect(model.regroup!(withField, want, [], [])).toBe(final);
   });
 
@@ -1815,5 +1841,202 @@ describe("a template carries the arrangement it was saved from (1.0.46)", () => 
         ...fields.filter((id) => id !== "todo").map((id) => ({ ids: [id] })),
       ])
     ).toBe(shown);
+  });
+});
+
+// ── A SECTION WHOSE BODY IS A LIST (1.0.49 §5) ───────────────────────────
+//
+// *"rename the default category in the diary attachments section to
+// 'Files & Links', add a second default category named 'Images'."*
+//
+// Every other section of an entry is one line and one region keyed alike, and
+// this file is built on that: `probeFor` finds a section by `keyword:regionkey`,
+// `parseEntry` attributes one line to one id, a reorder deals slots from a map
+// keyed by id. Attachments is a list — its categories are `attach:` lines the
+// Categories window adds, renames, reorders and removes — so shipping a second
+// one had to answer what the catalogue's five writers do with a line that is the
+// catalogue's and is not a section.
+//
+// THE ORPHAN IS WHY THE REMOVAL CASES ARE HERE. Measured before any of this was
+// written, on an entry with a reader-added second category: removing the section
+// from *Edit sections…* left its `attach:` line and its region in the file, and
+// the renderer drew that line as an Attachments section of its own — the first
+// `attach:` line of a barless fence IS a section. Shipping two categories by
+// default makes that the common case rather than the careful reader's.
+describe("a section whose body is a list of categories", () => {
+  const ctx = { grain: "daily" } as const;
+  const attachments = (): EntrySection =>
+    ENTRY_SECTIONS.find((s) => s.id === "attachments") as EntrySection;
+  // A third category, as the Categories window writes one: a line in the fence
+  // and a region below, neither of them the catalogue's.
+  const withPhotos = (text: string): string =>
+    text
+      .replace("attach:images|Images", "attach:images|Images\nattach:photos|Photos")
+      .replace(
+        "<!--chronoanvil:images\n-->",
+        "<!--chronoanvil:images\n-->\n\n<!--chronoanvil:photos\n-->"
+      );
+  const linesOf = (text: string, re: RegExp): string[] =>
+    text.split("\n").map((l) => l.trim()).filter((l) => re.test(l));
+
+  it("ships one shelf per category and a region for each, on every grain", () => {
+    for (const grain of TRACKER_CLASSES) {
+      const text = composeEntryTemplate(grain);
+      expect(linesOf(text, /^attach:/), grain).toEqual(
+        ENTRY_ATTACH_CATEGORIES.map((c) => `attach:${c.key}|${c.label}`)
+      );
+      // IN THE SAME ORDER, because the shelves are drawn in the order the
+      // directives appear and the regions are what they write into.
+      for (const c of ENTRY_ATTACH_CATEGORIES) {
+        expect(text, `${grain}/${c.key}`).toContain(`<!--chronoanvil:${c.key}\n-->`);
+      }
+    }
+  });
+
+  it("gives the same section to a note the editor adds it to", () => {
+    // ONE SHAPE FROM BOTH DOORS. A fresh entry composes the list; *Edit
+    // sections… → Attachments* on a note that has none used to write the
+    // section's own line and one region, which is a different section from the
+    // one every new entry gets — and the reader who notices is the one with
+    // both open.
+    const bare = composeEntryTemplate("daily")
+      .replace("attach:attachments|Files & Links\n", "")
+      .replace("attach:images|Images\n", "")
+      .replace("<!--chronoanvil:attachments\n-->\n\n", "")
+      .replace("<!--chronoanvil:images\n-->\n\n", "");
+    expect(detectEntrySections(bare, ctx)).not.toContain("attachments");
+
+    const added = addSectionToNote(bare, ctx, attachments())!;
+    expect(added).not.toBeNull();
+    expect(linesOf(added, /^attach:/)).toEqual(
+      ENTRY_ATTACH_CATEGORIES.map((c) => `attach:${c.key}|${c.label}`)
+    );
+    for (const c of ENTRY_ATTACH_CATEGORIES) {
+      expect(added, c.key).toContain(`<!--chronoanvil:${c.key}\n-->`);
+    }
+
+    // AND THE SAME THROUGH THE SAVE, which is the other add path: a section
+    // ticked in the window arrives through `applyEntrySections` rather than
+    // through `addSectionToNote`, and the two wrote different things.
+    const saved = applyEntrySections(bare, ctx, [
+      ...detectEntrySections(bare, ctx),
+      "attachments",
+    ])!;
+    expect(saved).not.toBeNull();
+    expect(linesOf(saved, /^attach:/)).toEqual(
+      ENTRY_ATTACH_CATEGORIES.map((c) => `attach:${c.key}|${c.label}`)
+    );
+    for (const c of ENTRY_ATTACH_CATEGORIES) {
+      expect(saved, c.key).toContain(`<!--chronoanvil:${c.key}\n-->`);
+    }
+  });
+
+  it("takes every category with it when the section is removed", () => {
+    // THE ORPHAN, PINNED. `attach:photos` is the reader's own and goes too:
+    // *remove the Attachments section* means the section, and a category is
+    // part of it — which is the sentence the Categories window's refusal has
+    // been pointing at this list with since 1.0.49 §1 ("remove the whole
+    // section from Edit sections… instead").
+    const text = withPhotos(composeEntryTemplate("daily"));
+    const want = detectEntrySections(text, ctx).filter((id) => id !== "attachments");
+    const next = applyEntrySections(text, ctx, want)!;
+    expect(next).not.toBeNull();
+    expect(linesOf(next, /^attach:/)).toEqual([]);
+    for (const key of ["attachments", "images", "photos"]) {
+      expect(next, key).not.toContain(`<!--chronoanvil:${key}`);
+    }
+    // AND NOTHING ELSE WENT WITH THEM.
+    expect(next).toContain("note:log:");
+    expect(next).toContain("<!--chronoanvil:log");
+  });
+
+  it("refuses the removal while any category holds writing", () => {
+    // THE GUARD THAT MAKES THE REMOVAL ABOVE NON-DESTRUCTIVE, and the reason
+    // the two are one change: asked about `attachments` alone, a section whose
+    // Images shelf was full reported itself removable — and now the removal
+    // would take that shelf with it.
+    const fresh = composeEntryTemplate("daily");
+    expect(entryRemovalRefusal(attachments(), fresh)).toBeNull();
+    for (const key of ["attachments", "images", "photos"]) {
+      const held = withPhotos(fresh).replace(
+        `<!--chronoanvil:${key}\n-->`,
+        `<!--chronoanvil:${key}\n![[a-photo.png]]\n-->`
+      );
+      expect(entryRemovalRefusal(attachments(), held), key).toBe(
+        "Holds your writing. Clear it first, then remove the section."
+      );
+      expect(removableFrom(ctx, held).map((s) => s.id), key).not.toContain(
+        "attachments"
+      );
+    }
+  });
+
+  it("does not call its own category line the reader's", () => {
+    // THREE READERS OF `isForeignBandLine` DREW THE WRONG CONCLUSION from an
+    // unattributed line: the Save window counted *1 line in this entry's widget
+    // fence* on every entry in the vault, saving an entry as a template
+    // announced that line as a drop, and a reload called a freshly composed
+    // entry damaged.
+    const fresh = composeEntryTemplate("daily");
+    const band = sharedBody(parseEntry(fresh, ctx));
+    const images = band.find((b) => b.line.trim().startsWith("attach:images"))!;
+    expect(images).toBeDefined();
+    expect(images.id).toBeNull();
+    expect(isForeignBandLine(images)).toBe(false);
+
+    // BY KEY AND NOT BY TEXT, so renaming the shelf in the Categories window
+    // does not turn the plugin's own line into a foreign one.
+    const renamed = { id: null, line: "attach:images|Photographs" };
+    expect(isForeignBandLine(renamed)).toBe(false);
+
+    // A CATEGORY THE READER ADDED IS A DIFFERENT THING and stays foreign: a
+    // recompose really does drop it, and the one reader for which that is a
+    // warning rather than noise is the reload.
+    expect(isForeignBandLine({ id: null, line: "attach:photos|Photos" })).toBe(true);
+  });
+
+  it("carries a category with its field through a regroup", () => {
+    // THE BAND WINDOW RE-EMITS THE BAND OUT OF WHAT IT READ, so a line it does
+    // not keep is a line it drops. Before `tailOf` it refused the whole band
+    // instead — honest, and it cost every entry in the vault its grouping
+    // window the day two categories shipped.
+    // EVERY FIELD IN WIDGET FORM FIRST, because a column is a widget (4.12 §A)
+    // and a group of fields that draw their own bars is refused for a reason
+    // that has nothing to do with this.
+    const fresh = withPhotos(composeEntryTemplate("daily"));
+    const text = applyEntrySections(
+      fresh,
+      ctx,
+      detectEntrySections(fresh, ctx).map((id) =>
+        id === "banner" || id === "trackers" ? id : { id, options: { form: "widget" } }
+      )
+    )!;
+    const model = entrySectionModel(ctx);
+    const blocks = model.blocks!(text).map((b) => b.ids);
+    expect(blocks.flat()).toContain("attachments");
+    const want = [...blocks.slice(0, -2), ["todo", "capture"]];
+    const out = model.regroup!(text, want, [], [])!;
+    expect(out).not.toBeNull();
+    // Both category lines are still there, still under the line they belong to.
+    const fence = out.split("```chronoanvil\n")[2].split("\n```")[0].split("\n");
+    const at = fence.findIndex((l) => l.startsWith("attach:attachments"));
+    expect(at).toBeGreaterThan(-1);
+    expect(fence[at + 1]).toBe("attach:images|Images");
+    expect(fence[at + 2]).toBe("attach:photos|Photos");
+    expect(out).toContain("<!--chronoanvil:photos");
+  });
+
+  it("leaves the band alone when a category sits apart from its field", () => {
+    // A FENCE WITHOUT THE SECTION THE LINE BELONGS TO is a band this window did
+    // not compose, and the refusal is the same one every unreadable band gets:
+    // no blocks, and a regroup that declines. Carrying the line to whichever
+    // field happened to precede it would move a category onto another section.
+    const text = composeEntryTemplate("daily").replace(
+      "attach:attachments|Files & Links\nattach:images|Images\n",
+      "attach:attachments|Files & Links\n```\n\n```chronoanvil\nattach:images|Images\n"
+    );
+    const model = entrySectionModel(ctx);
+    expect(model.blocks!(text).flatMap((b) => b.ids)).toEqual(["banner", "trackers"]);
+    expect(model.regroup!(text, [["banner", "trackers"]], [], [])).toBeNull();
   });
 });

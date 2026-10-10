@@ -370,6 +370,15 @@ export interface FoldableSection {
   // Everything the section holds. Hidden by the fold, so a caller appends here
   // rather than to the host.
   body: HTMLElement;
+  // The chevron, for a caller that needs to put a control BESIDE it.
+  //
+  // RETURNED FOR ONE REASON AND IT IS A PLACEMENT ONE. The actions slot of a
+  // level-1 head is a full-width second row (see the chevron's own note below),
+  // so "in the head" and "in the actions" are two different rows on a field —
+  // and a control that belongs to the whole section rather than to its body
+  // belongs on the title row, next to the fold. Insert before this; the
+  // chevron's `margin-left: auto` keeps it at the end either way.
+  toggle: HTMLElement;
   // The element the fold marks, wrapping both of the above.
   //
   // RETURNED BECAUSE THE CALLERS THAT KEPT PRIVATE FOLDS NEED IT (5.10). The
@@ -439,7 +448,48 @@ export function foldableSection(
     store.setCollapsed(key, next);
   });
 
-  return { frame, body, wrapper: section };
+  return { frame, body, toggle: chevron, wrapper: section };
+}
+
+// ── THE TITLE ROW'S SLOT, ON EVERY HEAD THAT HAS ONE (1.0.49) ──────────
+//
+// *"the diary and journal attachment sections should look more similar."* They
+// were drawn by the same two functions and diverged on where a control goes: an
+// entry's Attachments field put its Categories cog on the TITLE row beside the
+// chevron, and a Resources section's header bar put a labelled *Categories* pill
+// in `frame.actions` — which at level 1 is `flex: 1 0 100%`, a whole full-width
+// SECOND row for one button. Two looks, two rows, one window behind both.
+//
+// So the slot stops being a field's. Both surfaces draw the same head shape — a
+// flex row of title, glyph, controls, chevron — and this is the one place that
+// knows where in it a control belongs.
+//
+// THE INSERT ORDER IS THE WHOLE CONTRACT, and it is three selectors because the
+// two heads name their chevrons differently and either may be absent:
+//
+//   `.ca-journal-header-toggle`    a `HeaderBar`'s chevron (headerbar.ts)
+//   `.ca-journal-sec-fold-toggle`  a `foldableSection`'s (above)
+//   `.ca-journal-header-widgets`   the actions slot — the full-width second row
+//
+// A chevron carries `margin-left: auto`, so landing AFTER one puts the control
+// past the fold; landing after the widgets slot puts it on a third row. Before
+// the first of those three is the only position that is the end of the first
+// row, and `appendChild` is correct only on a head that has none of them.
+//
+// IDEMPOTENT ON PURPOSE. A caller asks for the slot when it has something to
+// put in it, and two callers on one head — a section's cog and a shelf's
+// toolbar — must land in the same box rather than build two.
+export function headTools(bar: HTMLElement): HTMLElement {
+  const found = bar.querySelector(":scope > .ca-journal-head-tools");
+  if (found instanceof HTMLElement) return found;
+  const slot = createDiv({ cls: "ca-journal-head-tools" });
+  const before =
+    bar.querySelector(":scope > .ca-journal-header-toggle") ??
+    bar.querySelector(":scope > .ca-journal-sec-fold-toggle") ??
+    bar.querySelector(":scope > .ca-journal-header-widgets");
+  if (before) bar.insertBefore(slot, before);
+  else bar.appendChild(slot);
+  return slot;
 }
 
 // ── the field head (5.14) ─────────────────────────────────────────────

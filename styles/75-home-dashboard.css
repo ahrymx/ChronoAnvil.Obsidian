@@ -297,63 +297,71 @@
    own actions slot (`buildShelfRemove`), and the dashed edge stays where it
    belongs, on the drop target inside the body. */
 
-/* Remove this category.
+/* ── THE SHELF'S ✕ IS GONE, AND SO IS ITS RULE (1.0.49) ──────────────────
+ *
+ * WHAT STOOD HERE: the shelf ✕'s own rules — the button, its `svg` sizing, its
+ * hover and its `.is-static` dim. Four of them, and two releases of argument
+ * about how loud a ✕ beside a shelf should be (3.19.2 hid it until hover; 5.14 made it
+ * plain, because the bare label row the hover-reveal was an affordance ON had
+ * become a field head whose other two actions are always drawn).
+ *
+ * THE CONTROL IT STYLED IS NOT DRAWN ANY MORE. Removing a category is one of
+ * three edits in the Categories window on the section's own title bar, and the
+ * window wears the Tags window's rows. The whole group goes rather than being
+ * left to style an element nothing builds — which is the mirror of the mistake
+ * 3.19.2 made in the other direction, when a moved button left its
+ * `position: absolute` behind and put a live control somewhere no reader could
+ * see. `test/ui-fixes-3-19-2.test.ts` sweeps for both. */
 
-   FAINT UNTIL HOVER, on the same reasoning as .ca-jsh-title-edit: it is an
-   affordance on a row that is mostly a label, and a always-visible ✕ beside
-   every shelf would read as three ways to delete something. */
-/* ── AND IT IS NOT FAINT ANY MORE (5.14) ────────────────────────────────
+/* ── A CATEGORY NESTED IN THE FIRST ONE'S CARD (1.0.49) ──────────────────
  *
- * WHAT STOOD HERE: `opacity: 0`, revealed by `.ca-journal-attach:hover`, on the
- * argument recorded below — *"it is an affordance on a row that is mostly a
- * label, and an always-visible ✕ beside every shelf would read as three ways to
- * delete something"*.
+ * *"new category got incorrectly inserted as a new section when it should be
+ * nested."* Where no `header:` bar owns the shelves — a diary entry's
+ * Attachments field, whose fence it shares with six other fields — the FIRST
+ * shelf is the section and the rest render inside its body. `index.ts` says why
+ * that is the only shape available there; this is what is left of what it looks
+ * like.
  *
- * THE ROW IT WAS AN AFFORDANCE ON IS GONE. That reasoning was about
- * `.ca-journal-attach-label`, a bare label with a ✕ floating at the end of it;
- * the ✕ is a head ACTION now, sitting on the field's own strip beside *Add
- * file* and *Add link*. Those are always drawn, so a third control that is
- * invisible until the pointer finds it is not restraint — it is one slot in a
- * row of three behaving differently from the other two, which is what the
- * reader reported.
+ * ── AND IT IS ONE DECLARATION NOW (1.0.49 §3) ───────────────────────────
  *
- * MUTED IS STILL THE ANSWER TO "three ways to delete something", and it is the
- * half of the old rule worth keeping: `--text-faint` against the pills' own
- * ink, with the error tint arriving only under the pointer. What changed is
- * that the control is THERE to be read before it is hovered.
+ * *"the diary and journal attachment sections should look more similar."* This
+ * block was an indent, a left hairline, a hand-built head of its own and a
+ * margin reset on the shared strip — a second way of drawing a shelf, written
+ * because a card inside a card would be a box in a box. That was true and it was
+ * already handled: `70-section-surface.css` stands a `.ca-journal-field` down to
+ * a flat head with a hairline wherever it sits inside another fold, so a nested
+ * shelf asking for the ordinary field head gets the ordinary SHELF — the same
+ * one a Resources bar draws three of — and the head, the name and the tools rule
+ * all come with it.
  *
- * `.is-static` KEEPS ITS 0.35 and gains meaning from the change: a shelf with
- * files in it now reads as a dimmed control among lit ones rather than as an
- * absent one among absent ones. */
-.ca-journal-attach-remove {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-  border: none;
-  background: none;
-  box-shadow: none;
-  color: var(--text-faint);
-  cursor: pointer;
-  opacity: 1;
-  border-radius: var(--ca-radius-sm);
-  transition: opacity 0.12s, color 0.12s, background 0.12s;
+ * NO INDENT, ON THE READER'S CALL. Flush, exactly as a journal shelf sits under
+ * its bar: the card's own border is the only thing saying this shelf belongs to
+ * it. Maximum similarity, least containment — and the left rule it replaces was
+ * the last thing making the two sections look like two features.
+ *
+ * SO WHAT SURVIVES IS THE TOP MARGIN, which is not nesting at all: it is the gap
+ * between two shelves. `.ca-journal-attach`'s own 0.9em is the gap between
+ * FIELDS and inside the card it would be 0.9em of nothing before the card's
+ * padding, so the whole margin is restated rather than the bottom zeroed on a
+ * `:last-child` — every shelf wants the same answer, and a rule reaching only
+ * the last one would be two rules that disagree. */
+.ca-journal-attach-shelf {
+  margin: var(--ca-space-3) 0 0;
 }
-.ca-journal-attach-remove svg {
-  width: 13px;
-  height: 13px;
+/* AND THE FIRST ONE HAS A HEAD ABOVE IT, NOT A SHELF (1.0.49 §4). The margin is
+   the gap BETWEEN two shelves; the first shelf in the section's body is already
+   sitting under that body's own padding, and a second gap there reads as the
+   head floating free of what it names. This is the one place a `:first-child`
+   is right where `:last-child` was not: the shelves genuinely do not all want
+   the same answer at the top, because only one of them is under the head. */
+.ca-journal-attach-shelf:first-child {
+  margin-top: 0;
 }
-.ca-journal-attach-remove:hover:not(:disabled) {
-  color: var(--text-error);
-  background: var(--background-modifier-hover);
-}
-/* Still shown, still explained by its tooltip, but plainly not available —
-   a control that vanished on the shelves with files in them would read as an
-   inconsistency rather than as a rule. */
-.ca-journal-attach-remove.is-static {
-  cursor: default;
-  opacity: 0.35;
-}
+/* The section's own wrapper draws nothing: the `fieldFrame` inside it is the
+   card, and `.ca-journal-attach:has(> .ca-journal-sec-fold.ca-journal-field)`
+   above has already taken this element's margin off for exactly that reason.
+   The class exists so a reader walking the DOM can tell the section's box from
+   a shelf's, and so this note has somewhere to live. */
 
 .ca-journal-attach-zone {
   display: flex;
@@ -576,6 +584,175 @@
   background: transparent;
 }
 
+/* ── THE THREE SHAPES A CATEGORY CAN DRAW (1.0.49 §6) ───────────────────
+ *
+ * *"now implement format options into the category editor for different ways to
+ * render the documents/links/images. I'm thinking default (kitchen sink, how it
+ * is now), image gallery (makes image previews larger), ordered lists (good for
+ * links)."*
+ *
+ * EVERY RULE ABOVE IS THE DEFAULT, and that is the arrangement rather than an
+ * accident of ordering: the shape that writes no token draws no class, so a
+ * note nobody has asked about this renders through exactly the declarations it
+ * did before this release. What follows is only the DIFFERENCE each of the
+ * other two makes, keyed off the class `ATTACH_FORMATS` names.
+ *
+ * ── IMAGE GALLERY: THE SAME TWO LANES, BIGGER ───────────────────────────
+ *
+ * Three numbers decide how big a preview is — the grid's `minmax` floor, the
+ * same floor under the container query, and the thumb's aspect ratio — and this
+ * format restates all three. `auto-fill` is kept, which is the whole reason a
+ * floor is the control: one image in a wide pane fills one 220px column rather
+ * than stretching across the note, and a dozen still wrap into rows.
+ *
+ * THE CHIPS ARE UNTOUCHED, ON THE READER'S CALL. A gallery category is only
+ * OFFERED to one holding nothing but images (`offeredFormats`), but a PDF can
+ * land on it afterwards — and then it is a chip under the grid, exactly as in
+ * the default shape. Nothing a reader dropped on a shelf ever stops being
+ * visible because of how the shelf is drawn. */
+.ca-journal-attach-zone.is-gallery .ca-journal-attach-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+/* The narrow pane gets the same treatment the default does — a smaller floor,
+   not the same one — because two 220px columns do not fit in 380px and a floor
+   wider than the container is a one-column grid with a scrollbar. It stays
+   larger than the default's 96px: this format is a request for bigger previews
+   at every width, not only at the wide one. */
+@container (max-width: 380px) {
+  .ca-journal-attach-zone.is-gallery .ca-journal-attach-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+/* Wider than it is tall, where the default is 4:3. A gallery is being read as
+   pictures rather than as a list of files, and the extra width is what the
+   larger tile is for. `object-fit: cover` above still does the cropping, so no
+   image is ever distorted by this. */
+.ca-journal-attach-zone.is-gallery .ca-journal-attach-thumb {
+  aspect-ratio: 3 / 2;
+}
+
+/* ── ORDERED LIST: ONE LANE, ONE ROW PER ITEM ────────────────────────────
+ *
+ * *"images should not have a preview, just the link to them."* So the renderer
+ * sends everything down the chip lane and the gallery lane is left empty —
+ * `render()` says why the format is asked before the kind. All this sheet has
+ * to do is stop the lane being a wrapping row of pills and make it a column.
+ *
+ * `flex-wrap: nowrap` IS NOT REDUNDANT BESIDE `flex-direction: column`. Without
+ * it a column flex container wraps into COLUMNS once its children overflow the
+ * height — which is exactly what happens inside a fold with a height cap on it,
+ * and a numbered list that continues in a second column beside itself is the
+ * one thing an ordered list must not do. */
+.ca-journal-attach-zone.is-list .ca-journal-attach-chips {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--ca-space-1);
+}
+/* A row, not a pill: the chip's own `max-width: 100%` is already the width of
+   the lane, but `inline-flex` sizes it to its content, and `34ch` on the title
+   leaves a short filename sitting in a pill a third of the way across a list.
+   The radius comes down with it — a stack of full-width pills reads as a row of
+   buttons. */
+.ca-journal-attach-zone.is-list .ca-journal-attach-chip {
+  display: flex;
+  max-width: none;
+  border-radius: var(--ca-radius-sm);
+}
+.ca-journal-attach-zone.is-list .ca-journal-attach-chip-title {
+  max-width: none;
+}
+/* ── EVERY ROW THE HEIGHT OF THE TALLEST KIND (1.0.49 §6) ────────────────
+ *
+ * *"some links have a subtext while others don't, so make the ones that don't
+ * the same size as the ones that do."*
+ *
+ * A chip's body is one line or two: a link the reader captioned shows its host
+ * under the caption, and everything else shows a title alone. In a wrapping row
+ * of pills nobody notices; in a numbered column it is a list whose rows are two
+ * different heights, which is the thing that stops it reading as a list.
+ *
+ * THE FLOOR IS COMPUTED FROM THE TYPE, NOT TYPED IN. Two lines is the title's
+ * own line box (`line-height: 1.25` on a body at the chip's size) plus the
+ * sub's (the same 1.25 on `--ca-text-2xs`), so the tokens stay the only place a
+ * size is stated and a change to either moves this with it. A literal `2.2em`
+ * would be the same number derived twice and wrong the moment one of them
+ * moved.
+ *
+ * AND THE LONE LINE IS CENTRED IN IT, so the icon, the number and the title of
+ * a one-line row sit on one line through the middle of the row — the reading
+ * the eye wants. Top-aligning it would keep every title on one grid line and
+ * leave each short row looking top-heavy beside its own icon, which is centred
+ * by the chip.
+ *
+ * `flex: 1 1 auto` IS HERE RATHER THAN BESIDE IT because it is the same claim:
+ * in a column the body is the part that takes the width, which is also what
+ * pushes the two move chevrons to the right-hand end of the row. */
+.ca-journal-attach-zone.is-list .ca-journal-attach-chip-body {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-height: calc(1.25em + 1.25 * var(--ca-text-2xs));
+}
+/* ── THE TWO MOVE CHEVRONS (1.0.49 §6) ──────────────────────────────────
+ *
+ * Drawn only on a numbered row (`renderAttachmentChip` says why), so the class
+ * is its own condition and needs no `.is-list` in front of it.
+ *
+ * AND THE 30px RESET, SIXTH TIME THIS RELEASE. app.css gives every `<button>`
+ * `height: var(--input-height)`, and nothing but `height: auto; min-height: 0`
+ * in this rule escapes it — a 30px control in a ~24px row is how that trap
+ * announces itself. See `obsidian-button-height`.
+ *
+ * FAINT UNTIL IT IS WANTED. These sit inside the row rather than over it, so
+ * they are always drawn — unlike the `⋯`, which is absolutely positioned and
+ * can afford to appear on hover. Muted is what keeps a column of them from
+ * reading as a column of buttons with some text beside it. */
+.ca-journal-attach-move {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: auto;
+  min-height: 0;
+  padding: 2px;
+  border: none;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.ca-journal-attach-move svg {
+  width: 14px;
+  height: 14px;
+}
+.ca-journal-attach-move:hover {
+  color: var(--text-normal);
+}
+/* An end of the list: dimmed and inert, which is the sentence "this one is
+   already first" drawn rather than written. The tooltip says it in words. */
+.ca-journal-attach-move.is-static {
+  opacity: 0.3;
+  cursor: default;
+}
+.ca-journal-attach-move.is-static:hover {
+  color: var(--text-faint);
+}
+/* THE NUMBER. `tabular-nums` so 9. and 10. put their dots in the same place,
+   and a minimum width so a list that runs past ten does not shift its icons
+   right by half a character halfway down. Muted, because the number is the
+   list's structure rather than the reader's content. */
+.ca-journal-attach-index {
+  flex: 0 0 auto;
+  min-width: 1.6em;
+  text-align: right;
+  color: var(--text-faint);
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Toolbar + empty/busy hints.
    THE TOOLBAR'S OWN ROW IS GONE (5.14): "Add file", "Add link" and the paste
    hint were a flex row built INSIDE the drop zone, under the chips. They are
@@ -586,10 +763,26 @@
 .ca-journal-attach-file-input {
   display: none;
 }
+/* ── AND THE 30px RESET, FIFTH TIME THIS RELEASE (1.0.49 §3) ────────────
+ *
+ * app.css gives every `<button>` `height: var(--input-height)` — 30px — and
+ * padding, font-size and line-height cannot reach it; `height: auto;
+ * min-height: 0` is the only thing that does. See `obsidian-button-height`: the
+ * signature is that resetting it looks like no visual change at all, because the
+ * control was already drawing its own metrics INSIDE a box 6px taller than them.
+ *
+ * IT DID NOT MATTER UNTIL THESE MOVED. The pills sat on a full-width row of
+ * their own, where 30px is just a tall row; *"the diary and journal attachment
+ * sections should look more similar"* put them on the TITLE row, whose collapsed
+ * height is `--ca-sec-bar-h` — `calc(1.35 * var(--ca-sec-title-size) + 2 *
+ * var(--ca-sec-pad))` — so an unreset pill silently inflates every shelf head in
+ * the plugin, and a folded shelf most of all. */
 .ca-journal-attach-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  height: auto;
+  min-height: 0;
   padding: var(--ca-space-2) var(--ca-space-5);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--ca-radius-pill);

@@ -766,7 +766,7 @@
   /* Rows breathe more than columns: the columns are already separated by the
      weekday key above them, whereas consecutive weeks have nothing between
      them but the gap. */
-  gap: 5px 3px;
+  gap: 5px 4px;
 }
 
 /* WHY rem AND NOT em (2.51.3). `--jc-weekcol` was `2.25em`, read in two rules:
@@ -944,10 +944,20 @@
    With an edge to sit against they read as marks on a day.
 
    An inset shadow rather than a border because a border would join the grid's
-   `gap` and change every cell's box; and because .ca-cal-cell-today already draws
-   its ring the same way, so today simply replaces this rule instead of wearing
-   both. The one consequence worth knowing: the two can't be tuned apart later
-   without moving one onto a pseudo-element.
+   `gap` and change every cell's box.
+
+   THE DAY THIS RULE WARNED ABOUT ARRIVED IN 1.0.49. It said the two rings
+   "can't be tuned apart later without moving one onto a pseudo-element", and
+   that is exactly what the span bars forced: today's accent ring is now
+   `.ca-cal-cell-today::after`, and this 10% ring stays on the element where it
+   belongs. Two consequences, both wanted: the hover rule below no longer takes
+   today's ring away for the duration of a hover, which it silently did for five
+   releases — and the accent ring is free to sit somewhere this one cannot.
+   Today's ring sits in exactly this band and REPLACES it — same inset, same
+   width, same radius, drawn over it by the pseudo-element — which is the
+   reader's third call on the same corner: *"it should basically be touching the
+   edge / replacing it, but not extend past it."* So there is one edge on a day
+   cell at any moment; what changes is its colour.
 
    color-mix on --text-normal rather than a fixed rgba, so it inverts with the
    theme — a white hairline on dark, a black one on light, both at 5%. */
@@ -999,10 +1009,66 @@
    inverts. `--text-on-accent` is for a SOLID fill and would put white on
    lavender for every light-theme reader. */
 .ca-cal-cell-today {
-  box-shadow: inset 0 0 0 var(--ca-rule) var(--interactive-accent);
   background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
   color: var(--text-normal);
   font-weight: 700;
+}
+/* ── TODAY'S RING IS THE CELL'S OWN EDGE, AND THE TRIP PAINTS OVER IT ───
+   THE REPORT: *"current day cell on calendar outline does not line up well at
+   the top when a spanning event is active."* It did not line up because the
+   two marks were different kinds of thing stacked on each other. The ring was
+   an inset box-shadow painting y 0→2px; a span bar is a real child div, and it
+   sat at `top: 2px` and 3px tall — so today-inside-a-trip drew two abutting
+   horizontal bands of different offset, weight and colour, and the two
+   literals that had to agree (`top` and `--ca-rule`) were independent.
+
+   THREE ANSWERS, AND THE READER DREW THE LINE AT THE THIRD. First the ring went
+   ON TOP of the bars; then *"the day cell should have its outline shifted in,
+   the event line should be on top"*, so it moved inward by the bar's height;
+   then, on seeing that: *"move the day cell outline much closer to the inner
+   edge (it should basically be touching the edge / replacing it, but not extend
+   past it)"*. An inset ring at `inset: 0` is exactly that — it REPLACES
+   `.ca-cal-cell`'s own 10% edge, in the same 2px band at the same radius, and
+   an inset shadow cannot reach outside the box it is drawn in.
+
+   WHAT ACTUALLY FIXED THE STEP, through all three, is the other half and it has
+   not moved since: `.ca-cal-bars` sits at `top: 0` and z-index 2, so the bar
+   OWNS the top `--ca-cal-bar-h` of the cell and paints over whatever is under
+   it. The two marks never have to be reconciled, because one covers the other
+   rather than abutting it — which is also why the ring can now go back to the
+   cell's edge without the step coming back.
+
+   STILL A PSEUDO-ELEMENT, THOUGH IT NO LONGER HAS TO BE. `.ca-cal-cell:hover`
+   is (0,2,0) and `.ca-cal-cell-today` is (0,1,0), so a ring written on the
+   element is replaced by the hover's 20% grey one — today loses its accent
+   edge under the pointer, which it did for every release before this one. An
+   `::after` is not in that cascade.
+
+   z-index 1, UNDER the bars (2) and under `.ca-cal-badge` (2, and later in the
+   tree). `pointer-events: none` because the cell's own click is the whole
+   control. */
+.ca-cal-cell-today::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--ca-radius-sm);
+  box-shadow: inset 0 0 0 var(--ca-rule) var(--interactive-accent);
+  pointer-events: none;
+}
+/* AND THE ONE SELECTOR THAT NEVER EXISTED. `.ca-cal-cell[class*="cal-tint-"]`
+   is (0,2,0) and `.ca-cal-cell-today` is (0,1,0), so for as long as both have
+   existed a today inside a trip has LOST its accent wash to the event tint —
+   silently, because the cell still had its ring and nobody missed a 16% mix
+   they had not been told to expect. The two are not alternatives: one says
+   which day it is and the other says what the day is part of. Layering the
+   accent over the tint is the only reading that keeps both facts. */
+.ca-cal-cell-today[class*="cal-tint-"] {
+  background: color-mix(
+    in srgb,
+    var(--interactive-accent) 16%,
+    var(--ca-ev-tint, transparent)
+  );
 }
 .ca-cal-cell-has-entry {
   font-weight: 600;
@@ -1039,7 +1105,13 @@
    decoration and the day's own data. */
 .ca-cal-bars {
   position: absolute;
-  top: 2px;
+  /* FLUSH WITH THE TOP EDGE SINCE 1.0.49, and ABOVE today's ring. The 2px was
+     clearance for a ring at the cell's edge; the ring is inset by this band's
+     own height now, so the offset was buying a step in the one place it was
+     meant to prevent one. A trip's band is the top of the row, in every cell,
+     today or not — *"the event line should be on top."* */
+  top: 0;
+  z-index: 2;
   left: 0;
   right: 0;
   display: flex;
@@ -1048,13 +1120,19 @@
   pointer-events: none;
 }
 .ca-cal-bar {
-  height: 3px;
+  height: var(--ca-cal-bar-h);
   border-radius: 2px;
   background: var(--ca-ev-grey);
-  /* The grid puts a 3px gap between cells. A bar that stopped at the cell edge
-     would leave a comb of gaps across a five-day trip, so the middle of a span
-     deliberately bleeds 4px each way to meet the next cell's bar. */
-  margin: 0 -4px;
+  /* THE BLEED IS HALF THE COLUMN GAP, AND THAT IS THE WHOLE RULE (1.0.49).
+     A bar that stopped at the cell edge would leave a comb of gaps across a
+     five-day trip, so the middle of a span bleeds out to meet its neighbour's
+     bar. It used to bleed 4px into a 3px gap, which is 1px INTO the next
+     cell's box — across today's rounded corner, with a square cap, which is
+     the other half of what the outline report was looking at. Two bars that
+     each reach the middle of the gap join exactly and overhang nothing, so
+     the gap went to 4 and the bleed to 2. Change one and change the other.
+     A cap (`-start`, `-end`, the week-edge clips) is the bleed cancelled. */
+  margin: 0 -2px;
 }
 .ca-cal-bar-start { margin-left: 2px; border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
 .ca-cal-bar-end { margin-right: 2px; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
@@ -1195,7 +1273,10 @@
    rather than swamping a cell half the size. */
 .ca-jc-embedded .ca-cal-badge { width: 12px; height: 12px; }
 .ca-jc-embedded .ca-cal-badge svg { width: 11px; height: 11px; }
-.ca-jc-embedded .ca-cal-bar { height: 2px; }
+/* THE TOKEN, NOT THE HEIGHT (1.0.49): today's inset ring reads the same
+   property, so a lighter bar in the embedded grid moves the ring with it
+   instead of leaving it assuming three pixels. */
+.ca-jc-embedded { --ca-cal-bar-h: 2px; }
 .ca-jc-embedded .ca-cal-more { font-size: 0.55em; }
 
 .ca-jc-year-grid {

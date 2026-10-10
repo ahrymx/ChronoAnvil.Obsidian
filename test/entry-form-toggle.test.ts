@@ -108,9 +108,60 @@ describe("a field's own line is the bar", () => {
   it("takes the token off again, byte for byte", () => {
     const text = composeEntryTemplate("daily");
     const off = save(text, { attachments: "widget" });
-    expect(off).toContain("attach:attachments#widget|Attachments\n");
+    expect(off).toContain("attach:attachments#widget|Files & Links\n");
     const on = save(off, { attachments: "section" });
     expect(on).toBe(text);
+  });
+
+  it("answers on the section's own line, and leaves its categories alone", () => {
+    // WHAT THE TOGGLE DOES TO A SECTION THAT SHIPS A LIST (1.0.49 §5). The
+    // answer is written on the section's own line, which is the FIRST category
+    // — so the tick bares that shelf and nothing else. That is the honest
+    // reading of it now that §4 made the section's head the renderer's: the
+    // label on a category line names the shelf, not the section, and a shelf
+    // drawn bare is a drop zone under a head that still says Attachments.
+    //
+    // THE OTHER CATEGORIES ARE NOT TOUCHED, which is the half worth pinning: a
+    // write that reached them would be the editor renaming a shelf nobody
+    // asked it about, and the Categories window is the only thing that does
+    // that.
+    const text = composeEntryTemplate("daily");
+    const off = save(text, { attachments: "widget" });
+    expect(off).toContain("attach:images|Images\n");
+    expect(off).not.toContain("attach:images#widget");
+    expect(save(off, { attachments: "section" })).toBe(text);
+  });
+
+  it("leaves a category's render format alone, both ways (§6)", () => {
+    // ONE LINE, TWO ANSWERS, AND NEITHER MAY TOUCH THE OTHER (1.0.49 §6). A
+    // category's shape is a `#token` on the same line the form toggle writes
+    // its own token on, so the two are one `withToken` call apart — and the
+    // grammar's rule is what keeps them independent: add at the end, remove by
+    // name, carry everything else.
+    //
+    // PROVED RATHER THAN ASSUMED. A recompose reads this band back through
+    // `COMPOSED_BAND_LINES`, which matches a line by `keyword:key` — so a
+    // flagged category is still one of the plugin's own lines and not a
+    // reader's stray. If that match were on the whole line instead, the
+    // toggle's save would report this category as a drop and take it out.
+    const text = composeEntryTemplate("daily").replace(
+      "attach:images|Images",
+      "attach:images#gallery|Images"
+    );
+    const off = save(text, { attachments: "widget" });
+    expect(off).toContain("attach:images#gallery|Images\n");
+    expect(off).toContain("attach:attachments#widget|Files & Links\n");
+    expect(save(off, { attachments: "section" })).toBe(text);
+
+    // And a format on the line the toggle itself writes on survives being
+    // ticked and unticked — the one case where both tokens are on one line.
+    const both = text.replace(
+      "attach:attachments|Files & Links",
+      "attach:attachments#gallery|Files & Links"
+    );
+    const ticked = save(both, { attachments: "widget" });
+    expect(ticked).toContain("attach:attachments#gallery#widget|Files & Links\n");
+    expect(save(ticked, { attachments: "section" })).toBe(both);
   });
 
   it("keeps the reader's own wording when it is drawn as a widget", () => {
@@ -136,12 +187,12 @@ describe("a field's own line is the bar", () => {
     // the row puts the catalogue's title back beside the token, which is
     // `withLabel`'s rule rather than a migration.
     const text = composeEntryTemplate("daily").replace(
-      "attach:attachments|Attachments",
+      "attach:attachments|Files & Links",
       "attach:attachments"
     );
     expect(formOn(text, "attachments")).toBe("widget");
     const next = save(text, { attachments: "widget" });
-    expect(next).toContain("attach:attachments#widget|Attachments\n");
+    expect(next).toContain("attach:attachments#widget|Files & Links\n");
     expect(formOn(next, "attachments")).toBe("widget");
   });
 

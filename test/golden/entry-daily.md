@@ -25,7 +25,8 @@ note:focus#line:What are you focusing on today?|Today's focus
 list:highlights:What went well?|Highlights
 list:challenges:What got in the way?|Challenges
 note:log:Notes, reflections & learnings…|Notes, reflections & learnings
-attach:attachments|Attachments
+attach:attachments|Files & Links
+attach:images|Images
 tasks:todo|Tasks
 note:capture#collapse:Captured thoughts land here…|Captured
 ```
@@ -43,6 +44,9 @@ note:capture#collapse:Captured thoughts land here…|Captured
 -->
 
 <!--chronoanvil:attachments
+-->
+
+<!--chronoanvil:images
 -->
 
 <!--chronoanvil:todo

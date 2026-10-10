@@ -309,9 +309,9 @@ describe("which lines of a welded fence the index owns", () => {
       .toBeGreaterThan(1);
     expect(span.to).toBe(lines.length);
 
-    const andAnother = [...lines, "header:1:📚 Resources", "resource-shelf:reading"];
+    const andAnother = [...lines, "header:1:📎 Attachments", "resource-shelf:reading"];
     const shorter = belowSpanIn(andAnother)!;
-    expect(andAnother[shorter.to]).toBe("header:1:📚 Resources");
+    expect(andAnother[shorter.to]).toBe("header:1:📎 Attachments");
   });
 
   it("answers null for a fence with no index in it", () => {

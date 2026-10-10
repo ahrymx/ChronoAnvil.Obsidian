@@ -2388,10 +2388,20 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   },
 
   {
+    // ── THE ID IS NOT THE NAME, AND IT STAYS `resources` (1.0.49 §4) ────
+    //
+    // *"Rename this section to 'Attachments' for both the diary and journal."*
+    // The label, the icon and the heading this writes are the rename; the id is
+    // not. It is what a stored template and every reconciler plan name this
+    // section BY — `locate` finds the section by its `attach:` directive, not
+    // by its heading — so changing it would orphan every template a reader has
+    // saved and read as a removal plus an addition on every note that has one.
+    // The diary's half of the same section has used `attachments` for its id
+    // since 3.11 and they have never had to agree.
     id: "resources",
-    icon: "📚",
+    icon: "📎",
     category: "writing",
-    label: "Resources",
+    label: "Attachments",
     blurb: "Attached files and links, as a row of tiles.",
     surface: "both",
     locked: false,
@@ -2406,16 +2416,28 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         label: "this section's title",
         directive: "header",
         settled: TITLE_SETTLED,
-        placeholder: "📚 Resources",
+        placeholder: "📎 Attachments",
       },
     ],
     claims: ["header", "attach"],
     locate: (t) => probe(t, /^attach:/m),
     render: (_ctx, opts) => {
+      // THE DEFAULT CATEGORY IS NOT THE SECTION'S NAME, and this half can
+      // afford to say so: the `header:` line below carries the section's name,
+      // so `Files` names the category and nothing is said twice. The diary's
+      // half cannot — it has no `header:` line, so its one `attach:` label is
+      // the only name of that section in the note and stays `Attachments`.
+      // `entry-sections.ts` records what renaming it to match costs.
       const fields = opts?.fields ?? [{ key: "resources", label: "Files" }];
       return [
         headerBar(
-          opts?.label ?? "📚 Resources",
+          // RENAMED IN 1.0.49 §4, AND ONLY FOR NEW SECTIONS. A note already
+          // carrying `header:📚 Resources` keeps it — that line is the
+          // reader's text, the fold key is built from it, and `locate` finds
+          // this section by its `attach:` directive rather than by its
+          // heading. So the rename reaches new notes and the title box, and
+          // nothing already written moves.
+          opts?.label ?? "📎 Attachments",
           ...fields.map((f) => `attach:${f.key}|${f.label}`)
         ),
         ...fields.map((f) => region(f.key)),

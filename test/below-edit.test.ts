@@ -1183,14 +1183,20 @@ describe("where the removal control lives", () => {
     expect(text.slice(at)).not.toContain("buildRemove");
   });
 
-  it("wears the other hosted button's shape rather than a third one", () => {
-    // `buildAddCategoryButton` is the other control hung in a `header:` bar on
-    // this surface. Same wrapper, same button classes, same icon slot — so it
-    // sits at the create button's height and needs no rule of its own.
+  it("wears a hosted button's shape rather than a third one", () => {
+    // Same wrapper, same button classes, same icon slot as the create button it
+    // sits beside — so it sits at that height and needs no rule of its own.
+    //
+    // IT USED TO CITE THE CATEGORIES CONTROL AS THE OTHER HOSTED BUTTON, and
+    // that comparand is gone: 1.0.49 §3 moved that door onto the bar's TITLE
+    // row as a chevron-sized cog, because a labelled pill in `frame.actions` is
+    // a full-width row for one control. This button is still a labelled pill
+    // and still belongs in the strip — it names an act on what is TICKED,
+    // which is not chrome and has no fold to sit beside.
     const text = src();
     expect(text).toContain('cls: "ca-journal-btn ca-journal-btn-subtle"');
     expect(text).toContain("ca-journal-widget ca-journal-button");
-    expect(readCode("ui/widgets/attachment-widgets")).toContain(
+    expect(readCode("ui/widgets/attachment-widgets")).not.toContain(
       'cls: "ca-journal-btn ca-journal-btn-subtle"'
     );
   });

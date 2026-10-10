@@ -19,7 +19,8 @@ note:focus#line:What's the theme for this quarter?|Focus
 list:highlights:What went well?|Highlights
 list:challenges:What got in the way?|Challenges
 note:log:Notes, reflections & learnings…|Notes
-attach:attachments|Attachments
+attach:attachments|Files & Links
+attach:images|Images
 tasks:todo|Goals this quarter
 ```
 
@@ -36,6 +37,9 @@ tasks:todo|Goals this quarter
 -->
 
 <!--chronoanvil:attachments
+-->
+
+<!--chronoanvil:images
 -->
 
 <!--chronoanvil:todo

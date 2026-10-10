@@ -231,7 +231,7 @@ describe("fieldDirective", () => {
 
   it("omits the placeholder segment when there isn't one", () => {
     const f = getField("attachments", "daily") as DiaryField;
-    expect(fieldDirective(f)).toBe("attach:attachments|Attachments");
+    expect(fieldDirective(f)).toBe("attach:attachments|Files & Links");
   });
 
   it("emits a collapse variant", () => {

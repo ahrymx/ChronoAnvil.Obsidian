@@ -3889,7 +3889,10 @@ describe("shipped monthly template", () => {
     expect(monthly).not.toContain("links:home,today,scopes#diary");
     expect(monthly).toContain("note:focus#line:");
     expect(monthly).toContain("note:log:");
-    expect(monthly).toContain("attach:attachments|Attachments");
+    // Two shelves since 1.0.49 §5, and the first one's name is the shelf's
+    // rather than the section's — the section is named by the renderer.
+    expect(monthly).toContain("attach:attachments|Files & Links");
+    expect(monthly).toContain("attach:images|Images");
     expect(monthly).toContain("tasks:todo|Goals this month");
   });
 
@@ -3897,7 +3900,15 @@ describe("shipped monthly template", () => {
     // A `note:`/`tasks:` directive with no matching region renders an empty
     // widget that writes nowhere — the failure is invisible until you type in
     // it and lose the text.
-    const keys = ["focus", "highlights", "challenges", "log", "attachments", "todo"];
+    const keys = [
+      "focus",
+      "highlights",
+      "challenges",
+      "log",
+      "attachments",
+      "images",
+      "todo",
+    ];
     const regions = allNoteRegions(monthly).map((r) => r.key);
     for (const key of keys) expect(regions).toContain(key);
   });

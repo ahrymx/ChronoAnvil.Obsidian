@@ -28,7 +28,7 @@
 // file's.
 
 import { describe, expect, it } from "vitest";
-import { readCss, readSrc, styleSheets } from "./sources";
+import { readCode, readCss, readSrc, styleSheets } from "./sources";
 import {
   DEFAULT_SOURCES,
   EMPTY_WINDOW,
@@ -42,10 +42,14 @@ import {
   COMPACT_RAIL_STEP,
   FULL_DAY_WINDOW,
   boxDay,
+  laneRowCount,
+  laneRuns,
   packBoxes,
+  packLaneRuns,
   placeSpan,
   tallyAllDay,
   type AllDayItem,
+  type LaneRun,
   railHours,
   shortHourLabel,
   SNAP_MINUTES,
@@ -1115,6 +1119,10 @@ describe("the all-day lane, counted", () => {
     title: key,
     day: 2,
     key,
+    // A task's identity is its own and its day's — it can never span, and
+    // `laneRuns` is what would group two of them if it could.
+    ident: `${key}:2`,
+    pos: "solo",
   });
 
   it("is one chip per colour, holding everything of it", () => {
@@ -1131,6 +1139,357 @@ describe("the all-day lane, counted", () => {
 
   it("is nothing at all on a day with nothing due", () => {
     expect(tallyAllDay([])).toEqual([]);
+  });
+});
+
+// ── 1.0.49: a trip is one chip across its own columns ───────────────────
+//
+// THE REPORT: *"time calendar not showing any text on mobile view (possibly to
+// narrow?)"* It IS too narrow, and `99-time-grid.css` holds the measurement
+// that says so — a name is hidden below 560px because seven columns divide
+// 360px into 45 each, which was 1.0.19's answer to the opposite report.
+//
+// THE ANSWER IS A WIDER BOX, NOT A SMALLER BREAKPOINT. A four-day trip already
+// owns four of those columns; it was simply being drawn as four stubs. One chip
+// across them has 180px, on the same phone, at the same font size, with
+// 1.0.19's finding intact for a box of one day.
+
+describe("the all-day lane, as spans", () => {
+  const week = [0, 1, 2, 3, 4, 5, 6];
+  // One day of a multi-day event. `pos` is the TRUE span's, straight off
+  // `EventOccurrence` — which is the whole reason a chip can know that the
+  // trip began before the week it is drawn in.
+  const trip = (
+    id: string,
+    day: number,
+    pos: AllDayItem["pos"],
+    color = "blue"
+  ): AllDayItem => ({
+    source: "events",
+    color,
+    title: id,
+    day,
+    key: `event:${id}:day${day}`,
+    ident: `event:${id}`,
+    pos,
+  });
+  const task = (day: number, text: string): AllDayItem => ({
+    source: "tasks",
+    color: "red",
+    title: text,
+    day,
+    key: `task:n.md:${text}`,
+    ident: `task:n.md:${text}:${day}`,
+    pos: "solo",
+  });
+
+  it("welds the days of one trip into a single run", () => {
+    const runs = laneRuns(
+      [trip("t", 1, "start"), trip("t", 2, "mid"), trip("t", 3, "end")],
+      week
+    );
+    expect(runs).toHaveLength(1);
+    expect(runs[0].col).toBe(1);
+    expect(runs[0].span).toBe(3);
+    expect(runs[0].members).toHaveLength(3);
+    // ONE MEMBER SPEAKS FOR THE RUN, and it is the first drawn day: that is
+    // whose key the chip's press follows.
+    expect(runs[0].item.key).toBe("event:t:day1");
+    // A trip whose both ends are on screen is capped at neither.
+    expect(runs[0].clipLeft).toBe(false);
+    expect(runs[0].clipRight).toBe(false);
+  });
+
+  it("caps the end that runs out of the week, not out of the window", () => {
+    // A trip that began last month: `pos` on its first DRAWN day is "mid", so
+    // the chip is capped square at the left even though the lane has no item
+    // to the left of it to notice. The items alone could not answer this —
+    // which is why `pos` is on the model rather than inferred from adjacency.
+    const [run] = laneRuns([trip("t", 0, "mid"), trip("t", 1, "end")], week);
+    expect(run.clipLeft).toBe(true);
+    expect(run.clipRight).toBe(false);
+    const [other] = laneRuns([trip("u", 5, "start"), trip("u", 6, "mid")], week);
+    expect(other.clipLeft).toBe(false);
+    expect(other.clipRight).toBe(true);
+    // AND THE DAY A TRIP ENDS IS THE ONLY DAY OF IT ON SCREEN. Both ends of
+    // the predicate have to be read as "this is not where the thing begins /
+    // ends" rather than as a list of the two middles, or a trip reaching into
+    // this week from the last one is drawn with a rounded start it never had.
+    const [tail] = laneRuns([trip("v", 0, "end")], week);
+    expect(tail.clipLeft).toBe(true);
+    expect(tail.clipRight).toBe(false);
+    const [head] = laneRuns([trip("w", 6, "start")], week);
+    expect(head.clipLeft).toBe(false);
+    expect(head.clipRight).toBe(true);
+  });
+
+  it("never caps a thing that is the whole of itself", () => {
+    // "solo" is a task, a birthday, a one-day event. It is not a middle and it
+    // is not an end, so a predicate written as "not the start" alone would cap
+    // every chip in the lane and claim each one continued into a week nobody
+    // can look at.
+    const [chore] = laneRuns([task(2, "water")], week);
+    expect([chore.clipLeft, chore.clipRight]).toEqual([false, false]);
+    const [party] = laneRuns([trip("b", 4, "solo")], week);
+    expect([party.clipLeft, party.clipRight]).toEqual([false, false]);
+  });
+
+  it("clips a narrowed window to the columns actually drawn", () => {
+    // A 3-day view of a 5-day trip. The run is the three drawn days and both
+    // ends are caps, which falls out of `pos` without the function being told
+    // the window was narrowed.
+    const items = [
+      trip("t", 1, "start"),
+      trip("t", 2, "mid"),
+      trip("t", 3, "mid"),
+      trip("t", 4, "mid"),
+      trip("t", 5, "end"),
+    ];
+    const [run] = laneRuns(items, [2, 3, 4]);
+    expect(run.col).toBe(0);
+    expect(run.span).toBe(3);
+    expect(run.clipLeft).toBe(true);
+    expect(run.clipRight).toBe(true);
+  });
+
+  it("splits one ident into two runs across a gap", () => {
+    // NOT A SHAPE A SPAN CAN HAVE, which is exactly why it is asserted: the
+    // alternative is one chip drawn across a day the thing is not on.
+    const runs = laneRuns([trip("t", 1, "mid"), trip("t", 4, "mid")], week);
+    expect(runs.map((r) => [r.col, r.span])).toEqual([
+      [1, 1],
+      [4, 1],
+    ]);
+  });
+
+  it("asks the day whether two cells are adjacent, not the column", () => {
+    // THE AGREEMENT THAT WOULD STOP BEING TRUE QUIETLY. `visibleDays` returns
+    // a contiguous window, so for every grid the plugin can draw today the two
+    // questions have the same answer. On a window of Monday, Wednesday and
+    // Friday they do not: Monday's chip is drawn NEXT TO Wednesday's, and a
+    // run welded on column adjacency would be a trip drawn across a Tuesday it
+    // does not cover.
+    const runs = laneRuns([trip("t", 0, "start"), trip("t", 2, "end")], [0, 2, 4]);
+    expect(runs.map((r) => [r.col, r.span])).toEqual([
+      [0, 1],
+      [1, 1],
+    ]);
+  });
+
+  it("never groups two things that merely share a day", () => {
+    const runs = laneRuns([task(2, "water"), trip("t", 2, "solo")], week);
+    expect(runs).toHaveLength(2);
+    expect(runs.every((r) => r.span === 1)).toBe(true);
+    // And two identical task lines on consecutive days stay two things: the
+    // day welded into `ident` is what stops a repeated chore reading as a trip.
+    const chores = laneRuns([task(2, "water"), task(3, "water")], week);
+    expect(chores.map((r) => r.span)).toEqual([1, 1]);
+  });
+
+  it("keeps the order the lane already drew them in", () => {
+    // `tallyAllDay`'s rule, for the same reason: the sources produced these in
+    // an order and re-sorting them is a reordering nobody asked for.
+    const runs = laneRuns([trip("b", 4, "solo"), trip("a", 0, "solo")], week);
+    expect(runs.map((r) => r.item.title)).toEqual(["b", "a"]);
+  });
+
+  it("places only what spans more than one column", () => {
+    // A box of one day is an ordinary all-day item in an ordinary cell, where
+    // the count chip can still fold four of them into one `4`. It has nothing
+    // to gain from a row of its own and would cost the lane a row to say so.
+    const runs = laneRuns([task(2, "water"), trip("t", 3, "start"), trip("t", 4, "end")], week);
+    const { placed, spill } = packLaneRuns(runs, 3);
+    expect(placed).toHaveLength(1);
+    expect(placed[0].span).toBe(2);
+    expect(placed[0].row).toBe(0);
+    expect(spill.map((r) => r.item.title)).toEqual(["water"]);
+    expect(laneRowCount(placed)).toBe(1);
+  });
+
+  it("stacks two overlapping trips onto two rows", () => {
+    const runs = laneRuns(
+      [
+        trip("t", 0, "start"),
+        trip("t", 1, "mid"),
+        trip("t", 2, "end"),
+        trip("u", 1, "start", "green"),
+        trip("u", 2, "mid", "green"),
+        trip("u", 3, "end", "green"),
+      ],
+      week
+    );
+    const { placed } = packLaneRuns(runs, 3);
+    expect(placed.map((r) => [r.item.title, r.row])).toEqual([
+      ["t", 0],
+      ["u", 1],
+    ]);
+    expect(laneRowCount(placed)).toBe(2);
+  });
+
+  it("reuses a row once the trip on it has ended", () => {
+    // FIRST FIT, LEFT TO RIGHT — the property that makes a repaint produce the
+    // same rows as the paint before it. Two trips that do not overlap share a
+    // row rather than growing the lane for nothing.
+    const runs = laneRuns(
+      [
+        trip("t", 0, "start"),
+        trip("t", 1, "end"),
+        trip("u", 3, "start", "green"),
+        trip("u", 4, "end", "green"),
+      ],
+      week
+    );
+    const { placed } = packLaneRuns(runs, 3);
+    expect(placed.map((r) => r.row)).toEqual([0, 0]);
+    expect(laneRowCount(placed)).toBe(1);
+  });
+
+  it("shares a row with a trip that ends where the next begins", () => {
+    // THE BOUNDARY CASE THE TEST ABOVE CANNOT SEE. A row is free FROM the
+    // column after the trip on it, so a Monday-Tuesday trip and a
+    // Wednesday-Thursday one are one row — and the off-by-one that reads it as
+    // two is invisible on any pair with a day between them.
+    const runs = laneRuns(
+      [
+        trip("t", 0, "start"),
+        trip("t", 1, "end"),
+        trip("u", 2, "start", "green"),
+        trip("u", 3, "end", "green"),
+      ],
+      week
+    );
+    const { placed } = packLaneRuns(runs, 3);
+    expect(placed.map((r) => [r.col, r.row])).toEqual([
+      [0, 0],
+      [2, 0],
+    ]);
+  });
+
+  it("spills what will not fit back into its days instead of hiding it", () => {
+    // THE WORST CASE OF THIS FEATURE IS THE BEHAVIOUR THAT PRECEDED IT. A
+    // phone's lane has room for one chip, so the second overlapping trip is
+    // returned to the caller to be drawn in its day cells — where the count
+    // chip picks it up. Nothing is dropped.
+    const runs = laneRuns(
+      [
+        trip("t", 0, "start"),
+        trip("t", 1, "mid"),
+        trip("t", 2, "end"),
+        trip("u", 1, "start", "green"),
+        trip("u", 2, "end", "green"),
+      ],
+      week
+    );
+    const { placed, spill } = packLaneRuns(runs, 1);
+    expect(placed.map((r) => r.item.title)).toEqual(["t"]);
+    expect(spill.map((r) => r.item.title)).toEqual(["u"]);
+    // Every member of it, so the days can draw them one at a time.
+    expect(spill[0].members).toHaveLength(2);
+  });
+
+  it("accounts for every drawn item exactly once", () => {
+    // THE INVARIANT THE VIEW DEPENDS ON. The day cells draw the spill and the
+    // lane draws the placed runs, so an item in both is a trip counted twice
+    // and an item in neither has vanished from the week.
+    const items = [
+      trip("t", 0, "start"),
+      trip("t", 1, "mid"),
+      trip("t", 2, "end"),
+      trip("u", 1, "start", "green"),
+      trip("u", 2, "end", "green"),
+      task(2, "water"),
+      task(6, "post"),
+    ];
+    for (const rows of [0, 1, 2, 3]) {
+      const { placed, spill } = packLaneRuns(laneRuns(items, week), rows);
+      const seen = [...placed, ...spill].flatMap((r: LaneRun) => r.members.map((m) => m.key));
+      expect(new Set(seen).size).toBe(seen.length);
+      expect(new Set(seen)).toEqual(new Set(items.map((i) => i.key)));
+    }
+  });
+
+  it("is nothing at all on a lane with nothing in it", () => {
+    expect(laneRuns([], week)).toEqual([]);
+    expect(packLaneRuns([], 3)).toEqual({ placed: [], spill: [] });
+    expect(laneRowCount([])).toBe(0);
+  });
+});
+
+describe("the lane draws a span where a cell cannot", () => {
+  it("places the chip on the lane, past the gutter", () => {
+    const src = readSrc("time-grid-view");
+    // THE GUTTER IS COLUMN 1, so the first drawn day is column 2. Off by one
+    // here is a trip drawn a day early, which is legible and false — the same
+    // argument `placeInWindow` is tested on.
+    expect(src).toContain("`${2 + run.col} / span ${run.span}`");
+    expect(src).toContain("chip.style.gridRow = String(run.row + 1);");
+    // And the day cells sit under however many rows the spans took.
+    expect(src).toContain("cell.style.gridRow = String(spanRows + 1);");
+    // ONE ROW ON A PHONE, THREE WHEN EXPANDED.
+    expect(src).toContain("opts.compact ? 1 : 3");
+  });
+
+  it("draws a spill in its day's cell and a placed run nowhere else", () => {
+    // The view's half of the accounting invariant above: what the cells draw
+    // comes from `spill`, so a trip drawn as a chip cannot also be counted in
+    // four day boxes.
+    const src = readSrc("time-grid-view");
+    const at = src.indexOf("const perDay = new Map<number, AllDayItem[]>();");
+    expect(at).toBeGreaterThan(-1);
+    expect(src.slice(at, src.indexOf("cols.forEach", at))).toContain("for (const run of spill)");
+    expect(src).toContain("const mine = perDay.get(day) ?? [];");
+  });
+
+  it("asks the events store for the occurrence, not just the definition", () => {
+    // `eventsOnDay` returns definitions: it expands a one-day window and throws
+    // the occurrence away. `pos` is the part the lane needs, so the week is
+    // expanded once and read per day.
+    // READ WITH THE COMMENTS OUT, because the note above the new call names
+    // the function it replaced — which is where that argument belongs and
+    // which a substring sweep cannot tell from a live call.
+    expect(readCode("time-grid-view")).not.toContain("eventsOnDay");
+    const src = readSrc("time-grid-view");
+    expect(src).toContain("expandEvents(defs, dates[0], dates[dates.length - 1])");
+    expect(src).toContain("pos: occ.pos");
+    expect(src).toContain("ident: `event:${def.id}`");
+    // AND A TASK'S IDENT CARRIES ITS DAY. A task's key is its file and its
+    // text, with no date in it — one task has one due date — so two identical
+    // chore lines in one note due on consecutive days would share an ident and
+    // group into a two-day trip that does not exist. The pure function cannot
+    // see this; it is handed the idents.
+    expect(src).toContain("ident: `${key}:${day}`");
+    expect(src).toContain('pos: "solo"');
+  });
+
+  it("names a span at every width, and a box of one still only where it fits", () => {
+    // THE WHOLE POINT OF THE ROUND, and it is written as an exemption to the
+    // 560px gate rather than a replacement for it: 1.0.19's finding about a
+    // 45px column is still live, and a chip spanning two columns is not one.
+    const block = compactRules();
+    const hide = block.indexOf(".ca-tg:not(.is-expanded) .ca-tg-blk-title,");
+    const reveal = block.indexOf("@container (min-width: 560px)");
+    const span = block.indexOf(
+      ".ca-tg:not(.is-expanded) .ca-tg-chip.is-span .ca-tg-chip-title"
+    );
+    expect(hide).toBeGreaterThan(-1);
+    expect(reveal).toBeGreaterThan(hide);
+    // LAST, because it is the same specificity as the query's rule and has to
+    // win at every width.
+    expect(span).toBeGreaterThan(reveal);
+    const shown = block.slice(span, block.indexOf("}", span));
+    expect(shown).toContain("display: block");
+    expect(shown).toContain("text-overflow: ellipsis");
+    // The hour blocks are NOT exempted: a block is one column wide whatever
+    // its duration, so nothing about it got wider.
+    expect(shown).not.toContain("ca-tg-blk-title");
+  });
+
+  it("keeps the gutter a column rather than one row's cell", () => {
+    // The lane grows rows now. Left to auto-place, the gutter would sit beside
+    // the top span and leave the day cells a column short.
+    expect(readCss("99-time-grid")).toMatch(
+      /\.ca-tg-lane-label \{[^}]*grid-row: 1 \/ -1/
+    );
   });
 });
 

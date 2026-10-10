@@ -483,6 +483,21 @@
      been re-weighting all of them. */
   --ca-head-spine: var(--ca-rule-edge);
 
+  /* THE SPAN BAR'S WEIGHT, AND WHY TODAY'S RING READS IT (1.0.49).
+
+     TWO MARKS SHARE THE TOP EDGE OF A DAY CELL and they are drawn by different
+     mechanisms: the bar along the top of a day in a multi-day event is a real
+     child div, and today's accent outline is an inset shadow on a
+     pseudo-element. The reader's note on the first attempt was *"the day cell
+     should have its outline shifted in, the event line should be on top"* —
+     which makes the outline's inset exactly the bar's height. One number, so a
+     one-event day has the two marks adjacent and never crossing.
+
+     AND THE EMBEDDED MONTH GRID OVERRIDES THE TOKEN, not the height: it draws
+     a 2px bar, and before this it said so in a rule of its own while the ring
+     went on assuming 3. Setting this on `.ca-jc-embedded` moves both. */
+  --ca-cal-bar-h: 3px;
+
   /* THE STACKED CARD'S INSET, AND WHY IT IS A TOKEN RATHER THAN 14px TYPED NINE
      TIMES (1.0.45).
 
@@ -871,7 +886,21 @@ body.is-mobile {
    TAP TARGETS ONLY. A display chip that reports a count is not a target and
    growing it to 40px would push a table row half again as tall for nothing.
    The list is what a reader clicks, types into or taps, and it is written out
-   so the diff is auditable against it. */
+   so the diff is auditable against it.
+
+   ── AND ONE TAP TARGET IS OFF IT ON PURPOSE (1.0.49) ────────────────
+   `.ca-journal-habit-chip-btn` was on this list and had to come off. It is a
+   target — you tap a habit chip to tick it — but it is the only one that
+   lives inside a box with a FIXED height: a tracker cell is 66px, its
+   content box 50px, and the habits row gets 36px of that to hold TWO rows of
+   chips. A 40px pill in a 36px window is clipped by the cell's
+   `overflow: hidden`, so the floor that was meant to make it hittable was
+   making it unreadable instead. It keeps the desktop pill's size and
+   `--ca-radius-pill`, which is why it leaves the radius half of this rule
+   behind as well.
+
+   THE FLOOR IS NOT WRONG; THE CONTAINER IS FIXED. If the day comes that a
+   tracker cell sizes to its content, this line goes back. */
 body.is-mobile .ca-journal-btn,
 body.is-mobile .ca-journal-btn-ghost,
 body.is-mobile .ca-journal-btn-subtle,
@@ -885,7 +914,6 @@ body.is-mobile .ca-tpl-copy,
 body.is-mobile .ca-picker-row,
 body.is-mobile .ca-journal-attach-btn,
 body.is-mobile .ca-journal-tracker-add-btn,
-body.is-mobile .ca-journal-habit-chip-btn,
 body.is-mobile .ca-jq-recap-moved-btn,
 body.is-mobile .ca-jc-jump-row button,
 body.is-mobile .ca-jc-jump-row input,
@@ -1004,6 +1032,18 @@ body {
   --ca-border-subtle: var(--background-modifier-border);
   --ca-border-hover: var(--background-modifier-border-hover);
   --ca-border-focus: var(--interactive-accent);
+  /* A STATE'S EDGE, NOT A FOCUS RING (1.0.49). `--ca-border-focus` is the
+     accent at full strength, which is right for the one element the keyboard
+     is on and too loud for the several that are merely ticked: a logging cell
+     with four habits done and a mood chosen drew five full-accent hairlines
+     in 66 pixels, which is what *"too much border"* was describing. Mixed
+     against the ordinary border rather than against transparent, so the edge
+     stays an edge at 55% instead of fading to nothing on a light theme. */
+  --ca-border-accent-soft: color-mix(
+    in srgb,
+    var(--interactive-accent) 55%,
+    var(--background-modifier-border)
+  );
 
   /* Header-bar and section-title ink */
   --ca-bar-ink: var(--text-muted);

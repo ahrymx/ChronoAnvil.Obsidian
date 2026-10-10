@@ -885,16 +885,39 @@ describe("two rows of habit chips", () => {
     // The budget's largest single term. Left inherited (~1.5) the label eats
     // 16.8px of the 50 for one line of 11px uppercase text, and the `* 1.1` in
     // the cap above would then be subtracting less than the label spends.
+    //
+    // ── AND IT IS THE SHARED EYEBROW'S NOW, NOT THIS CELL'S (1.0.49) ───
+    // The habits cell was simply the first one whose budget anybody measured;
+    // the four pixels it bought were four pixels EVERY tracker cell was paying
+    // for an inherited line-height on a single nowrap line. So the declaration
+    // moved up to the rule all of them share, and this cell keeps only the
+    // padding that clears its pinned `+`. Asserted in both places on purpose:
+    // the budget above is still subtracting 1.1, and the thing that supplies
+    // it is a rule with thirty other readers.
+    const shared = cssRule(
+      ".ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label"
+    );
+    expect(shared).toContain("line-height: 1.1");
     const label = cssRule(".ca-journal-habits-cell > .ca-journal-widget-label");
-    expect(label).toContain("line-height: 1.1");
+    expect(label).toContain("padding-right: 24px");
+    expect(label).not.toContain("line-height");
   });
 
-  it("leave the mobile tap-target floor alone", () => {
-    // A habit chip is something you tap, so it keeps its 40px minimum and a
-    // phone shows one row. The fitter is what makes that honest — it counts the
-    // rows the box can show — rather than the stylesheet promising two.
+  it("take the mobile tap-target floor off the chip, which cannot hold it", () => {
+    // IT WAS ON THE LIST AND IT HAD TO COME OFF. A habit chip is a tap target,
+    // which is why it was there — and it is the only one that lives inside a
+    // box of FIXED height: 66px of cell, 50px of content, 36px of row for two
+    // rows of chips. A 40px pill in a 36px window is clipped by the cell's
+    // `overflow: hidden`, so the floor that was meant to make it hittable was
+    // what made it unreadable. The reader reported it as the cell's contents
+    // clipping into the bottom of the card.
+    //
+    // THE FLOOR IS NOT WRONG; THE CONTAINER IS FIXED. The rest of the list
+    // keeps it, which is the half of this that must not drift.
     const tokens = readCss("00-tokens");
-    expect(tokens).toContain("body.is-mobile .ca-journal-habit-chip-btn,");
+    expect(tokens).not.toContain("body.is-mobile .ca-journal-habit-chip-btn");
+    expect(tokens).toContain("body.is-mobile .ca-journal-tracker-add-btn,");
+    expect(tokens).toContain("min-height: var(--ca-control-min)");
   });
 
   it("count the rows the box can show instead of assuming two", () => {

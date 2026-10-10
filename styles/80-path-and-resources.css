@@ -217,8 +217,13 @@ body.is-mobile .ca-journal-path-del {
   min-width: calc(var(--ca-control-min) * 0.75);
 }
 
-/* ── Resources: three attachment sections ─────────────────────────────────
-   Docs / Tutorials / Practice sit under one collapsible "Resources" header,
+/* ── Attachments: three shelves in one section ────────────────────────────
+   RENAMED IN 1.0.49 §4 — the section the catalogue called Resources is called
+   Attachments now, which is the diary field's word for the same feature. The
+   `--res-*` keys below are the Study template's category keys and are note
+   data, so they do not move with the name.
+
+   Docs / Tutorials / Practice sit under one collapsible Attachments header,
    each with its own uppercase label and a fully-rounded input bar. The header
    plus the labels do the grouping, so — unlike the monthly review's joined
    highlights/challenges box — the sections are NOT fused into one squared-off
@@ -230,7 +235,7 @@ body.is-mobile .ca-journal-path-del {
   transition: border-color 0.15s ease;
 }
 /* THE THREE SHELVES STILL KEEP THEIR NAMES (5.14), and this is the rule that
-   nearly cost them. `header:📚 Resources` names ONE thing and three `attach:`
+   nearly cost them. `header:📎 Attachments` names ONE thing and three `attach:`
    shelves render under it, so the "a field under a bar that already names it
    draws no head" rule cannot be read off the fence's `header:` alone — it would
    have deleted Docs, Tutorials and Practice and left one anonymous stack of

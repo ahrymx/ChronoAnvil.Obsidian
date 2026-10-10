@@ -179,10 +179,49 @@ export const DIARY_FIELDS: DiaryField[] = [
     id: "attachments",
     kind: "attach",
     class: "daily",
-    label: "Attachments",
+    // ── TWO ATTACH FIELDS PER GRAIN AS OF 1.0.49 §5 ──────────────────
+    //
+    // *"rename the default category in the diary attachments section to
+    // 'Files & Links', add a second default category named 'Images'."*
+    //
+    // A CATEGORY IS A FIELD HERE, AND THAT IS NOT A NEW RULE. This registry is
+    // keyed by REGION, one entry per `<!--chronoanvil:key-->` a template ships
+    // — `test/fields.test.ts` reconstructs every grain's directive lines from
+    // it and pins its region list against the template's — and an attachment
+    // category is a region. So a second shipped category is a second field,
+    // and it has to be here or the composed template and the registry have
+    // drifted by construction.
+    //
+    // THE SECTION IS STILL ONE SECTION. `entry-sections.ts` composes both
+    // lines from one declaration and the renderer draws them as one card with
+    // two shelves; what is plural is the storage, which is exactly what this
+    // list describes. The Categories window is the authority on the list after
+    // the note is written, so an entry may end up with one category or five —
+    // this is only what a FRESH one ships.
+    //
+    // AND THE LABEL IS THE SHELF'S, NOT THE SECTION'S. The section's name is
+    // drawn by the renderer (`ATTACH_SECTION_TITLE`); these two name the
+    // shelves under it, which is why renaming this one to `Files & Links` no
+    // longer disagrees with anything — `plain-markdown.ts` exports a region
+    // under the directive's own label, so an exported entry comes out with
+    // `## Files & Links` and `## Images`, and those are the two things it
+    // actually holds. 1.0.49 §4 measured the version of this with ONE category
+    // and a label that disagreed with the registry; the fix is both halves
+    // moving together, which is what this is.
+    label: "Files & Links",
     // Counted, not read. diary-index.ts::countAttachments scans this region
     // for link syntax and never puts its text in the searchable body, so
     // rolling it up would gather markdown, not content.
+    rollup: "none",
+  },
+  {
+    id: "images",
+    kind: "attach",
+    class: "daily",
+    label: "Images",
+    // Counted like its sibling: `countAttachments` runs over every region of
+    // an entry, so a photo dropped here is in the day's attachment count
+    // without anything else being told about this key.
     rollup: "none",
   },
   {
@@ -252,7 +291,14 @@ export const DIARY_FIELDS: DiaryField[] = [
     id: "attachments",
     kind: "attach",
     class: "monthly",
-    label: "Attachments",
+    label: "Files & Links",
+    rollup: "none",
+  },
+  {
+    id: "images",
+    kind: "attach",
+    class: "monthly",
+    label: "Images",
     rollup: "none",
   },
   {
@@ -387,7 +433,14 @@ export const DIARY_FIELDS: DiaryField[] = [
     id: "attachments",
     kind: "attach",
     class: "weekly",
-    label: "Attachments",
+    label: "Files & Links",
+    rollup: "none",
+  },
+  {
+    id: "images",
+    kind: "attach",
+    class: "weekly",
+    label: "Images",
     rollup: "none",
   },
   {
@@ -439,7 +492,14 @@ export const DIARY_FIELDS: DiaryField[] = [
     id: "attachments",
     kind: "attach",
     class: "quarterly",
-    label: "Attachments",
+    label: "Files & Links",
+    rollup: "none",
+  },
+  {
+    id: "images",
+    kind: "attach",
+    class: "quarterly",
+    label: "Images",
     rollup: "none",
   },
   {
@@ -486,7 +546,14 @@ export const DIARY_FIELDS: DiaryField[] = [
     id: "attachments",
     kind: "attach",
     class: "yearly",
-    label: "Attachments",
+    label: "Files & Links",
+    rollup: "none",
+  },
+  {
+    id: "images",
+    kind: "attach",
+    class: "yearly",
+    label: "Images",
     rollup: "none",
   },
   {

@@ -40,7 +40,7 @@
 // foot so the two read differently. Nothing here invents a duration for it: its
 // `mins` stays null all the way through.
 
-import { addDays, daysBetween } from "../events/events";
+import { addDays, daysBetween, type SpanPos } from "../events/events";
 
 // Which stores a grid draws. The directive's argument names these.
 export type GridSource = "events" | "logbooks" | "tasks" | "captures";
@@ -101,6 +101,20 @@ export interface AllDayItem {
   title: string;
   day: number;
   key: string;
+  // WHAT THIS ITEM IS, ACROSS DAYS — and `key` is not it. A key is
+  // `event:<id>:<iso>`, unique per day because that is what the view needs to
+  // get back to one cell's worth of thing. A trip arrives as one item per day
+  // it covers, and nothing in the model said they were the same trip until
+  // 1.0.49 needed to draw them as one chip. `event:<id>` for an event; a
+  // task's own key WITH its day welded on, so two identical task lines due on
+  // consecutive days can never group into a span they are not.
+  ident: string;
+  // Where this day sits in the thing's true span, straight off
+  // `EventOccurrence`. "solo" for everything that is not a multi-day event —
+  // tasks, weekly and recurring events — so a run of one never claims to
+  // continue. Derived from the WHOLE span, not from the drawn window, which is
+  // what lets a chip say "this trip began before the week you are looking at".
+  pos: SpanPos;
 }
 
 // A `GridItem` with its place inside an overlap worked out.
@@ -592,6 +606,179 @@ export function tallyAllDay(items: AllDayItem[]): ColorTally[] {
     out.push(made);
   }
   return out;
+}
+
+// ── ONE CHIP PER SPAN (1.0.49) ───────────────────────────────────────
+//
+// THE REPORT: *"time calendar not showing any text on mobile view (possibly to
+// narrow?)"* It is too narrow, and it was measured as too narrow on purpose:
+// `99-time-grid.css` hides a chip's name until the grid is 560px, because
+// 1.0.19's report from the same phone was the OPPOSITE one — *"entries are too
+// small"* — and seven columns divide 360px into 45 each, where a name is three
+// letters and an ellipsis.
+//
+// SO THE ANSWER IS NOT A SMALLER BREAKPOINT, IT IS A WIDER BOX. A four-day trip
+// already owns four of those columns; it was simply being drawn as four
+// separate stubs, one per cell, each too narrow to name. Drawn as ONE chip
+// across its own columns it has 180px to say what it is, on the same phone, at
+// the same font size, with 1.0.19's finding untouched: a box of one day is
+// still 45px and still says nothing.
+//
+// EVERYTHING HERE IS COLUMN ARITHMETIC AND NONE OF IT IS DOM. The lane is
+// already a CSS grid of gutter-plus-columns, so the view's whole job is to turn
+// these numbers into `grid-column` / `grid-row` — which is why the numbers are
+// decided here, where they can be tested.
+
+// A thing drawn as one chip across one or more of the drawn columns.
+export interface LaneRun {
+  // The first drawn day's item: its title, its colour, and the key the view
+  // wires the click to. A run is one thing, so one member speaks for it.
+  item: AllDayItem;
+  // Every member, so the view can take them OUT of their days' tallies. A trip
+  // drawn as a span and counted in four day-boxes as well is the same fact
+  // twice, and the second copy is the one that looks like a bug.
+  members: AllDayItem[];
+  // Offset into the drawn columns, not the day of the week: a 3-day view of
+  // Wednesday-to-Friday calls Wednesday column 0.
+  col: number;
+  span: number;
+  // The thing continues past this edge of what is drawn — because the window is
+  // narrower than the trip, or because the trip is older than the week. Both
+  // read the same way to a reader and both want a square cap.
+  clipLeft: boolean;
+  clipRight: boolean;
+}
+
+export interface PlacedRun extends LaneRun {
+  // Which lane row, zero-based.
+  row: number;
+}
+
+// Group the drawn lane items into runs of consecutive columns.
+//
+// `items` is what the lane is drawing (already narrowed to `cols`); `cols` is
+// the drawn day indices.
+//
+// ADJACENCY IS THE DAY'S, NOT THE COLUMN'S, and the difference is the whole
+// care in this function. `visibleDays` returns a contiguous window today, so
+// for every window the plugin can currently draw the two questions have the
+// same answer — which is exactly the kind of agreement that stops being true
+// quietly. Two days drawn side by side are not necessarily side by side: a
+// window of Monday, Wednesday and Friday would put Monday's chip next to
+// Wednesday's, and welding them would draw a trip across a Tuesday it does not
+// cover. The day number cannot be wrong about that, so it is what is asked.
+export function laneRuns(items: AllDayItem[], cols: number[]): LaneRun[] {
+  const at = new Map<number, number>();
+  cols.forEach((day, i) => at.set(day, i));
+
+  // FIRST-APPEARANCE ORDER, `tallyAllDay`'s rule: the lane already drew these
+  // in the order the sources produced them, and re-sorting is a reordering
+  // nobody asked for. Within one ident the days are sorted, because a run is
+  // left-to-right by definition.
+  const order: string[] = [];
+  const byIdent = new Map<string, AllDayItem[]>();
+  for (const item of items) {
+    if (!at.has(item.day)) continue;
+    const list = byIdent.get(item.ident);
+    if (list) {
+      list.push(item);
+      continue;
+    }
+    byIdent.set(item.ident, [item]);
+    order.push(item.ident);
+  }
+
+  const out: LaneRun[] = [];
+  for (const ident of order) {
+    const days = [...(byIdent.get(ident) ?? [])].sort((a, b) => a.day - b.day);
+    let run: AllDayItem[] = [];
+    const flush = (): void => {
+      if (!run.length) return;
+      const first = run[0];
+      const last = run[run.length - 1];
+      out.push({
+        item: first,
+        members: run,
+        col: at.get(first.day) ?? 0,
+        span: run.length,
+        // A CAP MEANS "THIS IS NOT WHERE THE THING BEGINS". `pos` is the TRUE
+        // span's, so a run whose first day is not the span's own start can
+        // only be missing its earlier days off screen — outside the narrowed
+        // window, or outside the week entirely. "solo" is the other half and
+        // it is not an edge case: a task, a birthday and a one-day event are
+        // each the whole of themselves, and a cap on one would be claiming it
+        // continues into a week nobody can look at.
+        clipLeft: first.pos !== "start" && first.pos !== "solo",
+        clipRight: last.pos !== "end" && last.pos !== "solo",
+      });
+      run = [];
+    };
+    for (const item of days) {
+      const prev = run[run.length - 1];
+      if (prev == null || item.day !== prev.day + 1) flush();
+      run.push(item);
+    }
+    flush();
+  }
+  return out;
+}
+
+// Assign runs to lane rows, first fit, left to right.
+//
+// A run of ONE COLUMN IS NEVER PLACED. It is an ordinary all-day item in an
+// ordinary day cell, which is where the count-chip tally can still fold four of
+// them into one `4` — the whole argument of `tallyAllDay`. Only a thing with
+// more columns than one has anything to gain from a row of its own.
+//
+// WHAT DOES NOT FIT SPILLS BACK, IT DOES NOT VANISH. `maxRows` is small — one
+// on a phone, where the lane has room for a single chip — and a trip that loses
+// the draw is returned to the caller to be drawn the old way, in its days'
+// cells. So the worst case of this feature is the behaviour that preceded it.
+export function packLaneRuns(
+  runs: LaneRun[],
+  maxRows: number
+): { placed: PlacedRun[]; spill: LaneRun[] } {
+  const placed: PlacedRun[] = [];
+  const spill: LaneRun[] = [];
+  // Where each open row is free from, as a column offset.
+  const rowFreeFrom: number[] = [];
+  // LEFT TO RIGHT, which is what makes first-fit produce the same rows every
+  // repaint: packing in source order would put Thursday's trip on row 0 and
+  // Monday's on row 1 depending only on which source was read first.
+  const candidates = [...runs]
+    .filter((r) => r.span > 1)
+    .sort((a, b) => a.col - b.col || b.span - a.span);
+  const spanning = new Set(candidates);
+
+  for (const run of candidates) {
+    let row = -1;
+    for (let i = 0; i < rowFreeFrom.length; i++) {
+      if (rowFreeFrom[i] <= run.col) {
+        row = i;
+        break;
+      }
+    }
+    if (row < 0) {
+      if (rowFreeFrom.length >= Math.max(0, maxRows)) {
+        spill.push(run);
+        continue;
+      }
+      row = rowFreeFrom.length;
+      rowFreeFrom.push(0);
+    }
+    rowFreeFrom[row] = run.col + run.span;
+    placed.push({ ...run, row });
+  }
+
+  // The single-column runs, in the order they arrived, after any spanning run
+  // that lost its row. Both halves are "draw this in its day's cell".
+  for (const run of runs) if (!spanning.has(run)) spill.push(run);
+  return { placed, spill };
+}
+
+// How many lane rows the placed runs need.
+export function laneRowCount(placed: PlacedRun[]): number {
+  return placed.reduce((n, r) => Math.max(n, r.row + 1), 0);
 }
 
 // ── how many days of the week are drawn (4.62) ───────────────────────

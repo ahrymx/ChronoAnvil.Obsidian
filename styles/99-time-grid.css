@@ -277,6 +277,11 @@
   position: sticky;
   left: 0;
   z-index: 4;
+  /* EVERY ROW THE LANE GROWS (1.0.49). The lane is one row until a trip is
+     drawn across it and then two or four, and the gutter is the lane's first
+     COLUMN rather than one cell of its first row — left to auto-place it would
+     sit beside the top span and leave the day cells a column short. */
+  grid-row: 1 / -1;
   background: var(--ca-tg-lane-bg);
   box-sizing: border-box;
   max-width: var(--ca-tg-gutter);
@@ -315,6 +320,42 @@
 
 .ca-tg-chip:hover {
   transform: translateY(-1px);
+}
+
+/* ── A SPAN CHIP IS A GRID ITEM, NOT A CELL'S CHILD (1.0.49) ──────────
+   A multi-day event is placed on the LANE — `grid-column: <n> / span <k>` —
+   rather than inside one day's cell, which is the whole of how it gets a name
+   on a phone. Two consequences are worth stating because neither is visible in
+   the markup:
+
+   IT IS NOT A FLEX ITEM, so the compact `flex: 1 1 0` further down does not
+   reach it; its width is its columns'. And it is laid over the cells' own
+   borders, so a trip crossing Wednesday does not get Wednesday's separator
+   drawn through its middle.
+
+   ALIGNED LEFT, WHERE A BOX OF ONE IS CENTRED: a centred name under an
+   ellipsis reads as a name that has been cut on both sides. And `align-self`
+   keeps the chip its own height when the lane's floor leaves its row taller
+   than the chip — a trip is a bar across days, not a block.
+
+   A CAP SAYS "THIS CONTINUES". `is-clip-left` / `is-clip-right` square the end
+   that runs out of the drawn window, the same trade the month grid's
+   `.ca-cal-bar-clip-*` makes at a week boundary. */
+.ca-tg-chip.is-span {
+  align-self: center;
+  justify-content: flex-start;
+  margin: 0 1px;
+  min-width: 0;
+}
+.ca-tg-chip.is-span.is-clip-left {
+  margin-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.ca-tg-chip.is-span.is-clip-right {
+  margin-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .ca-tg-chip.ca-tg-fill-red {
@@ -925,6 +966,32 @@
     text-overflow: ellipsis;
     min-width: 0;
   }
+}
+
+/* ── THE ONE EXEMPTION, AND IT IS THE RULE ABOVE RATHER THAN AN ESCAPE
+      FROM IT (1.0.49) ────────────────────────────────────────────────
+   THE REPORT: *"time calendar not showing any text on mobile view (possibly to
+   narrow?)"* Correct on both counts, and the width above is the measurement
+   that says so. What changed is not the threshold but the box: a multi-day
+   event used to be drawn as one stub per day and is now ONE CHIP ACROSS ITS
+   OWN COLUMNS (`laneRuns`, `packLaneRuns`). Two columns of a phone's grid is
+   ~90px and four is ~180px, which is past the 75-per-column point the 560px
+   gate is made of — so this is the same arithmetic reaching the same answer
+   about a wider element, not a reversal of 1.0.19.
+
+   AND A BOX OF ONE DAY IS STILL SILENT below 560px, which is the half of
+   1.0.19 that is still live: 45px holds three letters and an ellipsis. The
+   difference a reader sees is that a trip now reads as a trip.
+
+   WRITTEN AFTER THE CONTAINER QUERY ON PURPOSE. Same specificity, so the
+   cascade decides, and a rule meant to win at every width has to be last. */
+.ca-tg:not(.is-expanded) .ca-tg-chip.is-span .ca-tg-chip-title {
+  display: block;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* NO CURSOR PROMISES A GESTURE THAT IS NOT WIRED. The crosshair on a column

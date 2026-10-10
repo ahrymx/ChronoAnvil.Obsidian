@@ -41,8 +41,19 @@ import {
 import { basename, ensureFolder, moment, noExt, openFile } from "../../core/util";
 import { isValidNoteKey, noteKeyOf, readNoteRegion } from "../../core/notestore";
 import { panDuringDrag } from "../drag-scroll";
-import { slugify } from "../../core/util";
 import { confirmAction, promptText } from "../modals";
+import { AttachCategoriesEditor } from "../attach-categories-editor";
+import { splitArgHead } from "../../core/directive-grammar";
+import {
+  ATTACH_FORMATS,
+  applyAttachCategories,
+  attachFormatOf,
+  categoryItemCount,
+  categoryNonImageCount,
+  planAttachCategories,
+  readAttachCategories,
+  type AttachCategoryRow,
+} from "../attach-categories";
 import { trashClause, trashDestination, trashItem } from "../../core/trash";
 import {
   Attachment,
@@ -66,6 +77,7 @@ import {
 } from "../attachments";
 import type { PluginNoteRegionHost } from "./note-regions";
 import { fieldFoldStore, fieldHead } from "./note-field";
+import { fieldFrame, headTools } from "../section-frame";
 
 
 // MIME type used by the attachments widget's own drag-to-reorder, so its drop
@@ -320,12 +332,31 @@ export function renderAttachmentChip(
   item: Attachment,
   index: number,
   ctx: MarkdownPostProcessorContext,
-  cb: AttachmentHandlers
+  cb: AttachmentHandlers,
+  // HOW LONG THE LIST IS, OR NULL WHERE THIS ROW IS NOT IN ONE (1.0.49 §6).
+  // The `list` format is an ORDERED list — a numbered row per item, in the
+  // order the note has them — and two things need that length: the number
+  // itself is `index + 1` (a reader counts from one) and the row's two move
+  // chevrons have to know when they are at an end.
+  //
+  // ONE PARAMETER AND NOT TWO. `index` is already this item's position, so a
+  // separate ordinal would be the same fact passed twice and able to disagree.
+  listOf: number | null = null
 ): void {
   const chip = chips.createDiv({
     cls: `ca-journal-attach-chip ca-journal-attach-chip--${item.kind}`,
   });
   chip.draggable = true;
+
+  // A SPAN RATHER THAN A CSS COUNTER, which was the first shape of this. The
+  // number is then selectable text a reader can copy out with the row and it
+  // is in the accessibility tree.
+  if (listOf !== null) {
+    chip.createSpan({
+      cls: "ca-journal-attach-index",
+      text: `${index + 1}.`,
+    });
+  }
 
   const icon = chip.createSpan({ cls: "ca-journal-attach-chip-icon" });
   if (item.kind === "link") setIcon(icon, "external-link");
@@ -346,6 +377,53 @@ export function renderAttachmentChip(
     chip.addEventListener("click", () => openAttachment(deps, item, ctx));
   } else {
     chip.addEventListener("click", () => cb.onCaption(index));
+  }
+
+  // ── MOVING A ROW WITHOUT A POINTER (1.0.49 §6) ────────────────────────
+  //
+  // *"The ordered list needs chevrons on the cards themselves."*
+  //
+  // AN ORDERED LIST IS ABOUT ITS ORDER, and until now the only way to change
+  // one was to drag a row — which needs a pointer, gives nothing to a reader
+  // on a phone or a keyboard, and says nothing about where a row can go. Two
+  // chevrons per row, the same answer the Categories window gives for the same
+  // question one level up: *"ARROWS RATHER THAN DRAG"*, with a disabled one
+  // saying "this is already the first" where a dead drop zone says nothing.
+  //
+  // ONLY IN THE NUMBERED LIST. A gallery's tiles and a default shelf's chips
+  // are a wrapping grid and a wrapping row — "up" and "down" do not name
+  // anything a reader can see there, and the drag they already have does.
+  // `listOf` is therefore the whole condition, the same flag the number is on.
+  //
+  // THROUGH `onReorder`, which is the drag's own handler — one definition of
+  // what moving a row means, so a chevron and a drag cannot disagree about
+  // where the row lands or about when the note is written.
+  if (listOf !== null) {
+    const move = (delta: number, icon: string, word: string): void => {
+      const to = index + delta;
+      const can = to >= 0 && to < listOf;
+      const btn = chip.createEl("button", {
+        cls: "ca-journal-attach-move",
+        attr: { type: "button" },
+      });
+      setIcon(btn, icon);
+      btn.disabled = !can;
+      btn.toggleClass("is-static", !can);
+      const why = can
+        ? `Move ${displayTitle(item)} ${word}`
+        : `${displayTitle(item)} is already ${delta < 0 ? "first" : "last"}`;
+      btn.setAttr("aria-label", why);
+      btn.setAttr("title", why);
+      btn.addEventListener("click", (e) => {
+        // The chip opens what it names on click. A control inside it is not
+        // the chip being pressed — the same stop the `⋯` makes.
+        e.stopPropagation();
+        if (!can) return;
+        cb.onReorder(index, to);
+      });
+    };
+    move(-1, "chevron-up", "up");
+    move(1, "chevron-down", "down");
   }
 
   const menuBtn = chip.createEl("button", {
@@ -579,189 +657,157 @@ export async function storeAttachmentFile(
 }
 
 
-// Append a shelf to the Resources section of `notePath`. 3.18 §4.2.
+// Write a categories draft into the Resources section of `notePath`. 1.0.49.
 //
-// TWO WRITES THAT MUST BOTH LAND: an `attach:<key>|<Label>` line inside the
-// fence, and a `<!--chronoanvil:key -->` region below it for the shelf's contents.
-// A line with no region is a widget with nowhere to store what is dropped on
-// it, so they are written in one `modify` rather than two.
+// WHAT WENT: `addAttachCategory` and `removeAttachCategory`, one write each,
+// each re-reading the file and doing its own splice. The categories window is a
+// draft — a reader renames two, removes one and adds one, and presses Save once
+// — so the two become one read, one plan and one `vault.modify`. Three writes
+// would be three undo steps and would land a cancelling pair (remove `books`,
+// add `Books`) in whichever order the promises resolved.
 //
-// THE KEY IS SLUGIFIED AND DE-DUPLICATED, the same repair every other id in
-// this plugin gets. Two shelves named "Books" is two shelves — a reader who
-// does that wants two, not an error — so a collision suffixes rather than
-// refuses.
-async function addAttachCategory(
+// THE PLAN IS PURE AND LIVES IN `attach-categories.ts`, which is what makes the
+// guards testable: an empty-only removal re-checked against the file at the
+// moment of the write, and never the last category. Both are carried out rather
+// than thrown, so a save that is refused one removal still lands the renames —
+// and this is the half that says so, because a refusal nobody is told about is
+// the same as a bug.
+async function saveAttachCategories(
   deps: PluginNoteRegionHost,
   notePath: string,
-  label: string
+  rows: AttachCategoryRow[]
 ): Promise<void> {
   const file = deps.app.vault.getAbstractFileByPath(notePath);
   if (!(file instanceof TFile)) return;
   const text = await deps.app.vault.read(file);
-  const lines = text.split("\n");
-
-  // The last `attach:` line, and the fence it lives in.
-  let last = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\s*attach:/.test(lines[i])) last = i;
-  }
-  if (last === -1) {
-    new Notice("Couldn't find a Resources section in this note.");
-    return;
-  }
-  let close = -1;
-  for (let i = last; i < lines.length; i++) {
-    if (lines[i].trim() === "```") {
-      close = i;
-      break;
-    }
-  }
-  if (close === -1) {
-    new Notice("Couldn't find a Resources section in this note.");
+  const plan = planAttachCategories(text, rows);
+  if (!plan) {
+    new Notice("Couldn't find an Attachments section in this note.");
     return;
   }
 
-  const taken = new Set(
-    lines
-      .filter((l) => /^\s*attach:/.test(l))
-      .map((l) => l.replace(/^\s*attach:/, "").split("|")[0].trim())
-  );
-  const stem = slugify(label) || "resources";
-  let key = stem;
-  let n = 2;
-  while (taken.has(key)) key = `${stem}-${n++}`;
-  if (!isValidNoteKey(key)) {
-    new Notice("That name can't be used as a category.");
-    return;
-  }
-
-  const out = [...lines];
-  // The region goes after the fence close, ahead of anything else that follows
-  // it, so the shelves and their regions stay in the same order.
-  out.splice(close + 1, 0, "", `<!--chronoanvil:${key}`, "-->");
-  out.splice(last + 1, 0, `attach:${key}|${label}`);
-  await deps.app.vault.modify(file, out.join("\n"));
-}
-
-// Remove a category from this note's Resources section. 3.19.2.
-//
-// ONLY WHEN IT IS EMPTY, enforced by the caller and again here.
-//
-// A shelf owns two things in the file: its `attach:<key>|<label>` line inside
-// the fence, and its `<!--chronoanvil:<key> ... -->` region below it. The region is
-// where the reader's files and links live. Deleting a shelf that had any would
-// be deleting their attachments — and unlike removing a note kind, which leaves
-// the reader's markdown alone and merely stops recognising it, there is nothing
-// left behind here to recover from. So the control is offered only on a shelf
-// with nothing in it, where "remove" costs exactly the empty box it names.
-//
-// THE RE-CHECK IS NOT BELT-AND-BRACES. The button's enabled state is computed
-// from the widget's in-memory model at render time, and the write happens after
-// a confirmation the reader may have sat on. A drop that landed in between —
-// this widget accepts them — would make an empty shelf a full one while the
-// dialog was open. The file is read here and the region is checked as written.
-async function removeAttachCategory(
-  deps: PluginNoteRegionHost,
-  notePath: string,
-  key: string
-): Promise<void> {
-  const file = deps.app.vault.getAbstractFileByPath(notePath);
-  if (!(file instanceof TFile)) return;
-  const lines = (await deps.app.vault.read(file)).split("\n");
-
-  const open = lines.findIndex((l) => l.trim() === `<!--chronoanvil:${key}`);
-  const close =
-    open === -1
-      ? -1
-      : lines.findIndex((l, i) => i > open && l.trim() === "-->");
-  if (open !== -1 && close !== -1) {
-    const body = lines.slice(open + 1, close).join("").trim();
-    if (body) {
-      new Notice(
-        "That category isn't empty any more — remove what's in it first."
-      );
-      return;
-    }
-  }
-
-  const directive = lines.findIndex(
-    (l) => l.replace(/^\s*attach:/, "") !== l && l.split("|")[0].replace(/^\s*attach:/, "").trim() === key
-  );
-  if (directive === -1) {
-    new Notice("Couldn't find that category in this note.");
-    return;
-  }
-
-  // THE LAST SHELF STAYS. A Resources section with no `attach:` line renders an
-  // empty header and gives the reader no way back — "Add category" appends
-  // after the last one, and there would be none. Removing the section itself is
-  // the section editor's job, and it says so.
-  const shelves = lines.filter((l) => /^\s*attach:/.test(l)).length;
-  if (shelves <= 1) {
+  for (const cat of plan.kept) {
     new Notice(
-      "This is the only category left. Remove the whole Resources section from “Edit sections…” instead."
+      `“${cat.label}” isn't empty any more — it has ${cat.items} item${
+        cat.items === 1 ? "" : "s"
+      } in it, so it was kept.`
     );
-    return;
+  }
+  if (plan.floor) {
+    new Notice(
+      "An Attachments section needs one category — remove the whole section from “Edit sections…” instead."
+    );
   }
 
-  const out = [...lines];
-  // The region first, so removing it does not shift the directive's index.
-  if (open !== -1 && close !== -1) {
-    let from = open;
-    // The blank line `addAttachCategory` inserted with it, so adding and
-    // removing a category leaves the file as it found it.
-    if (from > 0 && out[from - 1].trim() === "") from--;
-    out.splice(from, close - from + 1);
-  }
-  out.splice(directive, 1);
-  await deps.app.vault.modify(file, out.join("\n"));
+  const next = applyAttachCategories(text, plan);
+  if (next !== text) await deps.app.vault.modify(file, next);
 }
 
-// "Add category", as the Resources section's own action. 3.18 follow-ups §1.
+// THE CATEGORIES DOOR. One control, one look, both surfaces. 3.18 follow-ups
+// §1, then 1.0.49 twice.
 //
-// A SECTION-LEVEL ACTION IN THE SECTION'S OWN STRIP. The header bar is where
-// this belongs and the mechanism was already there — `header:` opens a bar and
-// what follows anchors into it — but only for `button:<type>:<action>`
-// directives, which resolve to registered CREATE-actions. "Add a category here"
-// is not one of those: it acts on this note's own fence rather than creating a
-// note, so it has no create-action to name and cannot be written as a directive
-// without inventing a note-local action kind first.
+// A SECTION-LEVEL ACTION IN THE SECTION'S OWN HEAD. It cannot be written as a
+// `button:` directive: those resolve to registered CREATE-actions, and this one
+// acts on the note's own fence rather than creating a note. So the renderer
+// hosts it — it already knows this fence has shelves, it is about to draw them
+// — and nothing is written into the reader's note. The larger route (a
+// note-local action kind, reusable by every widget that wants one) stays
+// available and is still the only thing standing between this and being an
+// ordinary directive.
 //
-// So this is the smaller of the two routes the follow-up set out: the bar grows
-// an action slot the renderer hosts, rather than the directive vocabulary
-// growing a new kind. The renderer already knows this fence has shelves — it is
-// about to draw them — so it can host the section's action without anything
-// being written into the reader's note. The larger route (a note-local action
-// kind, reusable by every widget that wants one) stays available and is now the
-// only thing standing between this and being an ordinary `button:` directive.
+// IT WAS *Add category* UNTIL 1.0.49, one of the three edits a list needs and
+// the only one the section offered; the other two were a per-shelf ✕ for an
+// empty category and nothing at all for a rename. What is behind it now is the
+// whole list — see `attach-categories-editor.ts`, which also records why the
+// add field moved inside rather than staying beside it as a second door.
 //
-// STYLED AS A HEADER BUTTON, NOT AS AN ATTACH BUTTON. It has moved into a row
-// whose other members are `journal-btn`s, and keeping `.ca-journal-attach-btn`
-// here would have carried the toolbar's look into a strip it no longer belongs
-// to — the visual half of the same category error the move corrects.
-export function buildAddCategoryButton(
+// ── IT WAS ALSO TWO CONTROLS UNTIL 1.0.49 §3 ────────────────────────────
+//
+// *"the diary and journal attachment sections should look more similar."* A
+// titled `header:` bar hosted a labelled *Categories* pill, and a field head
+// hosted a bare cog, because they were added in that order and for two
+// different reports. The pill was the thing that made the two sections read as
+// unrelated features: `frame.actions` at level 1 is `flex: 1 0 100%`, so the
+// journal's section spent **a whole full-width row** on one button that the
+// diary's fitted onto its title row with room to spare. The pill is gone, and
+// both surfaces now reach this through `headTools`.
+//
+// ICON ONLY, AND SIZED TO THE CHEVRON. A title row is a line of text with a
+// fold at the end of it; a labelled pill there would be the second-largest
+// thing in the head. So this is the chevron's twin — `--ca-bar-glyph`, the same
+// 1.4em box — and the name it has lost lives in `aria-label` and `title`.
+//
+// A `<button>` SO IT IS REACHABLE BY KEYBOARD, which means the 30px reset:
+// app.css gives every button `height: var(--input-height)` and nothing but
+// `height: auto; min-height: 0` escapes it. See `obsidian-button-height` — a
+// 30px control in a ~20px head is how this trap announces itself.
+//
+// IT READS THE NOTE WHEN IT IS PRESSED, not when it is built. The window needs
+// each category's item count — that is what decides whether its row can be
+// removed — and a count captured at render time would be the count before the
+// reader dropped anything. The write re-checks it again anyway, because this
+// window can sit open.
+export function buildCategoriesGlyph(
   deps: PluginNoteRegionHost,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  section: string
 ): HTMLElement {
-  const wrap = createSpan({ cls: "ca-journal-widget ca-journal-button" });
-  const btn = wrap.createEl("button", { cls: "ca-journal-btn ca-journal-btn-subtle" });
-  setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), "folder-plus");
-  btn.createSpan({ cls: "ca-journal-btn-label", text: "Add category" });
-  btn.setAttr("aria-label", "Add a category to this section");
-  btn.setAttr("title", "Add a category to this section");
+  const btn = createEl("button", {
+    cls: "ca-journal-field-cats",
+    attr: { type: "button", "aria-label": CATEGORIES_LABEL, title: CATEGORIES_HINT },
+  });
+  setIcon(btn, "settings");
+  wireCategories(btn, deps, ctx, section);
+  return btn;
+}
+
+// THE SECTION'S NAME, WHERE THE NOTE DOES NOT CARRY ONE (1.0.49 §4). A barless
+// `attach:` fence gets its head from the renderer rather than from a `header:`
+// line, so the word has to live somewhere — and this is the same word
+// `journal-sections.ts` gives the `header:` default, because a diary entry's
+// Attachments and a journal note's are one section.
+export const ATTACH_SECTION_TITLE = "Attachments";
+
+const CATEGORIES_LABEL = "Change this section's categories";
+const CATEGORIES_HINT = "Add, rename or remove this section's categories";
+
+// ONE OPENER, KEPT SEPARATE FROM THE CONTROL. There is one control again as of
+// 1.0.49 §3, and this stays its own function anyway: what happens when the door
+// is pressed is a behaviour three guards and a vault read deep, and a second
+// surface wanting it — a command, a context menu — must not have to copy it.
+function wireCategories(
+  btn: HTMLElement,
+  deps: PluginNoteRegionHost,
+  ctx: MarkdownPostProcessorContext,
+  section: string
+): void {
   btn.addEventListener("click", (evt) => {
     // The bar folds on click; this does not. Same separation the title slot
-    // makes, and for the same reason — one gesture, one meaning.
+    // makes, and for the same reason — one gesture, one meaning. On the field
+    // head it is the fold handler's own skip list that would have covered a
+    // `<button>` anyway; the stop is here so neither surface depends on that.
     evt.stopPropagation();
-    void promptText(deps.app, "Name this category", "e.g. Tutorials").then(
-      (name) => {
-        const label = name?.trim();
-        if (!label) return;
-        void addAttachCategory(deps, ctx.sourcePath, label);
-      }
-    );
+    const file = deps.app.vault.getAbstractFileByPath(ctx.sourcePath);
+    if (!(file instanceof TFile)) return;
+    void deps.app.vault.read(file).then((text) => {
+      const seeds = readAttachCategories(text).map((cat) => ({
+        ...cat,
+        items: categoryItemCount(text, cat.key),
+        // THE TWO NUMBERS THE ROW'S CONTROLS ANSWER TO (1.0.49 §6): what it
+        // holds decides whether the ✕ is live, and how much of that is not an
+        // image decides whether *Image gallery* is offered.
+        others: categoryNonImageCount(text, cat.key),
+        format: attachFormatOf(cat.tokens),
+      }));
+      new AttachCategoriesEditor(
+        deps.app,
+        deps.plugin,
+        section,
+        seeds,
+        (rows) => saveAttachCategories(deps, ctx.sourcePath, rows)
+      ).open();
+    });
   });
-  return wrap;
 }
 
 // ── the three pieces `buildAttachments` used to hold inline (5.2) ────────
@@ -778,63 +824,26 @@ export function buildAddCategoryButton(
 // which matters here: `bar` is created before the intake listeners, and the
 // zone's `drop` handler must be registered after the tiles' own.
 
-// The shelf's remove control (3.19.2), which is a head ACTION now (5.14).
+// ── THE SHELF'S ✕ IS GONE (1.0.49) ──────────────────────────────────────
 //
-// WHAT WENT: the row it used to build. `.ca-journal-attach-label` was a label
-// and a ✕ in a flex row above the drop zone — a head, drawn by this file, for a
-// field whose only box was its dashed drop target. The label is
-// `fieldHead`'s now and the ✕ is one of its actions, which is what closes the
-// frame this shelf never had: the head, the tools and the body are one object.
+// `buildShelfRemove` built it into the field head's actions slot, beside *Add
+// file* and *Add link*: a ✕ that removed the category, disabled with a tooltip
+// whenever the shelf had anything in it, refreshed from `render` through a
+// `count()` getter because `items` is reassigned by a reorder and by the load.
 //
-// BUILT ONCE AND REFRESHED, rather than rebuilt from `render`: the button is not
-// torn down on every model change, and the returned function updates the one
-// thing that changes, which is whether it is offered at all.
+// WHAT WAS WRONG WITH IT was not any of that — it is that a category is a
+// SECTION-level thing and this was a per-shelf control for it, drawn once per
+// shelf (three times on Study's Topic index), offering one of the three edits a
+// list needs. 3.18 §1 made exactly this correction for *Add category* and left
+// the ✕ where it was. The Categories window is both halves of it now.
 //
-// TAKES A COUNT, NOT THE MODEL. `items` is reassigned by `onReorder` and by the
-// load, so a reference captured here would go stale; a getter asks the question
-// at the moment it is answered.
-function buildShelfRemove(
-  deps: PluginNoteRegionHost,
-  host: HTMLElement,
-  ctx: MarkdownPostProcessorContext,
-  key: string,
-  label: string,
-  count: () => number
-): () => void {
-  const drop = host.createEl("button", {
-    cls: "ca-journal-attach-remove",
-    attr: { type: "button" },
-  });
-  setIcon(drop, "x");
-  drop.addEventListener("click", async (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    const ok = await confirmAction(
-      deps.app,
-      `Remove the “${label}” category?`,
-      "It has nothing in it, so nothing is lost. You can add it again from “Add category” on the section's title bar.",
-      "Remove it",
-      true
-    );
-    if (!ok) return;
-    await removeAttachCategory(deps, ctx.sourcePath, key);
-  });
-  return (): void => {
-    // EMPTY IS THE WHOLE CONDITION. Disabled rather than hidden, on the
-    // reasoning the scope cycle used to state and this comment now keeps: a
-    // control that vanishes on some shelves and not others is harder to read
-    // than a quiet one, and the tooltip is where the reason belongs.
-    const n = count();
-    const empty = n === 0;
-    drop.disabled = !empty;
-    drop.toggleClass("is-static", !empty);
-    const why = empty
-      ? `Remove the “${label}” category`
-      : `“${label}” still has ${n} item${n === 1 ? "" : "s"} — remove them first`;
-    drop.setAttr("aria-label", why);
-    drop.setAttr("title", why);
-  };
-}
+// THE TWO GUARDS SURVIVED THE MOVE, which is the part worth checking against
+// this note: only an empty category can go, re-checked against the file at the
+// moment of the write because the window can sit open while a drop lands; and
+// the last category stays, because a Resources section with no `attach:` line
+// renders an empty header with no way back into it. Both live in
+// `attach-categories.ts` now, where they are pure and testable rather than
+// buried in a click handler.
 
 // What the shelf's action row offers: a file picker behind a button, and a
 // prompt for a link.
@@ -983,13 +992,72 @@ function attachIntake(zone: HTMLElement, io: AttachIntake): void {
   });
 }
 
+// ── A SHELF INSIDE ANOTHER SHELF'S CARD (1.0.49) ─────────────────────────
+//
+// *"new category got incorrectly inserted as a new section when it should be
+// nested."* A Resources section nests its categories under a `header:` bar —
+// that is what Study's three shelves do — but the Attachments field of a diary
+// entry has no bar and cannot be given one: the entry's shared fence holds
+// seven fields, and a `header:` line in it would claim Tasks and everything
+// after it. So a second category rendered as a second card at the same level,
+// which reads as a second SECTION.
+//
+// THE FIRST SHELF IS THE SECTION, where no bar owns them. Its head names the
+// group, its body holds every category, and `index.ts` passes the following
+// shelves that body as `nestInto`.
+//
+// ── AND A NESTED SHELF IS THE SAME SHELF (1.0.49 §3) ────────────────────
+//
+// *"the diary and journal attachment sections should look more similar."* This
+// function first shipped with a `shelfHead` of its own — a hand-built label row
+// with a tools div, no fold and no hairline — on the reasoning that a card
+// inside a card would be a box in a box. The reasoning was right and the code
+// was unnecessary: `70-section-surface.css` has stood a `.ca-journal-field`
+// DOWN to a flat head with a hairline, whenever it sits inside another fold,
+// since the field frame was written. A nested shelf asking for an ordinary
+// `fieldHead` therefore gets exactly the head a journal shelf wears — which is
+// the whole of what the reader asked for — and brings a fold of its own with
+// it, keyed per category off the store that was already threaded through here.
+// So the only thing the nested case still decides is WHERE `wrap` is created.
+//
+// ── AND THE SECTION GETS A HEAD OF ITS OWN (1.0.49 §4) ──────────────────
+//
+// *"I do think it would be better if the diary also had a distinct headerbar
+// instead of the first categorie doing double duty."* The first shelf being the
+// section was the shape the reader picked in §2 out of three drawn options, and
+// seeing it is what settled it: a card named **Attachments** holding a drop zone
+// AND a nested shelf is a head doing two jobs, and the journal's equivalent —
+// a bar, then equal shelves under it — is the shape that reads.
+//
+// SO THE RENDERER DRAWS THE BAR. It cannot come from the note: a `header:` line
+// in a diary entry's shared fence claims every field after it, which is the
+// fact that closed this route in §2 and has not changed. What has changed is
+// that it does not need to be in the note — the fence's first `attach:` line is
+// enough to know a section is here, and `headTools` now gives that head the
+// same slot a `header:` bar has. So `ownsCategories` means one more thing than
+// it did: this field draws the SECTION's head around itself, hosts the door on
+// it, and then nests itself inside it as the first of its shelves.
+//
+// WHICH MAKES EVERY SHELF A SHELF. The first one is no longer special in any
+// way a reader can see: same head, same fold, same two buttons, same drop zone,
+// and the name over all of them is the section's rather than the first
+// category's.
+//
+// THE TITLE IS A CONSTANT AND NOT THE FIRST LABEL, which is the whole point —
+// a section whose name is its first category's name is the double duty this
+// round removes, and renaming that category would have renamed the section.
+// `ATTACH_SECTION_TITLE` is the one word, and it is the same word the journal's
+// `header:` default now carries (`journal-sections.ts`), because they are the
+// same section.
 export function buildAttachments(
   deps: PluginNoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
   label: string | null,
   titled = false,
-  barActions: HTMLElement | null = null
+  barActions: HTMLElement | null = null,
+  ownsCategories = false,
+  nestInto: HTMLElement | null = null
 ): HTMLElement {
   // THROUGH `noteKeyOf`, WHICH IS THE ONE PARSE OF A REGION KEY (1.0.42). This
   // read was `rest.split(":")[0]`, which is right up to the moment a `#token`
@@ -997,34 +1065,92 @@ export function buildAttachments(
   // unparsed one is a region key of `capture#widget`: a field pointed at a span
   // nothing writes, which renders empty, loses nothing and says nothing either.
   const key = noteKeyOf(rest);
-  const wrap = createDiv({ cls: `ca-journal-attach ca-journal-attach--${key}` });
+  // ── WHAT SHAPE THIS SHELF DRAWS (1.0.49 §6) ─────────────────────────────
+  //
+  // OFF THE SAME `#` HEAD THE KEY COMES OFF, through the same `splitArgHead`:
+  // the format is a flag on the category's own line, which is the only thing
+  // in a diary entry's shared fence that means this category. `noteKeyOf`
+  // above is that parse's other half — it has stripped flags since 1.0.42, so
+  // a format token cannot be mistaken for part of a region key.
+  const format = attachFormatOf(splitArgHead(rest).tokens);
+  const store = fieldFoldStore(deps, ctx.sourcePath);
+  const shelfCls = `ca-journal-attach ca-journal-attach-shelf ca-journal-attach--${key}`;
+
+  // The element the fence sees. It is this shelf, except where this field draws
+  // the section's head — then it is the section, and the shelf is inside it.
+  let root: HTMLElement;
+  // The section body later shelves nest into, or null where this field is not
+  // the one that opened the section.
+  let shelves: HTMLElement | null = null;
+  if (ownsCategories) {
+    root = createDiv({ cls: "ca-journal-attach ca-journal-attach-section" });
+    const section = fieldFrame(
+      root,
+      { title: ATTACH_SECTION_TITLE },
+      store,
+      // KEYED OFF THE FIRST SHELF AND NOT OFF THE TITLE, so a note holding two
+      // barless `attach:` fences folds them separately. `#` cannot appear in a
+      // category key — `slugify`'s alphabet is the key grammar — so this cannot
+      // collide with the fold of the shelf it is named after, which is the one
+      // collision that would make the section's chevron fold a category.
+      `${key}#shelves`
+    );
+    headTools(section.frame.root).appendChild(
+      buildCategoriesGlyph(deps, ctx, ATTACH_SECTION_TITLE)
+    );
+    shelves = section.body;
+  } else {
+    root = nestInto
+      ? nestInto.createDiv({ cls: shelfCls })
+      : createDiv({ cls: `ca-journal-attach ca-journal-attach--${key}` });
+  }
+  const wrap = shelves ? shelves.createDiv({ cls: shelfCls }) : root;
+
+  const nested = nestInto != null || shelves != null;
   const chrome = fieldHead({
     wrap,
     key,
     label,
-    titled,
-    barActions,
-    store: fieldFoldStore(deps, ctx.sourcePath),
+    // A SHELF NEVER BORROWS A BAR, and both of these say so. `titled` means
+    // *the bar over this fence names this field*, and a shelf is nested only
+    // where no bar owns the shelves at all (`shelfHeader === -1`) — so passing
+    // either through would route it into the branch that WITHHOLDS its head,
+    // and a shelf with no head of its own is the one thing the nesting cannot
+    // be drawn without. True for the first shelf too as of §4: it is inside the
+    // section's own head now, so it is nested like every other one.
+    titled: nested ? false : titled,
+    barActions: nested ? null : barActions,
+    store,
   });
-  // ASSIGNED LATER, DECLARED HERE, because the control it refreshes is built
-  // beside the toolbar at the foot of this function — the two share the head's
-  // actions slot and their order in it is the order they read in: add, add,
-  // remove. `render` reads this variable at call time, and the first render
-  // cannot run before the load resolves.
-  let refreshRemove: () => void = () => {};
-
+  // WHERE A FOLLOWING SHELF NESTS. `index.ts` groups a barless run of `attach:`
+  // fields into the section this one opened (1.0.49), and it needs that body
+  // without knowing how it was built — the section's own head as of §4, a
+  // field head before that. The class is the contract; nothing styles it.
+  //
+  // EXACTLY ONE ELEMENT CARRIES IT PER WIDGET. On the field that drew the
+  // section the body is the SECTION's, not this shelf's — `index.ts` reads it
+  // with a `querySelector`, and two candidates nested one inside the other
+  // would be answered by document order rather than by intent.
+  (shelves ?? chrome.body).addClass("ca-journal-attach-body");
   if (!isValidNoteKey(key)) {
     chrome.body.createDiv({
       cls: "ca-journal-widget-error",
       text: `Invalid attachments key: "${key}"`,
     });
-    return wrap;
+    return root;
   }
 
   const zone = chrome.body.createDiv({
     cls: "ca-journal-attach-zone",
     attr: { tabindex: "0" },
   });
+  // THE FORMAT'S OWN CLASS, OFF `ATTACH_FORMATS` (1.0.49 §6). The default's is
+  // `null` — the shape that writes no token draws no class either, so a note
+  // that has never been asked about this renders through exactly the rules it
+  // did before. Composed rather than written out here so the stylesheet's
+  // selector and this element's class come off one declaration.
+  const formatCls = ATTACH_FORMATS.find((f) => f.value === format)?.cls;
+  if (formatCls) zone.addClass(formatCls);
   const gallery = zone.createDiv({ cls: "ca-journal-attach-gallery" });
   const chips = zone.createDiv({ cls: "ca-journal-attach-chips" });
 
@@ -1038,15 +1164,31 @@ export function buildAttachments(
   };
 
   const render = (): void => {
-    refreshRemove();
     gallery.empty();
     chips.empty();
-    const images = items.filter((a) => a.kind === "image");
-    gallery.toggleClass("is-empty", images.length === 0);
+    // ── THE LIST FORMAT HAS ONE LANE (1.0.49 §6) ─────────────────────────
+    //
+    // *"images should not have a preview, just the link to them."* So the
+    // format is asked BEFORE the kind: in `list` the gallery lane is left
+    // empty and every item — image or not — is a numbered chip, which is what
+    // makes the numbering mean anything. The other two formats keep the two
+    // lanes they have always had, and differ only in how big the tiles are.
+    const tiled = format === "list" ? [] : items.filter((a) => a.kind === "image");
+    gallery.toggleClass("is-empty", tiled.length === 0);
 
     items.forEach((item, index) => {
-      if (item.kind === "image") renderAttachmentTile(deps, gallery, item, index, ctx, handlers);
-      else renderAttachmentChip(deps, chips, item, index, ctx, handlers);
+      if (format !== "list" && item.kind === "image")
+        renderAttachmentTile(deps, gallery, item, index, ctx, handlers);
+      else
+        renderAttachmentChip(
+          deps,
+          chips,
+          item,
+          index,
+          ctx,
+          handlers,
+          format === "list" ? items.length : null
+        );
     });
 
     if (items.length === 0 && busy === 0) {
@@ -1164,11 +1306,38 @@ export function buildAttachments(
   // it, under a label that belonged to neither. `Add file` and `Add link` are
   // what this field can do, which is what a head's actions slot is for — and
   // with them gone the zone is what it says it is, a place to drop things.
-  const tools = chrome.actions();
+  //
+  // ── ON THE TITLE ROW OF IT, AS OF 1.0.49 §3 ──────────────────────────
+  //
+  // *"the diary and journal attachment sections should look more similar."*
+  // `actions()` on a field head is `foldableSection`'s level-1 actions slot,
+  // which is `flex: 1 0 100%` — a full-width SECOND row — and a Resources
+  // section with three shelves was therefore four rows of chrome holding five
+  // buttons over three empty drop zones. Two pills fit beside a title with room
+  // to spare, and a shelf is a band a few lines tall: the row they were costing
+  // was most of it.
+  //
+  // `head() ?? actions()` RATHER THAN EITHER. Null is a real answer — a field
+  // whose head is withheld because a bar names it, a widget, a nameless field —
+  // and there the second-row strip is not a choice but the only slot there is.
+  // So the fallback is today's behaviour exactly, and the title row is taken
+  // wherever this field drew a title row of its own.
+  const tools = chrome.head() ?? chrome.actions();
   buildAttachToolbar(deps, tools, { ingestFiles, add, persist, render });
-  if (label) {
-    refreshRemove = buildShelfRemove(deps, tools, ctx, key, label, () => items.length);
-  }
+
+  // ── WHERE THE CATEGORIES DOOR WENT, AND WHY NOT HERE (1.0.49 §4) ─────
+  //
+  // IT SAT ON THIS SLOT FOR ONE ROUND. `ownsCategories` marks the first
+  // `attach:` field of a fence no titled header owns — the one case the
+  // bar-hosted door never reaches — and with the first shelf doing double duty
+  // as the section, its own tools row was the only section-level strip there
+  // was. The cog went in after the pills, nearest the fold.
+  //
+  // THE SECTION HAS A HEAD OF ITS OWN NOW, drawn at the top of this function,
+  // and the door is on THAT — the end of the section's title row, which is
+  // exactly where a bar hosts it. Putting it here as well would be two doors
+  // onto one list, and on a SHELF, which is the per-shelf category error the ✕
+  // was removed for. One door per section, and it is the section's.
 
   // ── Where "Add category" used to be ──────────────────────────────────
   //
@@ -1180,10 +1349,13 @@ export function buildAttachments(
   // be in it: the button is not about a shelf at all.
   //
   // *Add file* is a SHELF-level action and belongs on a shelf. Adding a
-  // category is a SECTION-level one, and putting the two on one row stated a
-  // relationship that is not there. `buildAddCategoryButton` now anchors it in
-  // the Resources header bar, which is the section's own strip — one bar, one
-  // button, and the duplication goes with it.
+  // category is a SECTION-level one, and drawing one per shelf stated a
+  // relationship that is not there. `buildCategoriesGlyph` is now placed ONCE
+  // per section — on its bar's head where a bar names it, on the first shelf's
+  // head where none does — and the duplication goes with it. The two controls
+  // share a row again as of 1.0.49 §3, and that is a width decision rather than
+  // a category one: one is drawn per section and two are drawn per shelf, which
+  // is what the sizing says about them.
 
   // ON THE ZONE, WHICH IS WHAT IT IS ABOUT (5.14). It was the tail of the
   // toolbar row, and the toolbar has moved into the head — read from up there
@@ -1214,5 +1386,5 @@ export function buildAttachments(
     render();
   }
 
-  return wrap;
+  return root;
 }

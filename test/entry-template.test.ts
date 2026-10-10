@@ -423,6 +423,34 @@ describe("reading a page back as a want", () => {
     expect(want.map((w) => w.id)).not.toContain("calendar:month");
   });
 
+  // ── AND NOT THE CATEGORY LINE THE CATALOGUE WROTE (1.0.49 §5) ─────────
+  //
+  // Attachments composes one `attach:` line per shipped category and only the
+  // first is attributed to the section, so the rest arrive unattributed — the
+  // same class as a hand-written directive, and this is the reader that would
+  // have announced one. A fresh entry saved as a template would have reported
+  // *attach:images|Images will be dropped* while the composer wrote it back.
+  it("does not report its own category line as a drop", () => {
+    const { want, drops } = wantFromEntry(
+      composeEntryTemplate("daily"),
+      ctxFor("daily")
+    );
+    expect(drops).toEqual([]);
+    expect(want.map((w) => w.id)).toContain("attachments");
+    expect(want.map((w) => w.id)).not.toContain("images");
+
+    // A CATEGORY THE READER ADDED IS STILL A DROP, which is true rather than
+    // tidy: the composer writes the catalogue's list and nothing else, so a
+    // template built from this page would not carry it.
+    const theirs = composeEntryTemplate("daily").replace(
+      "attach:images|Images",
+      "attach:images|Images\nattach:photos|Photos"
+    );
+    expect(wantFromEntry(theirs, ctxFor("daily")).drops).toEqual([
+      "attach:photos|Photos",
+    ]);
+  });
+
   // ── INCLUDING THE ONES WRITTEN ON THE SECTION'S OWN LINE (1.0.46) ──────
   //
   // `answerInText` returns null BY NAME for `form`, `lines` and `flag`, and this

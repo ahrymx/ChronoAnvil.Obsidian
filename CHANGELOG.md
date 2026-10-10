@@ -5,6 +5,186 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.50] - 2026-10-10
+
+### Added
+
+- **An Attachments section's categories have a window too.** Its title bar carried
+  *Add category*, and the only other thing you could do to a category was
+  remove it — from a small **×** on the category's own head, one per category,
+  which is a section-wide list being edited from inside one of its boxes.
+  Renaming was not offered at all: getting from *Videos* to *Films* meant adding
+  a category, moving every file across and removing the old one. There is now one
+  **Categories** control, and it opens the whole list: add, rename, or remove,
+  with a count beside each row so you can see what you would be removing before
+  you remove it. Renaming changes the title only — nothing in a
+  category moves, and nothing is written to the note until you save.
+  The button is a small settings icon **next to the section's own fold arrow**,
+  and it is in that same place whether the section has a title bar or not — one
+  per section either way, never one per category. The
+  window has **up and down arrows** on every row as well: a category's place in
+  the list is the order its shelves are drawn in, and until now the only way to
+  change it was to remove the ones below and add them again, which a category
+  with anything in it will not let you do.
+
+- **A diary entry's Attachments field can have categories too, and they nest.**
+  It is one field inside the entry's shared block, alongside Notes and Tasks, so
+  it cannot be given a title bar the way a journal section can — a title line in
+  that block would claim Tasks and everything after it. The field now draws its
+  own **Attachments** head instead, with the Categories icon on it, and every
+  category is a named shelf inside that head with its own drop zone and its own
+  *Add file* / *Add link* — rather than a second section at the same level as
+  the rest of the entry. An Attachments section that does have a title bar is
+  unchanged: its categories stay equal shelves under that bar.
+
+- **Every attachment category can be drawn a different way.** The Categories
+  window has a **shape button** on each row, and pressing it cycles the
+  category between three shapes:
+
+  - **Default** — images as thumbnails in a grid, files and links as chips
+    underneath. What every category has always looked like, and still the
+    shape a category starts in.
+  - **Image gallery** — the same two lanes with the previews made noticeably
+    larger, at a wide pane and at phone width alike. Offered only to a
+    category that holds nothing but images: a gallery of PDFs is a bigger grid
+    with nothing in it. If a file or a link lands on a gallery category later
+    it is drawn as a chip under the grid, exactly as in Default — nothing you
+    put on a shelf is ever hidden by the shape the shelf is in — and the shape
+    button still offers *Image gallery*, so you are never locked out of the
+    choice you made.
+  - **Ordered list** — one numbered row per item, in the order the note has
+    them, with no previews at all. Good for a shelf of links, and an image in
+    one is a numbered row like everything else rather than a thumbnail. Each
+    row carries **up and down chevrons**, so the order is something you can
+    change without dragging — on a phone or from the keyboard included — and
+    every row is the same height whether or not the thing in it has a second
+    line under its name.
+
+  The shape is stored on the category's own line in the note, so it travels
+  with the note, survives every other edit to the section, and a category
+  nobody has chosen a shape for writes nothing at all.
+
+### Changed
+
+- **A category's × is gone from the Attachments shelf.** Removal is one row in
+  the Categories window on the section's title bar, where the list can be read
+  as a list. The two rules it enforced are unchanged and both now say so where
+  you can act on them: a category with anything in it has to be emptied first,
+  and a section keeps at least one — removing the whole section is *Edit
+  sections…*'s job.
+
+- **The two kinds of attachment section are one shape now.** A journal's
+  Attachments section and a diary entry's Attachments field are the same
+  feature and looked like two: the journal's spent a full-width row on a
+  labelled *Categories* button and another full-width row, per shelf, on that
+  shelf's *Add file* / *Add link*, while the diary's fitted the same controls
+  onto the lines they belong to. Every shelf now carries its two buttons **on
+  its own title line**, beside its fold arrow, and the Categories icon sits at
+  the end of the section's title line in both places. A section with three
+  categories comes out four rows shorter with nothing removed from it. A
+  category inside a diary entry's field is drawn as the same shelf as one under
+  a journal's title bar — the same name, the same fold arrow, the same hairline
+  — and it sits flush rather than indented, since the card it is in already
+  says what it belongs to.
+
+- **The diary's Attachments field has a head of its own.** Its first category
+  used to double as the section: the name on that card was the only name the
+  section had, so the card said *Attachments* and the shelves under it were
+  that card's contents. The field draws its own head now, and the first
+  category is a shelf like every other one, with its own name and its own fold
+  arrow. The section's head is what folds the whole thing away and what carries
+  the Categories icon, and folding it is remembered separately from folding any
+  one category. A fresh entry's single category is still *named* Attachments
+  inside it — that label is the only name the section has in the note's text,
+  and it is what an exported copy is headed with — and the Categories window
+  renames it in one click.
+
+- **A diary entry's Attachments ships two categories.** They are **Files &
+  Links** and **Images**, where there was one category called *Attachments*
+  sitting inside a section head that says Attachments. Both are ordinary
+  categories: rename them, reorder them, add a third or remove an empty one in
+  the Categories window. Entries you already have are untouched — nothing
+  rewrites a note you wrote — so the second shelf arrives on the next entry you
+  create, and the window adds it to an older one in two clicks.
+
+- **Resources is called Attachments.** The journal section and the diary field
+  were the same feature under two names, and the diary's was the better one.
+  The section is **📎 Attachments** in *Edit sections…* and in the title box
+  that suggests its heading; a note that already carries `header:📚 Resources`
+  keeps it, because that line is text you typed and the plugin finds the section
+  by its categories rather than by its heading. The default category a new
+  section ships with is called **Files**, so the name is not written twice.
+
+- **A multi-day event is one chip across its own days on the week grid.** It
+  was drawn as a separate stub in each day's all-day lane, and a stub in a
+  phone's 45px column has no room for a name — so a trip showed as a row of
+  blank coloured boxes. Drawn as one chip it has the width of all its days and
+  says what it is, on a phone as well as a laptop. A one-day item is unchanged:
+  below a laptop's width it is still a box with a count, which is what keeps the
+  phone grid readable. Trips that overlap stack, and if more of them overlap
+  than the lane has room for, the extra ones go back to being counted in their
+  days.
+
+- **A ticked habit and a chosen mood draw a quieter edge.** A logging cell with
+  four habits done and a mood picked was five full-strength accent hairlines in
+  66 pixels, which read as a cell full of borders rather than as five answers.
+  The tick itself is unchanged — it is the answer, and it still carries the
+  solid accent.
+
+### Fixed
+
+- **The Categories window mis-read a category whose section was drawn as a
+  widget.** A diary entry's Attachments field can be drawn bare — *Show as
+  widget* in *Edit sections…* — and that answer is stored on the first
+  category's own line. The window read that answer as part of the category's
+  name, so it was looking for a store that does not exist: the row said
+  **empty** however many files were in it, the **×** beside it went live, and
+  saving removed the category's line while the files themselves stayed in the
+  note with no shelf left to reach them. The window now reads the line the way
+  the rest of the plugin does, and anything else written on it survives a save
+  rather than being dropped.
+
+- **Removing the Attachments section now takes its categories with it.** It took
+  the first one and left the rest behind as shelves belonging to nothing, which
+  the plugin then drew as a second Attachments section. Every category goes, the
+  ones you added included, and the removal is refused while **any** of them
+  holds a file or a link rather than only the first — so nothing of yours can
+  go with it.
+
+- **The Mood and scale faces clipped into the bottom of the card.** The same
+  cause as the habit chip above, on the one control in a logging cell that had
+  never had it put right: a face was app-control height, so the selected one —
+  which grows very slightly, and carries the note pencil in its corner — was
+  cut off by the edge of the cell. Every tracker cell also gets about four
+  pixels back, because its little uppercase heading was reserving room for a
+  second line it can never have.
+
+- **On a phone, a habit chip asked for more height than its cell has.** Touch
+  controls are given a 40px minimum there; a habit chip lives in a cell of fixed
+  height with room for two rows of chips in 36 pixels, so the floor meant to
+  make it easy to hit was what cut it off instead. It is now the same small pill
+  on a phone as on the desktop. No other control changed.
+
+- **Removing a category from an older vault could orphan its contents.** The
+  removal looked for the category's storage block by its current marker only,
+  while the check for "is this category empty" read both the current and the
+  pre-rename spelling. On a note written before the rename the check passed and
+  the search found nothing, so the category went and its files stayed behind in
+  a block nothing renders. Both halves read both spellings now, in one place.
+
+- **Today's outline stepped where a multi-day event crossed it.** The ring
+  around today and the bar along the top of a day were drawn as two different
+  kinds of mark at two different offsets, so a day that was both today and part
+  of a trip showed two mismatched bands at its top edge. The outline is now
+  drawn **as the cell's own edge**: it sits exactly where every other day's
+  quiet outline sits, touching the inside of the cell and never reaching past
+  it, and the trip's bar paints over the top segment of it — so the trip keeps
+  the top edge of the row and runs unbroken across the week while today still
+  reads as a framed cell. Two smaller things came with it — a trip's bar
+  no longer overhangs by a pixel into the next day, and a day that is both today
+  and inside a trip keeps its own accent wash instead of losing it to the
+  event's tint.
+
 ## [1.0.49] - 2026-10-09
 
 ### Added

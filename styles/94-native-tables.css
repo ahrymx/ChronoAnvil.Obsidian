@@ -814,12 +814,37 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
 /* What pressing Add is about to do, said before it happens. A tag is a string
    in one note; a habit typed here becomes a row in Settings → Trackers, and a
    reader is owed that sentence at the moment they are deciding whether to type
-   — not afterwards, from a Notice. */
-.ca-habits-note {
+   — not afterwards, from a Notice.
+
+   THE CATEGORIES WINDOW SHARES THE RULE AND THE REASON (1.0.49). A category
+   typed there writes two things into the note — a line in the section's fence
+   and a block below it that stores what is dropped on the shelf — and removing
+   one takes both away. Same sentence, same place, same size; the second class
+   joins the selector rather than copying the four declarations, because a
+   second copy is what later disagrees. */
+.ca-habits-note,
+.ca-attach-cats-note {
   margin-top: var(--ca-space-2);
   color: var(--text-muted);
   font-size: var(--ca-text-2xs);
   line-height: 1.35;
+}
+
+/* ── The Categories window (1.0.49) ──────────────────────────────────────
+
+   WEARS THE TAGS WINDOW'S CLASSES for the third time, and by now that is the
+   rule rather than a resemblance: a list of named things in one note, with
+   adding, renaming and removing as three separate edits. The rows, the add
+   field, the count slot and the muted ✕ are all the same. What follows is the
+   one thing this window has that neither of the others does.
+
+   THE COUNT IS THE REASON THE ✕ IS LIVE, so it sits between the name and the
+   controls rather than trailing the row: `empty`, `3 items`, or `new` for a
+   category that has no storage yet. `.ca-tags-count` is already the muted
+   slot for exactly this, and the only thing it has to be told here is not to
+   be squeezed by a long name. */
+.ca-attach-cats-editor .ca-tags-count {
+  flex: 0 0 auto;
 }
 
 /* A phone has no hover, so the pencil that trails the chips would never

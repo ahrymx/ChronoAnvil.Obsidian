@@ -51,7 +51,7 @@ import {
   reconfigured,
   withAnswers,
 } from "../core/section-model";
-import { regionHasContent } from "../core/notestore";
+import { noteKeyOf, regionHasContent } from "../core/notestore";
 import { TRACKER_MARK_END, TRACKER_MARK_START } from "../core/constants";
 import {
   actionsQuestion,
@@ -235,6 +235,35 @@ export interface EntrySection extends Section<EntrySectionContext> {
   // change, and a section found by them would go missing when they did.
   above?: (ctx: EntrySectionContext) => string[];
   below?: (ctx: EntrySectionContext) => string[];
+  // The keyword whose EVERY line in the band belongs to this section. 1.0.49 §5.
+  //
+  // ONE SECTION HAS IT AND THE REST CANNOT. The rule this file is built on is
+  // one section, one line, one region keyed alike (`probeFor` states it), and
+  // `note:` is the keyword of two different sections — so a family is not
+  // derivable from a keyword and is declared by the one section whose keyword
+  // belongs to it alone.
+  //
+  // WHAT IT IS FOR: Attachments is a LIST. Its categories are `attach:` lines
+  // the Categories window adds and removes, every one of them is drawn as a
+  // shelf of the same card, and the number of them is the note's business
+  // rather than the catalogue's. Two questions therefore have a different
+  // answer for it than for every other section, and both are asked of a FILE:
+  //
+  //   WHICH REGIONS HOLD THE READER'S WRITING, which is what the removal
+  //   refusal is. Without this it asked about `attachments` alone, so a section
+  //   whose Images shelf was full reported itself removable.
+  //
+  //   WHICH LINES GO WHEN THE SECTION GOES. Measured before it was written: a
+  //   second category survived the removal of the section it belonged to, as an
+  //   `attach:images|Images` line with no section and a region nothing named —
+  //   which the renderer then drew as an Attachments section of its own,
+  //   because the first `attach:` line of a barless fence is a section.
+  //
+  // IT IS NOT AN ATTRIBUTION RULE, and that is deliberate. `parseEntry` still
+  // attributes ONE line per section: two lines carrying one id would collide in
+  // the `byLine` map a reorder is dealt from, and the Save that followed would
+  // duplicate one category and drop the other.
+  family?: string;
 }
 
 // THE ONE FENCE AN ENTRY COMPOSES. Every band of an entry is a `chronoanvil`
@@ -408,6 +437,33 @@ const on = (
 // Keeping entries strictly single-column gives each field (Focus, Tasks,
 // Highlights, Challenges, Notes, Attachments, Captured) full width and
 // consistent visual hierarchy.
+
+// The categories a fresh entry's Attachments section ships with. 1.0.49 §5.
+//
+// ONE LIST, THREE DERIVATIONS — the directive, the `below` lines and the
+// regions — for the reason every derived thing in this file is derived: a
+// second spelling is a second place to forget, and the thing forgotten here
+// would be a shelf with no region behind it or a region no shelf names.
+//
+// THE FIRST KEY IS THE SECTION'S ID AND CANNOT MOVE. `attachments` is where
+// every entry in every vault already keeps its files, and it is what
+// `probeFor` finds the section by. The LABELS are only what a fresh note is
+// written with: a reader renames either in the Categories window, and nothing
+// re-reads this list afterwards.
+export const ENTRY_ATTACH_CATEGORIES: readonly { key: string; label: string }[] =
+  [
+    { key: "attachments", label: "Files & Links" },
+    { key: "images", label: "Images" },
+  ];
+
+// One line on all five grains.
+//
+// `on` takes a map so a grain can be left out, which is how a section says it
+// does not exist there. A section that ships everywhere answers the same thing
+// five times, and five copies of one string is five chances for a patch to
+// change four of them.
+const byGrain = (line: string): Partial<Record<TrackerClass, string>> =>
+  Object.fromEntries(TRACKER_CLASSES.map((g) => [g, line]));
 
 const ENTRY_DECLS: EntryDecl[] = [
   {
@@ -639,20 +695,60 @@ const ENTRY_DECLS: EntryDecl[] = [
     id: "attachments",
     label: "Attachments",
     blurb: "Images, files and links for this entry.",
-    icon: "📎",
+    icon: "\u{1F4CE}",
     category: "writing",
     locked: false,
     band: "shared",
     // ALL FIVE GRAINS AS OF 3.11 §4.2. Daily and monthly, with no comment
     // explaining the other three — the same shape as `highlights` above and
     // answered the same way. A weekly entry can have a photo.
-    directive: on({
-      daily: "attach:attachments|Attachments",
-      weekly: "attach:attachments|Attachments",
-      monthly: "attach:attachments|Attachments",
-      quarterly: "attach:attachments|Attachments",
-      yearly: "attach:attachments|Attachments",
-    }),
+    //
+    // ── AND IT SHIPS TWO CATEGORIES AS OF 1.0.49 §5 ──────────────────
+    //
+    // *"rename the default category in the diary attachments section to
+    // 'Files & Links', add a second default category named 'Images'."*
+    //
+    // THE ONE DECLARATION IS `ENTRY_ATTACH_CATEGORIES`, and the three things
+    // that follow from it are derivations rather than decisions: the first
+    // category is the section's own `directive` (its key is the section's
+    // identity — `probeFor` says why), the rest are `below` lines in the same
+    // fence, and every one of them composes a region. Writing the second line
+    // out here as a literal would be the same list said twice, and the first
+    // drift between them would be a note with a shelf and no region behind it.
+    //
+    // WHAT §4'S MEASUREMENT SAID, AND WHY THE LABEL MOVES NOW. The label was
+    // held at `Attachments` one round ago because `plain-markdown.ts` exports a
+    // region under the directive's OWN label, and an entry has no `header:`
+    // line — so that label was the only name of the section in the note, and
+    // renaming it alone made a fresh entry export as `## Files` while every
+    // other surface said Attachments. The disagreement was with the registry,
+    // not with the rename: `fields.ts` is the per-REGION list a grain ships and
+    // it said `Attachments` too. Both halves move together here, so an export
+    // comes out `## Files & Links` and `## Images` — the two things the section
+    // actually holds — and the section's own name is the renderer's
+    // (`ATTACH_SECTION_TITLE`), which is where §4 put it.
+    directive: on(
+      byGrain(
+        `attach:${ENTRY_ATTACH_CATEGORIES[0].key}|${ENTRY_ATTACH_CATEGORIES[0].label}`
+      )
+    ),
+    // THE REST OF THE LIST, IN THE SECTION'S OWN FENCE. `below` is already
+    // "extra lines this section writes into its own fence" and these are
+    // exactly that: `index.ts` draws every `attach:` line of a barless fence as
+    // a shelf inside the first one's section, so the lines being contiguous is
+    // how they are read as one list rather than being load-bearing.
+    //
+    // NOT A SECTION EACH, which was the other way to ship this. A category is
+    // note data — the Categories window adds, renames, reorders and removes it
+    // — and a catalogue entry per shipped category would mean the two that
+    // ship are sections while a third the reader adds is not, with the editor
+    // offering to remove `Images` on its own and a `byLine` map keyed by id
+    // that two lines with one id would collide in.
+    below: () =>
+      ENTRY_ATTACH_CATEGORIES.slice(1).map((c) => `attach:${c.key}|${c.label}`),
+    // EVERY `attach:` LINE IN THE BAND IS THIS SECTION'S. See `family` on
+    // `EntrySection` for what that buys and why only this section has it.
+    family: "attach",
   },
   {
     id: "bridge",
@@ -914,6 +1010,59 @@ function trackerLines(
   return where === "frontmatter"
     ? ["Mood:", "Wake-Up:", "Bedtime:", "Sleep:"]
     : ["tracker:Mood", "sleep"];
+}
+
+// The regions a section COMPOSES, in the order its own lines write them. 1.0.49 §5.
+//
+// READ OFF THE LINES RATHER THAN DECLARED BESIDE THEM. A region-owning
+// section's directive is `<kind>:<regionkey>` — `probeFor` is built on exactly
+// that — so the keys are already in the fence the section renders, and asking
+// the lines is what stops a shelf and its region drifting apart. For every
+// section but Attachments the answer is the one-element list it always was.
+//
+// `ownsRegion: false` IS THE SHAPE THIS CANNOT BE ASKED OF: its second token is
+// an argument (`bridge-notes:meal`), and it owns no region to name anyway.
+function composedRegions(
+  section: EntrySection,
+  ctx: EntrySectionContext
+): string[] {
+  if (section.ownsRegion === false) return [];
+  const own = directiveFor(section, { ...ctx, extra: [section.id] });
+  const lines = [...(own == null ? [] : [own]), ...(section.below?.(ctx) ?? [])];
+  const keys: string[] = [];
+  for (const line of lines) {
+    const key = noteKeyOf(splitDirective(line.trim()).argument);
+    if (key && !keys.includes(key)) keys.push(key);
+  }
+  return keys;
+}
+
+// The regions a section owns IN THIS NOTE. 1.0.49 §5.
+//
+// NOT `regionsIn`, WHICH IS TAKEN: `journal-plan.ts` has a file-local function
+// of that name answering a different question about a different thing (which
+// regions a note's lines hold, and how many lines each), and the paragraph in
+// `parseEntry` below points at it by name.
+//
+// The same answer as `composedRegions` for every section without a `family`,
+// and for the one that has it the FILE is the authority rather than the
+// catalogue: a reader's third attachment category is as much the section's as
+// the two it shipped with. The id is always in the list — a category the reader
+// renamed away is still the section's identity, and a key with no region behind
+// it costs a caller nothing (`regionHasContent` is false, `shape.regions` has
+// no entry).
+function ownedRegionsIn(section: EntrySection, text: string): string[] {
+  if (section.ownsRegion === false) return [];
+  const keys = [section.id];
+  if (!section.family) return keys;
+  const re = new RegExp(`^\\s*${escapeForLine(section.family)}:([^|\\s:]+)`);
+  for (const line of text.split("\n")) {
+    const found = re.exec(line);
+    if (!found) continue;
+    const key = noteKeyOf(found[1]);
+    if (key && !keys.includes(key)) keys.push(key);
+  }
+  return keys;
 }
 
 // A body region, empty. The blank line between the markers is not decoration:
@@ -1193,9 +1342,14 @@ export function composeEntryTemplate(
       ...bandFences(shared),
       "",
     ].join("\n") +
+    // ONE REGION PER KEY A SECTION'S LINES NAME, which is one per section for
+    // six of the seven and two for Attachments as of 1.0.49 §5. It read
+    // `.map((s) => region(s.id))`, which is the same list for a section whose
+    // id IS its only key — and a shelf with no region behind it for the one
+    // whose body is a list.
     shared
-      .filter((s) => s.ownsRegion !== false)
-      .map((s) => region(s.id))
+      .flatMap((s) => composedRegions(s, ctx))
+      .map((key) => region(key))
       .join("\n\n") +
     "\n";
 
@@ -1339,7 +1493,12 @@ export function entryRemovalRefusal(
       ? "Part of every entry, so it can't be removed. You can still move it."
       : "Part of every entry, so it can't be removed or moved.";
   }
-  if (section.ownsRegion !== false && regionHasContent(fileText, section.id)) {
+  // EVERY REGION THE SECTION HAS IN THIS NOTE, not just the one named after it
+  // (1.0.49 §5). Attachments is a list of categories and each one is a region;
+  // asked about `attachments` alone, a section whose Images shelf was full
+  // reported itself removable — and the removal below now takes every one of
+  // them, so this is the guard that keeps that from being destructive.
+  if (ownedRegionsIn(section, fileText).some((key) => regionHasContent(fileText, key))) {
     return "Holds your writing. Clear it first, then remove the section.";
   }
   return null;
@@ -1405,15 +1564,24 @@ export function addSectionToNote(
   const close = lastSharedFenceClose(lines);
   if (close === -1) return null;
 
+  // EVERY LINE THE SECTION COMPOSES, AND EVERY REGION THEY NAME (1.0.49 §5).
+  // It was the directive and one region, which is the whole of a section whose
+  // body is one field. Attachments ships a list, and adding it to a note that
+  // never had it has to give the same thing a fresh entry gets — otherwise
+  // *Edit sections… → Attachments* and a new entry disagree about what the
+  // section is, and the reader who notices is the one who has both open.
   const withDirective = [
     ...lines.slice(0, close),
     directive,
+    ...(section.below?.(ctx) ?? []),
     ...lines.slice(close),
   ];
-  const body = withDirective.join("\n");
-  if (section.ownsRegion === false) return body;
-  const sep = body.endsWith("\n") ? "\n" : "\n\n";
-  return `${body}${sep}${region(section.id)}\n`;
+  let body = withDirective.join("\n");
+  for (const key of composedRegions(section, ctx)) {
+    const sep = body.endsWith("\n") ? "\n" : "\n\n";
+    body = `${body}${sep}${region(key)}\n`;
+  }
+  return body;
 }
 
 // A literal for use inside a line-anchored RegExp.
@@ -2045,13 +2213,59 @@ function tidyRowLine(body: readonly string[]): string[] {
   return body.filter((l) => !isRowLine(l.trim()) && !isCellLine(l.trim()));
 }
 
+// The `keyword:key` of every line the catalogue composes BESIDE a section's own
+// directive. 1.0.49 §5.
+//
+// One entry today: the Images category Attachments ships with. `parseEntry`
+// attributes one line per section — `family` says why that cannot change — so
+// these lines arrive unattributed, and three readers of `isForeignBandLine`
+// would each have drawn the wrong conclusion from that:
+//
+//   the Save window would report *1 line in this entry's widget fence* on every
+//   entry in the vault, over a line the plugin wrote itself;
+//   saving an entry as a template would announce that line as a drop, when the
+//   composer writes it back;
+//   and an entry-template reload would call a freshly composed entry damaged —
+//   which is the test that caught it.
+//
+// BY KEY AND NOT BY TEXT, so a reader who renames the shelf in the Categories
+// window does not turn the catalogue's own line into a foreign one. A category
+// the READER added is a different thing and stays foreign: a recompose really
+// does drop it, and the one place that is a warning rather than noise is the
+// reload, which is what the warning is for.
+const COMPOSED_BAND_LINES = new Set(
+  ENTRY_DECLS.filter((d) => d.band === "shared").flatMap((d) =>
+    TRACKER_CLASSES.flatMap((grain) =>
+      (d.below?.({ grain }) ?? []).map((line) => bandLineKey(line))
+    )
+  )
+);
+
+// Which section a family keyword's lines belong to: `attach` → `attachments`.
+// One entry, and `family` on `EntrySection` says why there cannot be two for
+// one keyword.
+const FAMILY_OF = new Map<string, string>(
+  ENTRY_DECLS.flatMap((d) => (d.family ? [[d.family, d.id] as const] : []))
+);
+
+// A line as `keyword:regionkey`, which is the identity a label cannot change.
+function bandLineKey(line: string): string {
+  const { keyword, argument } = splitDirective(line.trim());
+  return `${keyword}:${noteKeyOf(argument)}`;
+}
+
 // A band line that is the reader's own: not the catalogue's, not blank, and not
 // one of the layout modifiers above.
 export function isForeignBandLine(b: {
   id: string | null;
   line: string;
 }): boolean {
-  return b.id === null && b.line.trim() !== "" && !isModifierLine(b.line);
+  return (
+    b.id === null &&
+    b.line.trim() !== "" &&
+    !isModifierLine(b.line) &&
+    !COMPOSED_BAND_LINES.has(bandLineKey(b.line))
+  );
 }
 
 // What could still be added here: applies to this grain, and is not already in
@@ -2325,8 +2539,26 @@ export function applyEntrySections(
   const bodies: string[][] = shape.shared.map(() => []);
   if (shape.shared.length) {
     const lastFence = shape.shared.length - 1;
+    // WHAT A REMOVAL TAKES, AND THE ORPHAN IT USED TO LEAVE (1.0.49 §5).
+    // Measured before it was written: an entry with two attachment categories,
+    // with the section removed from *Edit sections…*, came out still carrying
+    // `attach:images|Images` and a region nothing named — and the renderer drew
+    // that line as an Attachments section of its own, since the first `attach:`
+    // line of a barless fence is a section. So a `family` section takes every
+    // line of its keyword with it, including categories the reader added, and
+    // `entryRemovalRefusal` is what makes that non-destructive: a category
+    // holding anything at all refuses the removal before it is offered.
+    const families = new Set(
+      [...removing].flatMap((id) => {
+        const family = byId.get(id)?.family;
+        return family ? [family] : [];
+      })
+    );
     const kept = flat
-      .filter((b) => b.id === null || !removing.has(b.id))
+      .filter((b) => {
+        if (b.id !== null) return !removing.has(b.id);
+        return !families.has(splitDirective(b.line.trim()).keyword);
+      })
       // A SETTLED SECTION'S ANSWER, CHANGED IN PLACE — 3.15 patch 5, and the
       // one property of this function that changed. The line is still the
       // reader's: `withAnswers` replaces the span the answer occupies and
@@ -2385,6 +2617,20 @@ export function applyEntrySections(
       const line = { id, line: line0 };
       fenceOf.set(line, lastFence);
       kept.push(line);
+      // AND THE REST OF THE SECTION'S OWN FENCE (1.0.49 §5). `below` is the
+      // declared way a section writes more than one line, and Attachments uses
+      // it for the categories it ships with — so an add from the editor lands
+      // the same section a fresh entry composes.
+      //
+      // UNATTRIBUTED, WHICH IS WHAT THEY ARE. `parseEntry` attributes one line
+      // per section and `family` says why it must stay that way; a `null` id
+      // here puts these lines in the same class as a `row` modifier — carried
+      // through the rewrite in place, never dealt a slot in the permutation.
+      for (const extra of section.below?.(ctx) ?? []) {
+        const held = { id: null, line: extra };
+        fenceOf.set(held, lastFence);
+        kept.push(held);
+      }
     }
     const slots: number[] = [];
     kept.forEach((b, i) => {
@@ -2423,8 +2669,11 @@ export function applyEntrySections(
   // goes with it, or the one before it when it was the last in the file —
   // otherwise every removal leaves a widening gap behind.
   const regionSkip = new Set<number>();
-  for (const id of removing) {
-    const at = shape.regions.get(id);
+  for (const key of [...removing].flatMap((id) => {
+    const section = byId.get(id);
+    return section ? ownedRegionsIn(section, text) : [id];
+  })) {
+    const at = shape.regions.get(key);
     if (!at) continue;
     for (let i = at.from; i <= at.to; i++) regionSkip.add(i);
     if (lines[at.to + 1]?.trim() === "") regionSkip.add(at.to + 1);
@@ -2471,10 +2720,13 @@ export function applyEntrySections(
   // shipped template already has and the one `addSectionToNote` writes.
   let next = out.join("\n");
   for (const id of adding) {
-    if (shape.regions.has(id)) continue;
-    if (byId.get(id)?.ownsRegion === false) continue;
-    const sep = next.endsWith("\n") ? "\n" : "\n\n";
-    next = `${next}${sep}${region(id)}\n`;
+    const section = byId.get(id);
+    if (!section) continue;
+    for (const key of composedRegions(section, ctx)) {
+      if (shape.regions.has(key)) continue;
+      const sep = next.endsWith("\n") ? "\n" : "\n\n";
+      next = `${next}${sep}${region(key)}\n`;
+    }
   }
 
   return next === text ? null : next;
@@ -2658,6 +2910,15 @@ interface BandRead {
   // Each field's directive line, VERBATIM. What a regroup moves between fences
   // is this string and nothing else.
   lineOf: Map<string, string>;
+  // The lines that TRAVEL WITH a field's own line. 1.0.49 §5.
+  //
+  // Attachments composes one `attach:` line per category and `parseEntry`
+  // attributes only the first (see `family`), so the rest arrive here
+  // unattributed — and this window re-emits the band out of what it read, so a
+  // line it did not keep is a line it would drop. Before this map it refused
+  // the whole band instead, which is the honest failure and still cost a
+  // two-category entry its grouping window.
+  tailOf: Map<string, string[]>;
   // The span the fences occupy, which a rewrite replaces whole.
   from: number;
   to: number;
@@ -2698,6 +2959,7 @@ const readBand = (shape: EntryShape, lines: readonly string[]): BandRead | null 
   if (!shape.shared.length) return null;
   const fences: BandFence[] = [];
   const lineOf = new Map<string, string>();
+  const tailOf = new Map<string, string[]>();
   for (const fence of shape.shared) {
     if (lines[fence.open] !== lines[shape.shared[0].open]) return null;
     if (lines[fence.close] !== lines[shape.shared[0].close]) return null;
@@ -2708,6 +2970,7 @@ const readBand = (shape: EntryShape, lines: readonly string[]): BandRead | null 
       title: null,
     };
     let tab = false;
+    const family: { owner: string; line: string }[] = [];
     for (const b of fence.body) {
       if (b.id !== null) {
         if (lineOf.has(b.id)) return null;
@@ -2750,7 +3013,27 @@ const readBand = (shape: EntryShape, lines: readonly string[]): BandRead | null 
         read.title = named;
         continue;
       }
+      // ── AND A CATEGORY OF A FIELD IN THIS FENCE (1.0.49 §5) ─────────
+      //
+      // KEPT, NOT SKIPPED. A skip would read the band as groupable and then
+      // drop the line on the first regroup, which is the one outcome every
+      // refusal in this function exists to prevent.
+      //
+      // IN THE FENCE ITS OWNER IS IN, which is checked after the body is read
+      // rather than here: the Categories window rewrites the `attach:` slots in
+      // place, so a reader who moves a category up can leave the section's own
+      // line second. A family line in a fence WITHOUT its owner is a band this
+      // did not compose and is refused below with everything else.
+      const owner = FAMILY_OF.get(splitDirective(bare).keyword);
+      if (owner) {
+        family.push({ owner, line: b.line });
+        continue;
+      }
       return null;
+    }
+    for (const held of family) {
+      if (!read.ids.includes(held.owner)) return null;
+      tailOf.set(held.owner, [...(tailOf.get(held.owner) ?? []), held.line]);
     }
     if (tab || !read.ids.length) return null;
     if (read.pages.size && !read.rowed) return null;
@@ -2768,7 +3051,15 @@ const readBand = (shape: EntryShape, lines: readonly string[]): BandRead | null 
   for (let i = from; i <= to; i++) {
     if (!held.has(i) && lines[i].trim() !== "") return null;
   }
-  return { fences, lineOf, from, to, open: lines[from], close: lines[shape.shared[0].close] };
+  return {
+    fences,
+    lineOf,
+    tailOf,
+    from,
+    to,
+    open: lines[from],
+    close: lines[shape.shared[0].close],
+  };
 };
 
 // ── AND A COLUMN IS A WIDGET, WHICH IS 4.12 §A ON THIS SURFACE (1.0.42) ──
@@ -2967,11 +3258,16 @@ const regroupBand = (
   const runs: string[][] = [];
   let rowed = false;
   for (const g of groups) {
-    const cells = g.flatMap((id, i) =>
-      i > 0 && pages.includes(id)
-        ? [TAB_KEYWORD, band.lineOf.get(id) as string]
-        : [band.lineOf.get(id) as string]
-    );
+    // A FIELD'S CELL IS ITS LINE AND WHATEVER TRAVELS WITH IT (1.0.49 §5):
+    // Attachments' categories, in the order the note had them, directly under
+    // the line they belong to. A reader who had moved one above the section's
+    // own line gets them back in catalogue order — a regroup rewrites the band
+    // it read, and `tailOf` is keyed by owner rather than by position.
+    const cells = g.flatMap((id, i) => [
+      ...(i > 0 && pages.includes(id) ? [TAB_KEYWORD] : []),
+      band.lineOf.get(id) as string,
+      ...(band.tailOf.get(id) ?? []),
+    ]);
     if (g.length > 1) {
       // A ROW OF ONE IS NOT A ROW, and so it is not a group and has no name.
       // The `header:` bar in a fence holding a single field would be read by

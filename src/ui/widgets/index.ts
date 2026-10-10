@@ -62,8 +62,8 @@ import {
   buildTasks,
 } from "./note-regions";
 import {
-  buildAddCategoryButton,
   buildAttachments,
+  buildCategoriesGlyph,
 } from "./attachment-widgets";
 import { buildRecall } from "./recall-widgets";
 import { NoteWriteScheduler } from "./note-write-scheduler";
@@ -163,6 +163,7 @@ import { buildPeriodNav } from "../../diary/periodnav";
 import {
   fieldFrame,
   foldableSection,
+  headTools,
   sectionFrame,
   splitGlyph,
 } from "../section-frame";
@@ -1224,6 +1225,42 @@ export class Widgets implements
       // stayed. Removing the scope button left the helper with one caller,
       // which is this one.
       const shelfHeader = headerOwning("attach");
+      // The fence's first `attach:` line, verbatim, or null for a fence with
+      // none. Compared by line rather than counted with a mutable flag because
+      // the loop `continue`s past several kinds of line before reaching a
+      // field, and a counter incremented in the wrong branch is the defect that
+      // shape invites.
+      const firstShelf =
+        lines.find((l) => keywordOf(l) === "attach")?.trim() ?? null;
+      // ── THE SECTION'S HEAD, WHERE NO BAR OWNS THE SHELVES (1.0.49) ──
+      //
+      // *"new category got incorrectly inserted as a new section when it should
+      // be nested."* `shelfHeader === -1` is the fence whose shelves hang under
+      // no titled header — a diary entry's `attach:attachments|Attachments`,
+      // which shares its fence with Tasks and five other fields and so can
+      // never be given a `header:` line of its own: that line would claim every
+      // field after it. Adding a category there produced a second card at the
+      // same level as the first, which reads as a second SECTION.
+      //
+      // THE SAME PREDICATE THAT HOSTS THE CATEGORIES DOOR, deliberately: one
+      // rule, said once. Where a bar owns the shelves it names the section and
+      // the shelves are equal siblings under it; where none does, the first
+      // `attach:` line's field draws that head itself and every shelf — its own
+      // included — nests under it.
+      //
+      // IT WAS "THE FIRST SHELF IS THE SECTION" UNTIL §4, which is the shape
+      // the reader chose from three drawn options and then revised on seeing
+      // it: *"I do think it would be better if the diary also had a distinct
+      // headerbar instead of the first categorie doing double duty."* The
+      // predicate is unchanged and so is the constraint behind it — a `header:`
+      // line here would claim Tasks and every field after it. What changed is
+      // that the head is the renderer's rather than the first category's, which
+      // leaves the first category an ordinary shelf. See `buildAttachments`.
+      //
+      // FILLED BY THE FIRST SHELF ITSELF rather than computed up front, because
+      // the body it hands back is a DOM node that does not exist until the
+      // widget is built.
+      let shelfBody: HTMLElement | null = null;
 
       // ── DOES THIS FENCE LIST A JOURNAL'S NOTE KINDS? (1.1) ────────────
       //
@@ -1491,18 +1528,39 @@ export class Widgets implements
             );
           }
           // THE SECTION'S OWN ACTION, HOSTED RATHER THAN DIRECTED (3.18
-          // follow-ups §1). "Add category" is a Resources-section action that
+          // follow-ups §1). "Categories" is a Resources-section action that
           // used to sit in the attach widget's toolbar, on every shelf — three
           // times on Study's Topic index. It cannot be written as a `button:`
           // directive because those resolve to registered create-actions and
           // this one acts on the note's own fence, so the bar hosts it instead.
+          //
+          // IT WAS *Add category* UNTIL 1.0.49, when the shelf's ✕ came off the
+          // field head and the two became one window — one door onto the whole
+          // list rather than an add here and a remove over there.
           //
           // ON THE HEADER THAT OWNS THE SHELVES, not on every header in the
           // fence: `shelfHeader` is the index of the last titled header before
           // this fence's first `attach:` line, which is the bar the shelves
           // actually render under. A fence with no `attach:` gets nothing.
           if (title && shelfHeader === headerIndex - 1) {
-            frame.actions.appendChild(buildAddCategoryButton(this, ctx));
+            // THE TITLE GOES WITH IT, because the window is about this bar's
+            // categories and a note can carry more than one Resources section.
+            // It is the DIRECTIVE's title, glyph and all — the same string the
+            // fold key is built from — so the window names the section the way
+            // the page does.
+            //
+            // ON THE TITLE ROW, AND THE SAME COG THE FIELD HEAD USES (1.0.49
+            // §3). *"the diary and journal attachment sections should look more
+            // similar."* This was `frame.actions`, which at level 1 is
+            // `flex: 1 0 100%` — so a labelled *Categories* pill got a whole
+            // full-width row of the section to itself, where the diary's field
+            // fitted the same door beside its chevron. `headTools` is that
+            // placement for both surfaces; it finds the bar's own chevron,
+            // already inserted by the `HeaderBar` child added just above, and
+            // goes in front of it.
+            headTools(frame.root).appendChild(
+              buildCategoriesGlyph(this, ctx, title)
+            );
           }
           // A SECOND HOSTED CONTROL SAT HERE AND IS GONE (5.21) — the task
           // table's scope button, moved onto the bar in 3.19.2 on exactly the
@@ -1545,6 +1603,10 @@ export class Widgets implements
           }
         }
 
+        // Null for the first shelf (nothing to nest into yet) and for every
+        // fence a bar owns.
+        const nestInto =
+          kind === "attach" && shelfHeader === -1 ? shelfBody : null;
         const widget = this.buildFromSpec(
           line,
           ctx,
@@ -1554,7 +1616,7 @@ export class Widgets implements
           // question for a widget that is the whole of what the section is —
           // the `checklist` section's one `tasks:` field, 5.10's case. It is
           // the WRONG question for a fence holding several: Study's Resources
-          // section renders `header:📚 Resources` over three `attach:` shelves
+          // section renders `header:📎 Attachments` over three `attach:` shelves
           // named Docs, Tutorials and Practice, and a bar cannot be three
           // names. Withholding all three heads there would delete the only
           // thing telling a reader which shelf is which.
@@ -1563,7 +1625,23 @@ export class Widgets implements
           // the field: the fence is titled AND holds one region field.
           fenceTitled && soleField,
           headerGroup,
-          wearsActions
+          wearsActions,
+          // ── WHO HOSTS *Categories* WHEN NOBODY DOES (1.0.49) ──────────
+          //
+          // `shelfHeader` names the titled header the shelves hang under, and
+          // -1 means there is none — a `attach:` fence written without a
+          // `header:` line, which the bar-hosted door at that site never
+          // reaches. Then the first `attach:` field draws the section's own
+          // head and hosts the door on THAT, which is the same place a bar
+          // hosts it: the end of the section's title row.
+          //
+          // THE TWO CONDITIONS ARE EXCLUSIVE BY CONSTRUCTION: the button is
+          // placed only where `shelfHeader` is some header's index, this glyph
+          // only where it is -1, so a section can never grow two doors onto one
+          // list. And `firstShelf` keeps it to one door per fence rather than
+          // one per shelf — the category error the ✕ was removed for.
+          shelfHeader === -1 && line.trim() === firstShelf,
+          nestInto
         );
 
         if (!widget) {
@@ -1582,6 +1660,16 @@ export class Widgets implements
               : `Unknown ChronoAnvil widget: ${line}`,
           });
           continue;
+        }
+
+        // The run's first shelf opens the section; every later one is already
+        // inside it and is not a block of this fence at all, so none of the
+        // bookkeeping below — the card, the name, the field band — applies to
+        // it. The body it hands back is the SECTION's as of §4, not its own,
+        // which is why exactly one element per widget carries that class.
+        if (kind === "attach" && shelfHeader === -1) {
+          if (nestInto) continue;
+          shelfBody = widget.querySelector(".ca-journal-attach-body");
         }
 
         // AND A KIND TABLE IS A HOST THE FOOT'S EDIT MODE HAS TO REACH.
@@ -2862,7 +2950,17 @@ export class Widgets implements
     // with the other modifiers and threaded here rather than met in the loop:
     // the line draws nothing of its own, and the only case that reads it is the
     // banner's. False for the legacy inline path, which has no fence.
-    wearsActions = false
+    wearsActions = false,
+    // Whether an `attach:` field here has to host the Categories control
+    // itself. Decided by the fence (see the call site), not by the field: it is
+    // true for one `attach:` line out of however many, and only when no titled
+    // header bar is hosting the button. Meaningless for every other kind.
+    ownsCategories = false,
+    // The body of the shelf that owns this fence's categories, where a barless
+    // run of `attach:` fields nests its second and later shelves. Null for the
+    // first shelf of such a run and for every other kind — see the nesting note
+    // over `buildAttachments`.
+    nestInto: HTMLElement | null = null
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const title = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -3050,7 +3148,16 @@ export class Widgets implements
         // link/file chips, over the same `<!--chronoanvil:<key>-->` body region the
         // other body-backed widgets use. Accepts dropped/pasted files, pasted
         // URLs, and links dragged in from the vault itself.
-        widget = buildAttachments(this, rest, ctx, label, fenceTitled, barActions);
+        widget = buildAttachments(
+          this,
+          rest,
+          ctx,
+          label,
+          fenceTitled,
+          barActions,
+          ownsCategories,
+          nestInto
+        );
         break;
       case "tracker":
         widget = buildTracker(this, rest, ctx);

@@ -305,7 +305,7 @@ describe("what the heading says", () => {
   it("makes a bar over several fields the name of the group", () => {
     const text = [
       "```chronoanvil",
-      "header:📚 Resources",
+      "header:📎 Attachments",
       "attach:res-docs|Docs",
       "attach:res-tutorials|Tutorials",
       "```",
@@ -319,7 +319,7 @@ describe("what the heading says", () => {
       "-->",
     ].join("\n");
     const out = toPlainMarkdown(text, daily);
-    expect(out).toContain("## 📚 Resources");
+    expect(out).toContain("## 📎 Attachments");
     expect(out).toContain("### Docs");
     expect(out).toContain("### Tutorials");
   });

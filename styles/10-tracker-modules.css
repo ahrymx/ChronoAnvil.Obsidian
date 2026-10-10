@@ -59,7 +59,18 @@ body.is-mobile .ca-journal-widget-bar.ca-journal-tracker-bar {
 
 /* Eyebrow label: small, muted, uppercase, tucked at the top-left so the
    metric control below is the cell's focus. The emoji/icon that leads each
-   label keeps its colour (uppercasing only affects letters). */
+   label keeps its colour (uppercasing only affects letters).
+
+   ── THE LINE-HEIGHT IS THE CELL'S BUDGET, NOT A REFINEMENT (1.0.49) ────
+   A 66px cell with a 1px border and 7px of padding has a 50px content box,
+   and this label is one line of it. With no line-height declared it inherits
+   the theme's ~1.5 and spends FIFTEEN of those pixels on ten pixels of
+   uppercase text — four more than the glyphs need, taken off whatever the
+   cell is actually for. Every clipped tracker control this release reported
+   was that four pixels plus a 30px host-styled button in a 36px window.
+   1.1 is the ascender-plus-descender of this face and nothing more; the
+   label is a single nowrap line, so there is no second line for the extra
+   leading to be doing anything for. */
 .ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label {
   flex: 0 0 auto;
   align-self: flex-start;
@@ -68,6 +79,7 @@ body.is-mobile .ca-journal-widget-bar.ca-journal-tracker-bar {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--ca-text-2xs);
+  line-height: 1.1;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;

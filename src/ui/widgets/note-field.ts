@@ -21,7 +21,7 @@ import {
 import type { App } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import type { NoteRegionHost, PluginNoteRegionHost } from "./note-regions";
-import { fieldFrame } from "../section-frame";
+import { fieldFrame, headTools } from "../section-frame";
 import type { FoldStore } from "../section-frame";
 import type { NoteWriteScheduler } from "./note-write-scheduler";
 import {
@@ -203,6 +203,21 @@ export interface FieldHead {
   body: HTMLElement;
   // Where its controls go, built on first use.
   actions: () => HTMLElement;
+  // A slot on the TITLE ROW, beside the chevron, or null where this field drew
+  // no head of its own.
+  //
+  // WHY IT IS NOT `actions()`. On a field head — `foldableSection` at level 1 —
+  // the actions slot is a full-width SECOND row, which is where *Add file* and
+  // *Add link* sit and is right for them: they are things you do to this
+  // field's contents. A control that acts on the whole SECTION rather than on
+  // its contents belongs on the title row, next to the fold, which is where a
+  // reader looking for the section's own settings looks first — *"it might be
+  // worth putting it next to the sections chevron"* (1.0.49).
+  //
+  // NULL IS A REAL ANSWER, not a failure: a field whose head is withheld
+  // because a bar already names it has no title row of its own, and its caller
+  // falls back to `actions()` — which in that case IS the bar's strip.
+  head: () => HTMLElement | null;
 }
 
 export interface FieldHeadOptions {
@@ -270,10 +285,22 @@ export function fieldHead(opts: FieldHeadOptions): FieldHead {
         }
         return strip;
       },
+      // No head was drawn, so there is no title row to put anything on.
+      head: () => null,
     };
   }
   const built = fieldFrame(wrap, { title: label }, opts.store, key);
-  return { body: built.body, actions: () => built.frame.actions };
+  return {
+    body: built.body,
+    actions: () => built.frame.actions,
+    // BEFORE THE CHEVRON, which carries `margin-left: auto` — so whatever goes
+    // in here lands at the right-hand end with the fold, rather than beside the
+    // title where it would read as part of the name. `headTools` owns that
+    // placement for every head in the plugin as of 1.0.49, a header bar's
+    // included, which is what stopped the same control being drawn two ways on
+    // the two surfaces that both host it.
+    head: () => headTools(built.frame.root),
+  };
 }
 
 export function buildNote(

@@ -152,7 +152,7 @@ export function headerTitleSpan(
 // besides the title itself.
 //
 // THE `<level>:` PREFIX IS NOT PART OF THE TITLE and must survive. The span
-// covers the whole argument — `2:📚 Resources` — while the reader is editing
+// covers the whole argument — `2:📎 Attachments` — while the reader is editing
 // only the second half of it, so a naive splice of the typed text would move a
 // level-2 bar to level 1 and change what it folds. `|label` is outside the span
 // already and needs no handling here.

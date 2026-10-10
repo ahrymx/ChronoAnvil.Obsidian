@@ -25,8 +25,15 @@
 // now pins the removal. The reasoning is in `tables.ts` where the builder was.
 
 import { describe, expect, it } from "vitest";
-import { readCode, readCss, readSrc } from "./sources";
+import { cssRule, readCode, readCss, readSrc } from "./sources";
 import { splitGlyph } from "../src/ui/section-frame";
+import {
+  applyAttachCategories,
+  attachFormatOf,
+  planAttachCategories,
+  readAttachCategories,
+  type AttachCategoryRow,
+} from "../src/ui/attach-categories";
 
 describe("an editable title is drawn once", () => {
   it("splits the glyph off before displaying it", () => {
@@ -165,88 +172,136 @@ describe("the task table draws no scope control", () => {
   });
 });
 
-describe("an empty resources category can be removed", () => {
+// 3.19.2's third fault, as 1.0.49 left it.
+//
+// THE DESCRIBE THAT STOOD HERE pinned the shelf's ✕: offered on the category's
+// own head, live only while the shelf was empty, re-checked against the file
+// before writing, removing the region as well as the directive, leaving the
+// blank line as `Add category` found it, refusing the last one, and reachable
+// without a hover.
+//
+// EVERY ONE OF THOSE INVARIANTS SURVIVES; the control does not. A category is a
+// SECTION-level thing and that was a per-shelf control for it — the same
+// category error 3.18 §1 corrected for *Add category* and left half-done. The
+// guards moved into `attach-categories.ts` as pure functions, which is why this
+// describe can now assert them against a model rather than against the text of
+// a click handler.
+describe("an empty resources category can still be removed", () => {
   const attach = (): string => readCode("attachment-widgets");
 
-  it("offers the control on the category's own subtitle", () => {
-    expect(attach()).toContain("journal-attach-remove");
+  const note = (shelves: string[], bodies: Record<string, string[]> = {}): string =>
+    [
+      "```chronoanvil",
+      "header:📎 Attachments",
+      ...shelves.map((k) => `attach:${k}|${k[0].toUpperCase()}${k.slice(1)}`),
+      "```",
+      ...shelves.flatMap((k) => ["", `<!--chronoanvil:${k}`, ...(bodies[k] ?? []), "-->"]),
+    ].join("\n");
+
+  const keep = (text: string, keys: string[]): AttachCategoryRow[] =>
+    readAttachCategories(text)
+      .filter((c) => keys.includes(c.key))
+      .map((c) => ({ key: c.key, label: c.label, format: attachFormatOf(c.tokens) }));
+
+  it("is not offered on the shelf any more", () => {
+    // Nothing builds `.ca-journal-attach-remove`, which is what makes the
+    // stylesheet sweep below a removal rather than a cosmetic tidy.
+    expect(attach()).not.toContain("journal-attach-remove");
+    expect(attach()).not.toContain("buildShelfRemove");
   });
 
   it("only when the category is empty", () => {
-    // The condition, in the widget's own model.
-    //
-    // THROUGH A GETTER SINCE 5.2, when the label row was extracted out of
-    // `buildAttachments` into `buildShelfLabel`. The count is asked for at the
-    // moment the button is refreshed rather than captured when it was built —
-    // which is not a nicety: `items` is REASSIGNED by a reorder and by the
-    // initial load, so a captured reference would answer for a model that has
-    // been replaced.
-    expect(attach()).toContain("const n = count();");
-    expect(attach()).toContain("const empty = n === 0;");
-    expect(attach()).toContain("drop.disabled = !empty;");
-    expect(attach()).toContain("() => items.length");
+    const text = note(["books", "films"], { films: ["- [Trailer](https://x.test)"] });
+    const plan = planAttachCategories(text, keep(text, []));
+    expect(plan?.removes.map((c) => c.key)).toEqual(["books"]);
+    // And the one that is refused comes back with what it holds, so the
+    // reader is told which shelf and how much is in it.
+    expect(plan?.kept).toEqual([
+      { key: "films", label: "Films", items: 1, tokens: [], tail: "" },
+    ]);
   });
 
-  it("and checks again against the file before writing", () => {
-    // NOT BELT-AND-BRACES. The button's state is computed at render time and
-    // the write happens after a confirmation the reader may have sat on — a
-    // drop landing in between would make an empty shelf a full one while the
-    // dialog was open.
-    expect(attach()).toMatch(/const body = lines\.slice\(open \+ 1, close\)/);
-    expect(attach()).toContain("isn't empty any more");
+  it("checks against the file rather than against the window", () => {
+    // NOT BELT-AND-BRACES. The row's ✕ is drawn from a count taken when the
+    // window opened, and the write happens whenever the reader presses Save —
+    // a drop landing in between would make an empty shelf a full one while the
+    // dialog sat open. The plan is computed from the file's text, so the
+    // refusal above is that same check and there is no second one to disagree.
+    const before = note(["books", "films"]);
+    const rows = keep(before, ["films"]);
+    const after = note(["books", "films"], { books: ["- ![[a.png]]"] });
+    expect(planAttachCategories(before, rows)?.removes.map((c) => c.key)).toEqual(["books"]);
+    expect(planAttachCategories(after, rows)?.removes).toEqual([]);
+    expect(planAttachCategories(after, rows)?.kept.map((c) => c.key)).toEqual(["books"]);
   });
 
   it("removes the region as well as the directive", () => {
     // A shelf owns two things in the file. Leaving the region behind would
     // orphan a comment block nothing renders and nothing can reach.
-    expect(attach()).toContain("out.splice(directive, 1);");
-    expect(attach()).toMatch(/out\.splice\(from, close - from \+ 1\)/);
+    const text = note(["books", "films"]);
+    const plan = planAttachCategories(text, keep(text, ["films"]));
+    const out = applyAttachCategories(text, plan!);
+    expect(out).not.toContain("attach:books|");
+    expect(out).not.toContain("<!--chronoanvil:books");
+    expect(out).toContain("attach:films|Films");
+    expect(out).toContain("<!--chronoanvil:films");
   });
 
-  it("leaves the file as `Add category` found it", () => {
-    // `addAttachCategory` inserts a blank line with the region. Removing one
-    // and not the other makes a note gain a blank line per add/remove cycle.
-    expect(attach()).toMatch(/if \(from > 0 && out\[from - 1\]\.trim\(\) === ""\) from--;/);
+  it("leaves the file as adding one found it", () => {
+    // Adding a category writes a blank line with the region. Removing one and
+    // not the other makes a note gain a blank line per add/remove cycle.
+    const base = note(["books"]);
+    const added = applyAttachCategories(
+      base,
+      planAttachCategories(base, [
+        ...keep(base, ["books"]),
+        { key: null, label: "Films" },
+      ])!
+    );
+    const back = applyAttachCategories(
+      added,
+      planAttachCategories(added, keep(added, ["books"]))!
+    );
+    expect(back).toBe(base);
   });
 
   it("refuses to remove the last one", () => {
     // A Resources section with no `attach:` renders an empty header and gives
-    // the reader no way back: "Add category" appends after the last shelf, and
-    // there would be none. Removing the section is the editor's job.
-    expect(attach()).toContain("shelves <= 1");
+    // the reader no way back into it. Removing the section is the editor's job,
+    // and both the window and the write say so.
+    const text = note(["books"]);
+    const plan = planAttachCategories(text, []);
+    expect(plan?.floor).toBe(true);
+    expect(plan?.removes).toEqual([]);
+    expect(applyAttachCategories(text, plan!)).toBe(text);
+    expect(attach()).toContain("needs one category");
+  });
+
+  it("lets the last one go when a new one is taking its place", () => {
+    // The floor is about what is LEFT, not about what is removed — a reader
+    // replacing their only category has not emptied the section.
+    const text = note(["books"]);
+    const plan = planAttachCategories(text, [{ key: null, label: "Films" }]);
+    expect(plan?.floor).toBe(false);
+    const out = applyAttachCategories(text, plan!);
+    expect(readAttachCategories(out).map((c) => c.label)).toEqual(["Films"]);
+    expect(out).not.toContain("<!--chronoanvil:books");
+    expect(out).toContain("<!--chronoanvil:films");
   });
 
   it("is reachable on a phone", () => {
-    // WAS: a `@media (hover: none)` branch holding this at 0.45, because the
-    // control was `opacity: 0` until the shelf was hovered and there is no
-    // second route to it. The comment ended "so a future removal has to argue
-    // with something", so here is the argument.
+    // WAS: a `@media (hover: none)` branch holding the shelf's ✕ at 0.45,
+    // because it was `opacity: 0` until the shelf was hovered and there was no
+    // second route to it. 5.14 dropped the hover-reveal; 1.0.49 drops the
+    // control.
     //
-    // THE HOVER-REVEAL IS GONE, WHICH IS WHAT THE BRANCH COMPENSATED FOR. The
-    // ✕ was an affordance on a bare label row; 5.14 made it an action on the
-    // field's own head, beside *Add file* and *Add link*, both of which are
-    // always drawn. A reader reported the result: one slot in a row of three
-    // behaving differently from the other two. It is drawn at full opacity on
-    // every pointer now, so a touch branch would be the only place it is
-    // DIMMED — the policy inverted rather than applied.
-    //
-    // The invariant this test is about is unchanged and is asserted directly:
-    // reachable without hovering. `test/hover-reveal.test.ts` still sweeps for
-    // the pattern this no longer is.
+    // The invariant is unchanged and now belongs to the window: its remove is
+    // `.ca-tags-remove`, a row control in a modal, which has never been
+    // hover-revealed. `test/hover-reveal.test.ts` sweeps for the pattern.
     const css = readCss();
-    const rule = css.slice(
-      css.indexOf(".ca-journal-attach-remove {"),
-      css.indexOf(".ca-journal-attach-remove svg")
-    );
-    expect(rule).toContain("opacity: 1");
-    expect(css).not.toMatch(
-      /@media \(hover: none\)[\s\S]{0,400}\.ca-journal-attach-remove/
-    );
-    // And no hover on the field reveals it, because there is nothing left to
-    // reveal — the pair of rules that did is gone with the zero.
-    expect(css).not.toContain(
-      ".ca-journal-attach:hover .ca-journal-attach-remove"
-    );
+    expect(css).not.toContain(".ca-journal-attach-remove");
+    expect(css).not.toContain(".ca-journal-attach:hover");
+    expect(cssRule(".ca-tags-remove:hover")).toContain("--text-error");
   });
 });
 

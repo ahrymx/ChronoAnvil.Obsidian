@@ -1404,7 +1404,7 @@ describe("renameable section titles", () => {
     // Only that header. The section's own directive and every other section's
     // heading are untouched — a title change is not a licence to reflow.
     expect(out).toContain("path:path");
-    expect(out).toContain("header:📚 Resources");
+    expect(out).toContain("header:📎 Attachments");
   });
 
   it("leaves the catalogue's heading when the answer is empty", () => {

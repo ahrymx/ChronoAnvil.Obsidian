@@ -356,6 +356,45 @@ export function hasNoteRegion(fileText: string, key: string): boolean {
   return findRegion(fileText, key) != null;
 }
 
+// The LINE SPAN a region occupies, for a caller editing the note as an array of
+// lines rather than as one string. Inclusive both ends, or null when the region
+// is absent or unterminated.
+//
+// WHY A LINE ANSWER EXISTS AT ALL. Everything else in this module reads and
+// writes a region's CONTENT and never has to know where the markers sit. The
+// Resources categories window is the one caller that removes a region
+// altogether, and it is splicing a `lines` array because the other half of the
+// same edit is an `attach:` directive INSIDE a fence — a line, with nothing in
+// this module's vocabulary to find it by.
+//
+// IT BELONGS HERE RATHER THAN THERE because the marker format does. The caller
+// that used to do this matched `<!--chronoanvil:${key}` itself and so could not
+// see a region written under the old spelling: `regionHasContent` reads both
+// prefixes, so the emptiness guard passed while the line search found nothing,
+// and the directive was removed while the reader's files stayed behind in an
+// orphaned comment. One function, both prefixes, one answer.
+export function regionLineSpan(
+  lines: string[],
+  key: string
+): { from: number; to: number } | null {
+  for (const prefix of OPEN_PREFIXES) {
+    const open = `${prefix}${key}`;
+    const from = lines.findIndex((l) => {
+      const t = l.trim();
+      if (!t.startsWith(open)) return false;
+      // The same end-of-key test `findRegion` makes, so `todo` does not match
+      // a region named `todo2`.
+      const after = t.charAt(open.length);
+      return after === "" || /\s/.test(after);
+    });
+    if (from === -1) continue;
+    const to = lines.findIndex((l, i) => i >= from && l.includes(CLOSE_MARKER));
+    if (to === -1) continue;
+    return { from, to };
+  }
+  return null;
+}
+
 // Ensure every key in `keys` has a (possibly empty) region, appending any that
 // are missing in the given order. Used once when a widget first renders so the
 // raw body carries a stable anchor. Returns the new text, or null if nothing

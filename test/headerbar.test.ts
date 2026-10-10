@@ -107,7 +107,7 @@ describe("a bar and the widgets welded into its own fence", () => {
     expect(out).toEqual([false, false, true]);
   });
 
-  it("folds every shelf of a Resources section", () => {
+  it("folds every shelf of an Attachments section", () => {
     // Three `attach:` fields in the one fence — Docs, Tutorials, Practice.
     const out = computeFoldHidden([
       blockNode(1),

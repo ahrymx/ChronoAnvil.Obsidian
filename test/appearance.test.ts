@@ -968,7 +968,15 @@ describe("the diary calendar draws the state it claims", () => {
     // one hairline's worth of hue, measured at #8a5cf5 against #3a3a3a.
     const today = body(".ca-cal-cell-today");
     expect(today).toContain("color-mix(in srgb, var(--interactive-accent) 16%");
-    expect(today).toContain("var(--ca-rule) var(--interactive-accent)");
+    // THE RING MOVED ONTO A PSEUDO-ELEMENT IN 1.0.49 and the fill did not. It
+    // had to: the ring and a span bar were an inset shadow and a child div
+    // stacked at different offsets, which is the step the report described, so
+    // the frame is now painted OVER the bars. Same weight, same colour, same
+    // token — a different box.
+    expect(today).not.toContain("box-shadow");
+    expect(body(".ca-cal-cell-today::after")).toContain(
+      "var(--ca-rule) var(--interactive-accent)"
+    );
     // NOT `--text-on-accent`, WHICH WOULD BE THE OBVIOUS WRONG ANSWER. That
     // variable is for a SOLID accent fill; over a 16% wash it puts white on pale
     // lavender for every light-theme reader. The readable colour on a ground
@@ -1422,5 +1430,167 @@ describe("a button holding an open menu says so (4.35.3)", () => {
     const returns = src.split("return menu;").length - 1;
     expect(opens).toBeGreaterThan(0);
     expect(returns).toBe(opens);
+  });
+});
+
+// ── 1.0.49: three awkward places, and two of them were one mistake ───────
+//
+// THE REPORT: *"polish up the visuals where they look awkward. Some I see:
+// habits/mood contents have too much border which makes them clip into the
+// bottom of the cards; current day cell on calendar outline does not line up
+// well at the top when a spanning event is active."*
+//
+// The first is the SAME DEFECT as the habit chip's earlier in this release —
+// Obsidian's app.css puts an explicit `height: var(--input-height)` on every
+// `<button>`, so a rule styling one as a small chip is decoration — plus the
+// shared eyebrow spending four pixels of a fifty-pixel content box on leading
+// it has no second line to use. The second is two marks of different kinds
+// stacked: an inset shadow at y 0→2 against a child div at y 2→5.
+
+describe("a tracker cell's controls fit the cell whose height is fixed", () => {
+  const rule = (sel: string): string => cssRule(sel);
+
+  it("resets the host height on the one button that never had it", () => {
+    // THE SWEEP THAT FOUND IT: every other button in a tracker cell — the
+    // habit chip, the habit box, the overflow count, sleep, tags, add, remove
+    // — carries a height of its own. The mood/scale face was the one that did
+    // not, so it was 30px in a 36px gap whatever its padding said, and
+    // `.is-selected`'s `scale(1.06)` painted 31.8 of them against the cell's
+    // `overflow: hidden`.
+    const face = rule(".ca-journal-mood-face");
+    expect(face).toContain("height: auto");
+    expect(face).toContain("min-height: 0");
+    // The metrics the reset makes real, rather than ornamental.
+    expect(face).toContain("padding: 3px 1px");
+    expect(face).toContain("line-height: 1");
+  });
+
+  it("pins the shared eyebrow's line-height for every cell, not one", () => {
+    // ONE NOWRAP LINE CANNOT USE 1.5. The label is `white-space: nowrap` with
+    // an ellipsis, so the inherited leading was four pixels of a fifty-pixel
+    // content box bought for a second line that cannot happen.
+    const label = rule(
+      ".ca-journal-tracker-bar .ca-journal-tracker-cell > .ca-journal-widget-label"
+    );
+    expect(label).toContain("line-height: 1.1");
+    expect(label).toContain("white-space: nowrap");
+  });
+
+  it("softens a state's edge without softening the answer", () => {
+    // *"too much border"*: a cell with four habits done and a mood chosen drew
+    // five full-accent hairlines in 66px. The TICK keeps the solid accent —
+    // it is the answer — and the pills around it drop to the mix.
+    const css = readCss();
+    expect(css).toMatch(/--ca-border-accent-soft:\s*color-mix\(/);
+    expect(rule(".ca-journal-habit-chip.is-done .ca-journal-habit-chip-btn")).toContain(
+      "border-color: var(--ca-border-accent-soft)"
+    );
+    expect(rule(".ca-journal-mood-face.is-selected")).toContain(
+      "border-color: var(--ca-border-accent-soft)"
+    );
+    // The box is the one thing that still shouts.
+    expect(rule(".ca-journal-habit-box.is-done")).toContain(
+      "background: var(--interactive-accent)"
+    );
+  });
+
+  it("names the element the presets are actually painting", () => {
+    // `.ca-journal-scale-face` was in two preset rules and in no TypeScript
+    // file: both the scale and the mood tracker build `.ca-journal-mood-face`.
+    // A dead selector in a selector list is invisible — the live half does the
+    // work — which is how it survived the renaming that orphaned it.
+    // ANCHORED AGAINST ITS OWN LIVE NEIGHBOUR: `.ca-journal-scale-faces` — the
+    // ROW, plural — is real and is the parent of these buttons, so a plain
+    // substring sweep for the dead singular passes through it and asserts
+    // nothing. The lookahead is what makes the absence an absence.
+    expect(readCss()).not.toMatch(/ca-journal-scale-face(?!s)/);
+    expect(readSrc("tracker-controls")).not.toMatch(/ca-journal-scale-face(?!s)/);
+  });
+});
+
+describe("today's outline and a trip's bar are one mark each", () => {
+  it("draws the ring on the cell's own edge, and lets the bar paint over it", () => {
+    // The step the report saw: the ring was an inset box-shadow painting
+    // y 0→2px and the bar is a real child at `top: 2px`, 3px tall. Two
+    // abutting bands of different offset, weight and colour, and the two
+    // literals that had to agree were independent.
+    //
+    // THREE ANSWERS, AND THE READER DREW THE LINE AT THE THIRD. On top of the
+    // bars; then inset by the bar's height (*"the outline shifted in, the event
+    // line should be on top"*); then *"much closer to the inner edge — it
+    // should basically be touching the edge / replacing it, but not extend past
+    // it"*. `inset: 0` on an inset shadow is exactly that: it paints in the
+    // same band as `.ca-cal-cell`'s own 10% edge, at the same radius, and
+    // cannot reach outside the box.
+    const css = readCss();
+    const ring = cssRule(".ca-cal-cell-today::after");
+    expect(ring).toContain("inset: 0");
+    expect(ring).toContain("border-radius: var(--ca-radius-sm)");
+    expect(ring).toContain("box-shadow: inset 0 0 0 var(--ca-rule) var(--interactive-accent)");
+    expect(ring).toContain("pointer-events: none");
+    // THE SAME BAND AS THE EDGE IT REPLACES, which is what "replacing it"
+    // means and what keeps it off the gap between two cells: one width, one
+    // radius, asserted against the quiet ring rather than restated.
+    expect(cssRule(".ca-cal-cell")).toContain("inset 0 0 0 var(--ca-rule)");
+    expect(cssRule(".ca-cal-cell")).toContain("border-radius: var(--ca-radius-sm)");
+    // WHAT ACTUALLY FIXED THE STEP, and the half that has not moved through any
+    // of the three: the bar owns the top of the cell and paints OVER whatever
+    // is under it, so the two marks never have to be reconciled. Under the
+    // badge too, which is later in the tree at the same layer.
+    expect(ring).toContain("z-index: 1");
+    expect(cssRule(".ca-cal-bars")).toContain("z-index: 2");
+    expect(cssRule(".ca-cal-badge")).toContain("z-index: 2");
+    expect(cssRule(".ca-cal-bars")).toContain("top: 0");
+    expect(css).not.toMatch(/\.ca-cal-bars \{[^}]*top: 2px/);
+    // STILL A PSEUDO-ELEMENT, THOUGH IT NO LONGER HAS TO BE: `.ca-cal-cell:hover`
+    // is (0,2,0) and `.ca-cal-cell-today` is (0,1,0), so a ring written on the
+    // element is taken away by the hover for as long as the pointer is there.
+    // That is what the ring did for every release before 1.0.49.
+    expect(cssRule(".ca-cal-cell-today")).not.toContain("box-shadow");
+    expect(cssRule(".ca-cal-cell:hover")).toContain("box-shadow");
+  });
+
+  it("sizes every bar from one token, wherever the bar is lighter", () => {
+    // The embedded month grid draws a 2px bar and said so in a rule of its own.
+    // The ring no longer reads this — it is the cell's edge now — but the bar
+    // is still the one thing on the cell with a height worth naming, and a
+    // per-grid override of a height is how the two drifted apart in the first
+    // place.
+    const css = readCss();
+    expect(cssRule(".ca-cal-bar")).toContain("height: var(--ca-cal-bar-h)");
+    expect(css).toMatch(/\.ca-jc-embedded \{\s*--ca-cal-bar-h: 2px;/);
+    expect(css).not.toMatch(/\.ca-jc-embedded \.ca-cal-bar \{[^}]*height:/);
+    // AND THE BASE VALUE IS IN THE TOKEN FILE, which the global token sweep
+    // cannot say: it asks whether a `var()` resolves ANYWHERE, and the override
+    // above is itself a definition — so losing the unconditional one would
+    // leave every month grid outside an embed reading an empty string, with the
+    // suite green. Measured: that mutant survived until this line.
+    expect(repoFile("styles/00-tokens.css")).toMatch(/\n {2}--ca-cal-bar-h: 3px;/);
+  });
+
+  it("bleeds exactly half the column gap, so nothing overhangs", () => {
+    // ASSERTED AS A PAIR, which is the point: a bar bled 4px into a 3px gap,
+    // so it reached 1px INTO the next cell's box — across today's rounded
+    // corner, with a square cap. Either number alone is meaningless and the
+    // two drifting apart is the defect.
+    const gap = /\.ca-jc-grid \{[^}]*gap: 5px (\d+)px/.exec(readCss());
+    const bleed = /\.ca-cal-bar \{[^}]*margin: 0 -(\d+)px/.exec(readCss());
+    expect(gap, "no column gap on .ca-jc-grid").not.toBeNull();
+    expect(bleed, "no bleed on .ca-cal-bar").not.toBeNull();
+    expect(Number(bleed![1]) * 2).toBe(Number(gap![1]));
+    // A cap is the bleed cancelled, at both kinds of end.
+    expect(cssRule(".ca-cal-bar-clip-left")).toContain("margin-left: 0");
+    expect(cssRule(".ca-cal-bar-clip-right")).toContain("margin-right: 0");
+  });
+
+  it("layers today's wash over an event tint rather than losing it", () => {
+    // THE SELECTOR THAT NEVER EXISTED. `.ca-cal-cell[class*="cal-tint-"]` is
+    // (0,2,0) and `.ca-cal-cell-today` is (0,1,0), so for as long as both have
+    // existed a today inside a trip has silently lost its accent wash. The two
+    // are not alternatives: one says which day it is, the other what the day
+    // is part of.
+    const both = cssRule('.ca-cal-cell-today[class*="cal-tint-"]');
+    expect(both).toContain("var(--interactive-accent) 16%");
+    expect(both).toContain("var(--ca-ev-tint, transparent)");
   });
 });

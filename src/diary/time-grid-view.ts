@@ -60,7 +60,7 @@ import {
 } from "../core/util";
 import { readDueTasks } from "../ui/tables";
 import { locateEntry } from "./lineage";
-import { eventColor, eventsOnDay, type EventDef } from "../events/events";
+import { eventColor, expandEvents, type EventDef } from "../events/events";
 import { readEvents, saveEvent } from "../events/eventstore";
 import { draftEvent, openEventEditor } from "../events/event-ui";
 import { parseLogItems, serializeLogItems, type LogItem } from "./log-items";
@@ -82,6 +82,9 @@ import {
   nowOffset,
   packBoxes,
   packDay,
+  laneRowCount,
+  laneRuns,
+  packLaneRuns,
   parseClock,
   parseDays,
   parseSources,
@@ -584,8 +587,19 @@ function fromEvents(
   lane: AllDayItem[]
 ): void {
   const defs = readEvents(plugin.app, plugin);
+  // ONE EXPANSION FOR THE WHOLE WEEK, AND `pos` IS WHY (1.0.49). This read the
+  // week a day at a time through `eventsOnDay`, which calls `expandEvents` for
+  // a one-day window and then throws the occurrence away to return the
+  // definition. The occurrence is the part the lane now needs: `pos` says
+  // whether this day is the START, the MIDDLE or the END of the thing's true
+  // span, which is what lets a chip drawn across four columns know that the
+  // trip began before the week and should be capped square at the left.
+  // Same day order — `expandEvents` sorts each day's list — and six fewer
+  // expansions.
+  const byDay = expandEvents(defs, dates[0], dates[dates.length - 1]);
   dates.forEach((iso, day) => {
-    for (const def of eventsOnDay(defs, iso)) {
+    for (const occ of byDay.get(iso) ?? []) {
+      const def = occ.def;
       const start = parseClock(def.time ?? null);
       const color = eventColor(def);
       const key = `event:${def.id}:${iso}`;
@@ -596,6 +610,10 @@ function fromEvents(
           title: def.title,
           day,
           key,
+          // The definition, not the day: every day of one trip shares this, and
+          // that is what makes them one chip.
+          ident: `event:${def.id}`,
+          pos: occ.pos,
         });
         continue;
       }
@@ -673,6 +691,13 @@ async function fromTasks(
         title: task.text,
         day,
         key,
+        // A TASK CAN NEVER SPAN, AND THE DAY IS WELDED ON TO MAKE SURE. A
+        // task's key is its file and its text — no date in it, because one task
+        // has one due date — so two identical lines in one file due on
+        // consecutive days would otherwise share an ident and group into a trip
+        // that does not exist.
+        ident: `${key}:${day}`,
+        pos: "solo",
       });
       continue;
     }
@@ -827,9 +852,64 @@ function paint(
     cls: "ca-tg-lane-label",
     attr: { title: "All day", "aria-label": "All day" },
   });
-  cols.forEach((day) => {
+  // ── A TRIP IS ONE CHIP ACROSS ITS OWN COLUMNS (1.0.49) ───────────────
+  //
+  // THE REPORT: *"time calendar not showing any text on mobile view (possibly
+  // to narrow?)"* It is too narrow — 360px over seven columns is 45px, which is
+  // why `99-time-grid.css` takes a chip's name out below 560px, answering
+  // 1.0.19's opposite report that the entries were too small WITH their names
+  // on. A four-day trip, though, already owns four of those columns: drawn as
+  // four stubs none of them can be named, and drawn as one chip it has 180px.
+  //
+  // THE ARITHMETIC IS IN `time-grid.ts` because it is arithmetic. All that
+  // happens here is `grid-column` and `grid-row` — the lane has been a CSS
+  // grid of gutter-plus-columns since 4.55, so a chip placed on it spans
+  // columns without anything else on the row having to know.
+  //
+  // ONE ROW ON A PHONE, THREE WHEN EXPANDED, and what does not fit SPILLS back
+  // into its days' cells to be drawn the way it was before — so a crowded lane
+  // degrades to the old behaviour rather than hiding a trip.
+  const { placed, spill } = packLaneRuns(laneRuns(shownAllDay, cols), opts.compact ? 1 : 3);
+  const spanRows = laneRowCount(placed);
+  // THE LAST ROW TAKES THE SLACK. The day cells are the lane's columns —
+  // their `border-left` is what separates the days — so they have to fill
+  // whatever the span rows above them leave, which `1fr` says and `auto`
+  // would not: a lane with a 52px floor and two auto rows splits the floor
+  // between them and the separators stop halfway down.
+  lane.style.gridTemplateRows = spanRows > 0 ? `repeat(${spanRows}, auto) 1fr` : "1fr";
+
+  for (const run of placed) {
+    const cls = [`ca-tg-chip`, `ca-tg-fill-${run.item.color}`, "is-span"];
+    if (run.clipLeft) cls.push("is-clip-left");
+    if (run.clipRight) cls.push("is-clip-right");
+    const chip = lane.createDiv({ cls: cls.join(" ") });
+    // The gutter is column 1, so the first drawn day is column 2.
+    chip.style.gridColumn = `${2 + run.col} / span ${run.span}`;
+    chip.style.gridRow = String(run.row + 1);
+    // THE NAME, DRAWN AT EVERY WIDTH. The stylesheet decides whether a chip is
+    // wide enough to show it, exactly as it does for a box of one — and a chip
+    // spanning two columns or more is the one case where the answer on a phone
+    // is yes.
+    chip.createSpan({ cls: "ca-tg-chip-title", text: run.item.title });
+    chip.setAttribute("title", laneTitle(run.item));
+    wire(plugin, chip, run.item.key);
+  }
+
+  // What the day cells draw: everything that is not part of a span chip above.
+  const perDay = new Map<number, AllDayItem[]>();
+  for (const run of spill) {
+    for (const member of run.members) {
+      const list = perDay.get(member.day);
+      if (list) list.push(member);
+      else perDay.set(member.day, [member]);
+    }
+  }
+
+  cols.forEach((day, col) => {
     const cell = lane.createDiv({ cls: "ca-tg-lane-cell" });
-    const mine = shownAllDay.filter((a) => a.day === day);
+    cell.style.gridColumn = String(2 + col);
+    cell.style.gridRow = String(spanRows + 1);
+    const mine = perDay.get(day) ?? [];
 
     // THE LANE COUNTS TOO, AND FOR A HARDER REASON THAN THE BODY'S: a block
     // that is too short can be grown downward and a chip cannot. Four tasks due

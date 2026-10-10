@@ -172,7 +172,20 @@ describe("the `#token` grammar, with one flag left to carry", () => {
     // sides of the tree. `buildNote` had the parse first — `#collapse`, `#line` —
     // written inline; a second copy in `buildTasks` is two answers to "what does
     // a `#` mean here" that agree until one of them is edited.
-    for (const file of ["ui/widgets/note-regions", "ui/widgets/note-field"]) {
+    //
+    // AND `attach-categories` JOINED THEM IN 1.0.49 §6, which is the round that
+    // proved the point rather than restating it. That module read a category's
+    // key as "everything before the `|`" — its own parse, written before any
+    // `attach:` line carried a flag — and by then one did: a diary entry drawn
+    // as a widget has `attach:attachments#widget|Files & Links`, so every
+    // question the Categories window asked about that key was asked about a
+    // region nothing writes. Measured: the row reported `empty` with an invoice
+    // in it, and the save deleted the directive line and orphaned the region.
+    for (const file of [
+      "ui/widgets/note-regions",
+      "ui/widgets/note-field",
+      "ui/attach-categories",
+    ]) {
       const code = readCode(file);
       expect(code, file).toContain("splitArgHead(");
       expect(code, file).not.toContain('indexOf("#")');

@@ -704,6 +704,53 @@ describe("the section's actions sit on a strip of their own", () => {
 // became a method in 2.55.5: a decision reachable only through a rendered
 // element is a decision nobody can check.
 
+// ── AND THE TITLE ROW HAS A SLOT, IN ONE PLACE (1.0.49 §3) ─────────────
+//
+// *"the diary and journal attachment sections should look more similar."* Part
+// of why they did not: a field head had a slot on its title row and a header bar
+// had none, so the one Categories door was a chevron-sized cog on one surface
+// and a labelled pill on a full-width row on the other. `headTools` is that slot
+// for both, and this is the sweep that stops a third placement being written —
+// the same pressure the rest of this file exists for, one scale down.
+describe("the title row's slot is placed in one place", () => {
+  it("is section-frame's job, and nobody reaches past it", () => {
+    // The three selectors `headTools` looks for are the positions a control must
+    // land in FRONT of. A caller doing its own `insertBefore` against one of
+    // them is the fourth copy: it would work, and it would be the thing that
+    // disagrees the next time a head grows a control.
+    //
+    // THE TWO INSERTS INSIDE THE MODULES THAT OWN THOSE ELEMENTS ARE NOT THAT.
+    // `foldableSection` and `HeaderBar` each insert their OWN chevron before
+    // their own actions slot, which is what creates the position in the first
+    // place. So the sweep reads the name of the thing being inserted BEFORE.
+    const offenders = sources
+      .filter(({ file }) => file !== FRAME)
+      .flatMap(({ file, code }) =>
+        [...code.matchAll(/insertBefore\([^)]*\)/g)]
+          .filter((m) =>
+            /header-toggle|sec-fold-toggle|header-widgets|head-tools/.test(m[0])
+          )
+          .map((m) => `${file}: ${m[0]}`)
+      );
+    expect(offenders).toEqual([]);
+  });
+
+  it("builds the slot once per head, however many controls want it", () => {
+    // Two callers share one head — a Resources section's cog and, where the
+    // first shelf IS the section, that shelf's *Add file* / *Add link*. Two
+    // boxes would be two rows, which is the thing this round removed.
+    const src = readSrc("section-frame");
+    expect(src).toContain(
+      'const found = bar.querySelector(":scope > .ca-journal-head-tools");'
+    );
+    expect(src).toContain("if (found instanceof HTMLElement) return found;");
+    // DIRECT CHILDREN ONLY. A head can contain another head — a field inside a
+    // section card — and an unscoped `querySelector` would hand a section's cog
+    // to a field nested in it.
+    expect((src.match(/":scope > /g) ?? []).length).toBe(4);
+  });
+});
+
 describe("a field wears the section's own head — 5.14", () => {
   // ── THE REVERT, PINNED ─────────────────────────────────────────────────
   //
@@ -760,8 +807,19 @@ describe("a field wears the section's own head — 5.14", () => {
       const bare = selectors.replace(/:has\([^)]*\)/g, "");
       const unscoped = bare.split(",").some((sel) => {
         const parts = sel.trim().split(/[\s>+~]+/).filter(Boolean);
+        // THE CLASS, NOT THE PREFIX (1.0.49). This read `includes`, which also
+        // matched every class the wrapper's name is a prefix OF — and two of
+        // those are slots inside the head rather than the wrapper:
+        // `.ca-journal-field-tools` and (until 1.0.49 §3 renamed it for the
+        // header bars that share it) the title row's slot, plus
+        // `.ca-journal-field-cats`, the settings glyph, which legitimately
+        // draws its own hover fill. A slot's own box is not the field's card
+        // and undrawing it is not the defect this sweeps for, so the token is
+        // compared whole: `.ca-journal-sec-fold.ca-journal-field` still matches
+        // and is still the subject the rule is about.
         return (
-          parts.length === 1 && parts[0].includes("ca-journal-field")
+          parts.length === 1 &&
+          parts[0].split(".").includes("ca-journal-field")
         );
       });
       if (!unscoped) continue;

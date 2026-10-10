@@ -103,7 +103,7 @@
  * to mean one thing — a `frame: section` fence, where the wrapper IS the
  * section and the block around it is therefore redundant. Since `fieldFrame` a
  * field wears the same wrapper, and a field is INSIDE a section rather than
- * being one: a Study topic's `header:📚 Resources` over three `attach:` shelves
+ * being one: a Study topic's `header:📎 Attachments` over three `attach:` shelves
  * is one section card holding three fields, and matching it here took the card
  * off the section because of what was in it. `:not(.ca-journal-field)` is the
  * whole fix; the fields themselves stand their own cards down instead, at the
