@@ -1105,3 +1105,530 @@ body.is-mobile .ca-list.is-editing {
     opacity: 0.55;
   }
 }
+
+/* ── The Link to diary window (1.0.51) ───────────────────────────────────
+
+   THE FOURTH LIST TO WEAR THE TAGS WINDOW'S CLASSES, and by now that is the
+   rule rather than a resemblance: `.ca-tags-editor`, `.ca-tags-list`,
+   `.ca-tags-row`, `.ca-tags-name`, `.ca-tags-count` and `.ca-tags-empty` are
+   the same here as they are for tags, habits and categories. What follows is
+   only what this window has that none of the others does — a tab strip, two
+   pagers, and a row that carries a tick instead of a ✕. */
+
+/* One tab per grain. A strip of pills rather than Obsidian's own tab chrome,
+   because the window is a dialogue and the strip is five words wide: the thing
+   it has to say is WHICH ONE IS ON, and a pill says that with a border. */
+.ca-dl-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ca-space-2);
+  margin-bottom: var(--ca-space-4);
+}
+.ca-dl-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  /* A chip-shaped <button> is 30px tall until it is told otherwise: app.css
+     gives every button `height: var(--input-height)`, and the reset has to be
+     in the same rule to beat it. Sixth instance of this in the sheet. */
+  height: auto;
+  min-height: 0;
+  padding: var(--ca-space-2) var(--ca-space-4);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-secondary);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  cursor: pointer;
+}
+.ca-dl-tab:hover {
+  border-color: var(--interactive-accent);
+}
+.ca-dl-tab.is-on {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* How many periods of that grain the page will be filed under once Save is
+   pressed — the one thing a tab can say about the four lists you are not
+   looking at. Accent-filled so it reads as a count and not as part of the
+   word. */
+.ca-dl-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  padding: 0 var(--ca-space-1);
+  border-radius: var(--ca-radius-pill);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--ca-text-3xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The find box and its two shortcuts, on one line. The box grows and the
+   buttons do not, so a narrow window loses the typing room rather than the
+   controls. */
+.ca-dl-find {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  margin-bottom: var(--ca-space-3);
+}
+.ca-dl-query {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ca-dl-jump {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  padding: var(--ca-space-2) var(--ca-space-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ca-dl-jump:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+/* *Later* above the list and *Earlier* below it, because the list runs newest
+   first and a control that adds rows belongs at the end it adds them to. Full
+   width and quiet: they are the edges of the list rather than two more things
+   competing with the rows. */
+.ca-dl-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ca-space-2);
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: var(--ca-space-2) 0;
+  border: none;
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.ca-dl-pager:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-dl-pager-icon {
+  display: inline-flex;
+}
+.ca-dl-pager-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* The list has a floor so the window does not jump between tabs — a tab with
+   five years on it and a tab with fifteen days are the same control. */
+.ca-dl-list {
+  max-height: 46vh;
+  min-height: 12em;
+  overflow-y: auto;
+}
+
+/* A <label> rather than a <div>, so the tick is the whole row. */
+.ca-dl-row {
+  cursor: pointer;
+}
+.ca-dl-row:hover {
+  background: var(--background-modifier-hover);
+}
+.ca-dl-tick {
+  flex: 0 0 auto;
+  margin: 0;
+}
+/* THE PERIOD'S NAME, AND ITS CONTRAST IS THE ANSWER TO ONE QUESTION (1.0.53):
+   is there an entry? Muted means a Save would create the note, full contrast
+   means it is already in the vault. Fifteen rows at one weight, with that fact
+   spelled out in a faint phrase on every one of them, is the list the reader
+   was shown five screenshots of. */
+.ca-dl-label {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+}
+.ca-dl-row.is-written .ca-dl-label {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+/* The entry's filename: it is what the find box accepts and the only thing on
+   the row naming the note a tick would write to. `--text-muted` rather than
+   `--text-faint` as of 1.0.53 — it is information rather than decoration, and
+   at 0.7em faint was a grey the screenshots could barely show. */
+.ca-dl-sub {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+}
+/* THE SAME DOT THE CALENDAR PUTS UNDER A NUMBER. A slot that is always there
+   and is only filled when the entry is: a mark that came and went would move
+   every label on the tab beside it. */
+.ca-dl-pip {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--ca-radius-pill);
+  background: transparent;
+}
+.ca-dl-row.is-written .ca-dl-pip {
+  background: var(--text-faint);
+}
+/* `linked` / `to link` / `to remove`. Right-aligned against the row's end so
+   the four states line up down the list instead of trailing each label. */
+.ca-dl-state {
+  flex: 0 0 auto;
+  text-align: right;
+}
+/* THE ACCENT DOWN THE EDGE OF A ROW IS THE FILL OF A CELL, said the only way a
+   row can say it without touching the text: `linked` is the state the reader
+   scans for, and it had nothing but a word in the right margin. */
+.ca-dl-row.is-on {
+  box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+/* And the edge GOES RED on the row a Save would unfile — the one state that
+   takes something away, which read identically to `to link` until 1.0.53. */
+.ca-dl-row.is-dropping {
+  box-shadow: inset 3px 0 0 var(--text-error, #e05561);
+}
+.ca-dl-row.is-adding .ca-dl-state {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+.ca-dl-row.is-dropping .ca-dl-state {
+  color: var(--text-error, #e05561);
+  font-weight: 600;
+}
+/* "this week", "this month" — the one landmark every tab has, and the four
+   list tabs had none of. Quiet: it says where you are, and nothing about what
+   a Save would do. */
+.ca-dl-now {
+  flex: 0 0 auto;
+  padding: 0 var(--ca-space-2);
+  border-radius: var(--ca-radius-pill);
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--ca-text-3xs);
+  white-space: nowrap;
+}
+/* THE RUNG THE LIST BREAKS ON: the month over a run of weeks, the year over a
+   run of months or quarters. STICKY, because the whole point is to answer
+   "which year am I looking at" while scrolling — a heading that scrolls away
+   answers it once. `--background-primary` is the modal's own ground. */
+.ca-dl-group {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--ca-space-2) 0 var(--ca-space-1);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── And the Days tab became a calendar (1.0.52) ──────────────────────────
+
+   *"I think the days should be groups into weeks, and weeks are how the view
+   cycles"*, and then *"would a calendar 30 day be a neater choice for the day
+   tab?"* — so the Days tab is a month grid whose every row IS an ISO week, and
+   the four other tabs are the list above, untouched.
+
+   WHAT THE GRID HAS TO SAY WITH NO ROOM FOR WORDS. A row carried a label, a
+   filename and a state word; a cell carries a number. So three marks do the
+   work — a dot for an entry that exists, an accent fill for a period this note
+   is filed under, an inset accent ring for a tick not yet saved — and the
+   legend under the grid names all three off the same class list the cells wear
+   (`CELL_KEYS`), so the two cannot drift. The sentence itself moves to the
+   caption, which follows the pointer. */
+
+/* ◀ October 2026 ▶. Centred, because it is a title with two controls on it
+   rather than a toolbar. */
+.ca-dl-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ca-space-3);
+  margin-bottom: var(--ca-space-2);
+}
+.ca-dl-month-name {
+  min-width: 10em;
+  color: var(--text-normal);
+  font-size: var(--ca-text-sm);
+  font-weight: 600;
+  text-align: center;
+}
+.ca-dl-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The button-height reset, in the same rule as everything else about this
+     control because that is the only place it beats app.css. */
+  height: auto;
+  min-height: 0;
+  padding: var(--ca-space-1) var(--ca-space-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: var(--background-secondary);
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ca-dl-step:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+.ca-dl-step svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* EIGHT COLUMNS: the week gutter, then seven days. `auto` for the gutter so
+   `W40` sets its own width and the seven day columns share what is left
+   equally — which is what keeps the columns under their own day names at any
+   window width. */
+.ca-dl-grid {
+  display: grid;
+  grid-template-columns: auto repeat(7, 1fr);
+  gap: var(--ca-space-1);
+  align-items: stretch;
+}
+/* The column heads, read off a real week rather than typed out. */
+.ca-dl-dow {
+  padding-bottom: var(--ca-space-1);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ca-dl-gutter {
+  text-align: right;
+}
+/* The week number. A LABEL AND NOT A CONTROL — see `paintGrid` for why a
+   clickable gutter was declined — so it is styled as the quietest thing in the
+   grid and carries no hover. */
+.ca-dl-wk {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--ca-space-2);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+/* A day of another month. It holds the column open and offers nothing: two
+   ways to reach one day would make ◀ ▶ sometimes change nothing. */
+.ca-dl-blank {
+  min-height: 2.2em;
+}
+/* A DAY. TRANSPARENT UNTIL SOMETHING IS TRUE OF IT, which is the 1.0.53
+   change: every cell carried `--background-secondary`, so a month of thirty
+   filled boxes said exactly as much about a day holding an entry as about a
+   day holding nothing. The fill is the diary's own density now — the written
+   days are the ones visible from across the grid. */
+.ca-dl-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 2.2em;
+  padding: var(--ca-space-1);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  position: relative;
+}
+/* Saturday and Sunday, by the column they sit in rather than by their date.
+   MUTED RATHER THAN TINTED, because the background is carrying the entry by
+   this point — and a weekend is a reading aid, not a state. */
+.ca-dl-day.is-weekend {
+  color: var(--text-muted);
+}
+/* Today: the accent on the border AND on the number. A 1px border alone is a
+   difference a reader has to go looking for, which is what 1.0.52 shipped.
+   BEFORE `.is-on` ON PURPOSE — one class against one class, so source order
+   decides, and a filled cell's number is `--text-on-accent` whatever day of
+   the month it happens to be. */
+.ca-dl-day.is-today {
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+  font-weight: 600;
+}
+/* An entry that is already written: a fill a shade up from the page, and the
+   dot. TWO MARKS FOR ONE FACT, deliberately — the fill is what reads at a
+   glance across a month, and the dot is what survives the accent fill of a day
+   this page is filed under. */
+.ca-dl-day.is-written {
+  background: var(--background-secondary);
+}
+.ca-dl-day.is-written::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--text-faint);
+}
+.ca-dl-day.is-on {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+}
+.ca-dl-day.is-on.is-written::after {
+  background: var(--text-on-accent);
+}
+/* THE TWO HALVES OF A PENDING WRITE, as a ring INSIDE the cell — an outline
+   would land between the cells and read as a gap. The accent for the tick that
+   adds, the error colour for the tick that takes away: they shared one ring
+   and one sentence until 1.0.53, and Save does opposite things with them. */
+.ca-dl-day.is-adding {
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+.ca-dl-day.is-dropping {
+  box-shadow: inset 0 0 0 2px var(--text-error, #e05561);
+}
+/* LAST OF THE CELL'S RULES, so a hover is visible on a cell in any state. */
+.ca-dl-day:hover {
+  border-color: var(--interactive-accent);
+}
+
+/* THE MARKS, NAMED — and under every tab as of 1.0.53, because the rows wear
+   them too. The text comes off `STATE_KEYS` in the window, which is the same
+   list the cells and the rows get their classes from, and three of the four
+   words come off `stateWord` so the key and the row cannot disagree. */
+.ca-dl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ca-space-3);
+  margin-top: var(--ca-space-3);
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+}
+.ca-dl-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+}
+.ca-dl-key-mark {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-xs);
+  background: transparent;
+}
+/* A MARK THAT LOOKS LIKE THE MARK IT NAMES. This was a filled square standing
+   for a dot under a number, which is a legend a reader has to be told how to
+   read: it is a cell with the fill and the dot now, at the same offsets. */
+.ca-dl-key-mark.is-written {
+  background: var(--background-secondary);
+}
+.ca-dl-key-mark.is-written::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--text-faint);
+}
+.ca-dl-key-mark.is-on {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+}
+.ca-dl-key-mark.is-adding {
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+.ca-dl-key-mark.is-dropping {
+  box-shadow: inset 0 0 0 2px var(--text-error, #e05561);
+}
+
+/* THE ROW A CELL CANNOT BE. It names the day the pointer is on — or the day
+   the grid is anchored on, so it is never blank — and says the same two things
+   the list's second line does. */
+.ca-dl-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--ca-space-2);
+  margin-top: var(--ca-space-2);
+  min-height: 1.4em;
+}
+.ca-dl-caption-day {
+  color: var(--text-normal);
+  font-size: var(--ca-text-xs);
+  font-weight: 600;
+}
+.ca-dl-caption-sub {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+}
+
+/* Where the link lands: two selects, one pair for the whole Save. */
+.ca-dl-dest {
+  margin-top: var(--ca-space-4);
+  padding-top: var(--ca-space-3);
+  border-top: 1px solid var(--background-modifier-border);
+}
+.ca-dl-dest-head {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ca-dl-dest-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-3);
+  margin-top: var(--ca-space-2);
+}
+.ca-dl-dest-label {
+  flex: 0 0 auto;
+  min-width: 5em;
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+}
+.ca-dl-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ca-dl-dest-note {
+  margin-top: var(--ca-space-2);
+  color: var(--text-faint);
+  font-size: var(--ca-text-2xs);
+}
+
+/* THE CONTROLS THAT BELONG TO ONE SHAPE, hidden rather than destroyed: the
+   month stepper on the four list tabs, the two pagers on the calendar. LAST IN
+   THE FILE ON PURPOSE — it is one class beating one class, so source order is
+   what decides it and `!important` is not needed. */
+.ca-dl-off {
+  display: none;
+}

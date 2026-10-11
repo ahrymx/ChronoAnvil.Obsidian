@@ -99,7 +99,7 @@ export const PAGE_ACTIONS: readonly PageAction[] = [
     label: "Link to diary",
     icon: "calendar-plus",
     blurb:
-      "Dates the page and links it from a diary entry you pick — a day, week, month, quarter or year — so it turns up in search, on-this-day and the bridge.",
+      "Opens a window of diary entries — a calendar for days, a list for weeks, months, quarters and years — and files this note under the ones you tick, so it turns up in search, on-this-day and the bridge. Untick one to take the link back. Choose which attachments category it lands on; an entry without that field gets one. Dates the note where it has no date of its own.",
     when: (ctx) => ctx.surface !== "entry",
     run: (p, path) => linkPageToDiary(p, path),
   },

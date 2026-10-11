@@ -261,6 +261,18 @@ export function hasTarget(items: Attachment[], target: string): boolean {
   return items.some((a) => a.target.trim().toLowerCase() === t);
 }
 
+// `hasTarget`'s pair: the list without that target (1.0.51).
+//
+// WRITTEN BESIDE IT AND COMPARING THE SAME WAY, because the two are one
+// decision seen from both ends. "Link to diary" adds a chip only when
+// `hasTarget` says there is none and takes it back only when this says there is
+// one — a removal that trimmed or lower-cased differently would either miss the
+// chip it put there or take out one the reader did.
+export function withoutTarget(items: Attachment[], target: string): Attachment[] {
+  const t = target.trim().toLowerCase();
+  return items.filter((a) => a.target.trim().toLowerCase() !== t);
+}
+
 // Move an item within the list, returning a new array. Out-of-range indices
 // return the list unchanged. Used by drag-to-reorder in the gallery.
 export function moveAttachment(

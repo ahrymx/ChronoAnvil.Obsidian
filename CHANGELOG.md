@@ -5,6 +5,130 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.53] - 2026-10-11
+
+### Changed
+
+- **Every tab of *Link to diary* says the same four things in the same way.**
+  Asked for as *"improve all tabs to improve readability and smart coloring"*.
+  The calendar carried three marks and the four lists carried none: every row
+  was one weight and one colour, and the one thing that differed between them —
+  whether that entry exists — was a phrase halfway down a faint second line
+  that every row repeated. Now a dot and a full-contrast name mean the entry is
+  already written, a muted name means a Save would create it, an accent edge
+  down a row means the note is filed under that period, and **a link you have
+  just taken back is red** where it used to look exactly like one you were
+  about to add. The three state words are spelled in one place and the key
+  under the list is drawn from it, so it sits under all five tabs rather than
+  under the calendar alone.
+- **A list heads itself with the period above it.** Weeks are grouped under
+  their month, months and quarters under their year, and the heading stays put
+  while you scroll — twelve months running past the turn of a year had nothing
+  to mark it.
+- **Every tab marks the period you are in** — *this week*, *this month*, *this
+  quarter* — which only the calendar did, and only for today.
+- **The calendar shows where your diary actually is.** A cell is transparent
+  until something is true of it, so the written days are the ones you can see
+  from across the grid; every cell used to be filled the same shade. Today is
+  drawn in the accent on its number as well as its border, and weekends are a
+  shade quieter.
+- **Smaller readings:** the entry filenames, the week numbers, the day names
+  and the two pagers are no longer the faintest grey the theme has; the find
+  box's placeholder is short enough to finish inside the box, with the five
+  date forms it accepts moved to its tooltip; and the sentence about what will
+  be composed into an entry is one line rather than three.
+
+## [1.0.52] - 2026-10-10
+
+### Added
+
+- **The Days tab of *Link to diary* is a month calendar.** Five rows, one per
+  ISO week, with the week number in a gutter and ◀ ▶ stepping a month at a
+  time — asked for as *"the days should be groups into weeks, and weeks are how
+  the view cycles"*, and a grid is that grouping rather than a drawing of it. A
+  dot marks a day whose entry is already written, a filled cell a period the
+  note is filed under, an accent ring a tick not yet saved, and an outline the
+  current day. The sentence a row used to carry — the entry's filename and
+  whether it exists — is on the cell's tooltip and in the caption under the
+  grid, which follows the pointer. The Weeks, Months, Quarters and Years tabs
+  are the same lists they were: five to twelve periods have no second dimension
+  to lay out.
+- **A Save says where the link lands.** Two fields under the list — the
+  attachments field, and the category on it — applied to every period ticked.
+  Until now every link went to the shelf keyed `attachments`, which was the
+  only one there was when the action was written and is one of two in any entry
+  composed since 1.0.49. The Category field offers the two that ship plus
+  whatever shelves the entries around the anchor actually have.
+- **An entry with no attachments field gets one, rather than being counted as
+  a miss.** It is composed exactly as a fresh entry's is — both default
+  categories, both regions — and a category the reader chose that an entry
+  lacks is added to it through the Categories window's own plan. A period with
+  no entry at all has been created on linking since 1.0.29; this is the half of
+  that promise that was missing. The notice says both, because composing a
+  field into somebody's note is a larger write than the one they asked for.
+- **Enter in the find box aims the window instead of saving it.** Typing a date
+  and pressing Enter goes there; Enter on anything else still saves, which is
+  what a dialog should do.
+
+### Fixed
+
+- **A note filed under *Images* read as not filed at all.** *Link to diary*
+  asked one region — the first shelf — so a note on any other category of the
+  same entry was offered as unlinked, and Save put a second copy of it in a
+  second region. Every shelf of an entry is asked now, including the section's
+  own region on an entry written before the categories existed, and one entry
+  holds one copy of a note whichever shelf it is on. Taking a link back
+  searches the same shelves, so the tick that says "linked" can always undo
+  itself.
+
+## [1.0.51] - 2026-10-10
+
+### Fixed
+
+- **Link to diary could not reach a day after the one the note was dated.**
+  The picker built its list by stepping BACKWARDS from an anchor and nowhere
+  else, so a note stating `date: 2026-09-22` was offered the fortnight before
+  it and nothing after — today included. The search box over it could not
+  rescue that either: a suggester filters the rows it was handed, so typing
+  `Day-2026-10-11` asked fourteen September days whether any of them were
+  called that and answered *No results found* about a day that plainly exists.
+  The list now reaches forwards as well as back and pages further in either
+  direction on demand.
+- **A typed date now moves the list instead of searching it.** The box above
+  the rows takes `2026-10-12`, `2026-10`, `2026-W41`, `2026-Q4`, `2026` and the
+  entry filenames the rows themselves show (`Day-…`, `Week-…`, `Month-…`,
+  `Quarter-…`, `Year-…`), with or without the prefix and whatever the case, and
+  aims the list at the LAST day of whatever was named — so a month typed on the
+  Days tab opens on the 31st with the rest of that month below it. Anything
+  that is not a date narrows the rows, which is the only thing the old box
+  could do.
+- **A date that does not exist is declined rather than rolled over.**
+  `2026-02-30` and `2026-13-01` used to be a day in March and a day in 2027;
+  the parse now round-trips what it produced against what was typed.
+
+### Added
+
+- **Link to diary is a window.** One tab per grain — Days, Weeks, Months,
+  Quarters, Years — a tick on every row, *Later* and *Earlier* at the ends of
+  the list, and the find box above it. Nothing is written until Save, which is
+  the same promise the Tags, Habits and Categories windows make and matters
+  more here, because a tick can create an entry note.
+- **It says what the note is already filed under.** A row whose entry carries a
+  link to this note in its Attachments reads *linked* and opens ticked. The
+  candidates come from Obsidian's own link index and each one is then read
+  properly, so a note merely NAMED in a day's prose is not claimed as filed
+  under it.
+- **And it can take a link back.** Unticking a linked period removes this note
+  from that entry's Attachments and touches nothing else — there was no gesture
+  for this before, only opening the entry and removing the chip by hand.
+- **One Save can file a note under several periods**, which used to be the
+  action run once per period. `date:` is still written only where the note has
+  none, and now takes the smallest period ticked.
+
+### Changed
+
+- The Settings blurb for the action describes the window and the undo.
+
 ## [1.0.50] - 2026-10-10
 
 ### Added
