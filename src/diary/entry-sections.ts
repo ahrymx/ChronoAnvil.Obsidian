@@ -61,6 +61,7 @@ import {
 } from "../core/note-sections";
 import { BANNER_ID, WELDS_INTO_BANNER } from "../core/sections";
 import { unweldEntryFences, weldEntryFences } from "../trackers/entry-trackers";
+import { HABITS_DIRECTIVE, HABITS_PROBE } from "../trackers/habits";
 import {
   addOps,
   fenceBlock,
@@ -605,6 +606,60 @@ const ENTRY_DECLS: EntryDecl[] = [
       "m"
     ),
     // Nothing of the reader's PROSE lives here, so there is no region to keep.
+    ownsRegion: false,
+  },
+  {
+    // ── A TRACKER TYPE WITH A SECTION OF ITS OWN (1.0.54) ─────────────
+    //
+    // *"a new category type of sections for trackers. The current Trackers
+    // section stays as it is, but more specific sections are added for the
+    // specific types."*
+    //
+    // The grid above is one box per tracker, 66px tall and clipped, which is
+    // the right box for a number and the wrong box for a list — every boolean
+    // the reader keeps folds into ONE of those cells and gets two rows of 14px
+    // chips to do it in. This is the type leaving the grid: one row per habit,
+    // full width, with the week behind it. `habits-section.ts` carries the
+    // design; what is declared here is that an entry may have one.
+    //
+    // FIRST IN THE SHARED BAND, DIRECTLY UNDER THE GRID IT CAME OUT OF. The
+    // band's order is this list's order, and a section that exists because the
+    // cell above it ran out of room belongs against it rather than below the
+    // reader's prose.
+    //
+    // OPT-IN, ON `bridge`'s IDIOM AND FOR A STRONGER REASON THAN ITS OWN. A
+    // fresh vault defines no habits — no shipped tracker is a boolean — so a
+    // section composed by default would be an empty card on every entry ever
+    // written, and the grain that does have habits has them in a cell that
+    // already works. Returning null without `ctx.extra` is also what keeps
+    // every golden template byte-identical: this release changes no composed
+    // note until a reader ticks it.
+    //
+    // OFFERED ON ALL FIVE GRAINS, which is not the same claim as drawing the
+    // week on all five. A habit's surface is the reader's to declare — a
+    // monthly boolean is legal and `habitsForSurface` admits it — so refusing
+    // the section anywhere would be the catalogue overruling the registry. The
+    // STRIP is daily-only, and the renderer says why: the box writes the host
+    // note's property, and on a weekly entry the seven columns are seven other
+    // notes.
+    id: "habits",
+    label: "Habits",
+    blurb:
+      "Every habit this entry logs, one per row, with the week behind it.",
+    icon: "✅",
+    category: "trackers",
+    locked: false,
+    band: "shared",
+    directive: (ctx) =>
+      (ctx.extra ?? []).includes("habits") ? HABITS_DIRECTIVE : null,
+    // THE WORD IS THE MODEL'S, and so is the probe — `habits.ts` holds both,
+    // because the renderer reads the same word to know the grid should stand
+    // down and a second spelling of it would be the two of them disagreeing
+    // about whether this note has a section.
+    probe: HABITS_PROBE,
+    // Nothing of the reader's prose lives here. The readings are frontmatter
+    // properties, which is what makes this section removable at no cost: take
+    // it off and the cell draws the same habits again.
     ownsRegion: false,
   },
   {

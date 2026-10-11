@@ -132,7 +132,6 @@ import {
   attachTrackerRemove,
   buildHabitChip,
   finishHabitsCell,
-  type HabitCellEntry,
   buildSleep,
   buildTracker,
   buildTrackerAddCell,
@@ -144,11 +143,17 @@ import {
   recomputeSleepInFrontmatter,
 } from "../../trackers/trackers";
 import { buildSleepSummary } from "../../trackers/sleep";
+import {
+  habitFromDirective,
+  habitLabelOf,
+  noteHasHabitsSection,
+  type HabitEntry,
+} from "../../trackers/habits";
+import { buildHabitsSection } from "./habits-section";
 import { buildTrackerStat } from "../../trackers/tracker-stat";
 import {
   describeSurfaceMismatch,
   directiveAllowedOn,
-  directiveTrackerId,
   journalTypeNamer,
   noteSurfaceOf,
   isManagedTemplate,
@@ -491,7 +496,7 @@ export function chromeClasses(
 // head over that fence say. `blockTitle` and `frame: section` read it the way
 // they always did, and nothing below this line changed.
 const ALIAS_TITLES: Record<string, string> = {
-  // THE FIVE THAT WEAR A HEAD AND ARE NOT IN `WIDGETS`, which is the whole of
+  // THE SIX THAT WEAR A HEAD AND ARE NOT IN `WIDGETS`, which is the whole of
   // what the registry cannot speak for: each is in `NOT_PAGE_WIDGETS`, so it
   // has no `WidgetSpec` to carry a `bar` — and each still DISPATCHES, so a
   // fence already in a reader's vault must go on drawing the head it has.
@@ -508,6 +513,14 @@ const ALIAS_TITLES: Record<string, string> = {
   // own title from the tracker it names, exactly as `journal-breakdown` does,
   // and a page can hold two tallies that one head saying "Tally" would name
   // neither of.
+  // AND A SIXTH THAT IS NEITHER AN ALIAS NOR A DEFERRAL (1.0.54). The Habits
+  // section is excluded from the page door because its boxes write onto the
+  // host note's own frontmatter — `NOT_PAGE_WIDGETS` carries the argument at
+  // its own `readings` reason — so it has no `WidgetSpec` and no `bar`, and it
+  // still wears a head: dropped into a diary entry's shared band it is a
+  // non-field keyword this map can name, which is exactly what `fieldBand`'s
+  // other half hands a card of its own.
+  habits: "✅ Habits",
   "topics-table": "🗂 Topics",
   "topic-stats": "📈 Topics",
   "journal-totals": "🧮 Totals",
@@ -516,7 +529,7 @@ const ALIAS_TITLES: Record<string, string> = {
 };
 
 // What the bar over a block of this widget says — the registry's string for a
-// page widget, the alias table's for the five that have no spec.
+// page widget, the alias table's for the six that have no spec.
 //
 // DERIVED, NOT DECLARED, which is what makes "every `WIDGETS` key has a
 // heading" structural instead of asserted: `bar` is a required field, so a
@@ -1018,6 +1031,33 @@ export class Widgets implements
 
       const container = el.createDiv({ cls: "ca-journal-widget-block" });
 
+      // ── THE NOTE, FOR THE TWO QUESTIONS A FENCE CANNOT ANSWER (1.0.54) ──
+      //
+      // Everything else here is answered by `source`, which is this fence's own
+      // body, and that has been enough for every directive: a widget is drawn
+      // from the line that names it. The Habits section is the first thing that
+      // needs a line from a DIFFERENT fence of the same note — its habits are
+      // the `tracker:` lines in the banner's fence, while the `habits` directive
+      // sits in the band below it — and the grid's fold-in needs the mirror of
+      // that question, whether the band holds a `habits` line at all.
+      //
+      // `getSectionInfo` IS HOW THIS PLUGIN READS THE LIVE DOCUMENT, synchronously
+      // (`group-tabs.ts`, `block-drag.ts`), and NULL IS AN ANSWER rather than a
+      // failure — an embed, an export, any render outside a live view, which
+      // `header-title.ts` was the first to record.
+      //
+      // THE LAST ANSWER IS KEPT, which is what makes it safe to hand this to a
+      // `liveScopedWidget`: its thunk runs again on every repaint, long after
+      // this handler returned, and a null there would redraw a section full of
+      // habits as an empty one. Stale text is the lesser wrong of the two, and a
+      // repaint that follows a write to THIS note re-reads it successfully.
+      let lastNoteText: string | null = null;
+      const noteTextNow = (): string => {
+        const text = ctx.getSectionInfo(el)?.text;
+        if (text != null) lastNoteText = text;
+        return lastNoteText ?? "";
+      };
+
       // A CONTRADICTION IS SHOWN, NOT RESOLVED (§3.3). `header:` and
       // `frame: section` both title the block, so a fence with both asked twice
       // and the grammar refuses it. Drawing the reason where the fence is means
@@ -1132,7 +1172,10 @@ export class Widgets implements
       // line is what the window's membership writes have to match, and the loop
       // is the only place that still has it — `finishHabitsCell` turns these
       // into the window's rows.
-      const habitEntries: HabitCellEntry[] = [];
+      const habitEntries: HabitEntry[] = [];
+      // Whether this note draws the habits elsewhere — see the fold-in below.
+      // Null until the first habit line asks.
+      let habitsElsewhere: boolean | null = null;
       let overviewGrain: PeriodGrain | null = null;
       // survives until the first entry is edited and then vanishes, with the
       // directive still in the file. So both of this bar's buttons are siblings
@@ -1579,7 +1622,27 @@ export class Widgets implements
         // eyebrow above a lone checkbox.
         if (kind === "tracker") {
           const habit = this.habitTrackerFor(line, ctx);
+          // ── UNLESS THE NOTE DRAWS A HABITS SECTION (1.0.54) ─────────
+          //
+          // The type leaves the grid when it has a section of its own, and this
+          // line is the whole of how: the cell is never built, so there is no
+          // chip, no `+N`, no fitter and no empty box left behind — and the
+          // grid reflows to the cells it still has, because a cell it was never
+          // given is not a gap.
+          //
+          // DERIVED, NOT MIGRATED, which is the reader's own call. Nothing
+          // rewrites the note's `tracker:` lines: removing the section puts the
+          // cell back with every chip and every reading intact, because the only
+          // thing that ever changed was which of the two surfaces drew them.
+          //
+          // ASKED ONCE PER FENCE, AND ONLY WHEN THERE IS A HABIT TO FOLD. The
+          // read is cheap but it is not free, and a fence with no boolean in it
+          // has no reason to ask.
           if (habit) {
+            if (habitsElsewhere == null) {
+              habitsElsewhere = noteHasHabitsSection(noteTextNow());
+            }
+            if (habitsElsewhere) continue;
             if (!bar) {
             bar = openActionsBar();
           }
@@ -1590,14 +1653,16 @@ export class Widgets implements
               habitsCell = this.habitsCell();
               bar.appendChild(habitsCell);
             }
-            // An inline `tracker:<id>|Label` override names the chip, exactly
-            // as it would have named the eyebrow. A bare trailing `|` names
-            // nothing, so it falls back rather than producing a nameless pill.
-            const barIdx = line.indexOf("|");
-            const override =
-              barIdx === -1 ? "" : line.slice(barIdx + 1).trim();
-            const label = override || habit.label || habit.id;
-            buildHabitChip(this, habitsCell, habit, label, ctx);
+            // The chip's name, and the Habits section's rows take it from the
+            // same function: an inline `tracker:<id>|Label` override names the
+            // habit, a bare trailing `|` names nothing. See `habitLabelOf`.
+            buildHabitChip(
+              this,
+              habitsCell,
+              habit,
+              habitLabelOf(habit, line),
+              ctx
+            );
             habitEntries.push({ def: habit, directive: line.trim() });
             continue;
           }
@@ -1641,7 +1706,8 @@ export class Widgets implements
           // list. And `firstShelf` keeps it to one door per fence rather than
           // one per shelf — the category error the ✕ was removed for.
           shelfHeader === -1 && line.trim() === firstShelf,
-          nestInto
+          nestInto,
+          noteTextNow
         );
 
         if (!widget) {
@@ -2960,7 +3026,11 @@ export class Widgets implements
     // run of `attach:` fields nests its second and later shelves. Null for the
     // first shelf of such a run and for every other kind — see the nesting note
     // over `buildAttachments`.
-    nestInto: HTMLElement | null = null
+    nestInto: HTMLElement | null = null,
+    // The whole note, re-read on each call. Only the Habits section asks, and
+    // `noteTextNow` at the call site says why it is a thunk rather than a
+    // string: a `liveScopedWidget` repaints long after this returns.
+    noteText: () => string = () => ""
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const title = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -3167,6 +3237,25 @@ export class Widgets implements
         // readout. Its own writes re-derive the Sleep property.
         widget = buildSleep(this, ctx);
         break;
+      // ── THE HABITS SECTION (1.0.54) ─────────────────────────────────
+      //
+      // THE DAILY FOLDER AND NOT THE DIARY ROOT, which is the distinction the
+      // two arms below already draw between themselves: this is made of the
+      // seven daily entries around the host, so it must repaint when one of
+      // them is written and has nothing to learn from a monthly entry. The
+      // note's own ticks come back through the same door, since a write to the
+      // host is a write inside that folder.
+      //
+      // THE NOTE IS RE-READ ON EVERY PAINT, not captured here — see
+      // `noteTextNow`, which is also why this cannot be a `buildFromSpec` that
+      // takes a string.
+      case "habits":
+        return liveScopedWidget(
+          this.plugin,
+          ctx,
+          this.plugin.settings.paths.diaryDaily,
+          () => buildHabitsSection(this, ctx, noteText())
+        );
       // EVERY DIARY GRAIN IS A SOURCE, so the scope is the diary root rather than
       // the daily folder: `scopesFor` decides which folder a tracker's readings
       // live in, and a monthly tracker's band must repaint when a monthly entry
@@ -3858,19 +3947,11 @@ export class Widgets implements
     line: string,
     ctx: MarkdownPostProcessorContext
   ): TrackerDef | null {
-    const body = line.split("|")[0].trim();
-    const id = directiveTrackerId(body);
-    if (!id) return null;
-    const def = getTracker(this.plugin, id);
-    if (!def || def.type !== "boolean" || def.derived) return null;
-    const surface = noteSurfaceOf(this.app, this.plugin, ctx.sourcePath);
-    if (
-      surface != null &&
-      !directiveAllowedOn(this.plugin.settings.trackers, body, surface)
-    ) {
-      return null;
-    }
-    return def;
+    return habitFromDirective(
+      this.plugin.settings.trackers,
+      line,
+      noteSurfaceOf(this.app, this.plugin, ctx.sourcePath)
+    );
   }
 
   // Coupled Wake-Up + Bedtime control. Two time inputs shown as one unit with a

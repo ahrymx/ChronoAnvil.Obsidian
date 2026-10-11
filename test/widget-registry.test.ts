@@ -317,6 +317,31 @@ describe("the exclusions say why, and the reasons are the ones claimed", () => {
     }
   });
 
+  it("excludes the Habits section for what it writes, not for how it draws", () => {
+    // THE SEVENTH REASON (1.0.54), and the case is here because the argument is
+    // one a later reader will want to shorten. `readings` shares `inline`'s
+    // first clause — the control writes onto the note it is in — and reverses
+    // its second: a full-width block over however many habits the reader keeps,
+    // not a control inside a line.
+    //
+    // WHY IT COULD NOT JOIN EITHER NEIGHBOUR, which is what the two cases above
+    // this one already prove and this one names: `inline` is an EQUALITY
+    // against the renderer's `INLINE_KINDS`, and `region` an equality against
+    // `SELF_LABELLED_KINDS`. Filing `habits` under the first would make the
+    // renderer's layout set wrong; under the second it would claim a
+    // `<!--chronoanvil:…-->` region this keyword neither writes nor owns.
+    expect(of("readings")).toEqual(["habits"]);
+    const inlineKeys = of("inline");
+    expect(inlineKeys).not.toContain("habits");
+    expect(of("region")).not.toContain("habits");
+    // And it is excluded rather than offered, which is the reader's own call:
+    // the section is for a diary entry, and a dashboard habits view is a
+    // read-only summary that will be a `WIDGETS` row of its own.
+    expect(isPageWidget("habits")).toBe(false);
+    expect(Object.keys(WIDGETS)).not.toContain("habits");
+    expect(NOT_PAGE_WIDGETS.habits.note).toContain("entry");
+  });
+
   it("defers the six that need a list only the vault has", () => {
     expect(of("needs-vault-answer")).toEqual([
       "bridge-notes",
@@ -404,7 +429,7 @@ describe("SECTION_TITLES and the registry answer different questions", () => {
   //
   // WHAT CHANGED IS WHERE THE FIRST ANSWER LIVES, and the four cases below did
   // not have to change with it, because each is about the SET of keywords a
-  // heading exists for. That set is now "every `WIDGETS` key, plus the five
+  // heading exists for. That set is now "every `WIDGETS` key, plus the six
   // aliases the dispatcher still names" — derived rather than typed, so the case
   // that used to find a missing entry is a compile error instead.
   const widgets = readSrc("widgets");
@@ -418,7 +443,7 @@ describe("SECTION_TITLES and the registry answer different questions", () => {
     expect(keys.length).toBeGreaterThanOrEqual(15);
     // NON-VACUOUS ON THE HALF THAT IS STILL SCRAPED. The registry half cannot
     // be empty — it is imported — but a renamed `ALIAS_TITLES` would leave this
-    // reading the registry alone and quietly stop testing the five.
+    // reading the registry alone and quietly stop testing the six.
     expect(aliasKeys.length).toBeGreaterThan(0);
   });
 

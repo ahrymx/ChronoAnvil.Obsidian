@@ -346,7 +346,7 @@ export interface WidgetSpec {
 
 // Why a keyword that dispatches is not offered as a page widget.
 //
-// FIVE REASONS, AND THE REASON IS THE POINT. A flat list of exclusions is a
+// SEVEN REASONS, AND THE REASON IS THE POINT. A flat list of exclusions is a
 // list somebody will "tidy" — the entry looks arbitrary, so it looks removable.
 // Each of these says what would go wrong, at the entry it would go wrong for.
 export type WidgetExclusionReason =
@@ -354,6 +354,23 @@ export type WidgetExclusionReason =
   // rather than as a block. A page-level `slider:Mood` would write to the
   // dashboard's own frontmatter, which is not where a reading lives.
   | "inline"
+  // ── THE SEVENTH, AND WHAT IT IS NOT (1.0.54) ───────────────────────────
+  //
+  // The same first clause as `inline` — it writes onto the note it is in, so a
+  // page-level one would record a reading against the dashboard — and the
+  // opposite second one: a FULL-WIDTH BLOCK over however many properties the
+  // reader keeps, rather than a control inside a line. The Habits section is
+  // the first, and the reason it needs a reason of its own is that `inline` is
+  // asserted as an EQUALITY against the renderer's `INLINE_KINDS`, which is the
+  // set that decides inline-versus-full-width rendering. Filing this there
+  // would make that set a lie about layout to win an argument about writes.
+  //
+  // AND THIS IS THE ROW A DASHBOARD VIEW WILL BE SPLIT FROM, not the one it
+  // widens. What a page wants of a habit is a rate, a streak and a density
+  // strip — read-only, over the vault, which is `sleep-summary`'s shape and a
+  // `WIDGETS` entry of its own. The thing excluded here is the one with the
+  // boxes in it.
+  | "readings"
   // Owns a keyed region of the note BODY (`<!--chronoanvil:<key>-->`). Two of one
   // kind on one page share the region and overwrite each other — which is
   // `addableSections`' own argument for withholding a section already present,
@@ -1073,6 +1090,12 @@ export const NOT_PAGE_WIDGETS: Record<string, WidgetExclusion> = {
     note: "the coupled wake-up and bedtime pair, on the entry whose night it is",
   },
   button: { reason: "inline", note: "one action, drawn beside what it acts on" },
+
+  // Writes onto the note it is in, full width.
+  habits: {
+    reason: "readings",
+    note: "every habit this entry logs, on the entry whose day it is",
+  },
 
   // Owns a keyed body region.
   note: { reason: "region", note: "a free-text field; two would share one region and overwrite each other" },

@@ -5,6 +5,38 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.54] - 2026-10-11
+
+### Added
+
+- **Habits can have a section of their own.** A boolean tracker has always
+  folded into one cell of the Trackers grid with the rest of them, and that
+  cell is 66 pixels tall: four habits is about the most it can show, and a chip
+  in it can tell you about today and nothing else. Add **Habits** from *Edit
+  sections…* → **Trackers** and the same habits are drawn full width instead —
+  one row each, with its box, its name, and **the week it sits in** behind it,
+  read from the entries either side of this one. The seven days are the ISO
+  week the Days calendar draws, this entry's own column is named at the top of
+  the card, and a day with no entry and a day whose habit you did not answer
+  look the same and say which on hover.
+- **The Habits cell leaves the grid while the section is there**, so the two are
+  never both drawn, and the grid closes up around the space rather than leaving
+  a gap. **Nothing is rewritten to make that happen** — your `tracker:` lines
+  stay exactly where they are, so taking the section off puts the cell back with
+  every chip and every reading intact.
+- **The card's door is the Habits window you already have.** A dashed *Add a
+  habit* / *Manage habits* row at the foot of the card opens the same window the
+  cell's **+** opens, with the same Save. It is a row rather than a **+** pinned
+  in the corner because on a full-width card that corner is where Sunday's
+  column head sits.
+
+### Changed
+
+- **The week strip is drawn on daily entries only.** On any other grain a habit
+  gets its box and its name and no strip: the box writes the property of the
+  note you are on, so on a weekly entry the seven columns would be seven other
+  notes and a tick would move nothing beside it.
+
 ## [1.0.53] - 2026-10-11
 
 ### Changed

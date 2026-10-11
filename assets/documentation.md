@@ -249,6 +249,26 @@ Nothing is written until you press Save, Cancel included: the whole thing — th
 ticks, the renames, the habits defined, what came on and off the entry — is one
 write at the end.
 
+**The Habits section.** The cell is 66 pixels tall, which is the right box for a
+number and the wrong box for a list — so habits can leave the grid instead. Add
+**Habits** from *Edit sections…* → **Trackers** on a diary entry and the same
+habits are drawn full width below the banner: one row each, with its box, its
+name, and **the week it sits in** behind it. The seven days are Monday to
+Sunday, read from the entries either side of this one, and this entry's own
+column is named at the top of the card. A filled dot is a day you marked done,
+a ring is a day you marked not-done, and a small faint dot is a day with nothing
+recorded — which covers both a day you have no entry for and a day whose habit
+you did not answer; hovering says which. The row at the foot of the card opens
+the same Habits window the cell's **+** does.
+
+While the section is on the note the **Habits cell leaves the grid**, so the two
+are never both drawn and the grid closes up around the space. Nothing in the
+note is rewritten to do that: it is still one `tracker:<id>` line per habit, so
+removing the section puts the cell back with every chip and every reading
+intact. On a weekly entry or any other grain the rows are box and name with no
+week behind them — the box writes the property of the note you are on, and on a
+weekly entry the seven columns would be seven other notes.
+
 ### Tracker surfaces
 
 Every tracker has a **surface**: the only kind of note it can be logged on at

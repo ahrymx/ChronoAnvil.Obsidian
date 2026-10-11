@@ -388,7 +388,7 @@ export function journalDashboardSections(type: JournalType): FlatSection[] {
       //
       // This was the one section on this page that composed no name for itself.
       // The dispatcher draws a head over the block from the same string — the
-      // tally is one of the five keywords `ALIAS_TITLES` still speaks for — so
+      // tally is one of the keywords `ALIAS_TITLES` still speaks for — so
       // the page has always SHOWN "🧮 Status" and the file has never said it.
       //
       // 4.46's reason for the tally having no `WIDGETS` entry is about the ADD

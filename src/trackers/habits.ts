@@ -37,6 +37,15 @@
 
 import type { App } from "obsidian";
 import { pagesUnder } from "../core/query";
+import { frontmatterOf, moment } from "../core/util";
+import { locateEntry } from "../diary/lineage";
+import type { DiaryPaths } from "../diary/lineage";
+import {
+  directiveAllowedOn,
+  directiveTrackerId,
+  noteHasDirective,
+  noteTrackerDirectives,
+} from "./entry-trackers";
 import {
   diaryClassOf,
   diarySurface,
@@ -109,6 +118,111 @@ export function habitsForSurface(
   );
 }
 
+// ── THE SECTION'S OWN WORD (1.0.54) ───────────────────────────────────────
+//
+// One keyword, read by three things: the entry catalogue composes it, the
+// dispatcher draws it, and the Habits CELL stands down when it is present. That
+// last reader is what makes the grid's cell *derived* rather than migrated —
+// removing the line puts the cell back, with every chip and every reading
+// intact, because nothing was ever rewritten to take it away.
+export const HABITS_DIRECTIVE = "habits";
+
+// The catalogue's probe. Anchored whole: `habits` is a word, and a `habits-week`
+// keyword invented later must not answer for this one.
+export const HABITS_PROBE = new RegExp(`^${HABITS_DIRECTIVE}$`, "m");
+
+// Does this note draw a Habits section?
+//
+// FENCE-SCOPED, THROUGH `noteHasDirective`, AND THE REGEX ABOVE IS NOT ENOUGH
+// HERE. The catalogue's probe runs over a structure parse and is the shape every
+// other section's is; this one is asked of the raw note by the renderer, where a
+// false positive silently empties a reader's Habits cell. `noteHasDirective`
+// already carries the argument — *a directive named in prose is not a
+// directive, the shipped documentation note quotes half the catalogue* — and
+// this release puts the word `habits` in exactly that document.
+export function noteHasHabitsSection(text: string): boolean {
+  return noteHasDirective(
+    text.split("\n"),
+    (line) => line.trim() === HABITS_DIRECTIVE
+  );
+}
+
+// ── WHICH OF A NOTE'S LINES IS A HABIT (1.0.54) ───────────────────────────
+//
+// THE TEST ABOVE, ASKED OF A DIRECTIVE INSTEAD OF A REGISTRY ROW. This was a
+// private method of the widget dispatcher (`habitTrackerFor`) and the claim one
+// screen up — *the same test `habitTrackerFor` applies, written once here* —
+// was half true: the two agreed, in two places, by inspection. They are one
+// function now, because the Habits section asks the question about a note it is
+// not drawing the grid of, from a different fence, and a third copy would be
+// the one that drifts.
+//
+// A BARE `|Label` IS CUT FIRST, for the reason the chip's own label note gives:
+// `tracker:Medication|Morning meds` is that habit's line and the override names
+// the chip, not the tracker.
+//
+// THE SURFACE TEST IS WHY A MISPLACED BOOLEAN IS NOT A HABIT HERE. A monthly
+// boolean written onto a daily entry takes the ordinary tracker path and draws
+// its visible refusal; answering `null` is what leaves it there to do that.
+export function habitFromDirective(
+  trackers: readonly TrackerDef[],
+  line: string,
+  surface: TrackerSurface | null
+): TrackerDef | null {
+  const body = line.split("|")[0].trim();
+  const id = directiveTrackerId(body);
+  if (!id) return null;
+  const def = trackers.find((t) => t.id === id);
+  if (!def || def.type !== "boolean" || def.derived) return null;
+  if (!directiveAllowedOn(trackers, body, surface)) return null;
+  return def;
+}
+
+// One habit a note carries, and the line it carries it on.
+//
+// `directive` IS CARRIED RATHER THAN DERIVED from the id, because the line in
+// the note is what a remove has to match — rebuilding `tracker:<id>` from the
+// definition would hand the write a string a hand-labelled note does not
+// contain, and the row would silently fail to come off.
+export interface HabitEntry {
+  def: TrackerDef;
+  directive: string;
+}
+
+// What a habit is CALLED on this note.
+//
+// AN INLINE `|Label` WINS, which is the chip's own rule — *"an inline
+// `tracker:<id>|Label` override names the chip, exactly as it would have named
+// the eyebrow"* — and a bare trailing `|` names nothing, so it falls back
+// rather than producing a nameless row. Here rather than at the two surfaces
+// that need it: the Habits cell and the Habits section must agree about a
+// renamed habit or the same entry has two names for one thing.
+export function habitLabelOf(def: TrackerDef, directive: string): string {
+  const bar = directive.indexOf("|");
+  const override = bar === -1 ? "" : directive.slice(bar + 1).trim();
+  return override || def.label || def.id;
+}
+
+// Every habit this note draws, in document order.
+//
+// EVERY FENCE, NOT THE MARKED REGION, which is `noteTrackerDirectives`' own
+// distinction and the right one here for its stated reason: the renderer walks
+// fences rather than regions, so a habit hand-placed outside the managed
+// markers is one the reader can see and tick. A section that listed only the
+// region's would be a list that disagrees with the note.
+export function habitsOnNote(
+  trackers: readonly TrackerDef[],
+  text: string,
+  surface: TrackerSurface | null
+): HabitEntry[] {
+  const out: HabitEntry[] = [];
+  for (const directive of noteTrackerDirectives(text.split("\n"))) {
+    const def = habitFromDirective(trackers, directive, surface);
+    if (def) out.push({ def, directive });
+  }
+  return out;
+}
+
 export interface HabitUse {
   id: string;
   label: string;
@@ -146,6 +260,97 @@ export function habitsInFolder(
       count: counts.get(h.id) ?? 0,
     }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+// ── THE WEEK BEHIND A HABIT (1.0.54) ──────────────────────────────────────
+//
+// A chip says whether a habit was done TODAY, which is one bit about a thing
+// nobody keeps for one day. The Habits section draws the week it sits in, and
+// this is the arithmetic for it.
+//
+// READ, NEVER STORED. Each day's answer is already written — it is a property
+// in that entry's frontmatter, put there by the same box this section draws —
+// so a cached copy on the host note would be a second truth that goes stale the
+// moment yesterday is edited. The read is cheap enough to do every paint:
+// `locateEntry` resolves a name and the metadata cache answers for the
+// frontmatter, so this is SEVEN CACHE LOOKUPS AND NO FILE READS, and it costs
+// the same on a vault of ten entries as on one of ten thousand. That is why
+// this and not `pagesUnder` (which walks the folder, as `habitsInFolder` must,
+// because its question is about every note) or `collectPoints` (which reads a
+// whole grain's readings to plot them).
+//
+// THE WEEK IS THE ISO WEEK, Monday first, and it is the Days calendar's own
+// definition — `monthGrid` lays its rows out from `startOf("isoWeek")` for the
+// reason that every row of a month calendar then IS a week. A habit strip that
+// started on Sunday would disagree with the calendar in the Link to diary
+// window about which days are "this week", in a plugin where a weekly entry is
+// an ISO week by `CLASS_DEFS`.
+export interface HabitDay {
+  iso: string;
+  // The column's letter, and it comes from this day rather than from a typed
+  // list of seven. A `["M","T","W",…]` constant beside the dates is two things
+  // that can disagree about which column is which — the 1.0.53 lesson about a
+  // legend that spelled its own states instead of reading them off the table
+  // the cells read off.
+  head: string;
+  // The day's full name, for the dot that cannot carry one.
+  label: string;
+}
+
+export interface HabitReading extends HabitDay {
+  state: HabitState;
+  // Whether that day has an entry at all.
+  //
+  // TWO FACTS, ONE MARK, AND THE SECOND IS IN THE TOOLTIP. A day nobody wrote
+  // and a day whose habit nobody answered are different things and they look
+  // the same, deliberately: both are "nothing recorded", and a third mark on a
+  // 10px dot is how 1.0.52's calendar legend became unreadable. The `title`
+  // says which, where there is room to say it.
+  written: boolean;
+}
+
+// Monday to Sunday of the week holding `anchorIso`. Empty for an unparseable
+// date, which is an answer a caller can draw nothing from.
+//
+// THE HEADS COME WITH THE DAYS so that the column letters and the dots under
+// them are one list. The section draws the heads once and the readings once per
+// habit; both read this.
+export function habitWeek(anchorIso: string): HabitDay[] {
+  const at = moment(anchorIso);
+  if (!at.isValid()) return [];
+  const mon = at.clone().startOf("isoWeek");
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = mon.clone().add(i, "days");
+    return {
+      iso: day.format("YYYY-MM-DD"),
+      // By grapheme, not by `slice(0, 1)`: a locale whose minimal weekday name
+      // is outside the BMP would be cut in half by an index into the string.
+      head: Array.from(day.format("dd"))[0] ?? "",
+      label: day.format("dddd, D MMM"),
+    };
+  });
+}
+
+// One habit's readings across that week.
+//
+// DAILY ENTRIES, WHICH IS NOT A GUESS ABOUT WHERE A HABIT LIVES but the only
+// grain whose seven notes ARE a week. `habitsForSurface` will admit a habit
+// declared on any surface; what this function answers is narrower and is said
+// in its name.
+export function habitWeekReadings(
+  app: App,
+  paths: DiaryPaths,
+  id: string,
+  anchorIso: string
+): HabitReading[] {
+  return habitWeek(anchorIso).map((day) => {
+    const file = locateEntry(app, paths, "daily", day.iso);
+    return {
+      ...day,
+      state: file ? readHabitState(frontmatterOf(app, file)[id]) : null,
+      written: file != null,
+    };
+  });
 }
 
 // ── the draft ─────────────────────────────────────────────────────────────

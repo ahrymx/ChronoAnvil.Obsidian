@@ -279,7 +279,10 @@ describe("a section cannot be moved across the rule", () => {
     // whole of the arrangement this surface gained is a block holding both.
     expect(bands.size).toBe(2);
     expect(bands.get("The banner")).toEqual(["banner", "trackers"]);
-    expect(bands.get("The page below")?.[0]).toBe("focus");
+    // THE BAND LEADS WITH THE GRID'S OVERFLOW AS OF 1.0.54 — the Habits
+    // section, declared directly after the grid it comes out of — and the
+    // fields follow in the order a fresh entry composes them.
+    expect(bands.get("The page below")?.slice(0, 2)).toEqual(["habits", "focus"]);
   });
 
   it("and a dashboard reports two, one row in the top one", () => {

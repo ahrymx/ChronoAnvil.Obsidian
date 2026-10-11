@@ -480,6 +480,182 @@
    window's, one × per row, where it can be read before it is taken. The chip
    keeps the gesture it exists for. See `buildHabitChip`. */
 
+/* ── THE HABITS SECTION (1.0.54) ───────────────────────────────────────────
+
+   The same habits, out of the grid. Everything above this is the arithmetic of
+   fitting a list into a 66px cell; a section has the width of the note and
+   needs none of it. Kept HERE, under the cell it replaces, because the two are
+   one feature in two forms and a reader comparing them should not have to go
+   looking — and because the control in both is the same element, which is the
+   whole point: `.ca-journal-habit-box` is styled once, above, and this sheet
+   adds nothing to it.
+
+   ONE GRID, AND IT IS THE LIST. `auto minmax(0, 1fr) auto` — box, name, week —
+   declared ONCE, on `.ca-habits-list`, with the heads row and every habit row
+   `display: contents` so their cells are the list's own grid items. The same
+   track list on each row AS ITS OWN GRID is the 1.0.31 records-table bug: an
+   `auto` track is sized by the content of its own grid, so the heads row would
+   size the first track to an empty span and the habit rows to a 1.6em box, and
+   the letters would sit beside the dots they name rather than over them. This
+   is that fix without subgrid (which the records tables need because their
+   cells are grandchildren, and which costs an `@supports`).
+
+   The heads row carries two empty cells to hold its place in the flow;
+   `buildHabitsSection` says so where they are made. Three children per row
+   element and three tracks, so each row element fills exactly one grid row.
+
+   `minmax(0, 1fr)` AND NOT `1fr` on the name. A grid item's automatic minimum
+   is its content, so a long habit name would push the week off the card
+   instead of truncating — the one failure mode a three-column row has, and the
+   one that looks like a layout bug rather than a long name. */
+.ca-habits-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ca-space-2);
+}
+.ca-habits-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--ca-space-2);
+}
+.ca-habits-heads,
+.ca-habits-row {
+  display: contents;
+}
+.ca-habits-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-normal);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The name follows the reading, which is the contrast rule the Link to diary
+   window settled in 1.0.53: full contrast for a thing that is so, muted for a
+   thing that is not. A habit nobody has answered today is not a habit this
+   entry says no to — `HabitState` keeps those apart and so does this. */
+.ca-habits-row:not(.is-done):not(.is-not-done) .ca-habits-name {
+  color: var(--text-muted);
+}
+
+/* ── THE WEEK ─────────────────────────────────────────────────────────────
+
+   SEVEN EQUAL TRACKS, so Tuesday is under Tuesday on every row however wide
+   the card is. The dots are centred in their tracks rather than sized to them:
+   a mark that grew with the card would be a different reading at two widths. */
+.ca-habit-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 0 4px;
+  min-width: 7.5em;
+}
+.ca-habit-dow {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  line-height: 1;
+}
+/* THIS ENTRY'S OWN COLUMN, named once at the top of the card — see the note in
+   `buildHabitsSection`. The accent and the weight together, because a colour
+   alone is not a mark for a reader who cannot see it as one. */
+.ca-habit-dow.is-now {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+/* THE MARK IS A SIZE AND A FILL, which is how three readings fit on one 9px
+   dot without a third colour:
+
+     done        a filled accent disc        ●
+     not done    a ring, muted               ○
+     nothing     a small faint dot           ·
+
+   The base rule is the LAST of those, so a day with nothing recorded is the
+   default state of the element rather than a class — and `is-blank` still
+   exists, because `paintDay` toggles all three and a reading that set no class
+   would be indistinguishable from an element nobody painted. */
+.ca-habit-day {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--ca-radius-pill);
+  background: var(--text-faint);
+}
+.ca-habit-day.is-done,
+.ca-habit-day.is-not-done {
+  width: 9px;
+  height: 9px;
+  background: transparent;
+}
+.ca-habit-day.is-done {
+  background: var(--interactive-accent);
+}
+.ca-habit-day.is-not-done {
+  box-shadow: inset 0 0 0 var(--ca-rule) var(--text-muted);
+}
+
+/* ── THE DOOR ─────────────────────────────────────────────────────────────
+
+   A ROW AT THE END, NOT A ＋ IN THE CORNER. A full-width card's top-right
+   corner is where the week's last column head is, so the cell's pinned button
+   has nowhere to land here — `buildHabitsSection`'s `drawDoor` carries the
+   argument. A row has room for the verb, which the corner never did.
+
+   DASHED, LIKE EVERY OTHER "ADD ONE" IN THIS PLUGIN (the `+` on the cell, the
+   tracker tile), and `height: auto; min-height: 0` because an Obsidian
+   `<button>` is 30px tall until it is told otherwise — a chip-shaped control
+   that skips those two lines looks right in a mockup and ships a pill with
+   eight pixels of air in it. */
+.ca-habits-door {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 5px;
+  height: auto;
+  min-height: 0;
+  padding: 3px 10px;
+  border: var(--ca-rule-hair) dashed var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  background: var(--ca-surface-inset);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.ca-habits-door .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+.ca-habits-door:hover:not(:disabled),
+.ca-habits-door:focus-visible {
+  border-style: solid;
+  border-color: var(--interactive-accent);
+  background: var(--ca-surface-raised);
+  color: var(--text-normal);
+}
+/* Refused rather than hidden, which is the cell's rule for the same control on
+   the same kind of note. */
+.ca-habits-door:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* THE NAME GOES FIRST, AND THE WEEK NEVER DOES. On a phone-width card there is
+   not room for a long habit name and seven columns; the name is already in the
+   box's tooltip and in the window, while the week is the thing this section
+   exists to draw. So the gutters close and the name takes what is left — which
+   `minmax(0, 1fr)` above has already made safe. */
+@container (max-width: 360px) {
+  .ca-habits-list {
+    gap: 2px var(--ca-space-1);
+  }
+  .ca-habit-week {
+    gap: 0 2px;
+    min-width: 6em;
+  }
+}
+
 /* ── Derived value chip (Sleep, when shown as a bare tracker) ───────────── */
 .ca-journal-derived-chip {
   display: inline-flex;

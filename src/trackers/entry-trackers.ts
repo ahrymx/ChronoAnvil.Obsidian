@@ -864,7 +864,7 @@ export function trackerOptions(
 // different and better error than "wrong surface", and buildTracker reports it
 // first.
 export function directiveAllowedOn(
-  trackers: TrackerDef[],
+  trackers: readonly TrackerDef[],
   directive: string,
   surface: TrackerSurface | null
 ): boolean {

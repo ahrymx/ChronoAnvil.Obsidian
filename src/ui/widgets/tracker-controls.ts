@@ -56,6 +56,7 @@ import {
 import {
   habitsForSurface,
   readHabitState,
+  type HabitEntry,
   type HabitRow,
 } from "../../trackers/habits";
 import { HabitsEditor } from "../habits-editor";
@@ -258,62 +259,66 @@ export function buildHabitChip(
 // the last chip, and the fit cannot be measured until every chip is in. The
 // "+ Add tracker" tile is placed on the same argument one screen down in
 // `index.ts`.
-export interface HabitCellEntry {
-  def: TrackerDef;
-  // The note's line, verbatim, because it is what a remove has to match — a
-  // hand-written `tracker:Medication|Morning meds` is still that habit's line
-  // and rebuilding it from the id would hand the write a string the note does
-  // not contain.
-  directive: string;
+// THE DOOR ONTO THE HABITS WINDOW, FROM EITHER SIDE (1.0.54).
+//
+// Two hosts open this now: the ＋ pinned to the Habits cell's corner, and the
+// Habits section's own door (`habits-section.ts`). It was a closure inside
+// `finishHabitsCell` and is a function because the second host is not a cell —
+// it has no chip row to measure, no `+N` to protect and no fitter — and a
+// second copy of this is two windows that would start disagreeing about what a
+// Save compares against.
+//
+// THE ROWS ARE READ WHEN IT OPENS, not when the host was drawn. A box ticked
+// since the render has written a value the host's own copy predates, and the
+// window would then show the reading from before the tick — the same one-behind
+// cache lag the Tags cell keeps a `known` list to dodge. Here there is nothing
+// to keep: the question is asked late, which is what `entries` being a list of
+// DEFINITIONS rather than of readings makes possible.
+export function openHabitsWindow(
+  deps: EntryControlHost,
+  entries: readonly HabitEntry[],
+  ctx: MarkdownPostProcessorContext
+): void {
+  const file = deps.fileOf(ctx);
+  if (!file) return;
+  const surface = noteSurfaceOf(deps.plugin.app, deps.plugin, ctx.sourcePath);
+  const before: HabitRow[] = entries.map((e) => ({
+    id: e.def.id,
+    directive: e.directive,
+    label: e.def.label || e.def.id,
+    state: readHabitState(deps.currentValue(ctx, e.def.id)),
+  }));
+  new HabitsEditor(
+    deps.plugin.app,
+    deps.plugin,
+    // The note's own folder, which is where `tagsInFolder` scopes its survey
+    // and for the same reason — the useful list when logging a Tuesday is
+    // what the rest of the week already tracks. `suggestionFolderFor` says
+    // nothing about tags; it is a note-to-folder rule, so it is shared.
+    suggestionFolderFor(file),
+    surface,
+    habitsForSurface(deps.plugin.settings.trackers, surface),
+    before,
+    async (draft) => {
+      await deps.plugin.entryTrackers.applyHabitDraft(
+        ctx.sourcePath,
+        before,
+        draft
+      );
+    }
+  ).open();
 }
+
 
 export function finishHabitsCell(
   deps: EntryControlHost,
   cell: HTMLElement,
-  entries: readonly HabitCellEntry[],
+  entries: readonly HabitEntry[],
   ctx: MarkdownPostProcessorContext
 ): void {
   const row = cell.querySelector(".ca-journal-habits-row");
   if (!(row instanceof HTMLElement)) return;
-
-  // READ AT THE MOMENT THE WINDOW OPENS, not when the cell was drawn. A chip
-  // ticked since the render has written a value the cell's own copy predates,
-  // and the window would then show the reading from before the tick — the same
-  // one-behind cache lag the Tags cell keeps a `known` list to dodge. Here
-  // there is nothing to keep: the thunk asks the question late.
-  const rowsNow = (): HabitRow[] =>
-    entries.map((e) => ({
-      id: e.def.id,
-      directive: e.directive,
-      label: e.def.label || e.def.id,
-      state: readHabitState(deps.currentValue(ctx, e.def.id)),
-    }));
-
-  const openWindow = (): void => {
-    const file = deps.fileOf(ctx);
-    if (!file) return;
-    const surface = noteSurfaceOf(deps.plugin.app, deps.plugin, ctx.sourcePath);
-    const before = rowsNow();
-    new HabitsEditor(
-      deps.plugin.app,
-      deps.plugin,
-      // The note's own folder, which is where `tagsInFolder` scopes its survey
-      // and for the same reason — the useful list when logging a Tuesday is
-      // what the rest of the week already tracks. `suggestionFolderFor` says
-      // nothing about tags; it is a note-to-folder rule, so it is shared.
-      suggestionFolderFor(file),
-      surface,
-      habitsForSurface(deps.plugin.settings.trackers, surface),
-      before,
-      async (draft) => {
-        await deps.plugin.entryTrackers.applyHabitDraft(
-          ctx.sourcePath,
-          before,
-          draft
-        );
-      }
-    ).open();
-  };
+  const openWindow = (): void => openHabitsWindow(deps, entries, ctx);
 
   // The count of what did not fit. A button rather than a span: it is the only
   // thing standing between a reader and the habits it is hiding.

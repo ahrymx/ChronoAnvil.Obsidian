@@ -266,7 +266,11 @@ describe("patch 6: the setting `extra` has been describing since 2.60.1", () => 
     const offered = offerableEntrySections({ grain: "daily" }).filter(
       (s) => !ships.has(s.id) && s.band === "shared"
     );
+    // TWO AS OF 1.0.54. The Habits section is the other opt-in member of this
+    // band — a tracker type that outgrew its cell in the grid above — and it
+    // leads the band for the reason its declaration gives.
     expect(offered.filter((s) => !isPageWidgetId(s.id)).map((s) => s.id)).toEqual([
+      "habits",
       "bridge",
     ]);
     expect(offered.some((s) => isPageWidgetId(s.id))).toBe(true);
@@ -382,7 +386,12 @@ describe("patch 8: From the journals", () => {
     const exempt = ENTRY_SECTIONS.filter(
       (s) => s.band === "shared" && s.ownsRegion === false
     ).map((s) => s.id);
-    expect(exempt).toEqual(["bridge"]);
+    // AND A SECOND ONE DID, IN 1.0.54, WHICH IS WHAT THIS CASE IS FOR. The
+    // Habits section holds no prose: a habit's readings are frontmatter
+    // properties of the seven entries the row draws, so there is nothing of the
+    // reader's in the note body to keep — and that is exactly why removing the
+    // section costs nothing (the cell in the grid draws the same habits again).
+    expect(exempt).toEqual(["habits", "bridge"]);
   });
 
   it("and an unconfigured one is no longer reachable from the editor", () => {
@@ -740,6 +749,7 @@ describe("entrySectionMatrix", () => {
     // would read "Ships" five times — which is what the group's own subtitle,
     // "beyond what its grain ships", already says.
     expect(entrySectionMatrix().rows.map((r) => r.id)).toEqual([
+      "habits",
       "bridge",
       "capture",
     ]);

@@ -19,12 +19,17 @@ import { App, TFile } from "obsidian";
 import {
   addHabitRow,
   describeHabitState,
+  habitLabelOf,
+  habitWeek,
+  habitWeekReadings,
   habitWrites,
   habitsForSurface,
   habitsInFolder,
+  habitsOnNote,
   hasHabit,
   newHabitDef,
   nextHabitState,
+  noteHasHabitsSection,
   normaliseHabitLabel,
   readHabitState,
   removeHabitRow,
@@ -33,7 +38,22 @@ import {
   type HabitRow,
 } from "../src/trackers/habits";
 import { planDirectiveEdits } from "../src/trackers/entry-trackers";
+import { habitsDoorLabel } from "../src/ui/widgets/habits-section";
+import { monthGrid } from "../src/diary/diary-link";
+import { entryPath } from "../src/diary/lineage";
+import { DEFAULT_PATHS } from "../src/core/constants";
+import { moment } from "../src/core/util";
+import { NOT_PAGE_WIDGETS, isPageWidget } from "../src/core/widget-registry";
 import {
+  ENTRY_SECTIONS,
+  addSectionToNote,
+  applyEntrySections,
+  composeEntryTemplate,
+  detectEntrySections,
+  entrySectionModel,
+} from "../src/diary/entry-sections";
+import {
+  TRACKER_CLASSES,
   anySurface,
   diarySurface,
   journalSurface,
@@ -665,15 +685,26 @@ describe("the Habits cell", () => {
     expect(s).toContain("fitChipRows(chips, chipEls, more, pencil)");
   });
 
-  it("reads the readings when the window opens, not when the cell was drawn", () => {
-    // A chip ticked since the render wrote a value the cell's copy predates,
+  it("reads the readings when the window opens, not when the host was drawn", () => {
+    // A chip ticked since the render wrote a value the host's copy predates,
     // and the window would show the state from before the tick.
+    //
+    // THE SAME PROPERTY, NOW STRUCTURAL (1.0.54). It was a `rowsNow` thunk
+    // inside `finishHabitsCell`; the Habits section opens the same window and
+    // is not a cell, so the opener is a function — and it takes the habits'
+    // DEFINITIONS and reads the states itself, which is stronger than a late
+    // thunk: neither host can hand it a reading at all.
     const s = src();
-    const at = s.indexOf("const rowsNow =");
+    const at = s.indexOf("export function openHabitsWindow(");
     expect(at).toBeGreaterThan(0);
-    expect(s.slice(at, at + 400)).toContain("readHabitState(deps.currentValue(");
-    const open = s.indexOf("const openWindow = (): void =>", at);
-    expect(s.slice(open, open + 600)).toContain("const before = rowsNow();");
+    const body = s.slice(at, s.indexOf("\n}\n", at));
+    expect(body).toContain("entries: readonly HabitEntry[]");
+    expect(body).toContain("state: readHabitState(deps.currentValue(");
+    expect(body).toContain("const before: HabitRow[] = entries.map(");
+    // And no host computes one to pass in.
+    expect(s).not.toContain("rowsNow");
+    const cell = s.slice(s.indexOf("export function finishHabitsCell("));
+    expect(cell).toContain("openHabitsWindow(deps, entries, ctx)");
   });
 
   it("saves the draft through the one method that applies it", () => {
@@ -940,5 +971,522 @@ describe("two rows of habit chips", () => {
     expect(body).not.toContain("CHIP_ROWS");
     expect(body).toContain("rows[cap - 1]");
     expect(body).toContain("rows.length <= cap");
+  });
+});
+
+// ── a habit type gets a section (1.0.54) ──────────────────────────────────
+//
+// The reader asked for "a new category type of sections for trackers", naming
+// habits as the type that would gain most and sleep as the next. The Trackers
+// grid is unchanged; what is new is that a TYPE can leave it for a section of
+// its own, and the first member is Habits.
+//
+// WHAT THESE CASES ARE ABOUT, since the DOM is not available to them: the
+// arithmetic of the week (`habits.ts`, pure), the catalogue's offer and what
+// adding it writes (pure), and then the three couplings that would break
+// silently — the grid's stand-down, the repaint scope, and the door being one
+// door. Those three are source-shape, as this suite works.
+
+describe("the week behind a habit", () => {
+  it("runs Monday to Sunday whatever day it is asked about", () => {
+    // ISO WEEKS, AND THE SAME ONE FROM ANY DAY IN THEM. A strip whose first
+    // column moved with the day being viewed would put Wednesday under the
+    // letter M on Wednesday's entry, and the reader comparing two entries of
+    // one week would be comparing two different weeks.
+    const mon = habitWeek("2026-10-12").map((d) => d.iso);
+    expect(mon).toEqual([
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+      "2026-10-15",
+      "2026-10-16",
+      "2026-10-17",
+      "2026-10-18",
+    ]);
+    // Midweek and the Sunday — the day `startOf("week")` would send to the
+    // NEXT week, which is this function's one real trap and a measured mutant.
+    expect(habitWeek("2026-10-14").map((d) => d.iso)).toEqual(mon);
+    expect(habitWeek("2026-10-18").map((d) => d.iso)).toEqual(mon);
+    // And a week that crosses a month, where "the seven days around this one"
+    // and "this calendar month" disagree.
+    expect(habitWeek("2026-11-01").map((d) => d.iso)).toEqual([
+      "2026-10-26",
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+      "2026-10-30",
+      "2026-10-31",
+      "2026-11-01",
+    ]);
+  });
+
+  it("is the same week the Days calendar draws", () => {
+    // ONE DEFINITION OF A WEEK IN THE PLUGIN. `monthGrid` rows a month by
+    // `startOf("isoWeek")` for the Link to diary window (1.0.52); a habit's
+    // strip is one of those rows. Asserted against the other implementation
+    // rather than against a second hand-typed list, because the failure this
+    // guards is the two drifting apart.
+    const row = monthGrid("2026-10-14")?.weeks.find((w) => w.key === "2026-10-12");
+    expect(row?.days).toEqual(habitWeek("2026-10-14").map((d) => d.iso));
+  });
+
+  it("names its own columns, off the dates it dated", () => {
+    // THE HEADS COME OFF THE SAME SEVEN DAYS, never a typed ["M","T",…] — the
+    // 1.0.53 lesson about a legend that spelled its own state words while the
+    // cells read theirs off a table. A head that disagreed with its column
+    // would be unfalsifiable on screen.
+    const week = habitWeek("2026-10-14");
+    expect(week.map((d) => d.head)).toEqual(
+      week.map((d) => Array.from(moment(d.iso).format("dd"))[0])
+    );
+    // The tooltip says the date, which is the only place there is room for it.
+    expect(week[0].label).toContain("Monday");
+    expect(week[0].label).toContain("12");
+  });
+
+  it("answers nothing for a date that is not one", () => {
+    // A note whose `date:` is missing or malformed asks for the week of "".
+    // Seven columns of a week the reader never named is worse than no strip.
+    expect(habitWeek("")).toEqual([]);
+    expect(habitWeek("not a date")).toEqual([]);
+  });
+});
+
+describe("what the week reads", () => {
+  // The vault as `locateEntry` sees one: a path per entry, each with
+  // frontmatter. Keyed through `entryPath`, so the fixture is filed where the
+  // plugin files entries rather than where this test guesses.
+  const vaultOf = (fm: Record<string, Record<string, unknown>>): App => {
+    const files = new Map(
+      Object.entries(fm).map(([iso, f]) => [
+        entryPath(DEFAULT_PATHS, "daily", iso),
+        f,
+      ])
+    );
+    return {
+      vault: {
+        getAbstractFileByPath: (path: string) =>
+          files.has(path) ? new TFile(path) : null,
+      },
+      metadataCache: {
+        getFileCache: (f: TFile) => ({ frontmatter: files.get(f.path) }),
+      },
+    } as unknown as App;
+  };
+
+  it("reads each day's entry through readHabitState, and a 0 is not a blank", () => {
+    const app = vaultOf({
+      "2026-10-12": { Gym: 1 },
+      "2026-10-13": { Gym: true },
+      "2026-10-14": { Gym: "1" },
+      "2026-10-15": { Gym: 0 },
+      "2026-10-16": { Gym: "" },
+      // Saturday exists and says nothing about Gym; Sunday does not exist.
+      "2026-10-17": { Read: 1 },
+    });
+    const week = habitWeekReadings(app, DEFAULT_PATHS, "Gym", "2026-10-14");
+    expect(week.map((d) => d.state)).toEqual([1, 1, 1, 0, null, null, null]);
+  });
+
+  it("says whether the day was written at all, which the mark cannot", () => {
+    // TWO FACTS, ONE GLYPH, TWO TOOLTIPS. "No entry for that day" and "this
+    // habit is unanswered" are both nothing-recorded and look identical on
+    // purpose — three marks on a 9px dot is the mistake 1.0.52 made with the
+    // calendar legend. `written` is what lets the tooltip say which.
+    const app = vaultOf({ "2026-10-14": { Gym: "" } });
+    const week = habitWeekReadings(app, DEFAULT_PATHS, "Gym", "2026-10-14");
+    expect(week.map((d) => d.written)).toEqual([
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    // The unanswered day and the unwritten one, side by side: same state.
+    expect(week[2].state).toBeNull();
+    expect(week[3].state).toBeNull();
+  });
+
+  it("keeps the day's own name and date on the reading", () => {
+    // `HabitReading extends HabitDay`, so a dot can be painted from one object
+    // rather than from an index into two lists that have to stay aligned.
+    const week = habitWeekReadings(vaultOf({}), DEFAULT_PATHS, "Gym", "2026-10-14");
+    expect(week.map((d) => d.iso)).toEqual(habitWeek("2026-10-14").map((d) => d.iso));
+    expect(week.map((d) => d.head)).toEqual(habitWeek("2026-10-14").map((d) => d.head));
+  });
+
+  it("costs seven cache lookups and no vault walk", () => {
+    // WHY `locateEntry` AND NOT `pagesUnder`. A strip drawn once per habit per
+    // repaint cannot afford a scan: seven probes cost the same on a vault of
+    // ten entries and of ten thousand, and this is the half of that claim a
+    // test can hold — the folder survey above is never reached.
+    const code = readCode("habits");
+    const fn = code.slice(
+      code.indexOf("export function habitWeekReadings("),
+      code.indexOf("export interface HabitRow")
+    );
+    expect(fn).toContain("locateEntry(app, paths, \"daily\", day.iso)");
+    expect(fn).toContain("readHabitState(frontmatterOf(app, file)[id])");
+    expect(fn).not.toContain("getMarkdownFiles");
+    expect(fn).not.toContain("pagesUnder");
+  });
+});
+
+describe("which habits a note carries", () => {
+  const trackers = normalizeTrackers([
+    habit("Gym"),
+    habit("Read"),
+    habit("Monthly thing", { surface: diarySurface("monthly") }),
+    { ...habit("Mood"), type: "slider" as const },
+    habit("Streak", { derived: true }),
+  ]);
+  const fence = (...lines: string[]): string =>
+    ["```chronoanvil", ...lines, "```"].join("\n");
+
+  it("is every boolean the note's fences name, in document order", () => {
+    const text = fence("tracker:Read", "tracker:Gym", "slider:Mood");
+    expect(
+      habitsOnNote(trackers, text, diarySurface("daily")).map((e) => e.def.id)
+    ).toEqual(["Read", "Gym"]);
+  });
+
+  it("leaves a misplaced or derived tracker to the grid", () => {
+    // A monthly boolean on a daily entry takes the ordinary tracker path and
+    // draws its own visible refusal; a derived one is a readout, not a habit.
+    // Answering null here is what leaves both of them to do that.
+    const text = fence("tracker:Monthly thing", "tracker:Streak", "tracker:Gym");
+    expect(
+      habitsOnNote(trackers, text, diarySurface("daily")).map((e) => e.def.id)
+    ).toEqual(["Gym"]);
+  });
+
+  it("carries the line, because a remove has to match it", () => {
+    const [entry] = habitsOnNote(
+      trackers,
+      fence("tracker:Gym|Morning workout"),
+      diarySurface("daily")
+    );
+    expect(entry.directive).toBe("tracker:Gym|Morning workout");
+    // AND THE SECTION'S ROW IS NAMED BY THE SAME RULE THE CHIP USES: an inline
+    // override names this habit on this note, and a bare trailing `|` names
+    // nothing and falls back rather than drawing a nameless row.
+    expect(habitLabelOf(entry.def, entry.directive)).toBe("Morning workout");
+    expect(habitLabelOf(entry.def, "tracker:Gym|")).toBe("Gym");
+    expect(habitLabelOf(entry.def, "tracker:Gym")).toBe("Gym");
+  });
+
+  it("answers the fold-in's question from a `habits` line of its own", () => {
+    expect(noteHasHabitsSection(fence("habits"))).toBe(true);
+    expect(noteHasHabitsSection(fence("tracker:Gym"))).toBe(false);
+    // FENCE-SCOPED, AND THIS RELEASE IS WHY. The shipped documentation note
+    // quotes the catalogue in prose, and `habits` is now one of the words it
+    // quotes — a raw regex over the note would empty that reader's cell.
+    expect(noteHasHabitsSection("A line about `habits` in prose.\n")).toBe(false);
+    // THE SHAPE THAT MAKES THIS A FENCE-SCOPED READ AND NOT A REGEX, and this
+    // release is what put it in a reader's vault: the shipped documentation
+    // note lists the catalogue's keywords in plain code blocks, and `habits` is
+    // now one of them. A line that IS the word, in a block that is not a
+    // `chronoanvil` fence, is prose — and reading it as a section would empty
+    // that reader's Habits cell while they were reading about habits.
+    const doc = ["## Habits", "", "```", "habits", "```", ""].join("\n");
+    expect(doc).toMatch(/^habits$/m);
+    expect(noteHasHabitsSection(doc)).toBe(false);
+    expect(noteHasHabitsSection(fence("habits-week"))).toBe(false);
+  });
+});
+
+describe("the catalogue offers the section, and nothing composes it", () => {
+  const sec = ENTRY_SECTIONS.find((s) => s.id === "habits")!;
+
+  it("probes for the whole word, so a later keyword cannot answer for it", () => {
+    // THE CATALOGUE'S OWN READ, which is a different function from the
+    // renderer's and has to agree with it. Anchored at both ends: `habits` is a
+    // word, and a `habits-week` keyword invented later must not be found as
+    // this section — the catalogue would report a section the reader does not
+    // have and offer to remove a line it does not own.
+    expect(sec.probe.test("habits")).toBe(true);
+    expect(sec.probe.test("note:log\nhabits\n")).toBe(true);
+    expect(sec.probe.test("habits-week")).toBe(false);
+    expect(sec.probe.test("tracker:habits")).toBe(false);
+  });
+
+  it("is a shared-band Trackers section, unlocked and region-free", () => {
+    expect(sec.band).toBe("shared");
+    // `locked === (band !== "shared")` is asserted for the whole catalogue;
+    // what is stated here is the half that makes it addable and movable at all.
+    expect(sec.locked).toBe(false);
+    expect(sec.category).toBe("trackers");
+    expect(sec.ownsRegion).toBe(false);
+  });
+
+  it("is offered on every grain and composed on none", () => {
+    for (const grain of TRACKER_CLASSES) {
+      // OPT-IN, ON THE `bridge` PATTERN: the directive is null unless the
+      // reader's own answer names it, which is what keeps every shipped
+      // template and every golden fixture byte-identical.
+      expect(sec.directive({ grain }), grain).toBeNull();
+      expect(sec.directive({ grain, extra: ["habits"] }), grain).toBe("habits");
+      expect(composeEntryTemplate(grain), grain).not.toContain("habits");
+    }
+  });
+
+  it("writes one keyword line into the band and no region", () => {
+    const daily = composeEntryTemplate("daily");
+    const out = addSectionToNote(daily, { grain: "daily" }, sec)!;
+    expect(out).toBeTruthy();
+    const added = out.split("\n").filter((l) => l.trim() === "habits");
+    expect(added).toHaveLength(1);
+    // NO REGION, which is the half that would show up as an empty pair of
+    // markers in the reader's note: this section draws readings and writes no
+    // prose, so it has nothing to keep between them.
+    expect(out).not.toContain("<!--chronoanvil:habits");
+    expect(detectEntrySections(out, { grain: "daily" })).toContain("habits");
+    // AND IT COMES OFF AGAIN, taking nothing else: the round trip is what
+    // makes "removing the section puts the cell back" a promise rather than a
+    // hope, since the cell's return is derived from this line's absence.
+    const want = detectEntrySections(out, { grain: "daily" }).filter(
+      (id) => id !== "habits"
+    );
+    const back = applyEntrySections(out, { grain: "daily" }, want)!;
+    expect(back).toBeTruthy();
+    expect(noteHasHabitsSection(back)).toBe(false);
+    expect(back).toBe(daily);
+  });
+
+  it("moves with the band's arrows, which is the first bare keyword in it", () => {
+    // EVERY OTHER MEMBER OF THE SHARED BAND HAS A FIELD BEHIND IT, so a line
+    // that is a keyword and nothing else is new here — and the band's rows are
+    // what the section window rearranges. A regroup that dropped it would lose
+    // the reader's section while reporting success, with the regions of
+    // everything else still in place to make the note look intact.
+    const ctx = { grain: "daily" } as const;
+    const model = entrySectionModel(ctx);
+    const text = addSectionToNote(composeEntryTemplate("daily"), ctx, sec)!;
+    const groups = model.blocks(text).map((b) => [...b.ids]);
+    expect(groups[groups.length - 1]).toEqual(["habits"]);
+    // Added at the end and moved to the top of the band, which is the arrow a
+    // reader presses eight times.
+    const moved = model.regroup(text, [
+      groups[0],
+      groups[groups.length - 1],
+      ...groups.slice(1, -1),
+    ]);
+    expect(moved).toBeTruthy();
+    const ids = detectEntrySections(moved!, ctx);
+    expect(ids.indexOf("habits")).toBe(ids.indexOf("trackers") + 1);
+    expect(moved!.split("\n").filter((l) => l.trim() === "habits")).toHaveLength(1);
+    // AND BACK, byte for byte. The round trip is what makes the arrows a door
+    // rather than a one-way write — and every other field's region is still
+    // where it was, which is the half that would fail silently.
+    expect(model.regroup(moved!, groups)).toBe(text);
+  });
+
+  it("is joinable as a widget, and a titled field is still refused one", () => {
+    // THE 1.0.42 RULE, AND THIS SECTION IS ON THE PERMITTED SIDE OF IT: a row
+    // is columns side by side, so its members must be widgets — a field
+    // wearing a permanent title bar brings a head the row has no room for.
+    // `habits` is a widget line, so the editor offers it the join; `capture` is
+    // a titled field, so the pair is refused WHOLE rather than trimmed to the
+    // part that would render, which would drop a directive on the floor.
+    const ctx = { grain: "daily" } as const;
+    const model = entrySectionModel(ctx);
+    const text = addSectionToNote(composeEntryTemplate("daily"), ctx, sec)!;
+    const blocks = model.blocks(text);
+    const mine = blocks[blocks.length - 1];
+    expect(mine.ids).toEqual(["habits"]);
+    expect(mine.column).toEqual(["habits"]);
+    // The fields beside it are loose and not joinable, which is what makes the
+    // line above a claim about this section rather than about the band.
+    expect(blocks[1].column).toEqual([]);
+    const groups = blocks.map((b) => [...b.ids]);
+    const pairedWithAField = model.regroup(text, [
+      ...groups.slice(0, -2),
+      [...groups[groups.length - 2], "habits"],
+    ]);
+    expect(pairedWithAField).toBeNull();
+  });
+});
+
+describe("the grid lets the type go", () => {
+  it("skips the habit line entirely when the note has the section", () => {
+    // THE WHOLE OF HOW THE CELL LEAVES THE GRID, and it is one `continue`: no
+    // cell is built, so there is no chip, no `+N`, no fitter and no empty box
+    // left behind — a cell the bar was never given is not a gap in it.
+    const code = readCode("widgets");
+    const loop = code.slice(
+      code.indexOf("if (habit) {"),
+      code.indexOf("buildHabitChip(")
+    );
+    expect(loop).toContain("habitsElsewhere = noteHasHabitsSection(noteTextNow())");
+    expect(loop).toContain("if (habitsElsewhere) continue;");
+    // ASKED ONCE PER FENCE: the read is cheap and not free, and a fence with
+    // no boolean in it has no reason to ask at all.
+    expect(loop).toContain("if (habitsElsewhere == null) {");
+    expect(code).toContain("let habitsElsewhere: boolean | null = null;");
+    // AND THE CHIP IT STILL BUILDS WHEN IT DOES NOT STAND DOWN takes its name
+    // from the same function the section's rows do, so the two surfaces cannot
+    // disagree about what a renamed habit is called.
+    expect(code).toContain("habitLabelOf(habit, line),");
+  });
+
+  it("reads the live note, and keeps the last answer it got", () => {
+    // `getSectionInfo` IS THE SYNCHRONOUS WHOLE-NOTE READ this plugin already
+    // uses, and NULL IS AN ANSWER — an embed, an export, any render outside a
+    // live view. Two different wrongs are possible on a null and this picks
+    // the lesser: folding the chips back into the grid on a repaint would be
+    // visible, while a section drawn from stale text is right again as soon as
+    // anything writes to this note.
+    const code = readCode("widgets");
+    const fn = code.slice(
+      code.indexOf("let lastNoteText: string | null = null;"),
+      code.indexOf("if (frameSpec.error) {")
+    );
+    expect(fn).toContain("const text = ctx.getSectionInfo(el)?.text;");
+    expect(fn).toContain("if (text != null) lastNoteText = text;");
+    expect(fn).toContain("return lastNoteText ?? \"\";");
+    // A THUNK AND NOT A STRING, because the section's builder runs again on
+    // every repaint, long after the handler that made it returned.
+    expect(code).toContain("() => buildHabitsSection(this, ctx, noteText())");
+    expect(code).toContain("noteText: () => string");
+  });
+
+  it("repaints on the daily folder, which is where its seven days are", () => {
+    const code = readCode("widgets");
+    const arm = code.slice(
+      code.indexOf("case \"habits\":"),
+      code.indexOf("case \"tracker-stat\":")
+    );
+    expect(arm).toContain("liveScopedWidget(");
+    expect(arm).toContain("this.plugin.settings.paths.diaryDaily");
+    // NOT THE DIARY ROOT, which is the distinction the arm below it draws for
+    // the opposite reason: a habit's readings are on daily entries by
+    // construction, so a monthly entry being written teaches this nothing.
+    expect(arm).not.toContain("diaryRoot");
+  });
+
+  it("wears a head because the dispatcher names it, and is not a page widget", () => {
+    const widgets = readSrc("widgets");
+    expect(widgets).toContain("habits: \"✅ Habits\"");
+    // THE SIXTH ALIAS TITLE, and the slot `journal-tally` and `kind-table`
+    // already occupy: it dispatches, it has no `WidgetSpec`, and dropped into
+    // an entry's shared band it is a non-field keyword `fieldFrame` wraps in
+    // the same card every field beside it gets.
+    expect(NOT_PAGE_WIDGETS.habits.reason).toBe("readings");
+    expect(isPageWidget("habits")).toBe(false);
+  });
+});
+
+describe("the section itself", () => {
+  const src = readSrc("habits-section");
+  const code = readCode("habits-section");
+
+  it("opens the window the cell opens, through one function", () => {
+    // ONE DOOR, ONE SAVE PATH. The cell's pinned `+` and this card's row both
+    // call `openHabitsWindow`, which was extracted from `finishHabitsCell` for
+    // this round — two openers would be two readings of what the window is
+    // editing, and the one that drifted would silently save the wrong set.
+    expect(code).toContain("openHabitsWindow(deps, entries, ctx)");
+    expect(code).not.toContain("new HabitsEditor(");
+    expect(readCode("tracker-controls")).toContain("export function openHabitsWindow(");
+    const opens = [...readCode("widgets").matchAll(/new HabitsEditor\(/g)];
+    expect(opens).toHaveLength(1);
+  });
+
+  it("uses the chip's own control and not a second cycle", () => {
+    // SAME CLASSES, SAME GLYPHS, SAME THREE-STATE CYCLE, so one habit is one
+    // control wherever a reader meets it — and `nextHabitState` is not
+    // re-implemented here, which is the drift that would give the section and
+    // the cell different ideas of what follows ✗.
+    expect(code).toContain("wireHabit(deps, box, box, entry.def, ctx,");
+    // EACH ROW READS ITS OWN HABIT'S WEEK, by the id of the tracker that row
+    // is — one strip shared by every row is a plausible optimisation and a
+    // wrong answer four rows out of five.
+    expect(code).toContain(
+      "habitWeekReadings(app, plugin.settings.paths, entry.def.id, iso)"
+    );
+    // AND THE ROW IS NAMED BY THE NOTE'S OWN LINE, not by the registry: an
+    // inline `tracker:<id>|Label` names this habit here, exactly as it names
+    // the chip the grid would have drawn.
+    expect(code).toContain("habitLabelOf(entry.def, entry.directive)");
+    expect(code).toContain("cls: \"ca-journal-habit-box\"");
+    expect(code).not.toContain("nextHabitState");
+    // THE BOX IS THE PRESS, NOT THE ROW: a row-wide target would make a click
+    // on Wednesday's dot tick today, which is the one gesture this must not
+    // have, since six of the seven dots are other notes.
+    expect(code).not.toContain("wireHabit(deps, row,");
+  });
+
+  it("draws the strip on a daily entry only, and marks this entry's column", () => {
+    // AND THE REASON IS NOT LAYOUT. The box writes the HOST note's property,
+    // so on a weekly entry the seven columns would be seven other notes and a
+    // tick would move nothing beside it — a control and a readout disagreeing
+    // on one row about one habit.
+    expect(code).toContain("const week = grain === \"daily\" ? habitWeek(iso) : [];");
+    expect(code).toContain("if (week.length) {");
+    expect(src).toContain("The box writes the HOST note's");
+    // ONE MARK, ON THE COLUMN'S HEAD, not on each of the seven dots under it.
+    expect(code).toContain("if (day.iso === iso) head.addClass(\"is-now\");");
+    // AND THE HOST'S OWN DOT FOLLOWS A TICK, repainted from the same function
+    // the first paint used: this entry's column is one of the seven, so a tick
+    // that did not move it would read as a bug in the strip.
+    const wired = code.slice(code.indexOf("wireHabit(deps, box"), code.indexOf("drawDoor(root, deps, entries, ctx);\n  return root;"));
+    expect(wired).toContain("dots.find(({ day }) => day.iso === iso)");
+    expect(wired).toContain("paintDay(");
+    expect(wired).toContain("written: true");
+  });
+
+  it("says what is behind the door, and refuses it on a managed template", () => {
+    expect(habitsDoorLabel(0)).toBe("Add a habit");
+    expect(habitsDoorLabel(3)).toBe("Manage habits");
+    // REFUSED RATHER THAN HIDDEN, which is the cell's own rule for the same
+    // control: a template's tracker list is generated from Settings, so a
+    // control that edited it would be writing what the next sync deletes. The
+    // rows still draw — a template holding habits still has to show them.
+    expect(code).toContain("if (isManagedTemplate(deps.plugin, ctx.sourcePath)) door.disabled = true;");
+    // AND THE EMPTY ANSWER IS A CALLOUT, as every pointable widget's is.
+    expect(code).toContain("emptyCallout(");
+    expect(code).toContain("No habits on this entry yet.");
+    // "remove", never the other word (1.0.43), and no retired vocabulary.
+    expect(src).not.toMatch(/\bdelete a habit\b/i);
+  });
+
+  it("is one grid and not a grid per row", () => {
+    // THE 1.0.31 RECORDS-TABLE BUG, which this shape would have reproduced: an
+    // `auto` track is sized by the content of ITS OWN grid, so a heads row
+    // carrying an empty span and habit rows carrying a 1.6em box would size
+    // their first track differently and the column letters would sit beside
+    // the dots they name rather than over them.
+    expect(cssRule(".ca-habits-list")).toContain("grid-template-columns: auto minmax(0, 1fr) auto");
+    expect(cssRule(".ca-habits-heads")).toContain("display: contents");
+    expect(cssRule(".ca-habits-row")).toContain("display: contents");
+    // SEVEN EQUAL TRACKS, so Tuesday is under Tuesday on every row.
+    expect(cssRule(".ca-habit-week")).toContain("grid-template-columns: repeat(7, 1fr)");
+    // `minmax(0, 1fr)` AND NOT `1fr`: a grid item's automatic minimum is its
+    // content, so a long habit name would push the week off the card instead
+    // of truncating, which looks like a layout bug rather than a long name.
+    expect(cssRule(".ca-habits-name")).toContain("text-overflow: ellipsis");
+    // THE MARK IS A SIZE AND A FILL, which is how three readings fit on one dot
+    // without a third colour: nothing-recorded is the SMALL faint base form,
+    // and a reading grows it. A base that was already dot-sized would make an
+    // empty week look like a kept one.
+    const dot = cssRule(".ca-habit-day");
+    expect(dot).toContain("width: 3px");
+    expect(dot).toContain("var(--text-faint)");
+    expect(cssRule(".ca-habit-day.is-not-done")).toContain("width: 9px");
+    expect(cssRule(".ca-habit-day.is-done")).toContain("var(--interactive-accent)");
+    expect(cssRule(".ca-habit-day.is-not-done")).toContain("inset 0 0 0");
+    // AND THIS ENTRY'S COLUMN IS NAMED BY TWO THINGS, because a colour alone is
+    // not a mark for a reader who cannot see it as one.
+    const now = cssRule(".ca-habit-dow.is-now");
+    expect(now).toContain("var(--text-accent)");
+    expect(now).toContain("font-weight: 600");
+    // THE DOOR IS A CHIP, AND AN OBSIDIAN `<button>` IS 30px UNTIL TOLD
+    // OTHERWISE — the two lines whose absence looks right in a mockup.
+    const door = cssRule(".ca-habits-door");
+    expect(door).toContain("height: auto");
+    expect(door).toContain("min-height: 0");
+    expect(door).toContain("dashed");
   });
 });
