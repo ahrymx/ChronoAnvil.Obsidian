@@ -576,9 +576,10 @@ export interface TrackerDef {
   step?: number;
   // number-only, cosmetic suffix on the stepper ("km", "chapters"...).
   unit?: string;
-  // How daily values collapse when a chart buckets them by month
-  // (ChartScope "daily-by-month"). Absent means mean — see ChartReduce.
-  // Number-shaped trackers only: a select or a checkbox has no arithmetic.
+  // Whether this quantity ADDS UP: `"sum"` puts it in a journal's Totals
+  // band, absent keeps it out. Number trackers on a journal surface only —
+  // see ChartReduce for the one meaning this field has left, and
+  // `summableTrackers` for the read.
   reduce?: ChartReduce;
   // select-only, raw "value=Label,value2=Label2" (same grammar as the
   // existing `select:` widget directive).
@@ -676,10 +677,11 @@ export type ChartRange = "period" | "30" | "90" | "365" | "all";
 // that a monthly tracker would, out of history that already exists, instead of
 // asking the user to start logging a second tracker on the review note.
 //
-// It waited on a per-tracker choice of reduction, because mean is right for
-// Weight and Mood and sum is right for kilometres run, and nothing in
-// TrackerType distinguishes them — both are `number`. That choice is
-// TrackerDef.reduce now; see it for why the default is mean.
+// It waited on a choice of reduction, because mean is right for Weight and
+// Mood and sum is right for kilometres run, and nothing in TrackerType
+// distinguishes them — both are `number`. That choice is `ChartSpec.reduce`,
+// and it is the CHART'S rather than the tracker's as of 1.0.57; see
+// ChartReduce for why it moved.
 //
 // It is what makes a quarter or year chart readable at all. A `period` line
 // chart on the year note plots 365 raw daily points and on the quarter 92 —
@@ -710,14 +712,28 @@ export type ChartScope = TrackerClass | "daily-by-month";
 // wrong mean reads as a plausible number; a wrong sum reads as a wildly
 // inflated one, so the safer of the two is the one that applies silently.
 //
-// TWO READERS SINCE 4.35, and the second is what gives this field a meaning on
-// a journal at all. It was written for `daily-by-month` bucketing, which is a
-// DIARY path — so on a journal tracker the control that sets it (*"chart by
-// month: average / total"*) was visibly present and did nothing whatever.
-// `journal-totals` reads it as the answer to "does this quantity add up",
-// which is the same question the diary asks and the only one this field has
-// ever encoded. Duration and Distance say `sum` and land in the totals band;
-// Intensity and `confidence` say nothing and stay out of it.
+// TWO READERS FROM 4.35 TO 1.0.57, AND NOW ONE EACH. It was written for
+// `daily-by-month` bucketing, a DIARY path, and 4.35 gave `journal-totals` the
+// same field as the answer to "does this quantity add up" — the same question,
+// asked of a journal. One field, two surfaces, and a single control on the
+// tracker setting both.
+//
+// That control could only ever be right about one of them. It was drawn on the
+// "How it behaves" step, before the surface is known, reading *"chart by month:
+// average / total"* — a sentence about charts on a journal tracker that charts
+// nothing, and a sentence about nothing at all on the diary tracker whose
+// charts it did govern, because `ChartEditor.reconcile` deleted any scope that
+// was not `monthly` and `daily-by-month` could not be chosen. The tracker field
+// named the reachable meaning and described the unreachable one.
+//
+// So the two readers split. A chart carries its own reduction
+// (`ChartSpec.reduce`, written `+sum`), because whether to total a month is a
+// property of the chart drawing it — two charts of one tracker may honestly
+// want different answers. `TrackerDef.reduce` keeps the journal meaning alone,
+// set by *"Readings add up"* on the step that knows the surface: Duration and
+// Distance say `sum` and land in the totals band; Intensity and `confidence`
+// say nothing and stay out of it. The default is absence on both, for the
+// reason the paragraph above gives.
 export type ChartReduce = "mean" | "sum";
 
 // How much of the chart grid one chart occupies (2.46).

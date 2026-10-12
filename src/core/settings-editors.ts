@@ -378,7 +378,7 @@ export class TrackerEditModal extends SteppedEditorModal {
       case "select":
         return "The values this writes and the labels shown for them.";
       default:
-        return "The bounds of the stepper, what unit it counts in, and how a month's worth of readings collapse into one point on a chart.";
+        return "The bounds of the stepper, and what unit it counts in.";
     }
   }
 
@@ -628,26 +628,6 @@ export class TrackerEditModal extends SteppedEditorModal {
             t.unit = v.trim() || undefined;
           });
         });
-
-        // How daily values collapse when a chart buckets them by month
-        // (2.52). Offered on plain numbers only: a scale's mean is meaningful
-        // and its sum is not, so a scale has no choice to make.
-        //
-        // "Average" and "Total" rather than "mean" and "sum" — the words are
-        // what a reader picking between them actually thinks, and the
-        // stored values stay mean/sum because that's what the reduction is.
-        range.addDropdown((d) => {
-          d.addOption("mean", "chart by month: average");
-          d.addOption("sum", "chart by month: total");
-          d.setValue(t.reduce ?? "mean");
-          d.selectEl.setAttribute("aria-label", "monthly reduction");
-          d.onChange((v) => {
-            // Absent means mean, so the default is stored as absence rather
-            // than as an explicit "mean" — one representation of the default,
-            // which is what keeps a settings diff readable.
-            t.reduce = v === "sum" ? "sum" : undefined;
-          });
-        });
       }
     }
 
@@ -860,6 +840,36 @@ export class TrackerEditModal extends SteppedEditorModal {
         cls: "setting-item-description ca-editor-note",
         text: "Journal trackers aren't seeded onto templates or added to Diary.base — put this on a note with “+ Add tracker”, or add a tracker: line to that journal's template yourself.",
       });
+
+      // WHETHER THE QUANTITY ADDS UP, and the only thing `TrackerDef.reduce`
+      // means as of 1.0.57 — see ChartReduce for the two readers it used to
+      // have and why they split.
+      //
+      // ON THIS STEP, WHICH IS THE WHOLE FIX. It was a dropdown on "How it
+      // behaves", two steps earlier, reading *"chart by month: average /
+      // total"*: a question about charts, asked before the surface is known,
+      // of a tracker that may turn out to chart nothing. Here the surface is
+      // the answer above it, so the control is drawn exactly where it applies
+      // and says what it does.
+      //
+      // NUMBER ONLY, which is `summableTrackers`' own gate and its own reason:
+      // a total of Intensity readings is a number with no meaning — five
+      // workouts at 4/5 do not make 20 of anything.
+      if (t.type === "number") {
+        new Setting(host)
+          .setName("Readings add up")
+          .setDesc(
+            "On: this journal's Totals band reports every reading below added together, like “1,240 pages”. Off: no total is reported, which is right for a rating or an intensity. A quantity with no readings draws no cell either way."
+          )
+          .addToggle((c) =>
+            c.setValue(t.reduce === "sum").onChange((v) => {
+              // Absence rather than an explicit "mean": one representation of
+              // the default, which is what keeps a settings diff readable.
+              t.reduce = v ? "sum" : undefined;
+            })
+          );
+      }
+
       this.renderPlacementSchematic(host);
       return;
     }

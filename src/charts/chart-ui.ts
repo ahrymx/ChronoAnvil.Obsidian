@@ -212,6 +212,7 @@ export class ChartEditModal extends SteppedEditorModal {
           scope: opts.spec.scope,
           tracker2: opts.spec.tracker2,
           avg: opts.spec.avg,
+          reduce: opts.spec.reduce,
           size: opts.spec.size,
           title: opts.spec.title,
         }
@@ -259,8 +260,26 @@ export class ChartEditModal extends SteppedEditorModal {
     this.draft.range = range;
     // Stored only when it isn't the default, so a daily chart's directive stays
     // byte-identical to what every existing vault already has on disk.
-    if (scope === "monthly") this.draft.scope = "monthly";
+    //
+    // ANY SCOPE BUT THE DEFAULT, AND IT USED TO BE `"monthly"` ALONE (1.0.57).
+    // Every other non-default scope was deleted here, from inside the very
+    // `onChange` that had just set it — so picking "Daily entries, by month" in
+    // the dropdown above reverted it in the same keystroke and the option could
+    // not be chosen at all. Silent in the worst way: the control moved, the
+    // form redrew, and the value snapped back to Daily with nothing said.
+    //
+    // The rule is `serializeChartSpec`'s own (`scope !== "daily"`), read off it
+    // rather than re-enumerated, which is what stops a scope arriving in the
+    // type and being writable but not settable for a third time — the four
+    // grains of 2.58.5 were the second.
+    if (scope !== "daily") this.draft.scope = scope;
     else delete this.draft.scope;
+
+    // A reduction belongs to the one scope that buckets. Dropped otherwise, so
+    // a directive never carries a token its scope ignores and so daily →
+    // by-month → daily does not leave `+sum` behind — the discipline `tracker2`
+    // and `avg` follow below, for the same reason.
+    if (scope !== "daily-by-month") delete this.draft.reduce;
 
     // tracker2 and avg only mean something for one chart type each; drop them
     // otherwise so a directive never carries a token its type ignores, and so
@@ -385,13 +404,50 @@ export class ChartEditModal extends SteppedEditorModal {
           });
         });
     } else {
+      // THE GRAIN'S OWN NAME, out of the table the dropdown above offers from.
+      // This branched on `monthly` and called everything else daily, which was
+      // two answers for six grains: a weekly or a quarterly tracker was told in
+      // so many words that it is a daily one. One sentence serves all of them
+      // because `SCOPE_LABELS` already names each.
+      const only = scopes[0] ?? "daily";
       new Setting(host)
         .setName("Read values from")
         .setDesc(
-          scopes[0] === "monthly"
-            ? "Monthly entries — this is a monthly tracker, so that is where its values are written."
-            : "Daily entries — this is a daily tracker, so that is where its values are written."
+          `${SCOPE_LABELS[only]} — that is the grain this tracker is logged at, so that is where its values are written.`
         );
+    }
+
+    // ── a month's point, when a month is the point (1.0.57) ──────────────
+    //
+    // SUMMONED BY THE CONTROL ABOVE AND DRAWN BESIDE IT, which is the rule the
+    // second tracker's dropdown states on the next step: a field that does not
+    // exist until another answer brings it into being belongs where that answer
+    // is. Only `daily-by-month` collapses anything, so only it asks.
+    //
+    // AND IT IS THE CHART'S QUESTION. The tracker used to answer it for every
+    // chart of itself, on a step that did not yet know the tracker would ever
+    // be charted — see ChartSpec.reduce.
+    //
+    // A DROPDOWN NAMING BOTH ANSWERS, not a toggle. Either answer draws a
+    // plausible chart and only one of them is the right one, so a reader
+    // scanning the form has to be able to see which they picked; "Total" left
+    // off would read as a setting that is simply absent.
+    if (scope === "daily-by-month") {
+      new Setting(host)
+        .setName("A month's point is")
+        .setDesc(
+          `Each month's days collapse into one point. An average suits anything measured — ${def?.label ?? "a weight"}, a mood, hours slept — and a total suits anything counted, like kilometres run or pages read.`
+        )
+        .addDropdown((d) => {
+          d.addOption("mean", "the average of its days");
+          d.addOption("sum", "the total of its days");
+          d.setValue(this.draft.reduce ?? "mean");
+          d.onChange((v) => {
+            // Absence is the mean, the rule every optional token here follows.
+            if (v === "sum") this.draft.reduce = "sum";
+            else delete this.draft.reduce;
+          });
+        });
     }
 
     new Setting(host)

@@ -5,6 +5,58 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.57] - 2026-10-12
+
+### Changed
+
+- **The confusing *chart by month* setting is gone from a tracker's settings**,
+  and what it was actually doing now has its own name. A number tracker's
+  "How it behaves" step carried a dropdown reading *chart by month: average /
+  total*, two steps before the window asks where the tracker is even logged. It
+  was setting two unrelated things at once, and the one it named could not be
+  reached:
+  - On a **journal** tracker it decided whether the quantity appears in the
+    **Totals** band — which is what it was really for, and what it never said.
+    That question is now a toggle called **Readings add up**, on the *Where it
+    appears* step, drawn only for a number tracker on a journal, where the
+    surface is already the answer above it.
+  - On a **diary** tracker it decided how a by-month chart collapsed each
+    month. That is now the chart's own setting (below), because a chart is what
+    wants the bucket.
+- **A by-month chart can finally be chosen.** The chart editor's **Read values
+  from** has offered *Daily entries, by month* for a daily tracker since 2.52,
+  and picking it never stuck: the editor kept only a `monthly` scope and threw
+  every other away, from inside the dropdown's own change handler, so the
+  selection reverted in the same keystroke with nothing said. A quarter chart of
+  something logged daily is three points instead of ninety, and a year is twelve
+  instead of three hundred and sixty-five — out of history you already have.
+- **A chart says for itself whether a month is an average or a total.** Picking
+  *Daily entries, by month* now asks **A month's point is** — *the average of
+  its days* or *the total of its days*. It belongs to the chart rather than to
+  the tracker, so one chart of kilometres run can show the monthly total while
+  another shows the daily average; in the note's directive it is a `+sum` after
+  the scope, absent for an average.
+- **A weekly, quarterly or yearly chart keeps its grain when you edit it.** The
+  same line that swallowed the by-month scope also deleted those three on save,
+  and the chart only kept drawing the right notes because the renderer reads a
+  stale scope charitably. The directive is now correct on disk.
+- **The chart editor names the grain it is reading.** Where a tracker is logged
+  at one grain the control is a statement rather than a dropdown, and it said
+  *"Daily entries — this is a daily tracker"* for four grains that are not
+  daily.
+
+### Compatibility
+
+- A by-month chart you wrote into a note **by hand** over a tracker that
+  declared *total* now averages, unless you add `+sum` to its directive or open
+  it in the editor and pick *the total of its days*. Nothing the plugin itself
+  wrote is affected: the option could not be selected, so the editor never
+  produced one, and the four by-month charts in the seeded vault all read
+  trackers that average.
+- Every chart directive already on disk serialises byte-identically. `+sum` is
+  written only when a month is a total, the same absence-is-the-default rule the
+  scope, the size and the title follow.
+
 ## [1.0.56] - 2026-10-12
 
 ### Added

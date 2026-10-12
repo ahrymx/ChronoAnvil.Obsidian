@@ -949,6 +949,23 @@ export interface ChartSpec {
   // belongs to. The editor withholds the toggle when a second tracker is set
   // and the renderer ignores the flag if a hand-written directive carries both.
   avg?: boolean;
+  // `daily-by-month` only: how the days in a month collapse into its one
+  // point. Absent means mean, written `+sum` when it isn't, so every directive
+  // already on disk keeps the byte shape it has.
+  //
+  // THE CHART'S, NOT THE TRACKER'S, AS OF 1.0.57. `TrackerDef.reduce` answered
+  // this until then, which made it one answer for every chart of that tracker
+  // — and two charts of kilometres run can honestly want different ones: the
+  // year's trend is a total a month, the comparison against Weight is a mean.
+  // ChartReduce has the rest of that history. A chart whose scope is not
+  // `daily-by-month` carries no reduction at all, enforced in `reconcile`, the
+  // same discipline `avg` and `tracker2` follow for the types that ignore them.
+  //
+  // ONE ANSWER FOR BOTH SERIES where a chart reads two. The second tracker is
+  // collected at the same scope and the same window, so it buckets the same
+  // way; a per-series reduction would be a second token saying which series it
+  // belongs to, which is the question 4.45 declined to make the grammar ask.
+  reduce?: ChartReduce;
   // How many grid cells this chart occupies. Absent means "derive it from the
   // chart type and the length of the window it draws" (see defaultSpan) — the
   // same absence-is-a-derivation rule `scope` follows, and the reason adding
@@ -1232,12 +1249,23 @@ const CHART_TAG = new RegExp(
 function parseChartFlags(suffix: string): {
   tracker2?: string;
   avg?: boolean;
+  reduce?: ChartReduce;
   size?: ChartSpan;
 } {
-  const out: { tracker2?: string; avg?: boolean; size?: ChartSpan } = {};
+  const out: {
+    tracker2?: string;
+    avg?: boolean;
+    reduce?: ChartReduce;
+    size?: ChartSpan;
+  } = {};
   for (const seg of suffix.split("+")) {
     if (seg === "") continue;
     if (seg === "avg") out.avg = true;
+    // A bare word rather than `+reduce=sum`, matching `+avg`: the question has
+    // two answers and one of them is the silent default, so the token's
+    // presence IS the answer. There is no `+mean` for the same reason there is
+    // no `+size=auto`.
+    else if (seg === "sum") out.reduce = "sum";
     else if (seg.startsWith("y=")) out.tracker2 = seg.slice(2);
     // A typo'd `+size=huge` is dropped and the chart falls back to its
     // automatic size, rather than failing the line match and losing the chart
@@ -1338,6 +1366,7 @@ export function parseChartDirectives(lines: string[]): ChartSpec[] {
       ...(m[5] ? { scope: m[5] as ChartScope } : {}),
       ...(flags.tracker2 ? { tracker2: flags.tracker2 } : {}),
       ...(flags.avg ? { avg: true } : {}),
+      ...(flags.reduce ? { reduce: flags.reduce } : {}),
       ...(flags.size ? { size: flags.size } : {}),
       // ABSENT AND EMPTY ARE DIFFERENT ANSWERS, which is `serializeJournalChartSpec`'s
       // rule for the same delimiter: a trailing bar with nothing after it yields
@@ -1446,10 +1475,14 @@ export function nextChartKey(existing: ChartSpec[]): string {
 // rewrites a directive that already says what it means.
 export function serializeChartSpec(s: ChartSpec): string {
   const scope = s.scope && s.scope !== "daily" ? `:${s.scope}` : "";
-  // Suffix flags follow scope, each `+`-prefixed. Order is fixed here (y before
-  // avg) for a stable byte output, though the parser accepts either order.
+  // Suffix flags follow scope, each `+`-prefixed. Order is fixed here (y, avg,
+  // sum, size) for a stable byte output, though the parser accepts any order.
   const y = s.tracker2 ? `+y=${s.tracker2}` : "";
   const avg = s.avg ? "+avg" : "";
+  // Absent for a mean, which is every chart written before 1.0.57 and most of
+  // them after — the omitted-default rule `scope` and `size` already follow,
+  // and what makes this field cost no rewrite of anything on disk.
+  const sum = s.reduce === "sum" ? "+sum" : "";
   // Absent when the chart is auto-sized, so a directive written before 2.46
   // still serialises byte-identically — the same discipline the omitted `daily`
   // scope token follows, and pinned by a test for the same reason.
@@ -1460,7 +1493,7 @@ export function serializeChartSpec(s: ChartSpec): string {
   // as on the way in, because this is the write path and a newline here would
   // end the directive it is part of.
   const title = cleanLabel(s.title ?? "");
-  return `chart:${s.key}:${s.tracker}:${s.type}:${s.range}${scope}${y}${avg}${size}${
+  return `chart:${s.key}:${s.tracker}:${s.type}:${s.range}${scope}${y}${avg}${sum}${size}${
     title ? `|${title}` : ""
   }`;
 }

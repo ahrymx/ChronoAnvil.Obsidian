@@ -297,7 +297,19 @@ describe("what draws two series, and what withholds the average", () => {
 
   it("reads the second tracker the same way the scatter does", () => {
     expect(render).toContain("renderLineOrBar(inner, points, partner)");
-    expect(render).toContain("collectPoints(app, plugin, args.def2, scope)");
+    // THE CHART'S REDUCTION TRAVELS WITH IT (1.0.57). Both series bucket the
+    // same way because the bucket belongs to the chart, so the partner is read
+    // with `args.reduce` exactly as the first series is.
+    //
+    // BOTH CALL SITES COUNTED, not one found. There are two — the line's
+    // partner and the scatter's Y — and an assertion that the string appears
+    // somewhere passes while one of them is still reading the tracker's field:
+    // measured, as a surviving mutant, before it was written this way.
+    const partnered = [
+      ...render.matchAll(/collectPoints\(app, plugin, args\.def2, scope, args\.reduce\)/g),
+    ];
+    expect(partnered.length).toBe(2);
+    expect(render).not.toContain("collectPoints(app, plugin, args.def2, scope)");
   });
 
   it("aligns the two over the union of their dates", () => {

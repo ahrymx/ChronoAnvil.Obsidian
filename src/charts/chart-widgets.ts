@@ -228,6 +228,9 @@ export function buildChartCell(
     period: spec.range === "period" ? period : null,
     body,
     avg: spec.avg,
+    // The chart's own reduction, read from the directive rather than from the
+    // tracker — 1.0.57; see ChartSpec.reduce.
+    reduce: spec.reduce,
     def2,
   });
 }

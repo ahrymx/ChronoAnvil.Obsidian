@@ -22,7 +22,13 @@ import {
 } from "chart.js";
 import type { ChartConfiguration } from "chart.js";
 import type ChronoAnvilPlugin from "../main";
-import type { ChartRange, ChartScope, ChartType, TrackerDef } from "../trackers/trackers";
+import type {
+  ChartRange,
+  ChartReduce,
+  ChartScope,
+  ChartType,
+  TrackerDef,
+} from "../trackers/trackers";
 import { CLASS_DEFS, diaryClassOf } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
 import {
@@ -275,7 +281,13 @@ export function collectPoints(
   app: App,
   plugin: ChronoAnvilPlugin,
   def: TrackerDef,
-  scope: ChartScope = "daily"
+  scope: ChartScope = "daily",
+  // How a month's days collapse, for `daily-by-month` and nothing else.
+  // ASKED OF THE CALLER, NOT OF THE TRACKER, as of 1.0.57 — the chart that
+  // wants the bucket is the only thing that knows whether it wants a total
+  // (see ChartSpec.reduce). Absent means mean, which is `bucketByMonth`'s own
+  // default and what every other scope ignores.
+  reduce?: ChartReduce
 ): ChartPoint[] {
   // `daily-by-month` READS DAILY and buckets on the way out — the compound is
   // an output granularity, not a folder — so it resolves to the daily grain
@@ -302,7 +314,7 @@ export function collectPoints(
     if (date == null) continue;
     out.push({ date, value });
   }
-  return scope === "daily-by-month" ? bucketByMonth(out, def.reduce) : out;
+  return scope === "daily-by-month" ? bucketByMonth(out, reduce) : out;
 }
 
 // Read a CSS custom property off an element's computed style, with a fallback so
@@ -1137,6 +1149,8 @@ export interface RenderChartOptions {
   scope?: ChartScope;
   // line-only: overlay a rolling average.
   avg?: boolean;
+  // `daily-by-month` only: total a month's days rather than averaging them.
+  reduce?: ChartReduce;
   // scatter-only: the Y-axis tracker (def is X).
   def2?: TrackerDef;
 }
@@ -1270,7 +1284,7 @@ export function renderTrackerChart(args: RenderChartOptions): ChartTeardown {
   const widenForTrend = scope === "daily" && (type === "line" || type === "bar");
   const win =
     args.window ?? resolveChartWindow(range, period, widenForTrend, args.today);
-  const all = collectPoints(app, plugin, def, scope);
+  const all = collectPoints(app, plugin, def, scope, args.reduce);
   const points = pointsInWindow(all, win);
 
   const inner: RenderArgs = {
@@ -1298,7 +1312,13 @@ export function renderTrackerChart(args: RenderChartOptions): ChartTeardown {
       const partner = args.def2
         ? {
             def: args.def2,
-            points: pointsInWindow(collectPoints(app, plugin, args.def2, scope), win),
+            points: pointsInWindow(
+              // THE SAME REDUCTION AS THE FIRST SERIES, because the bucket is
+              // the chart's and both series are drawn against one axis — see
+              // ChartSpec.reduce for why there is no second token.
+              collectPoints(app, plugin, args.def2, scope, args.reduce),
+              win
+            ),
           }
         : undefined;
       return renderLineOrBar(inner, points, partner);
@@ -1316,7 +1336,10 @@ export function renderTrackerChart(args: RenderChartOptions): ChartTeardown {
         body.setText("This scatter has no second tracker — edit it to pick one.");
         return null;
       }
-      const ys = pointsInWindow(collectPoints(app, plugin, args.def2, scope), win);
+      const ys = pointsInWindow(
+        collectPoints(app, plugin, args.def2, scope, args.reduce),
+        win
+      );
       return renderScatter(inner, pairPoints(points, ys));
     }
     case "streak":
