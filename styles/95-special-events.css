@@ -2313,9 +2313,13 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
 /* Zebra rather than rules between rows. A dated line can wrap to two or three
    lines while its neighbour is one, so a hairline leaves the eye guessing which
    text belongs to which date; a band is unambiguous at any row height. Very low
-   alpha — this is a reading aid, not a table. */
+   alpha — this is a reading aid, not a table.
+
+   THE MIX ITSELF MOVED TO `--ca-zebra` (1.0.63), where the Habits section's
+   bands read it too. Two lists banded by two copies of one magic number is the
+   shape that later disagrees with itself about what a band is. */
 .ca-jer-day:nth-child(even) {
-  background: color-mix(in srgb, var(--text-normal) 4%, transparent);
+  background: var(--ca-zebra);
 }
 /* The date is the link, and the rollup's only affordance: a derived page sends
    you to the entry to change it, never writes into itself. Fixed width and

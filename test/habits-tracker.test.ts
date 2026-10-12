@@ -2002,6 +2002,82 @@ describe("the section itself", () => {
     expect(cssRules(".ca-habits-name::after")).toHaveLength(0);
   });
 
+  it("bands alternate rows, in one box and not in cells", () => {
+    // *"Give both columns / the whole surface zebra pattern rows."*
+    //
+    // A `display: contents` ROW HAS NO BOX AND CANNOT BE PAINTED, which is the
+    // whole of the problem: every row's cells are the LIST's grid items, which
+    // is the 1.0.31 fix and is what keeps the day letters over the dots they
+    // name. Subgrid gives the row its box back without taking the tracks away —
+    // the same move `94-native-tables.css` made for the record tables.
+    const sub = cssRules(".ca-habits-row");
+    expect(sub).toHaveLength(2);
+    // THE FALLBACK IS YESTERDAY'S LAYOUT. Outside `@supports` the row is still
+    // `display: contents` and simply has no band.
+    expect(sub[0]).toContain("display: contents");
+    expect(sub[1]).toContain("grid-template-columns: subgrid;");
+    // SPANNING EVERY COLUMN, or the band stops at the name.
+    expect(sub[1]).toContain("grid-column: 1 / -1;");
+    // AND THE BAND IS ON THE ROW, NEVER ON THE CELLS. The column gap falls
+    // BETWEEN tracks, so painted cells would draw a band with a slit down it at
+    // every track boundary — a zebra that reads as a rendering fault.
+    expect(cssRules(".ca-habits-row > *")).toHaveLength(0);
+    expect(cssRule(".ca-habits-row:nth-child(odd)")).toContain(
+      "background: var(--ca-zebra)"
+    );
+    // THE HEADS ROW IS CHILD 1, so the odd children are the SECOND habit row,
+    // the fourth, and so on — a zebra that begins with a band under the first
+    // row reads as a selection. `column` draws the heads whether or not there
+    // is a week (1.0.62), which is what makes that true on a weekly entry too.
+    expect(cssRules(".ca-habits-row:nth-child(even)")).toHaveLength(0);
+    expect(cssRules(".ca-habits-heads:nth-child(odd)")).toHaveLength(0);
+    const col = code.slice(
+      code.indexOf("function column("),
+      code.indexOf("function drawBoolRow")
+    );
+    expect(col).toContain('createDiv({ cls: "ca-habits-heads" })');
+    // THE ROW GAP BECOMES THE ROW'S OWN PADDING, or the bands are a column of
+    // pills with 2px of unpainted list between them.
+    expect(cssRules(".ca-habits-list").at(-1)).toContain("row-gap: 0");
+    expect(sub[1]).toContain("padding-block: 2px");
+  });
+
+  it("paints both zebras from one token, declared on `body`", () => {
+    // TWO LISTS BANDED BY TWO COPIES OF ONE MAGIC NUMBER is the shape that
+    // later disagrees with itself about what a band is. The events rollup has
+    // banded its days since 4.62 with this exact mix; 1.0.63 made it a token
+    // and pointed both at it.
+    expect(cssRule(".ca-jer-day:nth-child(even)")).toContain(
+      "background: var(--ca-zebra)"
+    );
+    // NEITHER BAND SPELLS THE MIX ITSELF ANY MORE — which is the whole claim,
+    // and it is about the two ZEBRAS and not about the value. The same 4% of
+    // the ink is written twice more in this plugin, on `.ca-journal-bar-chip`
+    // and `.jc-yearnav`, and both must keep it: those are control SURFACES —
+    // *"a shade above the recessed band it sits on, so the pill reads as a
+    // control resting on the navigator rather than a hole cut into it"* — and a
+    // token that unified a band with a chip would have to be moved for one of
+    // them one day. One number, two decisions.
+    for (const rule of [
+      cssRule(".ca-jer-day:nth-child(even)"),
+      cssRule(".ca-habits-row:nth-child(odd)"),
+    ]) {
+      expect(rule).not.toContain("color-mix(");
+    }
+    // ON `body` AND NOT `:root` (4.42). It is a mix over `--text-normal`, which
+    // is a theme colour — and Obsidian declares its colours on `body`, so the
+    // same token on `:root` resolves to nothing and every band draws
+    // `currentColor`. `tokens.test.ts` holds the general rule; this is the
+    // reading that would have broken.
+    expect(cssRule("body")).toContain("--ca-zebra:");
+    expect(cssRule(":root")).not.toContain("--ca-zebra:");
+    // A READING AID, NOT A TABLE: 4% of the ink is legible as a band and
+    // illegible as a fill, so a row nobody selected cannot look selected.
+    expect(cssRule("body")).toContain(
+      "--ca-zebra: color-mix(in srgb, var(--text-normal) 4%, transparent)"
+    );
+  });
+
   it("keeps the habit names off the column divider", () => {
     // *"Fix number columns margin so tracker titles are not pressed up against
     // the column's dividing line."* The gutter was `--ca-space-2`, and this

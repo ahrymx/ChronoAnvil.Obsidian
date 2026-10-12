@@ -999,6 +999,21 @@ body {
      selector matches. The reader ruled that out; the tint is on the filled
      strip cells and nowhere else. A property only this card reads cannot reach
      a rule that was never told about it. */
+  /* ── a zebra band (1.0.63) ────────────────────────────────────────────
+     THE ONE ANSWER TO "WHAT A BANDED ROW IS PAINTED WITH", and it was written
+     twice before it was a token: the events rollup's day list has banded its
+     rows since 4.62 with this exact mix, and the Habits section's two columns
+     now do the same. A reading aid and not a table, which is what the alpha
+     says — 4% of the text colour is legible as a band and illegible as a
+     fill, so a row nobody has selected cannot be mistaken for one they have.
+
+     OVER `--text-normal` RATHER THAN A SURFACE, so it lands the same way in
+     both schemes: the band is a shade of the ink, which is dark on a light
+     theme and light on a dark one without a second declaration.
+
+     HERE AND NOT ON `:root`, for the reason at the head of this block. */
+  --ca-zebra: color-mix(in srgb, var(--text-normal) 4%, transparent);
+
   --ca-hrollup-grain: var(--interactive-accent);
 
   /* ── the grid's own surfaces (1.0.19) ─────────────────────────────────

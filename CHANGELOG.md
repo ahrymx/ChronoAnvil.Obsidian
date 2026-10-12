@@ -5,6 +5,16 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.63] - 2026-10-12
+
+### Changed
+
+- **The Habits section bands its rows.** Every other row in each column takes a
+  faint tint across its whole width, so a habit's name, its control and the week
+  beside it read as one line. The band is the same one the events rollup's day
+  list has used since 4.62, and both now read it from one token rather than from
+  two copies of one number.
+
 ## [1.0.62] - 2026-10-12
 
 ### Changed

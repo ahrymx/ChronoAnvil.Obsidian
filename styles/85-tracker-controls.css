@@ -1025,6 +1025,57 @@
   }
 }
 
+/* ── BANDED ROWS (1.0.63) ─────────────────────────────────────────────────
+
+   *"Give both columns / the whole surface zebra pattern rows."*
+
+   A `display: contents` ROW HAS NO BOX, so it cannot be painted — which is the
+   whole of the problem and the reason this block exists. Everything above
+   depends on the row having no box: each list is ONE grid and every row's cells
+   are the list's own items, which is the 1.0.31 records-table fix and is what
+   keeps the day letters over the dots they name.
+
+   SUBGRID GIVES THE ROW ITS BOX BACK WITHOUT TAKING THE TRACKS AWAY. A subgrid
+   does not size tracks; it uses its parent's — so the row is one element
+   spanning every column, paintable in one piece, while the name, the reading
+   and the week are still measured against the heads and against each other by
+   the one grid that holds them all. `94-native-tables.css` made this exact move
+   for the record tables in 1.0.31 and states the argument at length.
+
+   AND THE BAND COVERS THE GAPS, which painting the cells would not. The column
+   gap falls BETWEEN tracks, so `.ca-habits-row > *` would have drawn a band
+   with a 4px slit down it at every track boundary — a zebra that looks like a
+   rendering fault. One box has no slits in it.
+
+   THE ROW GAP GOES AND BECOMES THE ROW'S OWN PADDING. Bands either side of 2px
+   of unpainted list read as a column of pills rather than as a zebra; the same
+   two pixels inside the row are the air the text needs. Declared after the
+   container queries so it outranks the 360px `gap` above, which is a shorthand
+   and would otherwise put the row gap back at phone width.
+
+   THE HEADS ROW IS CHILD 1, so the banded children are the odd ones: the second
+   habit row, the fourth, and so on. A zebra that begins with a band under the
+   FIRST row reads as a selection rather than as a stripe, and `column` has
+   drawn the heads whether or not there is a week since 1.0.62 — which is what
+   makes "child 1" true on a weekly entry too. */
+@supports (grid-template-columns: subgrid) {
+  .ca-habits-list {
+    row-gap: 0;
+  }
+  .ca-habits-heads,
+  .ca-habits-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    align-items: center;
+    align-self: stretch;
+    padding-block: 2px;
+  }
+  .ca-habits-row:nth-child(odd) {
+    background: var(--ca-zebra);
+  }
+}
+
 /* ── THE HABITS ROLLUP (1.0.55) ────────────────────────────────────────────
 
    THE PERIOD'S SIDE OF THE SAME FEATURE, which is why it is here and not in a

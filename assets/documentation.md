@@ -264,7 +264,8 @@ grid instead. Add **Habits** from *Edit sections…* → **Trackers** on a diary
 entry and the same habits are drawn full width below the banner, in **two
 columns**: the yes/no ones on the left and the numbers on the right, with a rule
 between them. Each column is named over its first row, opposite the day letters
-— **Booleans** and **Units** — and a column that has nothing in it is not drawn
+— **Booleans** and **Units** — rows are **banded** so a name and the week beside
+it read as one line, and a column that has nothing in it is not drawn
 at all, so a vault whose habits are all yes/no sees one full-width list, and on
 a narrow card the two stack.
 
