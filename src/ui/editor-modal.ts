@@ -103,8 +103,35 @@ export abstract class EditorModal extends Modal {
     // narrow: a textarea needs Enter for newlines (emoji maps, note kinds),
     // and a <button> or <select> already has its own Enter behaviour — so
     // Enter on Cancel must cancel, not save.
+    //
+    // ── AND ONLY IF NOBODY ELSE WANTED IT (1.0.59) ─────────────────────
+    //
+    // A FIELD THAT CALLED `preventDefault()` ON ENTER HAS CLAIMED THE
+    // KEYSTROKE, and this listener must not then submit the window on top of
+    // whatever that field just did. `preventDefault` rather than
+    // `stopPropagation` is the signal because it is the one every such field
+    // already sends: the add boxes in the habits, tags and attachment-category
+    // windows, those three windows' rename fields, and the arrangement
+    // window's template name all call it, each because Enter there means
+    // something specific and local.
+    //
+    // WITHOUT THIS, EVERY ONE OF THOSE WAS ALSO A SAVE. Adding a habit with
+    // Enter added it and then closed the window, which merely looked brisk —
+    // until 1.0.56 gave the add row four fields instead of one. A reader
+    // defining a number habit types its name, tabs to "Least", types 0 and
+    // presses Enter: before this, that keystroke reached here having added
+    // NOTHING (the shape boxes had no handler of their own until 1.0.58) and
+    // saved a draft nobody had touched. The window shut and said *"Nothing to
+    // change — this entry's habits are as they were"*, which is how a number
+    // habit became a thing that could not be created. A Yes/No habit never met
+    // it, because the name box is the only box there is for one.
+    //
+    // Enter from a field nobody claimed still submits, which is the gesture
+    // this listener exists for and is what every ordinary one-field window
+    // here relies on.
     contentEl.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
+      if (e.defaultPrevented) return;
       const target = e.target;
       if (!(target instanceof HTMLInputElement)) return;
       // Checkboxes and radios use Enter/Space for their own toggling; every

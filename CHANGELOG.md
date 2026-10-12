@@ -5,6 +5,26 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.59] - 2026-10-12
+
+### Fixed
+
+- **A number habit still could not be created, and the cause was not in the
+  Habits window at all.** Every editor window in ChronoAnvil submits on Enter
+  from a single-line field, and it did so *even when the field had just handled
+  Enter itself*. So Enter in an add box added the thing and then saved and
+  closed the window on top of it — which merely looked brisk while the add row
+  had one field, and became "it does nothing" once the row grew four: a reader
+  defining a number habit types its name, tabs to **Least**, types `0` and
+  presses Enter, and the window saved a draft nobody had touched and shut,
+  reporting *"Nothing to change — this entry's habits are as they were"*. A
+  Yes/No habit never met it, because the name box is the only box there is for
+  one. Enter now adds the habit and **leaves the window open**, and the cursor
+  goes back to the name field so the next one can be typed straight away.
+- The same keystroke was ending the sitting in the **Tags** and **Attachment
+  categories** windows, and after renaming anything in any of the three. Adding
+  a tag no longer saves and closes the window behind it.
+
 ## [1.0.58] - 2026-10-12
 
 ### Fixed

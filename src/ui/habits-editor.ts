@@ -89,6 +89,15 @@ export class HabitsEditor extends EditorModal {
   private pendingMin = "";
   private pendingMax = "";
   private pendingUnit = "";
+  // Whether the next repaint should put the cursor back in the add field.
+  //
+  // SET ONLY BY AN ADD, and it matters now in a way it did not before 1.0.59:
+  // until then Enter in the add box added the habit and then saved and closed
+  // the window, so there was no "next" to put a cursor in. With the window
+  // staying open, a reader naming three habits in a row would otherwise have
+  // to reach for the mouse between each one — `renderBody` empties the body,
+  // and the element that had focus goes with it.
+  private focusAdd = false;
   // Which habit is open for renaming, or null. One at a time, for the reason
   // the tags window gives: two open editors over one list is a merge conflict
   // a reader cannot see.
@@ -513,6 +522,7 @@ export class HabitsEditor extends EditorModal {
           habitRowFor(known, trackerDirective(known.id))
         );
         this.pending = "";
+        this.focusAdd = true;
         this.renderBody();
         return;
       }
@@ -576,6 +586,7 @@ export class HabitsEditor extends EditorModal {
       this.pendingMin = "";
       this.pendingMax = "";
       this.pendingUnit = "";
+      this.focusAdd = true;
       this.renderBody();
     };
 
@@ -630,6 +641,15 @@ export class HabitsEditor extends EditorModal {
       cls: "ca-habits-note",
       text: "A new habit is added to Settings → Trackers and put on this entry. Existing entries are untouched. A number habit's step, and anything else about it, is in Settings.",
     });
+
+    // AFTER THE PAINT, not during it: this runs inside `renderBody`, and the
+    // element is not in the document until the call that asked for the repaint
+    // has returned. The rename field focuses itself the same way and for the
+    // same reason.
+    if (this.focusAdd) {
+      this.focusAdd = false;
+      window.setTimeout(() => input.focus(), 0);
+    }
   }
 
   // ── what the folder logs ────────────────────────────────────────────────
