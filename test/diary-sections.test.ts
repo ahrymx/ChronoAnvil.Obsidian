@@ -813,6 +813,9 @@ describe("a dashboard holds page widgets", () => {
       "entry-rollup",
       "open-tasks",
       "charts",
+      // `habit-rollup` the same way (1.0.55): composed, so already on the page
+      // this test starts from.
+      "habit-rollup",
       "w:events#1",
     ]);
     // A second run has nothing left to return, which is what makes idempotence

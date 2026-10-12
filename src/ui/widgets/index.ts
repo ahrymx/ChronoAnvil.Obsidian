@@ -14,6 +14,7 @@ import type ChronoAnvilPlugin from "../../main";
 import { buildYearSummary } from "../../review/year-view";
 import { buildQuarterSummary } from "../../review/quarter-view";
 import { buildPeriodRecap } from "../../review/recap-view";
+import { buildHabitRollup } from "./habit-rollup-view";
 import {
   buildEntryRollup,
   ROLLUP_FOLDER,
@@ -3442,6 +3443,24 @@ export class Widgets implements
             )
         );
       }
+      case "habit-rollup":
+        // LIVE OVER THE HABITS' OWN GRAIN FOLDER, which for every habit anybody
+        // has is the daily one. The widget is made of which entries exist and
+        // what they say, so it has to pass `shouldRefreshPath` — ticking a habit
+        // on today's entry must move the rate on the week's dashboard.
+        //
+        // ONE FOLDER, NOT THE GRAINS OF THE HABITS IT DRAWS. A subscription is
+        // made once, when the widget mounts, and the habits on it can change
+        // afterwards (the window is one click away) — so the scope is the folder
+        // the readings live in by construction rather than a set derived from
+        // this paint's rows. The period is resolved INSIDE the closure, for
+        // `entry-rollup`'s reason: a period-nav click re-reads it and repaints.
+        return liveScopedWidget(
+          this.plugin,
+          ctx,
+          this.plugin.settings.paths.diaryDaily,
+          () => buildHabitRollup(this.plugin, ctx, rest)
+        );
       // ONE QUESTION, ONE WIDGET, TWO SPELLINGS (4.16 §1). `level-index` asks
       // what is below a folder and draws whichever answer it gets; `topics-table`
       // is the older word for the same question asked of the host note, and it

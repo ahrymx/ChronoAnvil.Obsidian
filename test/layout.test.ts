@@ -152,6 +152,10 @@ describe("assetUnits", () => {
       "button",
       "entry-rollup",
       "tasks-table",
+      // 1.0.55's Habits rollup, composed on every grain and last in the
+      // catalogue's body — the charts fence between them is `chronoanvil-charts`
+      // and carries no content directive, so it is no unit of its own.
+      "habit-rollup",
     ]);
   });
 

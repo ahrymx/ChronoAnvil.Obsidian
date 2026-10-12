@@ -49,6 +49,10 @@
 // dashboards had been written down as one description.
 
 import { CLASS_DEFS } from "../trackers/trackers";
+import {
+  HABIT_ROLLUP_DIRECTIVE,
+  HABIT_ROLLUP_PROBE,
+} from "../trackers/habit-rollup";
 import { DEFAULT_PATHS, HEADER_PREFIX, TRENDS_HEADING } from "../core/constants";
 import { segment } from "../core/layout";
 import {
@@ -320,6 +324,21 @@ const ROLLUP_TITLES: Record<string, string> = {
   quarter: "📖 Inside this quarter",
   year: "📖 Inside this year",
 };
+
+// The habits rollup's bar, grain-worded for `rollupBar`'s reason: it opens with
+// the period because the whole card is about this one, and "✅ Habits" on a page
+// that also carries a weekly entry's Habits section would be two cards with one
+// name. The registry's `bar` is the unworded form, which is what the widget door
+// offers where there is no grain to word it with.
+const HABIT_TITLES: Record<string, string> = {
+  week: "✅ Habits this week",
+  month: "✅ Habits this month",
+  quarter: "✅ Habits this quarter",
+  year: "✅ Habits this year",
+};
+
+const habitBar = (ctx: DiaryDashboardContext): string =>
+  `${HEADER_PREFIX}${HABIT_TITLES[noun(ctx)] ?? "✅ Habits this period"}`;
 
 const rollupBar = (ctx: DiaryDashboardContext): string =>
   `${HEADER_PREFIX}${ROLLUP_TITLES[noun(ctx)] ?? "📖 Inside this period"}`;
@@ -875,6 +894,63 @@ export const DIARY_SECTIONS: DiarySection[] = [
       lines: [`${HEADER_PREFIX}${TRENDS_HEADING.replace(/^#+\s*/, "")}`],
     }),
     locate: (text) => probe(text, /^```chronoanvil-charts/m),
+  },
+  {
+    // ── THE TRACKERS' HALF OF THE ROLLUP LADDER (1.0.55) ────────────────
+    //
+    // `recap` and `entry-rollup` aggregate the AUTHORED regions across a period
+    // — focus, highlights, challenges, goals — and nothing on any of these four
+    // pages ever aggregated a tracker. `fields.ts` says why it went that way
+    // round and the irony in it: *"Trackers have a registry … and regions had a
+    // convention that held because exactly one caller ever needed it."* The half
+    // with the registry is the half that had no rollup.
+    //
+    // AND IT DOES NOT REPLACE THE SECTION ABOVE IT. `charts` is a MANAGER of
+    // series the reader configured, and its `holds` guard exists because those
+    // specs are theirs. This section is not configured, is scoped to the period
+    // rather than to a range, and says what a habit DID — a rate, two runs, a
+    // calendar of days kept. That is the distinction
+    // `diary-dashboard-sections.ts` draws about `sleep-summary`: *"'shortest
+    // night' is an extreme rather than a trend. Neither is a line a chart
+    // draws."* Both sections ship, both are `trackers`, and a reader who wants
+    // the trend as well as the tally has them one above the other.
+    id: "habit-rollup",
+    label: "Habits rollup",
+    blurb: "Each habit's completion rate, its runs, and a mark per day of this period.",
+    icon: "✅",
+    category: "trackers",
+    // NOTHING OF THE READER'S LIVES IN IT, so no lock and no `holds`: the
+    // readings are in their entries, put there by the box on each one, and
+    // removing this section removes a view of them. The section above needs a
+    // `holds` because a chart spec exists nowhere else.
+    locked: false,
+    band: "body",
+    // EVERY GRAIN, AND THE 2.58.6 ARGUMENT DOES NOT BITE. `open-tasks` and
+    // `entry-rollup` decline a year because a year of daily rows is a page-long
+    // list nobody reads; a rate and two runs are one line however long the
+    // period is, and the strip answers the length question by grouping (see
+    // `stripCells`) rather than by growing.
+    applies: always,
+    // COMPOSED, NOT OPT-IN, which is `charts`' answer and not `tags`'. The tag
+    // cloud is withheld because four dashboards drawing one folder's tags would
+    // be one view drawn four times — four periods are four different questions
+    // about the same habits, which is the whole point of the page they are on.
+    render: (ctx, opts) => fenceBlock({
+      fence: "chronoanvil",
+      lines: [
+        ...(opts?.form === WIDGET_FORM ? [] : [habitBar(ctx)]),
+        // BARE, AND THAT IS THE MEMBERSHIP ANSWER. An empty argument means
+        // every habit the vault has, so a composed section follows the registry
+        // and the window writes a list only once a reader has chosen one. See
+        // `HabitRollupAnswer`.
+        HABIT_ROLLUP_DIRECTIVE,
+      ],
+    }),
+    questions: (ctx) => [formQuestion(habitBar(ctx), HEADER_KEYWORD)],
+    // THE KEYWORD, NOT THE ARGUMENT — this catalogue's rule, and here it is what
+    // keeps a reader who hid three habits from having a section the editor can
+    // no longer find.
+    locate: (text) => probe(text, HABIT_ROLLUP_PROBE),
   },
   {
     // TAGS ON A DASHBOARD — 3.14 §3. The section already existed on the

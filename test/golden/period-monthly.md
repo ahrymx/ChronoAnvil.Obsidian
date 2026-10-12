@@ -23,5 +23,10 @@ tasks-table:,period
 header:📊 Trends and statistics
 ```
 
+```chronoanvil
+header:✅ Habits this month
+habit-rollup
+```
+
 %% chronoanvil-graph %%
 %% [[02 - Diary|​]] %%

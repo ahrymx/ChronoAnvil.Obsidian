@@ -85,6 +85,7 @@ Directives:
 - `sleep` — the coupled Wake-Up + Bedtime control with a live asleep/awake readout; re-derives the `Sleep` property on change.
 - `sleep-summary` — sleep stats across all daily entries (average, typical times, range).
 - `tracker-stat:<tracker>` — one tracker's latest reading, its average and its streak, over a month-long density strip. The tracker is named by its id from Settings → Trackers.
+- `habit-rollup[:<habit ids>][,no-strip]` — **Habits this week/month/quarter/year**: one row per habit, with the share of the period it was kept as a ring, the current and best runs, and a mark per day underneath — filled where it was kept, hollow where it was answered no, empty where nothing was written. A year draws one mark per week instead of per day. Scoped by the host note's `week-start` / `month-start` / `quarter-start` / `year-start` property, clipped to today, so a month half gone is measured against the days that have happened. Bare, it reports every habit the vault has; the **Choose habits…** row at the foot of the card opens a window to pick which of them, put them in order, and turn the strips off. Ships on all four period dashboards.
 - `button:<action>[:arg]` — a button. Diary/chart actions: `today`, `this-month`, `new-diary`, `new-monthly`, `week-prev`/`week-this`/`week-next`, `month-prev`/`month-this`/`month-next`, `chart-add`/`chart-edit`/`chart-remove`, `tracker-add`/`tracker-remove`, `log:<trackerId>:<delta>`.
 - `button:<typeId>:<action>[:arg]` — a journal-type button, scoped to a registered type (`study` or a custom type id). Actions: `new-journal`, `new-container`/`new-topic`, `new-lesson:<folder>`, `new-practice:<folder>`, `refresh`. E.g. `button:study:new-lesson:<folder>`.
 - `entry-header[:home,week,month]` — the unified top strip: an editable title (writes the note's `title` property; empty shows the date plus an "Add a title…" hint), quick links, and a compact prev/next navigator, in one bar. Used at the top of the daily and monthly templates in place of separate links + nav rows.
@@ -268,6 +269,28 @@ removing the section puts the cell back with every chip and every reading
 intact. On a weekly entry or any other grain the rows are box and name with no
 week behind them — the box writes the property of the note you are on, and on a
 weekly entry the seven columns would be seven other notes.
+
+**The Habits rollup.** The same habits, a period at a time. It ships on all four
+period overviews — week, month, quarter and year — and it is read-only: every
+mark on it belongs to another note, so there is nothing on the card a click
+could honestly change. One row per habit: the share of the period it was kept,
+drawn as a ring and said as a percentage; the current run and the best one; and
+under them a mark per day of the period, filled where it was kept, hollow where
+you answered no, and empty where nothing was written. A year draws one mark per
+*week* instead, shaded by how much of that week was kept — a mark that means one
+day is yes or no, and a mark that means seven days has an amount.
+
+The rate is measured against the days that have **happened**, not the whole
+period, so a month half gone is not reported as half missed; the foot of the card
+says how much of the period is behind the numbers. Bare, the rollup reports every
+habit the vault has, including ones you define later. The **Choose habits…** row
+at the foot opens a window to pick which habits it reports, put them in the order
+you want to read them in, and turn the day strips off — the window's counts are
+this period's, so you can see what you are hiding before you hide it.
+
+It does not replace **Trends and statistics**. A chart draws a line over time;
+this draws a rate, two runs and a calendar of kept days, and both sit under
+*Edit sections…* → **Trackers**.
 
 ### Tracker surfaces
 

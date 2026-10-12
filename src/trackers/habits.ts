@@ -60,10 +60,18 @@ import {
 //
 // `null` IS NOT `0`, and the distinction is the reason this is not a boolean.
 // A habit nobody answered today is not a habit answered "no" — the streak
-// charts count runs of `1`, the completion summary divides by the days that
-// were ANSWERED, and `Diary.base` shows an empty cell rather than a tidy zero.
-// `wireHabit`'s cycle has always been three-state; this is that parse, lifted
-// out of it so the window reads a value exactly as the chip does.
+// charts count runs of `1`, `Diary.base` shows an empty cell rather than a tidy
+// zero, and the rollup's strip draws the unanswered day instead of closing the
+// gap up. `wireHabit`'s cycle has always been three-state; this is that parse,
+// lifted out of it so the window reads a value exactly as the chip does.
+//
+// WHAT A RATE DIVIDES BY IS A SEPARATE QUESTION, and this comment used to
+// answer it wrongly — "divides by the days that were ANSWERED". The rollup
+// divides by the days that have ELAPSED (`HabitRollupRow.rate`), which is the
+// only denominator a reader can check: 23 of 31 is a month they can count, and
+// 23 of 23 would report a perfect month to somebody who logged three weeks and
+// stopped. `written` is kept beside it so the card can still say how much of
+// the period was filled in at all.
 export type HabitState = 1 | 0 | null;
 
 // What a frontmatter value means as a habit reading.

@@ -296,6 +296,10 @@ describe("a dashboard reorders too", () => {
     // exactly what 4.53.2 fixed on the other surface.
     expect(detectDiarySections(next, { grain: "monthly" })).toEqual([
       ...head,
+      // `habit-rollup` is composed last (1.0.55, after `charts`), so a reversal
+      // puts it first under the banner — which is the whole point of the
+      // assertion being a list and not a count.
+      "habit-rollup",
       "charts",
       "entry-rollup",
       "open-tasks",
@@ -782,8 +786,20 @@ describe("the pin restricts the editor without relocating anyone's file", () => 
     // summary "moving" from index 3 to index 2 is the row passing it, which is
     // what the reorder was asked to do.
     //
-    // The property is about SLOTS: three body blocks, the outer two trade, and
-    // the summary is left in the middle exactly where the author put it.
+    // The property is about SLOTS: the body blocks trade around the summary,
+    // which is left in the author's own slot rather than dragged to an end.
+    //
+    // ── AND THE REVERSAL IS NOT SATISFIABLE BLOCK-FOR-BLOCK (1.0.55) ───
+    //
+    // `want` above is built by index over the flat id list, which was the same
+    // thing as a block reversal while the body held one row and two singletons.
+    // It is not any more: `entry-rollup` and `open-tasks` are one block and the
+    // reversal asks for them in opposite halves of the file, with the summary
+    // between. The row cannot come apart, so the writer keeps it whole and the
+    // two singletons it displaced land above the summary instead of one. What
+    // is asserted below is that resolution, and the thing that would be WRONG
+    // is the row splitting — which is 4.53.2's defect, and is what this
+    // expectation is here to catch.
     const blocks = (t: string): string[][] =>
       parseDiarySections(t, { grain: "monthly" })
         .filter((r) => r.sectionIds.length)
@@ -793,9 +809,14 @@ describe("the pin restricts the editor without relocating anyone's file", () => 
       ["entry-rollup", "open-tasks"],
       ["summary"],
       ["charts"],
+      // FOUR body blocks since 1.0.55, and the summary is no longer the middle
+      // one — which is why the property below is stated as "the summary keeps
+      // its slot" rather than as an index.
+      ["habit-rollup"],
     ]);
     expect(blocks(next!)).toEqual([
       ["banner"],
+      ["habit-rollup"],
       ["charts"],
       ["summary"],
       ["entry-rollup", "open-tasks"],

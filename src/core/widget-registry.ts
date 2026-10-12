@@ -674,6 +674,31 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     // that sentence is the add list disagreeing with the widget.
     needs: "period",
   },
+  "habit-rollup": {
+    label: "Habits rollup",
+    glyph: "✅",
+    // NOT "✅ Habits", WHICH IS THE ENTRY SECTION'S (1.0.54). Two keywords may
+    // share a title as far as `SECTION_TITLES` is concerned — it is keyed by
+    // keyword — but a reader meeting both on one vault would have two cards with
+    // one name, one of which writes to the note it is on and one of which
+    // cannot. The catalogue words it per grain beside this (`HABIT_TITLES`), the
+    // way `entry-rollup` does; this is the string the widget door offers.
+    bar: "✅ Habits this period",
+    blurb:
+      "Each habit's completion rate, current and best run, and a mark per day of this period.",
+    category: "trackers",
+    // IT REFUSES, IN ITS OWN WORDS, and the sentence is `entry-rollup`'s
+    // because the argument is the same one: this widget's whole scope is "the
+    // dashboard's period", so a trailing-window fallback would draw a
+    // plausible, unrelated set of days. Offering it on a page that can only
+    // ever draw that refusal is the add list disagreeing with the widget.
+    needs: "period",
+    // AND NO `arg`, WHICH IS THE ONE PLACE IT PARTS FROM `tracker-stat`. That
+    // widget names ONE tracker because mood and kilometres do not add; this one
+    // reports every habit, and WHICH of them is a list and an order — two
+    // answers no `WidgetArg` kind can hold. They are the window's
+    // (`HabitRollupEditor`), behind the door at the foot of the card.
+  },
   "period-recap": {
     label: "Period recap",
     glyph: "📝",

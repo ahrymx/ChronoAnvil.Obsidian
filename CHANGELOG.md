@@ -5,6 +5,47 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.55] - 2026-10-12
+
+### Added
+
+- **The Habits rollup: a tracker section for the period overviews.** The week,
+  month, quarter and year dashboards have always rolled up what you *wrote* —
+  focus, highlights, challenges, goals — and never what you *tracked*. This is
+  the other half. Each habit gets a row: the share of the period it was kept,
+  drawn as a ring and said as a percentage; its current run and its best one;
+  and under them a mark per day of the period, filled where you kept it, hollow
+  where you answered no, and empty where nothing was written. It ships on all
+  four overviews under *Edit sections…* → **Trackers**.
+- **A year draws one mark per week** instead of 365 per row, shaded by how much
+  of that week you kept — a mark that means one day is yes or no, and a mark
+  that means seven days has an amount. The groups are seven days from the
+  period's own start, so every mark covers the same span.
+- **The rate is measured against the days that have happened**, not the whole
+  period, so a month half gone is not reported as half missed. The foot of the
+  card says how much of the period is behind the numbers.
+- **It is read-only, on purpose.** Every mark on it belongs to another note —
+  thirty of them on a month — so there is nothing on the card a click could
+  honestly change. The box that writes a habit is still on the entry it writes
+  to.
+- **A window for choosing what it reports.** The **Choose habits…** row at the
+  foot of the card opens the Tags window's shape: a tick per habit with this
+  period's count beside it, arrows to put them in the order you want to read
+  them in, and one switch for the day strips. Left alone, the rollup reports
+  every habit your vault has — including one you define next month, which is why
+  ticking all of them writes nothing to the note rather than writing the list
+  out.
+- **The days a habit was kept are counted as days, not as readings.** A habit
+  kept on Monday and again on Friday is a run of one, not of two — the rollup
+  reads every day of the period including the empty ones, which is also what
+  lets the strip draw the gaps instead of closing them up.
+
+### Fixed
+
+- **The Habits rollup does not replace Trends and statistics**, and neither is
+  removed from any dashboard. A chart draws a line over time; this draws a rate,
+  two runs and a calendar of kept days. Both sit in **Trackers**.
+
 ## [1.0.54] - 2026-10-11
 
 ### Added

@@ -632,6 +632,11 @@ describe("the editor cannot learn which surface it is on", () => {
       // carried since 4.59.
       "diary dashboard/entry-rollup",
       "diary dashboard/open-tasks",
+      // 1.0.55's Habits rollup asks the one question every bar-carrying
+      // dashboard section asks: whether it is drawn as a section or as a widget
+      // in a row. Nothing else about it is a choice the editor can hold — which
+      // habits it reports is a list and an order, and those are the window's.
+      "diary dashboard/habit-rollup",
       "diary dashboard/tags",
       "diary entry/banner",
       // AND SEVEN MORE ON THE ENTRY IN 1.0.42 — *"I think the diary sections

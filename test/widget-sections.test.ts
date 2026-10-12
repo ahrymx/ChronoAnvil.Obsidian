@@ -937,7 +937,9 @@ describe("one door, six surfaces (5.26)", () => {
     Object.values(WIDGETS).filter((w) => w.needs).length;
 
   it("offers the registry, less what each catalogue already claims", () => {
-    expect(Object.keys(WIDGETS).length).toBe(32);
+    // Thirty-three since 1.0.55 added `habit-rollup`, which `needs: "period"` —
+    // so the registry grew by one and FREE did not move at all.
+    expect(Object.keys(WIDGETS).length).toBe(33);
     expect(FREE).toBe(29);
 
     const rows: [string, SectionModel, number][] = [
@@ -999,8 +1001,17 @@ describe("one door, six surfaces (5.26)", () => {
     // be welded into a banner either, because the weld list names the SECTION
     // `pages`. A journal leaf supplies `pages` and claims the keyword with that
     // section; no other surface does either.
+    //
+    // `habit-rollup` IS THE FOURTH, and it is the plainest of them: a completion
+    // rate over a period has no period to be over on a note that declares none.
+    // Its own dashboard catalogue claims the keyword, so it too is free nowhere.
     const needy = Object.keys(WIDGETS).filter((k) => WIDGETS[k].needs);
-    expect(needy).toEqual(["entry-rollup", "period-nav", "pages-table"]);
+    expect(needy).toEqual([
+      "entry-rollup",
+      "habit-rollup",
+      "period-nav",
+      "pages-table",
+    ]);
     const models: SectionModel[] = [
       homeSectionModel(DEFAULT_PATHS.diary),
       searchSectionModel(),

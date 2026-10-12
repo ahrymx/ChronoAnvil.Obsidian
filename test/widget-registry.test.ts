@@ -123,7 +123,7 @@ describe("every entry is drawable", () => {
   //
   // SPELLED OUT rather than asserted loosely, on `needs`' own reasoning two
   // tests down: a reader of the diff sees which subject a new widget joined.
-  it("files all thirty-two widgets under six of the seven subjects", () => {
+  it("files all thirty-three widgets under six of the seven subjects", () => {
     const count: Record<string, number> = {};
     for (const spec of Object.values(WIDGETS)) {
       count[spec.category] = (count[spec.category] ?? 0) + 1;
@@ -132,7 +132,9 @@ describe("every entry is drawable", () => {
       diary: 11,
       journals: 6,
       tasks: 4,
-      trackers: 4,
+      // FIVE SINCE 1.0.55: the Habits rollup, which is the first widget in this
+      // subject that is scoped to a PERIOD rather than to the vault.
+      trackers: 5,
       finding: 6,
       structure: 1,
     });
@@ -162,7 +164,15 @@ describe("every entry is drawable", () => {
       .filter(([, spec]) => spec.needs !== undefined)
       .map(([k]) => k)
       .sort();
-    expect(needy).toEqual(["entry-rollup", "pages-table", "period-nav"]);
+    // `habit-rollup` JOINED IN 1.0.55 and for `entry-rollup`'s exact reason:
+    // its scope is the dashboard's period, so a surface that declares none can
+    // only ever draw its refusal.
+    expect(needy).toEqual([
+      "entry-rollup",
+      "habit-rollup",
+      "pages-table",
+      "period-nav",
+    ]);
   });
 
   it("says what each needy widget does when the need is unmet", () => {

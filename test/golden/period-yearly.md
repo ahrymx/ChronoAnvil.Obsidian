@@ -21,5 +21,10 @@ period-recap:year
 header:📊 Trends and statistics
 ```
 
+```chronoanvil
+header:✅ Habits this year
+habit-rollup
+```
+
 %% chronoanvil-graph %%
 %% [[02 - Diary|​]] %%

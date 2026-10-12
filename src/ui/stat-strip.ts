@@ -40,6 +40,43 @@ export interface StatCell {
   sub: HTMLElement;
 }
 
+// ── the ring, said once (1.0.55) ──────────────────────────────────────────
+//
+// TWO CALLERS NOW, AND THAT IS WHY IT IS A FUNCTION. A stats cell draws its
+// ring inside a `ca-stat`; the Habits rollup draws one per ROW, outside a cell
+// entirely. A second path pair written out in another file is the thing that
+// drifts — a viewBox in one place and a stroke width in the other, and two
+// rings that do not match on one page. Extracted unchanged, and `statStrip`
+// below now calls it rather than holding a copy.
+//
+// THE PATH IS A CONSTANT because it was written out twice in the original: the
+// background and the value are the same circle, and a circle that disagreed
+// with itself would show as a ring whose fill followed a different arc.
+const RING_PATH =
+  "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831";
+
+export function statRing(parent: HTMLElement, ratio: number): void {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 36 36");
+  svg.setAttribute("class", "ca-stat-ring-svg");
+
+  const bgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  bgPath.setAttribute("class", "ca-stat-ring-bg");
+  bgPath.setAttribute("d", RING_PATH);
+
+  const valPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  valPath.setAttribute("class", "ca-stat-ring-val");
+  // CLAMPED TO THE PATH. A dash array longer than the circle draws a second
+  // lap, and a negative one draws nothing while reading as a bug in the data.
+  const pct = Math.min(Math.max(Math.round(ratio * 100), 0), 100);
+  valPath.setAttribute("stroke-dasharray", `${pct}, 100`);
+  valPath.setAttribute("d", RING_PATH);
+
+  svg.appendChild(bgPath);
+  svg.appendChild(valPath);
+  parent.appendChild(svg);
+}
+
 // The grid, and the cells it made.
 //
 // THE COUNT IS AN ATTRIBUTE, NOT AN INLINE CUSTOM PROPERTY, and the first cut
@@ -68,31 +105,7 @@ export function statStrip(
     const root = grid.createDiv({ cls: "ca-stat" });
     if (c.ratio != null || c.icon) {
       const ringWrap = root.createDiv({ cls: "ca-stat-ring-wrap" });
-      if (c.ratio != null) {
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 36 36");
-        svg.setAttribute("class", "ca-stat-ring-svg");
-
-        const bgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        bgPath.setAttribute("class", "ca-stat-ring-bg");
-        bgPath.setAttribute(
-          "d",
-          "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-        );
-
-        const valPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        valPath.setAttribute("class", "ca-stat-ring-val");
-        const pct = Math.min(Math.max(Math.round(c.ratio * 100), 0), 100);
-        valPath.setAttribute("stroke-dasharray", `${pct}, 100`);
-        valPath.setAttribute(
-          "d",
-          "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-        );
-
-        svg.appendChild(bgPath);
-        svg.appendChild(valPath);
-        ringWrap.appendChild(svg);
-      }
+      if (c.ratio != null) statRing(ringWrap, c.ratio);
       if (c.icon) {
         ringWrap.createSpan({ cls: "ca-stat-ring-icon", text: c.icon });
       }
