@@ -263,9 +263,10 @@ for one reading and the wrong box for a list of them — so habits can leave the
 grid instead. Add **Habits** from *Edit sections…* → **Trackers** on a diary
 entry and the same habits are drawn full width below the banner, in **two
 columns**: the yes/no ones on the left and the numbers on the right, with a rule
-between them. A column that has nothing in it is not drawn at all, so a vault
-whose habits are all yes/no sees one full-width list, and on a narrow card the
-two stack.
+between them. Each column is named over its first row, opposite the day letters
+— **Booleans** and **Units** — and a column that has nothing in it is not drawn
+at all, so a vault whose habits are all yes/no sees one full-width list, and on
+a narrow card the two stack.
 
 A yes/no row is **its name, which is its toggle** — press the name to cycle
 unset → done → not-done, with a small ✓ / ✗ / · in front of it saying which —
@@ -273,7 +274,8 @@ and **the week it sits in** behind it: a filled dot is a day you marked done, a
 ring is a day you marked not-done, and a small faint dot is a day with nothing
 recorded — which covers both a day you have no entry for and a day whose habit
 you did not answer; hovering says which.
-A number row is its name, **its reading**, and the same week drawn as **bars**,
+A number row is its name and a colon, **its reading** beside it, and the same
+week drawn as **bars**,
 each one's height measured against that week's own least and greatest reading
 — so a week between 3 km and 4 km is still a readable shape rather than seven
 bars of one length. A day with no reading draws no bar, just a faint baseline
@@ -284,10 +286,12 @@ cell's **+** does.
 
 The reading is a button — the figure and its unit together, or **—** where
 nothing is recorded — and pressing it opens a small window with a number field,
-the unit beside it and the habit's range in the subtitle. **Enter** saves.
-Typing a number outside that range is refused rather than quietly rounded into
-it, and **leaving the field empty clears the reading**, which is the one thing
-the +/− stepper it replaced could never do.
+the unit beside it, **−** and **+** either side stepping by that habit's own
+step, and the habit's range in the subtitle. **Enter** saves. A press of − or +
+stops at the range's end, as the grid's stepper does; typing a number outside
+that range is refused rather than quietly rounded into it; and **leaving the
+field empty clears the reading**, which is the one thing a stepper alone could
+never do.
 
 While the section is on the note **every habit leaves the grid**, both kinds, so
 the two are never both drawn and the grid closes up around the space. Nothing in

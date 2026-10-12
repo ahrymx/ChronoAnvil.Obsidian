@@ -47,7 +47,11 @@ import {
   sparkFraction,
   sparkHeight,
 } from "../src/ui/widgets/habits-section";
-import { boundsNote, readingText } from "../src/ui/habit-reading-window";
+import {
+  boundsNote,
+  readingText,
+  stepReading,
+} from "../src/ui/habit-reading-window";
 import { monthGrid } from "../src/diary/diary-link";
 import { entryPath } from "../src/diary/lineage";
 import { DEFAULT_PATHS } from "../src/core/constants";
@@ -1964,6 +1968,56 @@ describe("the section itself", () => {
     expect(cssRule(".ca-habits-toggle")).toContain("min-width: 0");
   });
 
+  it("left-aligns the toggle and sizes its surface to the name", () => {
+    // *"Booleans should be left side aligned not centred and the surface should
+    // grow depending on the tracker's text length."* Two faults, one
+    // declaration each, and the first is the one worth recording: the button is
+    // a FLEX container, so `text-align: start` positions nothing — the items
+    // are placed by `justify-content`, which was never set and whose initial
+    // value a plain Obsidian `<button>` does not keep.
+    const rule = cssRule(".ca-habits-toggle");
+    expect(rule).toContain("justify-content: flex-start");
+    // AND THE SURFACE IS THE NAME'S. A grid item stretches to its track, so
+    // four habits of four lengths drew four identical full-width bars.
+    expect(rule).toContain("justify-self: start");
+    // WITH A CEILING, so the one name too long for the column still ellipses
+    // instead of taking the week off the card.
+    expect(rule).toContain("max-width: 100%");
+    // ONE RULE, NOT TWO. A second `.ca-habits-toggle` block is the shape that
+    // later disagrees with itself about the reset above.
+    expect(cssRules(".ca-habits-toggle")).toHaveLength(1);
+  });
+
+  it("marks a number habit's name with a colon, and no boolean's", () => {
+    // *"Number trackers should have a colon, then the number and unit button."*
+    // PUNCTUATION AND NOT CONTENT: the name is also the row's tooltip and the
+    // window's heading, and `Reading:` is not what that habit is called — so it
+    // is drawn by the stylesheet and never written into the text node.
+    expect(cssRule(".ca-habits-row-number .ca-habits-name::after")).toContain(
+      'content: ":"'
+    );
+    expect(numRow()).not.toContain('`${name}:`');
+    // AND THE BOOLEAN COLUMN TAKES NONE — its name is a control, and a colon
+    // after a thing you press labels something that is not there.
+    expect(cssRules(".ca-habits-name::after")).toHaveLength(0);
+  });
+
+  it("keeps the habit names off the column divider", () => {
+    // *"Fix number columns margin so tracker titles are not pressed up against
+    // the column's dividing line."* The gutter was `--ca-space-2`, and this
+    // scale's unit is 2px — four pixels either side of a border, which reads as
+    // an underline on the text beside it rather than as a divider.
+    expect(cssRule(".ca-habits-col")).toContain(
+      "padding-inline: var(--ca-space-4)"
+    );
+    expect(cssRule(".ca-habits-col")).not.toContain(
+      "padding-inline: var(--ca-space-2)"
+    );
+    // AND THE COLLAPSE STILL CLOSES IT. A stacked pair has no divider beside
+    // the columns, so a gutter there is indent for nothing.
+    expect(cssRules(".ca-habits-col")[1]).toContain("padding-inline: 0");
+  });
+
   // ── THE READING IS THE DOOR (1.0.61) ───────────────────────────────────
   it("opens a window on the reading, and repaints from its save", () => {
     const row = numRow();
@@ -2009,10 +2063,52 @@ describe("the section itself", () => {
     );
     const before = col.slice(0, col.indexOf('cls: "ca-habit-week"'));
     expect(before.match(/heads\.createSpan/g)).toHaveLength(2);
-    expect(before).toContain('heads.createSpan({ cls: "ca-habits-name" })');
     expect(before).toContain(
       'if (kind === "number") heads.createSpan({ cls: "ca-habits-pad" })'
     );
+  });
+
+  it("names each column in its head, in the reader's own two words", () => {
+    // *"Label each column on the left side (opposite weekday letters) as
+    // Booleans/Units."* The head cell in front of the day letters used to be an
+    // empty span holding its place in the grid, and nothing on the card said
+    // what the split down the middle of it was.
+    const col = code.slice(
+      code.indexOf("function column("),
+      code.indexOf("function drawBoolRow")
+    );
+    expect(col).toContain('cls: "ca-habits-name ca-habits-head-name"');
+    expect(col).toContain('text: kind === "boolean" ? "Booleans" : "Units"');
+    // IN THE NAME'S TRACK, which is what "opposite the weekday letters" means
+    // in a grid: the label keeps `.ca-habits-name` so it lands in the same
+    // track every habit's name does, and takes a second class for its own size.
+    expect(cssRule(".ca-habits-head-name")).toContain("var(--text-muted)");
+    expect(cssRule(".ca-habits-head-name")).toContain(
+      "font-size: var(--ca-text-2xs)"
+    );
+  });
+
+  it("draws the heads row, and the week's track, only when there is a week", () => {
+    // A LAYOUT DEFECT OLDER THAN THE LABELS. A non-daily entry gets rows and no
+    // strip, and `column` used to return before building the heads at all —
+    // while the grid's template still carried a week track nothing filled. Auto
+    // placement runs on, so the second row's name landed in the first row's
+    // empty week column and the list drew in zigzag.
+    const col = code.slice(
+      code.indexOf("function column("),
+      code.indexOf("function drawBoolRow")
+    );
+    // THE LABEL IS NOT THE WEEK'S, so the early return moved BELOW the heads.
+    const heads = col.indexOf('createDiv({ cls: "ca-habits-heads" })');
+    const bail = col.indexOf("if (!week.length) return list;");
+    const strip = col.indexOf('cls: "ca-habit-week"');
+    expect(heads).toBeGreaterThan(0);
+    expect(bail).toBeGreaterThan(heads);
+    expect(strip).toBeGreaterThan(bail);
+    // ONE DECISION, NOT TWO. The class is set from the same `week.length` the
+    // strip is drawn from, so a template with a track and a row without a cell
+    // for it cannot drift apart.
+    expect(col).toContain('list.toggleClass("has-week", week.length > 0)');
   });
 
   it("normalises a bar over the week's own range, flat weeks included", () => {
@@ -2095,11 +2191,33 @@ describe("the section itself", () => {
     // three tracks survived. Measured, which is the only way that shape is
     // ever found — `vacuous-sweep-rule`'s first shape, on a declaration
     // instead of a class name.
+    //
+    // AND THE WEEK IS A TRACK ONLY WHEN THERE IS A WEEK (1.0.62). Four
+    // templates, not two: a non-daily entry draws no strip, and a template
+    // carrying a track nothing fills wraps the next row's first cell into it.
     expect(cssRule(".ca-habits-list.is-boolean")).toContain(
+      "grid-template-columns: minmax(0, 1fr);"
+    );
+    expect(cssRule(".ca-habits-list.is-boolean.has-week")).toContain(
       "grid-template-columns: minmax(0, 1fr) auto;"
     );
+    // THE NUMBER'S NAME TRACK IS `max-content` (1.0.62), which is what puts the
+    // reading against its own name instead of against the strip: *"number
+    // trackers should have a colon, then the number and unit button, aligned on
+    // the left side"*. The slack moved to the reading's track, and
+    // `.ca-habits-reading` is justified to the start of it.
     expect(cssRule(".ca-habits-list.is-number")).toContain(
-      "grid-template-columns: minmax(0, 1fr) auto auto;"
+      "grid-template-columns: minmax(0, max-content) minmax(0, 1fr);"
+    );
+    expect(cssRule(".ca-habits-list.is-number.has-week")).toContain(
+      "grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;"
+    );
+    expect(cssRule(".ca-habits-reading")).toContain("justify-self: start;");
+    // `minmax(0, …)` AND NOT BARE `max-content`: a grid item's automatic
+    // minimum is its content, so a habit named at length would push the strip
+    // off the card rather than ellipsing.
+    expect(cssRule(".ca-habits-list.is-number")).not.toContain(
+      "grid-template-columns: max-content"
     );
     // AND STILL ONE GRID PER LIST, with the row carrying no tracks of its own.
     expect(cssRule(".ca-habits-list")).toContain("display: grid");
@@ -2231,6 +2349,95 @@ describe("the reading window's own shape", () => {
     // broke it.
     expect(code).not.toContain("keydown");
     expect(readSrc("editor-modal")).toContain("if (e.defaultPrevented) return;");
+  });
+
+  it("steps by the definition's own step, and clamps where typing is refused", () => {
+    // *"Number edit window should have the plus/minus buttons which increment
+    // in the step."* They left the ROW in 1.0.61 and stay gone from it; a
+    // window has room for both, and the two readings are different gestures —
+    // `7.5` is typed, one more page is pressed.
+    const def = (over: Record<string, unknown> = {}) =>
+      ({ id: "x", label: "X", type: "number", ...over }) as never;
+    expect(stepReading(3, 1, def())).toBe(4);
+    expect(stepReading(3, -1, def())).toBe(2);
+    // THE STEP COMES OFF THE DEFINITION, which is the whole of the ask.
+    expect(stepReading(3, 1, def({ step: 0.5 }))).toBe(3.5);
+    expect(stepReading(3, -1, def({ step: 5 }))).toBe(-2);
+    // A PRESS CLAMPS WHERE A TYPED NUMBER IS REFUSED — `buildStepper`'s rule,
+    // and not an inconsistency: a `+` past the ceiling has no other answer and
+    // the reader watches the number stop.
+    expect(stepReading(10, 1, def({ max: 10 }))).toBe(10);
+    expect(stepReading(0, -1, def({ min: 0 }))).toBe(0);
+    // NOTHING RECORDED STEPS FROM THE BASE, which is `buildStepper`'s
+    // `known ?? def.min ?? 0` — a habit stepped here and stepped in the 66px
+    // grid must land on the same number.
+    expect(stepReading(null, 1, def())).toBe(1);
+    expect(stepReading(null, 1, def({ min: 5 }))).toBe(6);
+    // AND SO DOES A GARBLED FIELD. `parsed()` answers NaN for text that is not
+    // a number, and `NaN + 1` is a reading nothing downstream can use.
+    expect(stepReading(NaN, 1, def())).toBe(1);
+    // ROUNDED AT THE SIXTH DECIMAL, because `0.1 + 0.2` is not `0.3` and a
+    // habit counted in tenths would collect a tail of noughts in frontmatter.
+    expect(stepReading(0.1, 1, def({ step: 0.2 }))).toBe(0.3);
+  });
+
+  it("keeps the same arithmetic the 66px grid's stepper does", () => {
+    // ONE OPINION ABOUT WHAT A STEP IS. Asserted against `buildStepper`'s own
+    // source, because the defect this guards is the two drifting apart — a
+    // habit that reads 10 after a press here and 10.000000001 after one there.
+    const stepper = readCode("controls");
+    expect(stepper).toContain("if (def.min != null) clamped = Math.max(def.min, clamped)");
+    expect(stepper).toContain("if (def.max != null) clamped = Math.min(def.max, clamped)");
+    expect(stepper).toContain("Math.round(clamped * 1e6) / 1e6");
+    expect(stepper).toContain("(known ?? def.min ?? 0) - step");
+    // SLICED TO THE FUNCTION. `fnBodyOf` above is the member slicer and this is
+    // a top-level export, and a slice that ran to end of file would be
+    // satisfied by the class below it — 1.0.51's survivor, which is why the
+    // end is `export class` and is checked for having been found.
+    const start = code.indexOf("export function stepReading");
+    const end = code.indexOf("export class HabitReadingWindow");
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    const mine = code.slice(start, end);
+    expect(mine).toContain("def.min ?? 0");
+    expect(mine).toContain("def.step ?? 1");
+    expect(mine).toContain("Math.max(def.min, next)");
+    expect(mine).toContain("Math.min(def.max, next)");
+    expect(mine).toContain("Math.round(next * 1e6) / 1e6");
+  });
+
+  it("gives the field its focus back after a press", () => {
+    // THE PROMISE THIS KEEPS IS ENTER. The frame submits on Enter from a
+    // single-line field, so a press that left focus on the button would make
+    // the next Enter press `+` again instead of saving — which is the one
+    // gesture 1.0.59 exists to have got right.
+    //
+    // SLICED TO THE HANDLER: `box.focus()` is called twice in this window, here
+    // and in the initial `setTimeout`, so a sweep of the whole function would
+    // be satisfied by the call that was not mutated — `vacuous-sweep-rule`'s
+    // third shape, measured on this very file in 1.0.61.
+    const from = code.indexOf("for (const [btn, dir] of");
+    const to = code.indexOf("window.setTimeout(");
+    expect(from).toBeGreaterThan(0);
+    expect(to).toBeGreaterThan(from);
+    const handler = code.slice(from, to);
+    expect(handler).toContain("this.draft = String(stepReading(this.parsed(), dir, this.def))");
+    expect(handler).toContain("box.value = this.draft");
+    expect(handler).toContain("this.clearError()");
+    expect(handler).toContain("box.focus()");
+    // BOTH BUTTONS, AND THEY BRACKET THE READING — `buildStepper`'s own order,
+    // where the unit sits inside the value between the two.
+    const down = code.indexOf("this.stepButton(row, -1)");
+    const unit = code.indexOf('cls: "ca-habit-reading-unit"');
+    const up = code.indexOf("this.stepButton(row, 1)");
+    expect(down).toBeGreaterThan(0);
+    expect(up).toBeGreaterThan(unit);
+    expect(unit).toBeGreaterThan(down);
+    // AND THEY ARE NOT 30px PILLS beside a 28px box — `obsidian-button-height`.
+    const rule = cssRule(".ca-habit-reading-step");
+    expect(rule).toContain("height: auto");
+    expect(rule).toContain("min-height: 0");
+    expect(code).toContain('attr: { type: "button"');
   });
 
   it("puts the unit beside the field and not inside it", () => {

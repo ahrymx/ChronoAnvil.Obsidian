@@ -547,9 +547,16 @@
 .ca-habits-pair.is-single {
   grid-template-columns: 1fr;
 }
+/* THE GUTTER EITHER SIDE OF THE DIVIDER (widened 1.0.62). It was
+   `--ca-space-2`, and the scale's unit is 2px — so four pixels, which put the
+   second column's habit names hard against the rule: *"fix number columns
+   margin so tracker titles are not pressed up against the column's dividing
+   line"*. A divider needs air on both sides or it reads as an underline on the
+   text beside it. `--ca-space-4` is 8px here and 10px on the touch scale,
+   which is the same decision `.ca-jld-pair` made for the same border. */
 .ca-habits-col {
   min-width: 0;
-  padding-inline: var(--ca-space-2);
+  padding-inline: var(--ca-space-4);
 }
 .ca-habits-col:first-child {
   padding-inline-start: 0;
@@ -578,17 +585,44 @@
    THEY ARE SEPARATE GRIDS AND ALWAYS WERE — see the head of
    `habits-section.ts` — so differing track lists is not the 1.0.31 bug. That
    bug is rows WITHIN one list sizing their own tracks, which is why each list
-   stays one grid with `display: contents` rows. */
+   stays one grid with `display: contents` rows.
+
+   ── WHERE THE SLACK GOES, AND WHEN THERE IS A WEEK AT ALL (1.0.62) ──
+
+   THE NUMBER'S NAME TRACK IS `max-content` AND THE SLACK MOVED TO THE READING.
+   It was `minmax(0, 1fr)`, which put every reading button hard against the
+   right-hand strip with a hand's width of nothing between it and the name it
+   belongs to: *"number trackers should have a colon, then the number and unit
+   button, aligned on the left side"*. A `max-content` track is as wide as the
+   longest name in the column and no wider, so the colons line up down the
+   column and each button sits against its own name. `minmax(0, …)` keeps the
+   floor at zero, so a name longer than the card still ellipses rather than
+   pushing the strip off the edge — the same reason `1fr` was never written
+   bare here.
+
+   AND THE WEEK IS A TRACK ONLY WHEN THERE IS A WEEK. A non-daily entry draws
+   the rows and no strip (`buildHabitsSection` says why), and a template with a
+   track nothing fills is not harmless in a `display: contents` grid: auto
+   placement simply runs on, so the second row's name landed in the first row's
+   empty week column and the list drew in zigzag. `has-week` is set by `column`
+   from the same `week.length` the strip itself is drawn from, which is what
+   keeps the template and the cells one decision. */
 .ca-habits-list {
   display: grid;
   align-items: center;
   gap: 2px var(--ca-space-2);
 }
 .ca-habits-list.is-boolean {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ca-habits-list.is-boolean.has-week {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 .ca-habits-list.is-number {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+}
+.ca-habits-list.is-number.has-week {
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
 }
 .ca-habits-heads,
 .ca-habits-row {
@@ -602,6 +636,33 @@
   white-space: nowrap;
 }
 
+/* ── THE COLUMN'S OWN NAME (1.0.62) ──────────────────────────────────────
+
+   *"Label each column on the left side (opposite weekday letters) as
+   Booleans/Units."* It sits in the heads row, in the name's track, directly
+   opposite the seven day letters — so it takes the day letters' own size and
+   colour. A head is not a habit: it reads as part of the rule over the list
+   rather than as the first row of it, which is the whole reason it is not
+   simply `.ca-habits-name` with text in it. */
+.ca-habits-head-name {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+  line-height: 1;
+}
+
+/* ── THE COLON (1.0.62) ──────────────────────────────────────────────────
+
+   *"Number trackers should have a colon, then the number and unit button."*
+   PUNCTUATION AND NOT CONTENT, so it is here and not in the text node: the
+   name is also the row's tooltip and the window's heading, and `Reading:` is
+   not what that habit is called. The boolean column takes none — its name is a
+   control, and a colon after a thing you press reads as a label for something
+   that is not there. */
+.ca-habits-row-number .ca-habits-name::after {
+  content: ":";
+  color: var(--text-muted);
+}
+
 /* ── THE NAME, AS THE TOGGLE (1.0.61) ────────────────────────────────────
 
    A `<button>` HOLDING THE MARK AND THE NAME, and the grid item is the button.
@@ -612,8 +673,29 @@
    `min-width: 0` BECAUSE THE BUTTON IS NOW THE TRACK'S ITEM. A grid item's
    automatic minimum is its content, so without this a long habit name pushes
    the week off the card instead of ellipsing — `.ca-habits-name` keeps the
-   ellipsis, which only works if what contains it is allowed to be narrow. */
+   ellipsis, which only works if what contains it is allowed to be narrow.
+
+   ── THE SURFACE IS THE NAME'S, NOT THE COLUMN'S (1.0.62) ──────────────
+
+   *"Booleans should be left side aligned not centred and the surface should
+   grow depending on the tracker's text length."* Two faults, one rule each.
+
+   `justify-content` AND NOT `text-align`, which is what was wrong. The button
+   is a flex container as of 1.0.61, and `text-align: start` on a flex container
+   positions nothing — the items are placed by `justify-content`, whose initial
+   value a plain Obsidian `<button>` does not keep. So the mark and the name sat
+   centred in a full-width button while the declaration meant to left-align them
+   was being honoured and had nothing to align.
+
+   `justify-self: start` IS THE SURFACE. A grid item stretches to its track by
+   default, so every button was the width of the name column whatever its name
+   said — four identical bars down a card of four habits of different lengths.
+   `max-width: 100%` keeps the ellipsis reachable for the one name too long for
+   the column, which is the case `min-width: 0` above exists for. */
 .ca-habits-toggle {
+  justify-content: flex-start;
+  justify-self: start;
+  max-width: 100%;
   height: auto;
   min-height: 0;
   min-width: 0;
@@ -670,8 +752,15 @@
 
    IT READS AS A VALUE AND PRESSES AS A CONTROL: tabular figures so a column of
    readings lines up, a hairline border so there is something to aim at, and the
-   same height reset every chip-shaped button in this plugin needs. */
+   same height reset every chip-shaped button in this plugin needs.
+
+   `justify-self: start` (1.0.62) IS THE OTHER HALF OF THE TRACK CHANGE ABOVE.
+   The slack in a number row now sits in the reading's own track, so without
+   this the button would stretch across it — the gap between a name and its
+   value the reader asked to close, drawn as a very wide button instead of as
+   empty space. */
 .ca-habits-reading {
+  justify-self: start;
   height: auto;
   min-height: 0;
   padding: 1px 6px;
@@ -818,6 +907,34 @@
 .ca-habit-reading-field {
   width: 8em;
   flex: 0 0 auto;
+}
+
+/* ── THE STEP BUTTONS (1.0.62) ───────────────────────────────────────────
+
+   SQUARE, AND THE SAME HEIGHT AS THE FIELD THEY BRACKET. `obsidian-button-height`
+   again: the first three declarations are the reset, and a control that skips
+   them is a 30px pill beside a 28px box — the mismatch that reads as a broken
+   row rather than as a tall button. The glyphs are `−` and `+`, the same pair
+   `.ca-journal-step-btn` draws in the 66px grid, because they are the same
+   gesture at two sizes. */
+.ca-habit-reading-step {
+  height: auto;
+  min-height: 0;
+  padding: 2px 0;
+  width: 2em;
+  flex: 0 0 auto;
+  box-shadow: none;
+  border: var(--ca-rule-hair) solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-xs);
+  background: none;
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: var(--ca-text-sm);
+  line-height: 1;
+}
+.ca-habit-reading-step:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
 }
 .ca-habit-reading-unit {
   color: var(--text-muted);

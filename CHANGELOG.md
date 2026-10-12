@@ -5,6 +5,32 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.62] - 2026-10-12
+
+### Changed
+
+- **Each Habits column is named.** **Booleans** and **Units** sit over the first
+  row of each list, opposite the day letters, so the rule down the middle of the
+  card says what it divides.
+- **A yes/no habit's name sits at the left of its row, on a surface its own
+  width.** It was centred in a button as wide as the column, which drew four
+  identical bars down a card of four habits of different lengths.
+- **A number habit reads `Name: 5 pages`.** The name takes a colon and the
+  reading sits against it, instead of at the far right of the row with a hand's
+  width of nothing between them.
+- **The reading window has − and + again**, stepping by that habit's own step
+  and stopping at its range, beside the field that still takes a typed number.
+  Pressing one puts the cursor back in the field, so **Enter** still saves.
+- **Room either side of the column divider**, so a habit's name in the right
+  column is no longer pressed against the rule.
+
+### Fixed
+
+- **A Habits section on a weekly, monthly, quarterly or yearly entry drew its
+  rows in zigzag.** Those entries get no week strip, but the list's grid still
+  reserved a column for one, so every second row's name was placed in the empty
+  week column of the row above it.
+
 ## [1.0.61] - 2026-10-12
 
 ### Changed

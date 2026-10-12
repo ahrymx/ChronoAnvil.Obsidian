@@ -277,6 +277,27 @@ export function buildHabitsSection(
 // control IS its name, so that side is two tracks and the number's — name,
 // reading, week — is three. They are separate grids and always were, for the
 // reason at the head of this file, so they are free to differ.
+//
+// ── AND EACH COLUMN IS NAMED (1.0.62) ─────────────────────────────────────
+//
+// *"Label each column on the left side (opposite weekday letters) as
+// Booleans/Units."* The head cell in front of the day letters was an empty
+// span holding its place in the grid, and the card said nowhere at all what
+// the split down the middle of it was — a reader meeting two lists of habit
+// names had to infer the rule from the controls at the end of each row.
+//
+// THE READER'S OWN TWO WORDS, and short ones for a reason: the label sits
+// opposite seven single letters in a half-width column, and "Number habits"
+// would wrap and take the day letters down with it.
+//
+// THE HEAD ROW NOW DRAWS WITHOUT A WEEK, which also fixes a layout defect
+// older than the labels. A non-daily entry gets rows and no strip — see
+// `buildHabitsSection` — and `column` used to return before making the heads
+// at all. The grid's track list did not know that, so every row's cells were
+// placed against a template with a week track in it and the second row's name
+// landed in the first row's leftover column. `has-week` is how the template
+// follows the content, and the heads row is drawn either way because the
+// label is not the week's.
 function column(
   pair: HTMLElement,
   kind: "boolean" | "number",
@@ -286,15 +307,20 @@ function column(
   const list = pair
     .createDiv({ cls: "ca-habits-col" })
     .createDiv({ cls: `ca-habits-list is-${kind}` });
-  if (!week.length) return list;
+  list.toggleClass("has-week", week.length > 0);
 
   const heads = list.createDiv({ cls: "ca-habits-heads" });
   // THE CELLS A HEAD HAS NOTHING TO PUT IN, one per track in front of the
   // strip. Present rather than skipped: the row is a grid and a strip that
   // landed in the name's track would sit over the names instead of the marks —
   // and the count has to match the kind, or the letters are off by a column.
-  heads.createSpan({ cls: "ca-habits-name" });
+  // The first of them is no longer empty; it is the column's name.
+  heads.createSpan({
+    cls: "ca-habits-name ca-habits-head-name",
+    text: kind === "boolean" ? "Booleans" : "Units",
+  });
   if (kind === "number") heads.createSpan({ cls: "ca-habits-pad" });
+  if (!week.length) return list;
   const strip = heads.createDiv({ cls: "ca-habit-week" });
   for (const day of week) {
     const head = strip.createSpan({
