@@ -1092,12 +1092,12 @@
    "trackers"` and neither replaces the other.
 
    ONE GRID, AND IT IS THE LIST — 1.0.31's records-table fix for the third
-   time, and 1.0.54's section is the second. `auto auto minmax(0, 1fr) auto`
-   (ring, rate, name, counts) declared ONCE on `.ca-hrollup-list` with every
-   row `display: contents`, so the four rings line up down the card and the
-   names all start in the same place. The same tracks on each row AS ITS OWN
-   grid sizes each `auto` track to that row's own content: "100%" and "8%" are
-   different widths, so every name would begin somewhere else.
+   time, and 1.0.54's section is the second. The tracks are declared ONCE on
+   `.ca-hrollup-list` (see the block below for what they are) with every row
+   `display: contents`, so the figures line up down the card and the names all
+   start in the same place. The same tracks on each row AS ITS OWN grid sizes
+   each `auto` track to that row's own content: "100%" and "8%" are different
+   widths, so every name would begin somewhere else.
 
    `minmax(0, 1fr)` AND NOT `1fr` on the name, for the reason the section
    records: a grid item's automatic minimum is its content, so a long habit
@@ -1107,9 +1107,28 @@
   flex-direction: column;
   gap: var(--ca-space-2);
 }
+/* ── THE TRACKS (1.0.64) ──────────────────────────────────────────────────
+
+   `auto minmax(0, max-content) minmax(0, 1fr)` — figure, name, sub — where it
+   was `auto auto minmax(0, 1fr) auto` with the ring first and the sub last.
+
+   THE SUB FOLLOWS THE NAME IT DESCRIBES. Pinned to the right edge it sat three
+   hundred pixels from the habit it was counting, with a void between them: the
+   eye had to cross the card and come back, on every row. The slack now falls at
+   the END of the row, where nothing is reading.
+
+   `max-content` ON THE NAME, so one column of names ends where the longest one
+   does and every sub line starts at the same place — a ragged left edge down a
+   column of counts is what stops a list of nine scanning. `minmax(0, …)` keeps
+   the floor at zero, so a long name still ellipses rather than pushing the sub
+   off the card.
+
+   AND THE RING'S TRACK IS GONE WITH THE RING. Eight rings down a card, most of
+   them drawn empty, were the largest thing on it and the least said; the strip
+   under each row draws the same proportion slot by slot. */
 .ca-hrollup-list {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
   align-items: center;
   gap: 2px var(--ca-space-2);
 }
@@ -1159,27 +1178,18 @@
   margin-top: var(--ca-space-2);
 }
 
-/* THE NUMBER ROW'S MARK IS THE QUIETER ARC (1.0.61). Both types lead with a
-   ring now, and the two rings answer different questions: a boolean's is a RATE
-   (how many slots were kept) and a number's is COVERAGE (how many have an
-   answer at all). The figure beside it says which — a percentage against a
-   total with its unit — but geometry is read first, so coverage is drawn
-   thinner and softer.
+/* A `.ca-hrollup-lead` RING USED TO SIT HERE, with an `is-cover` variant
+   drawing a number's thinner arc. 1.0.64 took the ring off the card — see the
+   track list above — so there is nothing left to size, and `statRing` is drawn
+   only by `statStrip` again. The rule that mattered is in the test suite, not
+   here: no selector of this card's may set a ring's stroke, because
+   `[data-ca-grain] .ca-stat-ring-val` is a DESCENDANT selector and a row that
+   bound the grain property by hand would repaint any ring inside it. */
 
-   NO `stroke` HERE. The ring's colour is the DASHBOARD's grain, set by
-   `[data-ca-grain] .ca-stat-ring-val` in the presets sheet, and this rule must
-   change the weight of that arc without taking its colour over. */
-.ca-hrollup-lead.is-cover .ca-stat-ring-val {
-  stroke-width: 2;
-  opacity: 0.6;
-}
-
-/* THE RATE IS SAID TWICE, ONCE AS A SHAPE AND ONCE AS A NUMBER. The ring is
-   `statStrip`'s own element — one definition, two callers, which is what
-   pulling `statRing` out of it bought — and it answers "roughly how much" at a
-   glance; the percentage beside it is the answer a reader can compare to last
-   month's. Tabular figures and a right edge, because a column of numbers that
-   does not line up is read as two columns. */
+/* THE RATE IS THE FIGURE, AND IT LEADS THE ROW. Tabular figures and a right
+   edge, because a column of numbers that does not line up is read as two
+   columns — and with the ring gone this is the first thing on every line, so
+   the alignment is doing more work than it was. */
 .ca-hrollup-pct {
   min-width: 2.6em;
   color: var(--text-normal);
@@ -1211,12 +1221,11 @@
 
 /* A NUMBER HABIT'S TOTAL USED TO LIVE HERE, in a `.ca-hrollup-total` spanning
    the ring's track and the percentage's, because a number has no rate and so
-   got no ring. 1.0.61 is the reader's reversal of that: every row now reads
-   *picture, figure, name*, the picture being the share of the period the habit
-   has an answer on — `done / slots` for a boolean, `logged / slots` for a
-   number, which `rollupLead` states and argues. So the total is simply the
-   figure, in the figure's own cell, and the `Σ` that labelled it is gone with
-   the second shape it belonged to. */
+   got no ring. 1.0.61 reversed that — every row read *picture, figure, name* —
+   and 1.0.64 took the picture off the row as well, so the total is simply the
+   figure, in the figure's own cell. `rollupFigure` is the one function that
+   says what a figure is for either type; the `Σ` that labelled the total is
+   gone with the second shape it belonged to. */
 
 /* ── THE STRIP ────────────────────────────────────────────────────────────
 
@@ -1237,7 +1246,7 @@
   grid-column: 1 / -1;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(0, 10px);
   gap: 2px;
   margin-bottom: var(--ca-space-2);
 }
@@ -1245,6 +1254,22 @@
    with no class is a day with no reading, so the gaps are drawn rather than
    closed up. A mark is a bar and not a disc because a month of discs with gaps
    between them is a dotted line, and the thing being compared is AREA. */
+/* ── A CELL HAS A CEILING (1.0.64) ────────────────────────────────────────
+
+   `minmax(0, 1fr)` SIZED A MARK BY THE CARD AND NOT BY THE CALENDAR, which is
+   the whole of *"the rollup is visually messy"*. Two slots on a week card drew
+   two slabs three hundred pixels wide; thirteen days of a quarter drew thirteen
+   bars. A mark is a mark — `10px` is its size, and the strip's LENGTH is what
+   says how long the period is.
+
+   `minmax(0, 10px)` AND NOT `10px`, so the ceiling is a ceiling and not a
+   width: ninety-two marks at ten pixels is wider than any card, and a track
+   whose maximum is fixed shares the space it actually has instead of
+   overflowing. A quarter's marks come out thin, a week's come out square, and
+   neither is stretched.
+
+   LEFT-ALIGNED BY ARITHMETIC, not by a declaration. The tracks no longer add up
+   to the row, so the leftover simply falls at the end. */
 .ca-hrollup-cell {
   height: 10px;
   min-width: 0;
@@ -1273,10 +1298,51 @@
 /* THE FOUR SHADES THE CHART STRIPS USE, so a colour means the same amount of
    activity wherever this plugin draws one. A grouped mark only — a single day
    is done or not, and shading it would invent a quantity it does not have. */
-.ca-hrollup-cell.ca-act-1 { background: var(--ca-act-1); }
-.ca-hrollup-cell.ca-act-2 { background: var(--ca-act-2); }
-.ca-hrollup-cell.ca-act-3 { background: var(--ca-act-3); }
-.ca-hrollup-cell.ca-act-4 { background: var(--ca-act-4); }
+/* ── ONE PALETTE PER CARD (1.0.64) ────────────────────────────────────────
+
+   THE FOUR SHADES ARE THE ROW'S GRAIN NOW, and this reverses the last clause of
+   1.0.61's eighth call. That round tinted a KEPT boolean mark by grain and left
+   a number's marks on the `--ca-act-*` ramp, on the argument that a shade means
+   the same amount of activity everywhere this plugin draws one. In the vault it
+   read as a fault: one list, two palettes, a daily habit orange on one line and
+   green on the next — *"the rollup is visually messy"*, and this was most of it.
+
+   A LIGHTNESS RAMP OF ONE HUE SAYS BOTH THINGS AT ONCE. The hue is the grain,
+   which is what the reader asked the colour to say; the lightness is how much,
+   which is what the ramp said. Mixed toward `transparent` rather than toward a
+   surface colour, so a card on any theme ramps toward its own background.
+
+   THE OTHER STRIPS ARE UNTOUCHED. `tracker-stat.ts`'s and the journal's read
+   `--ca-act-*` and keep it — they draw one tracker over time with no grain to
+   speak of, which is the reading the ramp was made for. */
+.ca-hrollup-cell.ca-act-1 {
+  background: color-mix(in srgb, var(--ca-hrollup-grain) 30%, transparent);
+}
+.ca-hrollup-cell.ca-act-2 {
+  background: color-mix(in srgb, var(--ca-hrollup-grain) 50%, transparent);
+}
+.ca-hrollup-cell.ca-act-3 {
+  background: color-mix(in srgb, var(--ca-hrollup-grain) 75%, transparent);
+}
+.ca-hrollup-cell.ca-act-4 {
+  background: var(--ca-hrollup-grain);
+}
+
+/* ── A SLOT NOBODY HAS REACHED (1.0.64) ───────────────────────────────────
+
+   *"The day strips should always match the dashboard period range."* So the
+   strip draws the whole month and the eighteen days left in it have to look
+   unlike the twelve that were missed — the gaps are the information, and a gap
+   in the future is not one. Fainter than the empty mark and the same size, so
+   the strip's length is still the period's and the edge between them is where
+   today is. */
+.ca-hrollup-cell.is-ahead {
+  background: color-mix(
+    in srgb,
+    var(--background-modifier-border) 40%,
+    transparent
+  );
+}
 
 /* ── THE FOOT ─────────────────────────────────────────────────────────────
 
@@ -1302,10 +1368,16 @@
    31 · streak 5 · best 9" is three facts in a line that will not truncate
    gracefully — it has no ellipsis a reader could act on — and every one of them
    is in the strip underneath, which is the thing this section exists to draw.
-   The rate and the name are what a phone-width card is for. */
+   The rate and the name are what a phone-width card is for.
+
+   TWO TRACKS AND THE NAME TAKES THE SLACK (1.0.64). The base list is
+   `auto minmax(0, max-content) minmax(0, 1fr)` — figure, name, sub — so with
+   the sub hidden a third track would hold the leftover and the name would stop
+   at its longest sibling with a void after it. `minmax(0, 1fr)` on the name
+   instead: there is nothing to its right to keep clear of. */
 @container (max-width: 360px) {
   .ca-hrollup-list {
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 2px var(--ca-space-1);
   }
   .ca-hrollup-sub {

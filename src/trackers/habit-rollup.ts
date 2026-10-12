@@ -369,14 +369,26 @@ export function habitSlots(
 // the most obvious way for a stats page to mislead"*. It was written for the
 // review dashboards' "N of M days logged" and this is the same denominator
 // question asked about one habit.
+//
+// AND `through` IS THE PERIOD ITSELF (1.0.64), which the clip has thrown away
+// since this was written. *"The day strips should always match the dashboard
+// period range"*: a strip over a month half gone drew fifteen marks and
+// stretched them across the card, so the same habit drew a different picture
+// every morning and two dashboards' strips were not comparable at all. The
+// COUNTS keep the clipped window, for the reason directly above; the strip
+// draws `start … through` and says which of its marks have not happened.
 export function rollupWindow(
   startIso: string,
   endIso: string,
   todayIso: string
-): { start: string; end: string } | null {
+): { start: string; end: string; through: string } | null {
   const cover = periodCoverage(startIso, endIso, todayIso);
   if (!cover.started) return null;
-  return { start: startIso, end: cover.partial ? todayIso : endIso };
+  return {
+    start: startIso,
+    end: cover.partial ? todayIso : endIso,
+    through: endIso,
+  };
 }
 
 export interface HabitSlotReading extends HabitSlot {
@@ -405,14 +417,28 @@ export interface HabitRollupRow {
   // Dense and in order, one per elapsed slot — which is what makes a run over
   // this array a run over the calendar. See `habitRuns`.
   slots: HabitSlotReading[];
+  // The REST of the period, in order, which nobody has lived yet (1.0.64).
+  //
+  // A SECOND LIST AND NOT A FLAG ON THE FIRST, which is the whole of the
+  // design. Every number on this row — `done`, `written`, `rate`, `logged`,
+  // `mean`, both runs — is computed over `slots`, and a reader of
+  // `slots.length` means "how much of this period has happened". Folding the
+  // unlived slots into that array would have changed all eleven of those
+  // answers at once, silently, in the direction the module's own head warns
+  // about: a month's rate measured against days nobody has reached yet.
+  //
+  // NOTHING BUT THE STRIP READS IT. These slots carry no reading because there
+  // is nothing to read — they exist so the marks can cover the period and so
+  // the strip can say where today is.
+  ahead: HabitSlot[];
   done: number;
   // Slots that have an entry, done or not. Not the rate's denominator; it is
   // what the tooltip says when the two numbers disagree.
   written: number;
   current: number;
   best: number;
-  // `done / slots.length`, and `null` for a period that has not started — a
-  // ring drawn from 0/0 is a claim about nothing.
+  // `done / slots.length`, and `null` for a period that has not started —
+  // 0/0 drawn as 0% is a claim about nothing.
   rate: number | null;
   // ── the number half, meaningless on a boolean row ──────────────────────
   //
@@ -482,7 +508,9 @@ export function habitRollupRows(
   app: App,
   paths: DiaryPaths,
   defs: readonly TrackerDef[],
-  window: { start: string; end: string } | null,
+  // `rollupWindow`'s answer: where the counts stop (`end`) and where the
+  // period does (`through`). See that function and `HabitRollupRow.ahead`.
+  window: { start: string; end: string; through: string } | null,
   // The grains the reader chose, by habit id — the window's answer, straight
   // off the directive.
   chosen: Readonly<Record<string, TrackerClass>> = {},
@@ -517,6 +545,7 @@ export function habitRollupRows(
     const grain = grainOf.get(def.id);
     if (grain == null) continue;
     const byKey = read.get(grain) ?? new Map();
+    // THE LIVED SLOTS, which every count below is measured over.
     const slots = (
       window ? habitSlots(grain, window.start, window.end) : []
     ).map((slot) => {
@@ -528,6 +557,15 @@ export function habitRollupRows(
         written: fm != null,
       };
     });
+    // AND THE REST OF THE PERIOD, BY KEY DIFFERENCE. Not `full.slice(lived)`:
+    // that would be right only while the two walks agree on their order and
+    // their start, which is true today and is an argument rather than a fact.
+    // A key is what a slot IS — `habitSlots` and `entryDateKey` meet on it —
+    // so the set difference cannot drift.
+    const livedKeys = new Set(slots.map((s) => s.key));
+    const ahead = (
+      window ? habitSlots(grain, window.start, window.through) : []
+    ).filter((s) => !livedKeys.has(s.key));
     const done = slots.filter((s) => s.state === 1).length;
     const numbers = slots
       .map((s) => s.value)
@@ -539,6 +577,7 @@ export function habitRollupRows(
       grain,
       type: habitTypeOf(def),
       slots,
+      ahead,
       done,
       written: slots.filter((s) => s.written).length,
       ...habitRuns(slots),

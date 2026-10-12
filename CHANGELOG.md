@@ -5,6 +5,28 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.64] - 2026-10-12
+
+### Changed
+
+- **A habit rollup row is a figure, a name and its counts.** The ring that led
+  every row is gone: eight of them down a quarterly card, most drawn empty, were
+  the largest thing on it, and the strip under each row already draws the same
+  proportion slot by slot.
+- **The counts follow the name they describe.** They were pinned to the right
+  edge of the card, a hand's width from the habit they were counting.
+- **A mark in the strip is a mark and not a slab.** Every mark now has a ten
+  pixel ceiling and the strip starts at the left, so the strip's *length* is how
+  long the period is — two logged weeks on a week card used to draw two bars
+  three hundred pixels wide.
+- **The strip always draws the whole period.** A month opened on its twelfth
+  drew twelve marks; it draws thirty-one, with the days nobody has reached yet
+  fainter than the days that were missed. The counts are still clipped to today,
+  so nothing a rate or a run reports has changed.
+- **Every filled mark in a strip wears its row's grain**, lighter for less. A
+  number habit's marks were on a separate four-step palette, so one card drew a
+  daily habit orange on one line and green on the next.
+
 ## [1.0.63] - 2026-10-12
 
 ### Changed

@@ -20,17 +20,16 @@
 // could honestly change. 1.0.54 wrote the daily-only rule for exactly this
 // reason and this is the other side of it.
 //
-// ONE ROW PER HABIT: a ring and a rate, the counts and the two runs, and under
-// them a strip with one mark per day of the period. The strip is the reader's
-// to turn off, and the rows are theirs to choose — see `HabitRollupEditor`,
-// behind the door at the foot of the card.
+// ONE ROW PER HABIT: a figure, the name, and the counts and the two runs, with
+// a strip under them carrying one mark per slot of the period. The strip is the
+// reader's to turn off, and the rows are theirs to choose — see
+// `HabitRollupEditor`, behind the door at the foot of the card.
 
 import type { MarkdownPostProcessorContext } from "obsidian";
 import { setIcon } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
 import { emptyCallout } from "../empty";
 import { notify } from "../../core/notify";
-import { statRing } from "../stat-strip";
 import { periodCoverage, plural, today } from "../../core/util";
 import { formatPeriodLabel } from "../../charts/charts";
 import { resolvePeriodBounds } from "../../charts/chart-widgets";
@@ -77,6 +76,10 @@ interface StripCell {
   // A single-slot cell says done / not done / nothing, which is 1.0.54's
   // vocabulary; a grouped cell has a density instead. One mark cannot mean both.
   single: boolean;
+  // A slot the period has not reached (1.0.64). NOT the same as a slot nobody
+  // wrote: the strip covers the whole period now, so without this the eighteen
+  // days left in a month would be drawn exactly like eighteen days missed.
+  ahead: boolean;
   state: HabitSlotReading["state"];
   written: boolean;
 }
@@ -87,12 +90,24 @@ interface StripCell {
 // about the chart strips — *"the gaps are the information: a strip that closed
 // up its holes would show a perfect month to somebody who logged four days"* —
 // and it is the whole reason `habitSlots` emits the empty days at all.
-export function stripCells(slots: readonly HabitSlotReading[]): StripCell[] {
+// `ahead` IS HOW MANY OF THE SLOTS AT THE END HAVE NOT HAPPENED (1.0.64), and
+// they are passed as part of one array rather than as a second one so the
+// GROUPING sees the period whole. Grouped separately, the lived half would end
+// in a stub of however many days were left in its last seven — and a three-day
+// stub shaded over three days reads as a bad week rather than as a short one,
+// which is the argument `STRIP_GROUP` is already written around. A group that
+// STRADDLES today is a lived group: it holds real readings.
+export function stripCells(
+  slots: readonly HabitSlotReading[],
+  ahead = 0
+): StripCell[] {
+  const lived = slots.length - ahead;
   if (slots.length <= STRIP_CELL_CAP) {
-    return slots.map((slot) => ({
+    return slots.map((slot, at) => ({
       ratio: slot.state === 1 ? 1 : 0,
       label: slot.label,
       single: true,
+      ahead: at >= lived,
       state: slot.state,
       written: slot.written,
     }));
@@ -104,8 +119,14 @@ export function stripCells(slots: readonly HabitSlotReading[]): StripCell[] {
     const written = group.some((s) => s.written);
     out.push({
       ratio: written ? done / group.length : null,
-      label: `${group[0].label} – ${group[group.length - 1].label}: ${done} of ${group.length}`,
+      // AN UNLIVED GROUP IS NAMED AND NOT TALLIED. "0 of 7" is a true sentence
+      // about seven days nobody has reached and a false one about this habit.
+      label:
+        at >= lived
+          ? `${group[0].label} – ${group[group.length - 1].label}`
+          : `${group[0].label} – ${group[group.length - 1].label}: ${done} of ${group.length}`,
       single: false,
+      ahead: at >= lived,
       state: null,
       written,
     });
@@ -137,8 +158,8 @@ export function slotNoun(row: HabitRollupRow): string {
   return row.slots.length === 1 ? noun : plural(noun);
 }
 
-// What a row says beside its name. The rate is drawn as the ring, so this is
-// the three facts the ring cannot carry.
+// What a row says after its name. The rate leads the row as the figure, so this
+// is the three facts the figure cannot carry.
 export function rollupSub(row: HabitRollupRow): string {
   if (!row.slots.length) return "nothing yet";
   const noun = slotNoun(row);
@@ -190,53 +211,30 @@ export function round1(value: number): string {
   return String(Math.round(value * 10) / 10);
 }
 
-// The lead cell, for either type: the proportion the ring draws, and the figure
-// printed beside it (1.0.61).
+// The figure a row leads with, for either type (1.0.61, reduced 1.0.64).
 //
 // ONE SHAPE FOR BOTH ROWS, which is the reader's call and is why this is a
-// function rather than two arms of the drawing code. Until now a boolean led
-// with a ring and a percentage and a number led with `Σ 128` spanning both of
-// their tracks — two different pictures down one card, and the Σ was a symbol
-// the card never explained. Every row now reads *picture, figure, name*.
+// function rather than two arms of the drawing code. Before 1.0.61 a boolean
+// led with a ring and a percentage and a number led with `Σ 128` spanning both
+// of their tracks — two different pictures down one card, and the Σ was a
+// symbol the card never explained.
 //
-// THE PROPORTION IS NOT `row.rate` ON A NUMBER, and this is the whole reason
-// the arithmetic is lifted out where it can be stated and mutated. `rate` is
-// `done / slots.length`, and `done` counts slots whose `state === 1` — which
-// for a number is `readHabitState` rounding the stored value to >= 0.5. A ring
-// drawn from that reports "the share of days I ran at least half a kilometre",
-// which is not a question anybody asked. `logged / slots.length` is "the share
-// of the period this habit has an answer on", which is the same question
-// `done / slots.length` asks a boolean, and it is the same pair `rollupSub`
-// already prints on each side of the card: `23 of 31` and `23 of 31 logged`.
-//
-// `null` IS A PERIOD WITH NO SLOTS, for `rate`'s own stated reason: a ring
-// drawn from 0/0 is a claim about nothing.
-export function rollupLead(row: HabitRollupRow): {
-  frac: number | null;
-  figure: string;
-} {
+// IT RETURNED A PROPORTION TOO, FOR THE RING, UNTIL 1.0.64 TOOK THE RING OFF.
+// The proportion was `logged / slots.length` on a number and emphatically not
+// `row.rate`: `rate` is `done / slots.length` and `done` counts slots whose
+// `state === 1`, which for a number means `readHabitState` rounded the stored
+// value to >= 0.5 — so a ring drawn from it reported "the share of days I ran
+// at least half a kilometre". That reasoning is kept here because the strip
+// now draws the proportion instead, slot by slot, and the next hand to want a
+// single mark back should start from it rather than from `rate`.
+export function rollupFigure(row: HabitRollupRow): string {
   if (row.type === "number") {
     const said = row.unit ? ` ${row.unit}` : "";
-    return {
-      frac: row.slots.length ? row.logged / row.slots.length : null,
-      figure: row.logged ? `${round1(row.total)}${said}` : "—",
-    };
+    return row.logged ? `${round1(row.total)}${said}` : "—";
   }
-  return {
-    frac: row.rate,
-    figure: row.rate == null ? "—" : `${Math.round(row.rate * 100)}%`,
-  };
+  return row.rate == null ? "—" : `${Math.round(row.rate * 100)}%`;
 }
 
-// Whether this row has nothing in it at all — which mutes its name and its
-// figure, and is the type's own idea of nothing (1.0.61).
-//
-// A SECOND READING OF THE 1.0.56 `is-logged` DEFECT. That one muted every
-// number habit's name on a diary entry for ever, because the contrast rule
-// keyed on `is-done` and a stepper never wears it; this card made the mirror
-// mistake, asking `row.done === 0` of a row whose `done` is "slots that rounded
-// to >= 0.5". A habit logged at 0.2 km on twenty days was drawn muted above its
-// own sub line reading `avg 0.2 km · 20 of 31 days logged`.
 export function rollupIdle(row: HabitRollupRow): boolean {
   return row.type === "number" ? row.logged === 0 : row.done === 0;
 }
@@ -270,9 +268,15 @@ export function valueRange(
 // distinction the row's own mean makes, for the same reason.
 export function numberStripCells(
   slots: readonly HabitSlotReading[],
-  unit: string | null
+  unit: string | null,
+  ahead = 0
 ): StripCell[] {
-  const range = valueRange(slots);
+  const lived = slots.length - ahead;
+  // THE RANGE IS THE LIVED SLOTS', which is the whole reason this normalises at
+  // all: an unlived slot has no value, so it would not move `lo` or `hi` — but
+  // reading the array whole would say it might, and the next hand to add a
+  // default would find out it does.
+  const range = valueRange(slots.slice(0, lived));
   const step = slots.length <= STRIP_CELL_CAP ? 1 : STRIP_GROUP;
   const said = unit ? ` ${unit}` : "";
   const out: StripCell[] = [];
@@ -293,10 +297,13 @@ export function numberStripCells(
         ? null
         : sparkFraction(mean, range.lo, range.hi),
       label:
-        mean == null
-          ? `${span}: nothing logged`
-          : `${span}: ${round1(mean)}${said}`,
+        at >= lived
+          ? span
+          : mean == null
+            ? `${span}: nothing logged`
+            : `${span}: ${round1(mean)}${said}`,
       single: false,
+      ahead: at >= lived,
       state: null,
       written: group.some((g) => g.written),
     });
@@ -311,11 +318,31 @@ function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
   // unwritten mark read "no entry for that day" on a card that had just drawn
   // thirteen of them across a quarter. `periodNoun` again — see `slotNoun`.
   const noun = CLASS_DEFS[row.grain].periodNoun;
+  // THE PERIOD, NOT THE PART OF IT THAT HAS HAPPENED (1.0.64). `row.ahead`
+  // carries the rest of it, with nothing in it to read, so that the strip's
+  // LENGTH is the period's length: seven marks on a week card and ninety-two on
+  // a quarter's, the same shape every morning rather than one mark longer.
+  const rest: HabitSlotReading[] = row.ahead.map((slot) => ({
+    ...slot,
+    state: null,
+    value: null,
+    written: false,
+  }));
+  const all = [...row.slots, ...rest];
   const cells = number
-    ? numberStripCells(row.slots, row.unit)
-    : stripCells(row.slots);
+    ? numberStripCells(all, row.unit, rest.length)
+    : stripCells(all, rest.length);
   for (const cell of cells) {
     const el = strip.createDiv({ cls: "ca-hrollup-cell" });
+    // A SLOT NOBODY HAS REACHED SAYS SO, and says it before anything else can
+    // paint it: without this the days left in the month are drawn exactly like
+    // the days that were missed, which is the misreading `rollupWindow`'s clip
+    // exists to prevent, moved from the arithmetic into the picture.
+    if (cell.ahead) {
+      el.addClass("is-ahead");
+      el.setAttr("aria-label", `${cell.label}: not yet`);
+      continue;
+    }
     if (cell.single) {
       el.toggleClass("is-done", cell.state === 1);
       el.toggleClass("is-not-done", cell.state === 0);
@@ -542,34 +569,33 @@ function drawRow(
   // attribute binding a private property reaches nothing it was not pointed at.
   el.setAttr("data-ca-row-grain", row.grain);
 
-  // ONE LEAD SHAPE FOR BOTH TYPES (1.0.61) — the mark, then the figure, then
-  // the name, on every row. `rollupLead` holds which proportion and which
-  // figure each type means.
+  // ── THE RING IS GONE (1.0.64) ───────────────────────────────────────────
   //
-  // AND THE NUMBER'S MARK IS THE QUIETER ONE. Two readings share this track: a
-  // boolean's is a RATE (of the slots, how many were kept) and a number's is
-  // COVERAGE (of the slots, how many have an answer at all). The figure beside
-  // it already tells them apart — a percentage against a total with its unit —
-  // but a reader scanning the column sees geometry first, so `is-cover` draws a
-  // thinner, softer arc. It sets no `stroke`, so the dashboard's grain still
-  // wins on colour.
-  const lead = rollupLead(row);
-  const ring = el.createDiv({ cls: "ca-stat-ring-wrap ca-hrollup-lead" });
-  ring.toggleClass("is-cover", row.type === "number");
-  statRing(ring, lead.frac ?? 0);
-  el.createSpan({ cls: "ca-hrollup-pct", text: lead.figure });
+  // Eight of them down a card, most drawn empty, was the largest thing on it
+  // and the least said: *"the row becomes figure, name, sub — and the strip
+  // under it is already the picture"*. It drew a PROPORTION, and the strip
+  // under it draws the same proportion slot by slot, which is strictly more.
+  //
+  // `rollupLead` WENT WITH IT, down to `rollupFigure`. Its `frac` had exactly
+  // one reader — the ring — and a function returning a number nothing reads is
+  // how a later hand concludes the number must matter.
+  const figure = rollupFigure(row);
+  el.createSpan({ cls: "ca-hrollup-pct", text: figure });
   const noun = slotNoun(row);
   const said =
     row.type === "number"
       ? row.logged
-        ? `${row.label} — ${lead.figure} over ${label}, logged on ${row.logged} of ${row.slots.length} ${noun}`
+        ? `${row.label} — ${figure} over ${label}, logged on ${row.logged} of ${row.slots.length} ${noun}`
         : `${row.label} — nothing logged for ${label}`
       : row.rate == null
         ? `${row.label} — nothing logged for ${label}`
-        : `${row.label} — ${lead.figure} of ${label}, ${row.written} of ${row.slots.length} ${noun} written`;
-  ring.setAttr("aria-label", said);
-  ring.setAttr("title", said);
-  el.createSpan({ cls: "ca-hrollup-name", text: row.label });
+        : `${row.label} — ${figure} of ${label}, ${row.written} of ${row.slots.length} ${noun} written`;
+  // THE SENTENCE MOVES TO THE NAME, which is where it can be read: it used to
+  // hang off the ring, and `.ca-hrollup-row` is `display: contents` and so has
+  // no box to hover.
+  const name = el.createSpan({ cls: "ca-hrollup-name", text: row.label });
+  name.setAttr("aria-label", said);
+  name.setAttr("title", said);
   el.createSpan({ cls: "ca-hrollup-sub", text: rollupSub(row) });
 
   if (strip && row.slots.length) drawStrip(el, row);

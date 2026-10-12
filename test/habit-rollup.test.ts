@@ -46,7 +46,7 @@ import {
 import {
   numberStripCells,
   rollupIdle,
-  rollupLead,
+  rollupFigure,
   rollupSeeds,
   rollupSub,
   rollupRegistry,
@@ -71,7 +71,7 @@ import {
   type TrackerClass,
   type TrackerDef,
 } from "../src/trackers/trackers";
-import { readSrc, readCode, cssRule, cssRules, fnBody } from "./sources";
+import { readSrc, readCode, readCss, cssRule, cssRules, fnBody } from "./sources";
 import { BUNDLED_ASSETS } from "../generated/bundled-assets";
 
 // A boolean tracker on one diary grain — a habit, which is what the type IS
@@ -198,9 +198,15 @@ describe("rollupWindow", () => {
     // A MONTH HALF GONE MUST NOT READ AS HALF MISSED. This is the whole reason
     // the window exists, and `periodCoverage` is both the arithmetic and the
     // argument behind it.
+    //
+    // AND `through` IS THE PERIOD ITSELF (1.0.64), which the clip used to throw
+    // away: *"the day strips should always match the dashboard period range"*.
+    // The counts stop at `end` and the strip runs to `through`, so the two
+    // readings the card makes are two fields and not one compromise.
     expect(rollupWindow(...MONTH, "2026-10-12")).toEqual({
       start: "2026-10-01",
       end: "2026-10-12",
+      through: "2026-10-31",
     });
   });
 
@@ -208,12 +214,18 @@ describe("rollupWindow", () => {
     expect(rollupWindow(...MONTH, "2026-11-04")).toEqual({
       start: "2026-10-01",
       end: "2026-10-31",
+      through: "2026-10-31",
     });
     // The last day of the period is still the period, not the day after it.
     expect(rollupWindow(...MONTH, "2026-10-31")).toEqual({
       start: "2026-10-01",
       end: "2026-10-31",
+      through: "2026-10-31",
     });
+    // A FINISHED PERIOD HAS NOTHING AHEAD OF IT, which is what makes the strip
+    // the same picture for ever once the month is over.
+    const done = rollupWindow(...MONTH, "2026-11-04");
+    expect(done?.end).toBe(done?.through);
   });
 
   it("refuses a period that has not begun", () => {
@@ -385,7 +397,7 @@ describe("habitRollupRows", () => {
     day("2026-10-07", { Read: 1, Gym: 1 }),
   ]);
 
-  const win = { start: "2026-10-01", end: "2026-10-07" };
+  const win = { start: "2026-10-01", end: "2026-10-07", through: "2026-10-07" };
   const habits = [habit("Read"), habit("Gym")];
 
   it("divides by the slots that have ELAPSED, not by the ones written", () => {
@@ -455,6 +467,68 @@ describe("habitRollupRows", () => {
     expect(floss.done).toBe(0);
     expect(floss.rate).toBe(0);
     expect(floss.slots).toHaveLength(7);
+  });
+
+  it("carries the rest of the period as a SECOND list, not as a flag", () => {
+    // ── *"THE DAY STRIPS SHOULD ALWAYS MATCH THE DASHBOARD PERIOD RANGE"* ───
+    //
+    // The reader said this twice, which is why it is a model change rather than
+    // a stylesheet one. A month opened on its twelfth drew twelve marks; it has
+    // to draw thirty-one.
+    //
+    // AND `slots` COULD NOT SIMPLY GROW TO HOLD THEM. Eleven counts on this row
+    // divide by `slots.length` — the rate, the two runs, the average, every
+    // "23 of 31" in `rollupSub` — and the module's own head is an argument that
+    // a partial period compared against a whole one is how a stats card
+    // misleads by arithmetic alone. A flag on each slot would have been the
+    // other shape and leaves all eleven of those sites to remember it.
+    const { app } = vaultOf(WEEK);
+    const [read] = habitRollupRows(app, DEFAULT_PATHS, habits, {
+      start: "2026-10-01",
+      end: "2026-10-04",
+      through: "2026-10-07",
+    });
+    // THE COUNTS STOP AT TODAY.
+    expect(read.slots).toHaveLength(4);
+    expect(read.rate).toBeCloseTo(3 / 4);
+    // AND THE STRIP'S OWN LIST CARRIES THE REMAINDER, in order, with no key in
+    // both lists — which is the arithmetic the strip concatenates on.
+    expect(read.ahead.map((s) => s.key)).toEqual([
+      "2026-10-05",
+      "2026-10-06",
+      "2026-10-07",
+    ]);
+    const lived = new Set(read.slots.map((s) => s.key));
+    expect(read.ahead.some((s) => lived.has(s.key))).toBe(false);
+    expect(read.slots.length + read.ahead.length).toBe(7);
+  });
+
+  it("has nothing ahead of it once the period is over", () => {
+    // Which is what makes the strip the same picture for ever once the month
+    // has ended — and is the case a `slots`-vs-`through` subtraction would get
+    // wrong by a day at either end.
+    const { app } = vaultOf(WEEK);
+    const [read] = habitRollupRows(app, DEFAULT_PATHS, habits, win);
+    expect(read.ahead).toEqual([]);
+    // A GRAIN COARSER THAN A DAY COUNTS ITS OWN SLOTS AHEAD, not days — the
+    // `ahead` list is `habitSlots` at the ROW's grain, like `slots` beside it,
+    // so a weekly habit on a month opened in its first week gets the three or
+    // four weeks left and not twenty-four days.
+    const [review] = habitRollupRows(
+      app,
+      DEFAULT_PATHS,
+      [habit("Review", "weekly")],
+      { start: "2026-10-01", end: "2026-10-07", through: "2026-10-31" }
+    );
+    expect(review.grain).toBe("weekly");
+    expect(review.ahead.length).toBeLessThan(5);
+    expect(review.ahead.every((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.key))).toBe(
+      true
+    );
+    // AND NOTHING AHEAD HAS A STATE. They are slots nobody has reached, so a
+    // reading on one would be a note from the future.
+    expect(review.ahead.every((s) => s.state == null)).toBe(true);
+    expect(review.ahead.every((s) => !s.written)).toBe(true);
   });
 
   it("has no slots and no rate for a period that has not started", () => {
@@ -780,6 +854,54 @@ describe("stripCells", () => {
     expect(cells).toHaveLength(53);
     expect(cells[52].ratio).toBe(1);
   });
+
+  // ── THE SLOTS NOBODY HAS REACHED (1.0.64) ───────────────────────────────
+  it("marks the tail the period has not reached, counted from the end", () => {
+    // `ahead` IS A COUNT AND NOT A PREDICATE, because the caller knows exactly
+    // how many it appended and this function already walks by index. A
+    // predicate would need a date and a today, which is a second clock inside a
+    // pure function that has none.
+    const cells = stripCells(slots([1, 0, null, null]), 2);
+    expect(cells.map((c) => c.ahead)).toEqual([false, false, true, true]);
+    // AND AN UNREACHED SLOT IS NOT A MISSED ONE. They arrive identical —
+    // `state: null, written: false` — so this flag is the only thing that tells
+    // them apart, which is why the default has to be 0 and not something
+    // derived.
+    expect(stripCells(slots([1, 0, null, null])).every((c) => !c.ahead)).toBe(
+      true
+    );
+  });
+
+  it("names an unlived group without tallying it", () => {
+    // "0 of 7" IS A TRUE SENTENCE ABOUT SEVEN DAYS NOBODY HAS REACHED and a
+    // false one about this habit. A year card opened in January would otherwise
+    // read forty-nine weeks of failure.
+    const year = slots(Array(364).fill(1));
+    const cells = stripCells(year, 357);
+    expect(cells).toHaveLength(52);
+    expect(cells[51].ahead).toBe(true);
+    expect(cells[51].label).not.toContain("of 7");
+    expect(cells[51].label).toContain("–");
+    // THE LIVED GROUPS KEEP THEIR TALLY, which is the half of this a `label`
+    // rewritten for every group would have taken away.
+    expect(cells[0].ahead).toBe(false);
+    expect(cells[0].label).toContain("7 of 7");
+  });
+
+  it("counts a group straddling today as lived", () => {
+    // THE CASE THE ARITHMETIC HAD TO CHOOSE. A group of seven whose first three
+    // days happened and whose last four have not is one mark, and it has to be
+    // either tallied or not. Lived: it holds readings, and a mark that said
+    // nothing about three logged days would lose them — the tally is over the
+    // group's own length, so a partial group reads light rather than absent.
+    const states: HabitState[] = Array(364).fill(null);
+    for (let i = 0; i < 3; i++) states[i] = 1;
+    const cells = stripCells(slots(states), 361);
+    expect(cells[0].ahead).toBe(false);
+    expect(cells[0].ratio).toBeCloseTo(3 / 7);
+    expect(cells[0].label).toContain("3 of 7");
+    expect(cells[1].ahead).toBe(true);
+  });
 });
 
 describe("rollupSub", () => {
@@ -963,7 +1085,7 @@ describe("slotNoun", () => {
   });
 });
 
-describe("rollupLead", () => {
+describe("rollupFigure", () => {
   // EVERY NUMBER IN THIS FIXTURE IS DIFFERENT, which is `vacuous-sweep-rule`'s
   // second shape: `logged`, `written`, `done`, `slots.length` and `rate` must
   // all disagree, or a mutant swapping two of them survives.
@@ -1000,50 +1122,38 @@ describe("rollupLead", () => {
     }) as HabitRollupRow;
 
   it("draws a boolean's rate, exactly as the card always did", () => {
-    expect(rollupLead(bool())).toEqual({ frac: 23 / 31, figure: "74%" });
+    expect(rollupFigure(bool())).toBe("74%");
   });
 
-  it("refuses a figure and a proportion for a period with no slots", () => {
+  it("refuses a figure for a period with no slots", () => {
     // `rate == null` IS A CLAIM ABOUT NOTHING, which is the refusal `rate`
-    // itself makes: a ring drawn from 0/0 is not a reading.
-    expect(rollupLead(bool({ slots: [], rate: null }))).toEqual({
-      frac: null,
-      figure: "—",
-    });
-    expect(rollupLead(num({ slots: [], logged: 0 }))).toEqual({
-      frac: null,
-      figure: "—",
-    });
-  });
-
-  it("draws a number's COVERAGE and never its done-rate", () => {
-    // THE WHOLE REASON THIS FUNCTION EXISTS. `rate` is `done / slots`, and on a
-    // number row `done` counts slots `readHabitState` rounded to >= 0.5 — so a
-    // ring drawn from it reports "the share of days I ran at least half a
-    // kilometre". The fixture's `rate` is 0.25 and its coverage 0.5.
-    expect(rollupLead(num()).frac).toBe(4 / 8);
-    expect(rollupLead(num()).frac).not.toBe(num().rate);
-  });
-
-  it("counts the slots with a READING, not the slots with an entry", () => {
-    // `logged` IS NOT `written`: a day with an entry that never answered this
-    // habit is written and not logged, and on a number that is the denominator.
-    expect(rollupLead(num({ logged: 1, written: 7 })).frac).toBe(1 / 8);
-  });
-
-  it("divides by the slots and not by the readings", () => {
-    expect(rollupLead(num({ logged: 1, slots: Array(2).fill({ state: null }) })).frac).toBe(0.5);
+    // itself makes: 0 of 0 is not 0%.
+    expect(rollupFigure(bool({ slots: [], rate: null }))).toBe("—");
+    expect(rollupFigure(num({ slots: [], logged: 0 }))).toBe("—");
   });
 
   it("prints a number's total with its unit, and no sigma", () => {
-    expect(rollupLead(num()).figure).toBe("128.4 km");
-    expect(rollupLead(num({ unit: null })).figure).toBe("128.4");
+    expect(rollupFigure(num())).toBe("128.4 km");
+    expect(rollupFigure(num({ unit: null }))).toBe("128.4");
   });
 
   it("tells a logged window of zeroes from a window with nothing in it", () => {
     // THE PAIR, because either one alone passes against a `!row.total` guard.
-    expect(rollupLead(num({ logged: 2, total: 0 })).figure).toBe("0 km");
-    expect(rollupLead(num({ logged: 0, total: 0 })).figure).toBe("—");
+    expect(rollupFigure(num({ logged: 2, total: 0 }))).toBe("0 km");
+    expect(rollupFigure(num({ logged: 0, total: 0 }))).toBe("—");
+  });
+
+  it("returns a string and nothing else, now that the ring is gone", () => {
+    // IT RETURNED `{ frac, figure }` UNTIL 1.0.64, and `frac` had exactly one
+    // reader: the ring the reader has now taken off the card. A function
+    // returning a number nothing reads is how a later hand concludes the number
+    // must matter — and the number in question was the one a reader is most
+    // likely to reach for and wrong (`logged / slots`, never `rate`). The
+    // reasoning stays in the comment above it; the field does not.
+    expect(typeof rollupFigure(num())).toBe("string");
+    const code = readCode("habit-rollup-view");
+    expect(code).not.toContain("rollupLead");
+    expect(code).not.toContain("frac:");
   });
 });
 
@@ -1156,6 +1266,37 @@ describe("numberStripCells", () => {
     expect(cells[0].label).toContain("l6");
     expect(cells[0].label).toContain("10 km");
     expect(cells[1].ratio).toBeNull();
+  });
+
+  // ── THE SLOTS NOBODY HAS REACHED (1.0.64) ───────────────────────────────
+  it("scales by the LIVED readings and says nothing of the rest", () => {
+    // ── AN EQUIVALENT MUTANT, MEASURED AND RECORDED ─────────────────────────
+    //
+    // `valueRange(slots)` in place of `valueRange(slots.slice(0, lived))`
+    // SURVIVES every behavioural assertion in this file, and has to: an unlived
+    // slot carries `value: null`, and `valueRange` skips the nulls, so the two
+    // expressions cannot disagree on any input `drawStrip` can build. That is
+    // `vacuous-sweep-rule`'s own exception — a mutant nothing can kill is not a
+    // gap in the suite, it is two spellings of one function.
+    //
+    // IT IS STILL THE WRONG SPELLING. The next hand to give an unlived slot a
+    // default of 0 would silently rescale every strip on the card, and the
+    // normaliser would be the one line that could no longer be read as meaning
+    // the lived window. So the slice is pinned as a SHAPE, which is the only
+    // thing that can hold it, and the behaviour below is pinned separately.
+    expect(fnBody("numberStripCells", "habit-rollup-view")).toContain(
+      "valueRange(slots.slice(0, lived))"
+    );
+    const cells = numberStripCells(slots([2, 9, null, null]), "km", 2);
+    expect(cells.map((c) => c.ahead)).toEqual([false, false, true, true]);
+    expect(cells[0].ratio).toBe(0);
+    expect(cells[1].ratio).toBe(1);
+    // AND AN UNREACHED MARK IS NOT "nothing logged". It is a mark with no
+    // sentence of its own, because there is nothing yet to say about it —
+    // `drawStrip` appends the one word that does apply.
+    expect(cells[2].label).toBe("l2");
+    expect(cells[2].label).not.toContain("nothing logged");
+    expect(cells[1].label).toContain("9 km");
   });
 });
 
@@ -1560,13 +1701,25 @@ describe("the rollup in the tables", () => {
 
 // ── THE DRAWING AND THE WINDOW ────────────────────────────────────────────
 describe("the card's shape", () => {
-  it("draws the ring through the one statRing definition", () => {
-    // `vacuous-sweep-rule`, third shape: assert the CALL SITE. A second inline
-    // SVG here would pass "the ring exists" and be the drift the extraction was
-    // done to prevent.
-    const view = readSrc("habit-rollup-view");
-    expect(view).toContain("statRing(ring, lead.frac ?? 0)");
-    expect(view).not.toContain("<circle");
+  it("draws no ring, and leaves statRing its one remaining caller (1.0.64)", () => {
+    // THE REVERSAL. 1.0.61 gave both row types a ring, on the reader's own
+    // *"one lead shape for both"*; 1.0.64 takes it off both, on the reader's
+    // *"figure only, no ring"*. Eight rings down a quarterly card, most of them
+    // drawn empty, were the largest thing on it — and the strip under each row
+    // draws the same proportion slot by slot, which is strictly more.
+    //
+    // SWEPT ON THE COMMENT-STRIPPED SOURCE, because the prose above `drawRow`
+    // names the ring and the function that drew it in order to record why
+    // neither is there. A sweep over `readSrc` would be satisfied by that
+    // paragraph and could never fail.
+    const code = readCode("habit-rollup-view");
+    expect(code).not.toContain("statRing");
+    expect(code).not.toContain("ca-hrollup-lead");
+    expect(code).not.toContain("<circle");
+    // AND THE RING ITSELF IS NOT DEAD. `statStrip` draws one, which is the only
+    // caller it had before 1.0.61 borrowed it — `test/dead-code.test.ts` is the
+    // general form of this, and naming the surviving call site here is what
+    // tells a later hand the removal was scoped to this card.
     expect(readSrc("stat-strip")).toContain("export function statRing(");
     expect(fnBody("statStrip", "stat-strip")).toContain("statRing(");
   });
@@ -1707,21 +1860,34 @@ describe("the card's shape", () => {
   // a number had no rate so it got no ring, which left two different pictures
   // down one column and a symbol the card never explained. Every row now reads
   // *picture, figure, name*.
-  it("leads every row with one mark and one figure", () => {
+  it("reads figure, name, sub — in that order, and nothing between", () => {
     const row = fnBody("drawRow", "habit-rollup-view");
     const code = readCode("habit-rollup-view");
-    // ONE `statRing` CALL AND NO BRANCH BEFORE IT, which is what "one shape"
-    // means in the code rather than only on screen.
-    expect(code.match(/statRing\(/g)).toHaveLength(1);
-    expect(row).toContain("statRing(ring, lead.frac ?? 0)");
-    expect(row).toContain('el.createSpan({ cls: "ca-hrollup-pct", text: lead.figure })');
+    // THE ORDER IS THE READER'S SECOND CALL: *"the sub line moves right after
+    // the name"*. Pinned to the right edge it sat a card's width from the habit
+    // it was counting; the slack falls at the end of the row now, where nothing
+    // is reading. Asserted as THREE POSITIONS and not three substrings, because
+    // all three spans existed before this round and only their order changed —
+    // a `toContain` trio would pass on the old card.
+    const pct = row.indexOf('cls: "ca-hrollup-pct"');
+    const name = row.indexOf('cls: "ca-hrollup-name"');
+    const sub = row.indexOf('cls: "ca-hrollup-sub"');
+    expect(pct).toBeGreaterThan(0);
+    expect(name).toBeGreaterThan(pct);
+    expect(sub).toBeGreaterThan(name);
+    expect(row).toContain('el.createSpan({ cls: "ca-hrollup-pct", text: figure })');
+    // ONE FIGURE FOR BOTH TYPES, through the one function that knows which
+    // figure a type gets.
+    expect(row).toContain("const figure = rollupFigure(row);");
+    expect(code.match(/rollupFigure\(/g)).toHaveLength(2);
     // The Σ and the span it labelled are both gone from the tree.
     expect(code).not.toContain("Σ");
     expect(code).not.toContain("ca-hrollup-total");
-    // AND THE TWO READINGS ARE STILL TOLD APART. The arc is the quieter one on
-    // a number, because the figure beside it (a total, not a percentage) is
-    // read second.
-    expect(row).toContain('ring.toggleClass("is-cover", row.type === "number")');
+    // AND THE SENTENCE HANGS OFF THE NAME. It used to hang off the ring; with
+    // the ring gone the row itself is `display: contents` and has no box to
+    // hover, so a `title` on the row would never be read by anyone.
+    expect(row).toContain('name.setAttr("title", said)');
+    expect(row).toContain('name.setAttr("aria-label", said)');
   });
 
   // ── THE GRAIN GROUPS ON THE CARD (1.0.61) ──────────────────────────────
@@ -1785,6 +1951,44 @@ describe("the card's shape", () => {
     expect(strip).toContain("const noun = CLASS_DEFS[row.grain].periodNoun");
     expect(strip).toContain("`no entry for that ${noun}`");
     expect(readCode("habit-rollup-view")).not.toContain("no entry for that day");
+  });
+
+  it("draws the whole period, lived slots first and the rest blanked", () => {
+    // *"The day strips should always match the dashboard period range."* The
+    // strip is the one reader of `row.ahead`, and this is the arithmetic the
+    // two lists have to agree on.
+    const strip = fnBody("drawStrip", "habit-rollup-view");
+    // BLANKED ON THE WAY IN, so a slot nobody has reached cannot carry a
+    // reading however it was built. `row.ahead` is `habitSlots`' output and
+    // those fields are already empty — this is the statement, and it is what
+    // makes the `is-ahead` arm below the only thing that can paint them.
+    expect(strip).toContain("const rest: HabitSlotReading[] = row.ahead.map");
+    expect(strip).toMatch(/state: null,\s*value: null,\s*written: false,/);
+    // LIVED FIRST AND THE COUNT FROM THE END, which is what `stripCells`' and
+    // `numberStripCells`' `ahead` parameter means. Reversed, every lived mark
+    // would be drawn as unreached and the whole strip would go faint.
+    expect(strip).toContain("const all = [...row.slots, ...rest];");
+    expect(strip).toContain("numberStripCells(all, row.unit, rest.length)");
+    expect(strip).toContain("stripCells(all, rest.length)");
+    // CONCATENATED BEFORE GROUPING AND NOT AFTER. Grouping each list on its own
+    // would end the lived half in a stub — three days shaded over three days
+    // reads as a bad week rather than a short one, which is the same argument
+    // `stripCells` groups from the period's own start for.
+    const cells = strip.indexOf("const cells =");
+    expect(cells).toBeGreaterThan(strip.indexOf("const all ="));
+    // AND THE UNREACHED ARM COMES FIRST AND LEAVES. Below it sit the two arms
+    // that read `state` and `ratio`, and both would paint an unreached mark:
+    // the single arm as "nothing recorded", the shade arm as a null ratio with
+    // the bare label. A mark the reader is told nothing about is the one the
+    // clip exists to avoid.
+    const ahead = strip.indexOf("if (cell.ahead) {");
+    expect(ahead).toBeGreaterThan(0);
+    expect(strip.indexOf("if (cell.single) {")).toBeGreaterThan(ahead);
+    expect(strip).toContain('el.addClass("is-ahead")');
+    expect(strip).toContain('el.setAttr("aria-label", `${cell.label}: not yet`)');
+    expect(
+      strip.slice(ahead, strip.indexOf("if (cell.single) {"))
+    ).toContain("continue;");
   });
 
   it("mutes a row by the type's own idea of nothing", () => {
@@ -2001,14 +2205,31 @@ describe("the rollup's CSS", () => {
     // track to that row's own content, so "100%" and "8%" being different
     // widths would start every name somewhere else.
     expect(cssRule(".ca-hrollup-list")).toContain("display: grid");
-    expect(cssRule(".ca-hrollup-list")).toContain(
-      "grid-template-columns: auto auto minmax(0, 1fr) auto"
+    // THREE TRACKS, FIGURE / NAME / SUB (1.0.64) — where it was four with the
+    // ring first and the sub pinned last. The terminating semicolon is in the
+    // expectation on purpose: `vacuous-sweep-rule`'s fourth shape is an
+    // expected value that is a PREFIX of the one it replaced, and
+    // `auto minmax(0, max-content) minmax(0, 1fr)` is not a prefix of the old
+    // list but `auto minmax(0, 1fr)` — the narrow-width override — is a prefix
+    // of plenty.
+    const list = cssRules(".ca-hrollup-list");
+    expect(list[0]).toContain(
+      "grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);"
     );
+    // `max-content` ON THE NAME, so one column of names ends where the longest
+    // one does and every sub line starts at the same place. A ragged left edge
+    // down a column of counts is what stops a list of nine scanning.
+    expect(list[0]).not.toContain("grid-template-columns: auto auto");
     expect(cssRule(".ca-hrollup-row")).toContain("display: contents");
-    // And the name truncates rather than pushing the counts off the card, which
-    // is what `minmax(0, 1fr)` and not `1fr` buys.
+    // And the name truncates rather than pushing the sub off the card, which is
+    // what `minmax(0, …)` and not a bare `max-content` buys.
     expect(cssRule(".ca-hrollup-name")).toContain("text-overflow: ellipsis");
     expect(cssRule(".ca-hrollup-name")).toContain("min-width: 0");
+    // AT PHONE WIDTH THE SUB GOES AND THE NAME TAKES THE SLACK. Leaving three
+    // tracks there would stop the name at its longest sibling and hold the
+    // leftover in a track with nothing in it.
+    expect(list).toHaveLength(2);
+    expect(list[1]).toContain("grid-template-columns: auto minmax(0, 1fr);");
   });
 
   it("gives the strip the whole width of the card, on its own line", () => {
@@ -2022,42 +2243,79 @@ describe("the rollup's CSS", () => {
     // reflows a month into two and a half lines on a phone, which reads as a
     // second week of nothing.
     expect(strip).toContain("grid-auto-flow: column");
-    expect(strip).toContain("grid-auto-columns: minmax(0, 1fr)");
     expect(strip).not.toContain("flex-wrap");
+    // ── A CELL HAS A CEILING (1.0.64) ───────────────────────────────────────
+    //
+    // `minmax(0, 1fr)` SIZED A MARK BY THE CARD AND NOT BY THE CALENDAR, which
+    // is most of *"the rollup is visually messy"*: two slots on a week card
+    // drew two slabs three hundred pixels wide. `10px` is a mark's size, and
+    // the strip's LENGTH is what says how long the period is.
+    //
+    // `minmax(0, 10px)` AND NOT `10px`, so the ceiling is a ceiling: ninety-two
+    // marks at ten pixels is wider than any card, and a track whose maximum is
+    // fixed shares the space it actually has instead of overflowing. The
+    // left-alignment is arithmetic rather than a declaration — the tracks no
+    // longer add up to the row, so the leftover falls at the end.
+    expect(strip).toContain("grid-auto-columns: minmax(0, 10px);");
+    expect(strip).not.toContain("minmax(0, 1fr)");
   });
 
-  it("gives a mark the two vocabularies its two meanings need", () => {
+  it("gives a mark the three vocabularies its three meanings need", () => {
     // A base rule that means "nothing recorded", so the gaps are drawn; the
-    // binary pair for a single day; and the chart strips' own four shades for a
-    // grouped one, so a colour means the same amount wherever it is drawn.
+    // binary pair for a single slot; a four-step ramp for a grouped one; and
+    // from 1.0.64 a fourth reading — a slot the period has not reached yet.
     expect(cssRule(".ca-hrollup-cell")).toContain("background");
     expect(cssRules(".ca-hrollup-cell.is-done")).toHaveLength(1);
     expect(cssRules(".ca-hrollup-cell.is-not-done")).toHaveLength(1);
+    expect(cssRules(".ca-hrollup-cell.is-ahead")).toHaveLength(1);
     for (const n of [1, 2, 3, 4]) {
-      expect(cssRule(`.ca-hrollup-cell.ca-act-${n}`)).toContain(
-        `var(--ca-act-${n})`
-      );
+      expect(cssRule(`.ca-hrollup-cell.ca-act-${n}`)).toContain("background:");
     }
+    // ── THE EMPTY MARK AND THE UNREACHED ONE ARE NOT THE SAME MARK ──────────
+    //
+    // *"The day strips should always match the dashboard period range"*, so the
+    // strip draws the eighteen days left in the month as well as the twelve
+    // that were missed — and if those looked alike the strip would report a
+    // month of failure on its second day. Fainter than the empty mark and the
+    // same size, so the edge between them is where today is.
+    const ahead = cssRule(".ca-hrollup-cell.is-ahead");
+    expect(ahead).not.toBe(cssRule(".ca-hrollup-cell"));
+    expect(ahead).toContain("var(--background-modifier-border) 40%");
+    // AND IT IS A BACKGROUND AND NOT A SIZE OR AN OPACITY. `opacity` would take
+    // the gap between the marks with it on any theme whose card is not the
+    // body's colour, and a shorter mark would make the strip's own length — the
+    // thing that says how long the period is — read as two strips.
+    expect(ahead).not.toContain("opacity");
+    expect(ahead).not.toContain("height");
   });
 
-  it("gives both kinds of lead the same two tracks (1.0.61)", () => {
-    // `.ca-hrollup-total` AND ITS `span 2` ARE GONE. A number used to take the
-    // ring's track and the figure's with one span; both types now lead with a
-    // ring and a figure, so there is nothing to span and one cell does both
-    // figures.
+  it("gives both kinds of row one figure cell and no picture (1.0.64)", () => {
+    // `.ca-hrollup-total` AND ITS `span 2` ARE GONE, from 1.0.61: a number used
+    // to take the ring's track and the figure's with one span. `.ca-hrollup-lead`
+    // and its `is-cover` variant are gone from 1.0.64, which is the reader's
+    // *"figure only, no ring"* — so there is no picture track left either, and
+    // the figure is the first thing on every line.
     expect(cssRules(".ca-hrollup-total")).toHaveLength(0);
+    expect(cssRules(".ca-hrollup-lead")).toHaveLength(0);
+    expect(cssRules(".ca-hrollup-lead.is-cover .ca-stat-ring-val")).toHaveLength(
+      0
+    );
     const pct = cssRule(".ca-hrollup-pct");
     expect(pct).toContain("font-variant-numeric: tabular-nums");
     expect(pct).toContain("text-align: right");
     expect(cssRules(".ca-hrollup-list").some((r) => r.includes("span"))).toBe(
       false
     );
-    // THE COVERAGE ARC CHANGES WEIGHT AND NOT COLOUR. Its stroke is the
-    // dashboard's grain, set in the presets sheet, and this rule must not take
-    // that over — see the `[data-ca-grain] .ca-stat-ring-val` sweep below.
-    const cover = cssRule(".ca-hrollup-lead.is-cover .ca-stat-ring-val");
-    expect(cover).toContain("stroke-width");
-    expect(cover).not.toMatch(/\bstroke:/);
+    // NO SELECTOR OF THIS CARD'S TOUCHES A RING AT ALL, which is what keeps the
+    // `[data-ca-grain] .ca-stat-ring-val` hazard below unreachable from here:
+    // the sweep that mattered was never about weight, it was about a descendant
+    // selector finding a ring inside a row that had bound the grain property.
+    // SWEPT WITH THE PROSE TAKEN OUT. The block this replaced is still in the
+    // stylesheet as a comment naming both class and ring, which is the whole of
+    // why it is readable — and `[^{}]*` runs through a comment happily, so a
+    // sweep over the raw sheet matches that paragraph and can never pass.
+    const bare = readCss().replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(bare).not.toMatch(/\.ca-hrollup[\w-]*[^{}]*\.ca-stat-ring/);
   });
 
   it("heads a grain's group across the one grid (1.0.61)", () => {
@@ -2082,24 +2340,66 @@ describe("the rollup's CSS", () => {
     expect(cssRules(".ca-hrollup-row.is-idle .ca-hrollup-head")).toHaveLength(0);
   });
 
-  it("tints a kept mark with its row's grain, and nothing else (1.0.61)", () => {
+  it("ramps every filled mark in the row's own grain (1.0.64)", () => {
     expect(cssRule(".ca-hrollup-cell.is-done")).toContain(
       "background: var(--ca-hrollup-grain)"
     );
-    // THE BASE RULE, THE OUTLINE AND THE FOUR SHADES ARE UNTOUCHED. A single
-    // mark is a STATE and wears the grain; a grouped mark is a QUANTITY on the
-    // ramp whose whole promise is that a colour means the same amount wherever
-    // this plugin draws one. A number's marks are all quantity, so a number's
-    // strip takes no tint at all.
+    // ── THE REVERSAL, AND WHY ───────────────────────────────────────────────
+    //
+    // 1.0.61's eighth call tinted a KEPT boolean mark by grain and left a
+    // grouped mark on the `--ca-act-*` ramp, on the argument that a shade means
+    // the same amount of activity everywhere this plugin draws one. In the
+    // vault that read as a fault rather than a rule: one list, two palettes, a
+    // daily habit orange on one line and green on the next — and a number's
+    // strip, whose marks are ALL grouped, took no grain at all.
+    //
+    // A LIGHTNESS RAMP OF ONE HUE SAYS BOTH THINGS AT ONCE: the hue is the
+    // grain, the lightness is how much. So the four stops are mixes of the
+    // row's own property, and the top stop is the property itself — the same
+    // colour `is-done` paints, which is what makes a full group and a kept slot
+    // the same mark.
+    for (const n of [1, 2, 3] as const) {
+      const rule = cssRule(`.ca-hrollup-cell.ca-act-${n}`);
+      expect(rule).toContain("color-mix(in srgb, var(--ca-hrollup-grain)");
+      expect(rule).not.toContain(`--ca-act-${n}`);
+    }
+    expect(cssRule(".ca-hrollup-cell.ca-act-4")).toContain(
+      "background: var(--ca-hrollup-grain)"
+    );
+    // AND THE RAMP STILL RAMPS. Four stops that all resolved to the same mix
+    // would pass every assertion above and draw one flat colour, which is the
+    // first shape `vacuous-sweep-rule` records: read the percentages out and
+    // require them to ascend.
+    const steps = [1, 2, 3].map((n) => {
+      const m = /var\(--ca-hrollup-grain\) (\d+)%/.exec(
+        cssRule(`.ca-hrollup-cell.ca-act-${n}`)
+      );
+      expect(m).not.toBeNull();
+      return Number(m?.[1]);
+    });
+    expect(steps).toEqual([...steps].sort((a, b) => a - b));
+    expect(new Set(steps).size).toBe(3);
+    // MIXED TOWARD `transparent` AND NOT TOWARD A SURFACE COLOUR, so a card on
+    // any theme ramps toward its own background rather than toward the one this
+    // was written on.
+    for (const n of [1, 2, 3]) {
+      expect(cssRule(`.ca-hrollup-cell.ca-act-${n}`)).toContain(", transparent)");
+    }
+    // THE BASE RULE AND THE OUTLINE ARE STILL UNTOUCHED. They mean "no reading"
+    // and "a reading of no", which are facts about the slot and not about how
+    // much — a grain on either would say a habit was logged where it was not.
     expect(cssRule(".ca-hrollup-cell")).not.toContain("--ca-hrollup-grain");
     expect(cssRule(".ca-hrollup-cell.is-not-done")).not.toContain(
       "--ca-hrollup-grain"
     );
-    for (const n of [1, 2, 3, 4]) {
-      expect(cssRule(`.ca-hrollup-cell.ca-act-${n}`)).toBe(
-        cssRule(`.ca-hrollup-cell.ca-act-${n}`).replace("--ca-hrollup-grain", "")
-      );
-    }
+    expect(cssRule(".ca-hrollup-cell.is-ahead")).not.toContain(
+      "--ca-hrollup-grain"
+    );
+    // AND THE OTHER STRIPS KEEP THE RAMP. `tracker-stat.ts`'s and the journal's
+    // draw one tracker over time with no grain to speak of, which is the
+    // reading `--ca-act-*` was made for; this round is scoped to the one card
+    // that lists several grains at once.
+    expect(cssRule(".ca-tstat-cell.ca-act-4")).toContain("var(--ca-act-4)");
   });
 
   it("binds the grain through a private property, never the page's (1.0.61)", () => {
@@ -2124,8 +2424,14 @@ describe("the rollup's CSS", () => {
       "--ca-hrollup-grain: var(--interactive-accent)"
     );
     expect(cssRule(":root")).not.toContain("--ca-hrollup-grain");
-    // AND NO ROLLUP SELECTOR ANYWHERE SETS A RING'S STROKE.
-    expect(cssRules(".ca-hrollup-lead.is-cover .ca-stat-ring-val")).toHaveLength(1);
+    // AND NO ROLLUP SELECTOR ANYWHERE REACHES A RING. With the ring off the
+    // card the hazard is no longer about this sheet at all, but the attribute
+    // name is still load-bearing: `data-ca-grain` on a row would rebind
+    // `--ca-grain-accent` for everything inside it, and the presets sheet reads
+    // that property through a DESCENDANT selector onto any ring a later round
+    // puts back. A private attribute binding a private property reaches nothing
+    // it was not pointed at.
+    expect(readCss()).not.toContain(".ca-hrollup-row[data-ca-grain");
   });
 
   it("keeps monochrome monochrome (1.0.61)", () => {
@@ -2168,9 +2474,12 @@ describe("the rollup's CSS", () => {
     // and a three-fact line has no ellipsis a reader could act on.
     const narrow = cssRules(".ca-hrollup-sub");
     expect(narrow.some((r) => r.includes("display: none"))).toBe(true);
+    // TWO TRACKS AND NOT THREE (1.0.64): with the sub hidden a third track
+    // would hold the leftover and the name would stop at its longest sibling
+    // with a void after it.
     expect(
       cssRules(".ca-hrollup-list").some((r) =>
-        r.includes("grid-template-columns: auto auto minmax(0, 1fr);")
+        r.includes("grid-template-columns: auto minmax(0, 1fr);")
       )
     ).toBe(true);
   });
