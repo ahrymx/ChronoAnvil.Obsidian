@@ -5,6 +5,24 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.60] - 2026-10-12
+
+### Fixed
+
+- **Save now finishes what is in an add row instead of throwing it away.** Fill
+  in the Habits window — *Running*, **Number (stepper)**, `0`, `50`, `km` — and
+  press **Save**, and until now the whole row was discarded and the window
+  reported *"Nothing to change — this entry's habits are as they were"*. The row
+  was only ever committed by its own **Add** button, so a reader who finished
+  the way a form is normally finished lost the habit they had just described.
+  That is the rest of the "number habits can't be created" report: a Yes/No
+  habit is one short field and gets added almost by reflex, while a number habit
+  is four fields and an obvious place to reach for Save.
+- The same was true of the **Tags** and **Attachment categories** windows: a
+  typed-in tag or category is now added by Save rather than dropped. A refusal —
+  an unusable name, a duplicate, an inverted range — is reported with the window
+  still open and what you typed still on screen.
+
 ## [1.0.59] - 2026-10-12
 
 ### Fixed

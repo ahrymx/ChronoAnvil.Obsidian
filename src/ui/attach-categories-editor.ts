@@ -349,28 +349,11 @@ export class AttachCategoriesEditor extends EditorModal {
       },
     });
     const commit = (): void => {
-      const label = normaliseCategoryLabel(input.value);
-      if (label == null) {
-        this.showError(
-          "That isn't a usable category name — it needs a letter or a digit in it."
-        );
+      const problem = this.addPending();
+      if (problem) {
+        this.showError(problem);
         return;
       }
-      // TWO CATEGORIES NAMED "Books" IS TWO CATEGORIES, as it has been since
-      // 3.18 — the key suffixes and both shelves work. Unlike a habit, a
-      // category is a box in one note rather than a row in a registry, so
-      // joining an existing one is not a thing a reader could have meant.
-      this.rows.push({
-        id: `new-${this.fresh++}`,
-        key: null,
-        label,
-        items: 0,
-        // A category with nothing in it has nothing that is not an image, so
-        // every format is on offer from the moment it is typed.
-        others: 0,
-        format: "default",
-      });
-      this.pending = "";
       this.clearError();
       this.renderBody();
     };
@@ -402,7 +385,44 @@ export class AttachCategoriesEditor extends EditorModal {
     });
   }
 
+  // Take whatever is in the add field and make a category of it. Returns the
+  // refusal to show, or null — including when the field is empty.
+  //
+  // SAVE FLUSHES IT (1.0.60), which is why this is a method and not a closure
+  // in `renderAdd`. A reader who has typed a name and reaches for Save means
+  // that category; discarding it and reporting no change loses an edit that was
+  // on screen. The habits window carries the full note.
+  private addPending(): string | null {
+    if (!this.pending.trim()) return null;
+    const label = normaliseCategoryLabel(this.pending);
+    if (label == null) {
+      return "That isn't a usable category name — it needs a letter or a digit in it.";
+    }
+    // TWO CATEGORIES NAMED "Books" IS TWO CATEGORIES, as it has been since
+    // 3.18 — the key suffixes and both shelves work. Unlike a habit, a
+    // category is a box in one note rather than a row in a registry, so
+    // joining an existing one is not a thing a reader could have meant.
+    this.rows.push({
+      id: `new-${this.fresh++}`,
+      key: null,
+      label,
+      items: 0,
+      // A category with nothing in it has nothing that is not an image, so
+      // every format is on offer from the moment it is typed.
+      others: 0,
+      format: "default",
+    });
+    this.pending = "";
+    return null;
+  }
+
   protected validate(): string | null {
+    // A FILLED-IN ADD FIELD IS AN INTENTION, NOT NOISE — see `addPending`. It
+    // runs first, so a reader who types a category and presses Save gets it,
+    // and so the floor below cannot refuse a window whose add field was about
+    // to satisfy it.
+    const problem = this.addPending();
+    if (problem) return problem;
     // THE FLOOR, where the reader can still act on it. A Resources section with
     // no `attach:` line renders an empty header with no way back into it, so
     // the write refuses the last removal as well (`planAttachCategories`) —

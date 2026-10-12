@@ -188,21 +188,12 @@ export class TagsEditor extends EditorModal {
     for (const { tag } of this.used) suggest.createEl("option", { value: tag });
 
     const commit = (): void => {
-      const next = addTag(this.draft, input.value);
-      if (next.length !== this.draft.length) {
-        this.draft = next;
-        this.pending = "";
-        this.renderBody();
+      const problem = this.addPending();
+      if (problem) {
+        this.showError(problem);
         return;
       }
-      // Nothing changed: either it was unusable or the note already has it.
-      // Both are worth saying, because "I pressed Add and nothing happened" is
-      // the same experience for two different reasons.
-      this.showError(
-        normaliseTag(input.value) == null
-          ? "That isn't a usable tag — letters, digits, - _ and / only."
-          : "This note already has that tag."
-      );
+      this.renderBody();
     };
 
     input.addEventListener("input", () => {
@@ -254,12 +245,37 @@ export class TagsEditor extends EditorModal {
     }
   }
 
+  // Take whatever is in the add field and put it on the note. Returns the
+  // refusal to show, or null — including when the field is empty.
+  //
+  // SAVE FLUSHES IT (1.0.60), which is why this is a method and not a closure
+  // in `renderAdd`. A reader who has typed a tag and reaches for Save means
+  // that tag; a window that discarded it and reported no change would be
+  // losing an edit it had been shown. The habits window carries the full note
+  // — it is where this was reported, with a four-field add row that made the
+  // loss unmissable.
+  private addPending(): string | null {
+    if (!this.pending.trim()) return null;
+    const next = addTag(this.draft, this.pending);
+    if (next.length !== this.draft.length) {
+      this.draft = next;
+      this.pending = "";
+      return null;
+    }
+    // Nothing changed: either it was unusable or the note already has it.
+    // Both are worth saying, because "I pressed Add and nothing happened" is
+    // the same experience for two different reasons.
+    return normaliseTag(this.pending) == null
+      ? "That isn't a usable tag — letters, digits, - _ and / only."
+      : "This note already has that tag.";
+  }
+
   protected validate(): string | null {
-    // Nothing to reject: every edit above went through `normaliseTag` at the
-    // moment it was made, so the draft cannot hold an unusable tag by the time
-    // Save is reachable. Stated rather than left empty because "this window
-    // validates nothing" is a claim about the edits, not an omission.
-    return null;
+    // A FILLED-IN ADD FIELD IS AN INTENTION, NOT NOISE — see `addPending`.
+    // There is nothing else to reject: every edit above went through
+    // `normaliseTag` at the moment it was made, so the draft cannot hold an
+    // unusable tag by the time Save is reachable.
+    return this.addPending();
   }
 
   onClose(): void {

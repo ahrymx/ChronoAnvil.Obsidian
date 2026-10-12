@@ -840,6 +840,17 @@ describe("the add box's two types", () => {
     return s.slice(at, end);
   };
 
+  // The add row's ACTION, which stopped being a closure inside `renderAdd` in
+  // 1.0.60 so that Save could run it too.
+  const logic = (): string => {
+    const s = readSrc("habits-editor");
+    const at = s.indexOf("private addPending(): string | null {");
+    expect(at).toBeGreaterThan(0);
+    const end = s.indexOf("private renderAdd(): void {", at);
+    expect(end).toBeGreaterThan(at);
+    return s.slice(at, end);
+  };
+
   it("has a reader-facing label for every habit type", () => {
     // The picker iterates `HABIT_TYPES`, so a third type is one row in that
     // array and nothing else — provided the vocabulary knows its name.
@@ -888,11 +899,8 @@ describe("the add box's two types", () => {
   });
 
   it("reads a blank bound as unanswered and refuses only an inverted one", () => {
-    const a = add();
-    const shapeOf = a.slice(
-      a.indexOf("const shapeOf = ()"),
-      a.indexOf("const shape = shapeOf();")
-    );
+    const a = logic();
+    const shapeOf = a.slice(a.indexOf("private pendingShape()"));
     expect(shapeOf).toContain('if (this.pendingType !== "number") return { type: "boolean" };');
     expect(shapeOf).toContain("if (!t) return null;");
     expect(shapeOf).toContain("Number.isFinite(n) ? n : null");
@@ -902,10 +910,12 @@ describe("the add box's two types", () => {
     // every reading to its floor and the `+` visibly does nothing.
     expect(shapeOf).toContain("if (min != null && max != null && min > max) return null;");
     expect(a).toContain("The smallest value has to be below the largest one.");
+    // AND THE SHAPE IS ASKED FOR ON THE ADD PATH, not computed and dropped.
+    expect(a).toContain("const shape = this.pendingShape();");
   });
 
   it("hands the shape to newHabitDef, which is the only way the type lands", () => {
-    const a = add();
+    const a = logic();
     const call = a.slice(
       a.indexOf("const def = newHabitDef("),
       a.indexOf("if (!def) {")
@@ -914,10 +924,10 @@ describe("the add box's two types", () => {
   });
 
   it("lets the registry's type win over the picker on a join", () => {
-    const a = add();
+    const a = logic();
     const join = a.slice(
       a.indexOf("const known = this.habits.find"),
-      a.indexOf("const shapeOf = ()")
+      a.indexOf("const shape = this.pendingShape();")
     );
     expect(join).toContain("habitRowFor(known,");
     // Typing a name that already names a habit is a JOIN, and joining Read
@@ -928,9 +938,9 @@ describe("the add box's two types", () => {
   });
 
   it("keeps the picked type after an add and clears the shape", () => {
-    const a = add();
+    const a = logic();
     const after = a.slice(a.indexOf("this.created.push(def);"));
-    const tail = after.slice(0, after.indexOf("this.renderBody()"));
+    const tail = after.slice(0, after.indexOf("return null;"));
     expect(tail).toContain('this.pendingMin = "";');
     expect(tail).toContain('this.pendingMax = "";');
     expect(tail).toContain('this.pendingUnit = "";');

@@ -5,7 +5,7 @@
 // attribution and naming terms under its section 7. See LICENSE and
 // LICENSING.md.
 
-// Enter inside an editor window (1.0.59).
+// Finishing an add row in an editor window (1.0.59, 1.0.60).
 //
 // THE REPORT WAS "number habits cant be created", and the cause was none of
 // the habits window's own code. `EditorModal.onOpen` puts one `keydown`
@@ -21,6 +21,13 @@
 // Two halves, and the sweep below is what makes the rule bite: the frame
 // yields to a field that called `preventDefault()`, and every field that means
 // something by Enter calls it.
+//
+// AND THE OTHER WAY OF FINISHING, which is what the reader was actually doing
+// (1.0.60): they filled in the whole add row — "Running", Number, 0, 50, km —
+// and pressed SAVE. Every one of these windows threw that row away and
+// reported no change, because an add row was only ever committed by its own
+// button. A field with something in it is an intention; Save now flushes it
+// first. The last block here is that rule, across all three windows.
 
 import { describe, it, expect } from "vitest";
 import { readCode } from "./sources";
@@ -149,10 +156,12 @@ describe("the habits add row, which is where this was reported", () => {
     // in a row would be reaching for the mouse between each one.
     const code = readCode("habits-editor");
     expect(code).toContain("private focusAdd = false;");
-    // SET BY AN ADD AND BY NOTHING ELSE. The type picker, a cloud pill and a
+    // SET BY AN ADD AND BY NOTHING ELSE, in ONE place since 1.0.60 moved the
+    // add's body out to `addPending`. The type picker, a cloud pill and a
     // finished rename all repaint too, and none of them is the reader asking
-    // to type another name.
-    expect(code.split("this.focusAdd = true;")).toHaveLength(3);
+    // to type another name — nor is Save, which runs the same add and then
+    // closes the window.
+    expect(code.split("this.focusAdd = true;")).toHaveLength(2);
     const at = code.indexOf("if (this.focusAdd) {");
     expect(at).toBeGreaterThan(0);
     const body = code.slice(at, at + 200);
@@ -160,5 +169,80 @@ describe("the habits add row, which is where this was reported", () => {
     expect(body).toContain("window.setTimeout(() => input.focus(), 0);");
     // And it is the LAST thing `renderAdd` does, after the element exists.
     expect(code.indexOf("private renderUsed()")).toBeGreaterThan(at);
+  });
+});
+
+// ── and the other way of finishing ────────────────────────────────────────
+
+const WITH_ADD_ROWS = ["habits-editor", "tags-editor", "attach-categories-editor"] as const;
+
+describe("Save finishes the add row rather than discarding it", () => {
+  for (const name of WITH_ADD_ROWS) {
+    it(`${name}: validate runs the pending add first`, () => {
+      const code = readCode(name);
+      // The add's body is a METHOD, which is the whole mechanism: a closure
+      // inside `renderAdd` cannot be reached from the footer.
+      expect(code).toContain("private addPending(): string | null {");
+      const at = code.indexOf("protected validate(): string | null {");
+      expect(at, `${name} has a validate`).toBeGreaterThan(0);
+      const body = code.slice(at, at + 700);
+      expect(body, `${name}: Save must flush the add row`).toContain(
+        "this.addPending()"
+      );
+    });
+
+    it(`${name}: an empty add row adds nothing and refuses nothing`, () => {
+      // Otherwise every Save in a window nobody typed in would be a refusal,
+      // which is the opposite failure and a louder one.
+      const code = readCode(name);
+      const at = code.indexOf("private addPending(): string | null {");
+      const body = code.slice(at, at + 400);
+      expect(body).toContain("if (!this.pending.trim()) return null;");
+    });
+
+    it(`${name}: it reads the draft, not the element`, () => {
+      // It has to work from the footer, where no add row is in scope. The
+      // field has kept `pending` in step on every keystroke since each of
+      // these windows was written, which is what makes that possible.
+      const code = readCode(name);
+      const at = code.indexOf("private addPending(): string | null {");
+      // To the next member, whichever kind it is — a slice that ran on to
+      // `validate` would swallow `renderAdd` in between and find its element.
+      const ends = ["\n  private ", "\n  protected "]
+        .map((k) => code.indexOf(k, at + 10))
+        .filter((i) => i > at);
+      const body = code.slice(at, Math.min(...ends));
+      expect(body).toContain("this.pending");
+      expect(body, `${name}: addPending must not reach for an input`).not.toContain(
+        "input.value"
+      );
+    });
+
+    it(`${name}: the Add button shows what Save would refuse`, () => {
+      // One path, two ways in. The button reports the refusal in the window;
+      // Save reports the same string through `validate`, with the window still
+      // open and what the reader typed still on screen.
+      const code = readCode(name);
+      const at = code.indexOf("const commit = (): void => {");
+      expect(at).toBeGreaterThan(0);
+      const body = code.slice(at, at + 400);
+      expect(body).toContain("const problem = this.addPending();");
+      expect(body).toContain("this.showError(problem);");
+      expect(body).toContain("this.renderBody();");
+    });
+  }
+
+  it("the categories window flushes before it checks its floor", () => {
+    // Its `validate` refuses a list with no categories left. A reader who
+    // removed the last one and typed a replacement has satisfied that floor —
+    // refusing them while their answer sits in the add box would be the window
+    // arguing with something it is holding.
+    const code = readCode("attach-categories-editor");
+    const at = code.indexOf("protected validate(): string | null {");
+    const body = code.slice(at, at + 700);
+    const flush = body.indexOf("const problem = this.addPending();");
+    const floor = body.indexOf("if (this.rows.length === 0) {");
+    expect(flush).toBeGreaterThan(0);
+    expect(floor).toBeGreaterThan(flush);
   });
 });

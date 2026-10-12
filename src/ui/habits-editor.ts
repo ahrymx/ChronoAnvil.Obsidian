@@ -388,6 +388,114 @@ export class HabitsEditor extends EditorModal {
 
   // ── adding ──────────────────────────────────────────────────────────────
 
+  // Take whatever is in the add row and put it on the entry: join a habit the
+  // registry already has, or define a new one. Returns the refusal to show, or
+  // null — including when there is nothing there to add.
+  //
+  // A METHOD RATHER THAN A CLOSURE IN `renderAdd`, AND THAT IS THE FIX FOR THE
+  // THING READERS KEPT HITTING (1.0.60). A reader who has typed "Running",
+  // picked Number and filled in 0 / 50 / km has SAID WHAT THEY WANT. Pressing
+  // Save there is not "discard that"; it is the most natural way in the world
+  // to finish. The window used to throw the whole row away and report "Nothing
+  // to change — this entry's habits are as they were", which reads as a
+  // failure to create the habit, because that is exactly what it was.
+  //
+  // So `validate()` runs this first, and Save means "add it, then save". It
+  // reads `this.pending` rather than an element because it has to work from
+  // the footer, where there is no add row in scope — and the field has kept
+  // `pending` in step on every keystroke since this window was written.
+  private addPending(): string | null {
+    if (!this.pending.trim()) return null;
+    const name = normaliseHabitLabel(this.pending);
+    if (name == null) {
+      return "That isn't a usable habit name — it needs a letter or a digit in it.";
+    }
+    // AN EXISTING HABIT IS JOINED, NOT DUPLICATED. A reader who types
+    // "Exercise" into a vault that already has an Exercise habit means that
+    // one; defining a second `Exercise2` property beside it would split a
+    // year of readings in two and is the kind of thing nobody notices until
+    // a chart is wrong.
+    const known = this.habits.find(
+      (h) => (h.label || h.id).toLowerCase() === name.toLowerCase()
+    );
+    if (known) {
+      if (hasHabit(this.rows, known.id)) {
+        return "This entry already has that habit.";
+      }
+      // THE REGISTRY'S TYPE WINS OVER THE PICKER, and that is the right way
+      // round. The picker describes a habit about to be DEFINED; a name that
+      // already names one is a join, and joining Read with "Number" selected
+      // adds the Read that exists rather than a second property shadowing it.
+      // `habitRowFor` reads the type off the definition, so the branch is
+      // not even written here.
+      this.rows = addHabitRow(
+        this.rows,
+        habitRowFor(known, trackerDirective(known.id))
+      );
+      this.pending = "";
+      return null;
+    }
+
+    // A NEW ONE IS DEFINED, and `taken` carries the ids this sitting has
+    // already claimed as well as the registry's, so two habits typed one
+    // after the other cannot be handed the same property name.
+    const shape = this.pendingShape();
+    if (!shape) {
+      return "The smallest value has to be below the largest one.";
+    }
+
+    const def = newHabitDef(
+      name,
+      [
+        ...this.plugin.settings.trackers.map((t) => t.id),
+        ...this.created.map((t) => t.id),
+      ],
+      this.surface,
+      shape
+    );
+    if (!def) {
+      return "That isn't a usable habit name — it needs a letter or a digit in it.";
+    }
+    this.created.push(def);
+    this.rows = addHabitRow(
+      this.rows,
+      habitRowFor(def, trackerDirective(def.id))
+    );
+    this.pending = "";
+    // The shape described THAT habit and nothing after it — see
+    // `pendingType`'s note on why the type itself stays picked.
+    this.pendingMin = "";
+    this.pendingMax = "";
+    this.pendingUnit = "";
+    return null;
+  }
+
+  // What the three range boxes add up to, or null if they contradict.
+  private pendingShape(): HabitShape | null {
+    if (this.pendingType !== "number") return { type: "boolean" };
+    const num = (raw: string): number | null => {
+      const t = raw.trim();
+      if (!t) return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    };
+    const min = num(this.pendingMin);
+    const max = num(this.pendingMax);
+    // THE ONE REFUSAL THE SHAPE EARNS. An inverted range is not a taste
+    // question: `buildStepper` clamps with `max(min, …)` and then
+    // `min(max, …)`, so a 10–0 habit pins every reading to 0 and the
+    // stepper's `+` does nothing at all — a control that is visibly broken
+    // and gives no reason. Caught here, where the reader can still see what
+    // they typed.
+    if (min != null && max != null && min > max) return null;
+    return {
+      type: "number",
+      min,
+      max,
+      unit: this.pendingUnit.trim() || null,
+    };
+  }
+
   private renderAdd(): void {
     const wrap = this.body.createDiv({ cls: "ca-tags-section" });
     const row = wrap.createDiv({ cls: "ca-tags-add" });
@@ -490,102 +598,14 @@ export class HabitsEditor extends EditorModal {
       });
     }
 
+    // The add row's action, and `addPending` is where it lives — see the
+    // method. Here it is only "do it, and say so if it was refused".
     const commit = (): void => {
-      const name = normaliseHabitLabel(input.value);
-      if (name == null) {
-        this.showError(
-          "That isn't a usable habit name — it needs a letter or a digit in it."
-        );
+      const problem = this.addPending();
+      if (problem) {
+        this.showError(problem);
         return;
       }
-      // AN EXISTING HABIT IS JOINED, NOT DUPLICATED. A reader who types
-      // "Exercise" into a vault that already has an Exercise habit means that
-      // one; defining a second `Exercise2` property beside it would split a
-      // year of readings in two and is the kind of thing nobody notices until
-      // a chart is wrong.
-      const known = this.habits.find(
-        (h) => (h.label || h.id).toLowerCase() === name.toLowerCase()
-      );
-      if (known) {
-        if (hasHabit(this.rows, known.id)) {
-          this.showError("This entry already has that habit.");
-          return;
-        }
-        // THE REGISTRY'S TYPE WINS OVER THE PICKER, and that is the right way
-        // round. The picker describes a habit about to be DEFINED; a name that
-        // already names one is a join, and joining Read with "Number" selected
-        // adds the Read that exists rather than a second property shadowing it.
-        // `habitRowFor` reads the type off the definition, so the branch is
-        // not even written here.
-        this.rows = addHabitRow(
-          this.rows,
-          habitRowFor(known, trackerDirective(known.id))
-        );
-        this.pending = "";
-        this.focusAdd = true;
-        this.renderBody();
-        return;
-      }
-
-      // A NEW ONE IS DEFINED, and `taken` carries the ids this sitting has
-      // already claimed as well as the registry's, so two habits typed one
-      // after the other cannot be handed the same property name.
-      const shapeOf = (): HabitShape | null => {
-        if (this.pendingType !== "number") return { type: "boolean" };
-        const num = (raw: string): number | null => {
-          const t = raw.trim();
-          if (!t) return null;
-          const n = Number(t);
-          return Number.isFinite(n) ? n : null;
-        };
-        const min = num(this.pendingMin);
-        const max = num(this.pendingMax);
-        // THE ONE REFUSAL THE SHAPE EARNS. An inverted range is not a taste
-        // question: `buildStepper` clamps with `max(min, …)` and then
-        // `min(max, …)`, so a 10–0 habit pins every reading to 0 and the
-        // stepper's `+` does nothing at all — a control that is visibly broken
-        // and gives no reason. Caught here, where the reader can still see what
-        // they typed.
-        if (min != null && max != null && min > max) return null;
-        return {
-          type: "number",
-          min,
-          max,
-          unit: this.pendingUnit.trim() || null,
-        };
-      };
-      const shape = shapeOf();
-      if (!shape) {
-        this.showError("The smallest value has to be below the largest one.");
-        return;
-      }
-
-      const def = newHabitDef(
-        name,
-        [
-          ...this.plugin.settings.trackers.map((t) => t.id),
-          ...this.created.map((t) => t.id),
-        ],
-        this.surface,
-        shape
-      );
-      if (!def) {
-        this.showError(
-          "That isn't a usable habit name — it needs a letter or a digit in it."
-        );
-        return;
-      }
-      this.created.push(def);
-      this.rows = addHabitRow(
-        this.rows,
-        habitRowFor(def, trackerDirective(def.id))
-      );
-      this.pending = "";
-      // The shape described THAT habit and nothing after it — see
-      // `pendingType`'s note on why the type itself stays picked.
-      this.pendingMin = "";
-      this.pendingMax = "";
-      this.pendingUnit = "";
       this.focusAdd = true;
       this.renderBody();
     };
@@ -694,12 +714,16 @@ export class HabitsEditor extends EditorModal {
   }
 
   protected validate(): string | null {
-    // Nothing to reject: a name went through `normaliseHabitLabel` at the
-    // moment it was typed and a pill can only name a habit the registry
-    // already holds, so the draft cannot carry an unusable row by the time
-    // Save is reachable. Stated rather than left blank because "this window
-    // validates nothing" is a claim about the edits, not an omission.
-    return null;
+    // A FILLED-IN ADD ROW IS AN INTENTION, NOT NOISE (1.0.60). Save flushes it
+    // onto the entry before the draft leaves, so "type a name, press Save"
+    // does what it plainly looks like it does. An empty row adds nothing and
+    // refuses nothing; a bad one refuses HERE, with the window still open and
+    // what the reader typed still on screen.
+    //
+    // There is nothing else to reject: every other edit above went through
+    // `normaliseHabitLabel` at the moment it was made, and a pill can only
+    // name a habit the registry already holds.
+    return this.addPending();
   }
 
   onClose(): void {
