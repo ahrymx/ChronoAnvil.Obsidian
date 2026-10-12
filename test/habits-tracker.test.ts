@@ -62,6 +62,7 @@ import {
 } from "../src/diary/entry-sections";
 import {
   TRACKER_CLASSES,
+  TRACKER_TYPE_LABELS,
   anySurface,
   diarySurface,
   journalSurface,
@@ -370,6 +371,90 @@ describe("newHabitDef", () => {
   it("returns null for a name it could not make a property out of", () => {
     expect(newHabitDef("  ", [], null)).toBe(null);
   });
+
+  // ── THE SHAPE PARAMETER (1.0.56), which is the window picker's answer ──
+
+  it("takes its type from the shape it was handed", () => {
+    // The default stays boolean, which is what every caller that passes no
+    // shape means — and is why widening this function did not touch them.
+    expect(
+      newHabitDef("Pages", [], diarySurface("daily"), { type: "number" })?.type
+    ).toBe("number");
+    expect(newHabitDef("Pages", [], diarySurface("daily"))?.type).toBe("boolean");
+  });
+
+  it("carries a number's bounds and unit where they were answered", () => {
+    const def = newHabitDef("Run", [], diarySurface("daily"), {
+      type: "number",
+      min: 0,
+      max: 42,
+      unit: "km",
+    });
+    // ZERO IS AN ANSWER. The guard is `!= null`, not truthiness, because a
+    // habit that runs from 0 is the ordinary case for anything counted.
+    expect(def?.min).toBe(0);
+    expect(def?.max).toBe(42);
+    expect(def?.unit).toBe("km");
+  });
+
+  it("omits the keys the reader left blank rather than nulling them", () => {
+    // `min: null` is a BOUND OF NULL once this round-trips through data.json,
+    // and `buildStepper` clamps against whatever it finds. An unanswered
+    // bound has to be an absent key.
+    const def = newHabitDef("Pages", [], diarySurface("daily"), {
+      type: "number",
+      min: null,
+      max: null,
+      unit: null,
+    })!;
+    expect("min" in def).toBe(false);
+    expect("max" in def).toBe(false);
+    expect("unit" in def).toBe(false);
+    // And the registry takes it unchanged, boundless: this is the blank-range
+    // number the add box is expected to produce most of the time.
+    const stored = normalizeTrackers([def], false).find((t) => t.id === def.id);
+    expect(stored?.type).toBe("number");
+    expect(stored?.min).toBe(undefined);
+  });
+
+  it("never carries bounds onto a boolean, whatever it is handed", () => {
+    const def = newHabitDef("Stretch", [], diarySurface("daily"), {
+      type: "boolean",
+      min: 0,
+      max: 10,
+      unit: "km",
+    })!;
+    expect(def.type).toBe("boolean");
+    expect("min" in def).toBe(false);
+    expect("max" in def).toBe(false);
+    expect("unit" in def).toBe(false);
+  });
+
+  it("decides a number's Diary.base column the same way a boolean's is", () => {
+    // `showInBase` follows `diaryClassOf` and knows nothing about the type.
+    const shape = { type: "number" } as const;
+    expect(
+      newHabitDef("Pages", [], diarySurface("daily"), shape)?.showInBase
+    ).toBe(true);
+    expect(
+      newHabitDef("Pages", [], journalSurface("study"), shape)?.showInBase
+    ).toBe(false);
+    expect(
+      newHabitDef("Pages", [], diarySurface("daily"), shape)?.showInTemplate
+    ).toBe(false);
+  });
+
+  it("gives a second number habit its own property name", () => {
+    // `taken` is type-blind, and must be: a number named Read and a boolean
+    // named Read would otherwise write the same frontmatter key.
+    const first = newHabitDef("Read", [], diarySurface("daily"), {
+      type: "number",
+    })!;
+    const second = newHabitDef("Read", [first.id], diarySurface("daily"), {
+      type: "number",
+    })!;
+    expect(second.id).toBe("Read2");
+  });
 });
 
 // ── the draft ─────────────────────────────────────────────────────────────
@@ -494,6 +579,47 @@ describe("habitWrites", () => {
     expect(habitWrites(before, draftOf([])).remove).toEqual([
       "tracker:Med|Morning meds",
     ]);
+  });
+
+  // ── A NUMBER ROW (1.0.56), down the same `values` channel ─────────────
+
+  it("writes a number reading where it moved", () => {
+    // `HabitWrites.values` was `[string, number | null][]` before numbers
+    // existed, which is why widening the window needed no new write channel:
+    // only the field the row's value is read from changed.
+    const writes = habitWrites([numRow("Pages", 20)], draftOf([numRow("Pages", 34)]));
+    expect(writes.values).toEqual([["Pages", 34]]);
+    expect(writes.add).toEqual([]);
+    expect(writes.remove).toEqual([]);
+  });
+
+  it("writes a number cycled back to its old reading not at all", () => {
+    // THE CANCELLING PAIR, which is what makes Cancel free, asserted for a
+    // number: stepping 20 → 21 → 20 is not three writes, it is none.
+    expect(
+      habitWrites([numRow("Pages", 20)], draftOf([numRow("Pages", 20)]))
+    ).toEqual({ add: [], remove: [], values: [] });
+  });
+
+  it("writes a zero reading, and does not mistake it for unset", () => {
+    // A number logged at 0 is ANSWERED — nought pages read today — and the
+    // key has to land, or the strip draws a gap where a reader put a number.
+    const writes = habitWrites([numRow("Pages", null)], draftOf([numRow("Pages", 0)]));
+    expect(writes.values).toEqual([["Pages", 0]]);
+  });
+
+  it("writes null for a number cleared back to unset", () => {
+    const writes = habitWrites([numRow("Pages", 7)], draftOf([numRow("Pages", null)]));
+    expect(writes.values).toEqual([["Pages", null]]);
+  });
+
+  it("adds a number habit with no reading, exactly as a boolean", () => {
+    // A number defined in the add box and not stepped has nothing to log:
+    // `applyDirectiveEdits` seeds the property blank, and a null over that
+    // would delete the key it just declared.
+    const writes = habitWrites([], draftOf([numRow("Pages")]));
+    expect(writes.add).toEqual(["tracker:Pages"]);
+    expect(writes.values).toEqual([]);
   });
 
   it("asks for no reading on a habit it is removing", () => {
@@ -695,6 +821,148 @@ describe("the Habits window", () => {
     const s = src();
     expect(s).not.toContain("document.addEventListener");
     expect(s).not.toContain("window.addEventListener");
+  });
+});
+
+// ── defining a number from the add box ────────────────────────────────────
+
+describe("the add box's two types", () => {
+  // THE PATH THAT HAD NO COVERAGE AT ALL. 1.0.56 taught this window to define
+  // a number habit and nothing in the suite read the add box's number branch,
+  // which is how 1.0.57's defect — Enter did nothing from the shape fields —
+  // shipped and had to be reported from a vault.
+  const add = (): string => {
+    const s = readSrc("habits-editor");
+    const at = s.indexOf("private renderAdd(): void {");
+    expect(at).toBeGreaterThan(0);
+    const end = s.indexOf("private renderUsed(): void {", at);
+    expect(end).toBeGreaterThan(at);
+    return s.slice(at, end);
+  };
+
+  it("has a reader-facing label for every habit type", () => {
+    // The picker iterates `HABIT_TYPES`, so a third type is one row in that
+    // array and nothing else — provided the vocabulary knows its name.
+    for (const t of HABIT_TYPES) {
+      expect(TRACKER_TYPE_LABELS[t]).toBeTruthy();
+    }
+    expect(HABIT_TYPES).toEqual(["boolean", "number"]);
+  });
+
+  it("offers the types by iterating the list, in the settings tab's words", () => {
+    const a = add();
+    expect(a).toContain("for (const t of HABIT_TYPES) {");
+    expect(a).toContain(
+      'type.createEl("option", { value: t, text: TRACKER_TYPE_LABELS[t] });'
+    );
+    // And the select is themed, which it was not until 1.0.57: `dropdown` is
+    // the whole of a select's appearance in Obsidian.
+    expect(a).toContain('cls: "dropdown ca-habits-type"');
+  });
+
+  it("records the picked type in the draft and repaints", () => {
+    const a = add();
+    const on = a.slice(
+      a.indexOf('type.addEventListener("change"'),
+      a.indexOf("const shape = wrap.createDiv")
+    );
+    expect(on).toContain(
+      'this.pendingType = type.value === "number" ? "number" : "boolean";'
+    );
+    // The repaint is what reveals the three shape fields: they are drawn by
+    // `renderAdd`, so the change has to come back through it.
+    expect(on).toContain("this.renderBody()");
+  });
+
+  it("reveals the three shape fields for a number only", () => {
+    const a = add();
+    const guard = a.indexOf('if (this.pendingType === "number") {');
+    expect(guard).toBeGreaterThan(0);
+    for (const f of ["field(this.pendingMin", "field(this.pendingMax", "field(this.pendingUnit"]) {
+      expect(a.indexOf(f)).toBeGreaterThan(guard);
+    }
+    // REVEALED, NOT DISABLED: a boolean has no range to answer, so the row is
+    // not there rather than three greyed boxes a reader has to rule out.
+    expect(a).toContain('const shape = wrap.createDiv({ cls: "ca-habits-shape" });');
+    expect(a).not.toContain("disabled");
+  });
+
+  it("reads a blank bound as unanswered and refuses only an inverted one", () => {
+    const a = add();
+    const shapeOf = a.slice(
+      a.indexOf("const shapeOf = ()"),
+      a.indexOf("const shape = shapeOf();")
+    );
+    expect(shapeOf).toContain('if (this.pendingType !== "number") return { type: "boolean" };');
+    expect(shapeOf).toContain("if (!t) return null;");
+    expect(shapeOf).toContain("Number.isFinite(n) ? n : null");
+    expect(shapeOf).toContain("unit: this.pendingUnit.trim() || null,");
+    // THE ONE REFUSAL THE SHAPE EARNS, asserted as its condition and not only
+    // its wording: `buildStepper` clamps low-then-high, so a 10–0 habit pins
+    // every reading to its floor and the `+` visibly does nothing.
+    expect(shapeOf).toContain("if (min != null && max != null && min > max) return null;");
+    expect(a).toContain("The smallest value has to be below the largest one.");
+  });
+
+  it("hands the shape to newHabitDef, which is the only way the type lands", () => {
+    const a = add();
+    const call = a.slice(
+      a.indexOf("const def = newHabitDef("),
+      a.indexOf("if (!def) {")
+    );
+    expect(call.replace(/\s+/g, " ")).toContain("this.surface, shape");
+  });
+
+  it("lets the registry's type win over the picker on a join", () => {
+    const a = add();
+    const join = a.slice(
+      a.indexOf("const known = this.habits.find"),
+      a.indexOf("const shapeOf = ()")
+    );
+    expect(join).toContain("habitRowFor(known,");
+    // Typing a name that already names a habit is a JOIN, and joining Read
+    // with "Number" selected adds the Read that exists rather than a second
+    // property shadowing it. `habitRowFor` reads the type off the definition,
+    // so the picker is not consulted here at all.
+    expect(join).not.toContain("pendingType");
+  });
+
+  it("keeps the picked type after an add and clears the shape", () => {
+    const a = add();
+    const after = a.slice(a.indexOf("this.created.push(def);"));
+    const tail = after.slice(0, after.indexOf("this.renderBody()"));
+    expect(tail).toContain('this.pendingMin = "";');
+    expect(tail).toContain('this.pendingMax = "";');
+    expect(tail).toContain('this.pendingUnit = "";');
+    // The shape described THAT habit; the TYPE describes what the reader is
+    // sitting there entering, and three numbers in a row should not need the
+    // picker set three times.
+    expect(tail).not.toContain("this.pendingType =");
+  });
+
+  it("adds on Enter from every box in the row, and from none outside it", () => {
+    // 1.0.57, AND THE WHOLE OF THE REPORTED BUG. The name field has committed
+    // on Enter since this window existed; the three shape fields arrived in
+    // 1.0.56 with an `input` listener and no `keydown`. So "type it, press
+    // Enter" worked for a Yes/No — where the name box is the only box there
+    // is — and did nothing at all once the reader had tabbed into "Least".
+    const a = add();
+    expect(a).toContain("const enterAdds = (el: HTMLElement): void => {");
+    expect(a).toContain("enterAdds(input);");
+    expect(a).toContain("for (const box of boxes) enterAdds(box);");
+    // ONE HANDLER OVER THE WHOLE ROW, so a fourth field cannot be added
+    // without it: the boxes are collected where they are built.
+    const field = a.slice(a.indexOf("const field = ("), a.indexOf('if (this.pendingType === "number") {'));
+    expect(field).toContain("boxes.push(box);");
+    expect(a.split('addEventListener("keydown"')).toHaveLength(2);
+    // AND THE TYPE SELECT IS DELIBERATELY OUT OF IT: Enter on an open native
+    // dropdown means "take this option", and committing there too would add a
+    // habit on the keystroke that picked what kind it is.
+    expect(a).not.toContain("enterAdds(type)");
+    const handler = a.slice(a.indexOf("const enterAdds = ("), a.indexOf("enterAdds(input);"));
+    expect(handler).toContain('if (evt.key !== "Enter") return;');
+    expect(handler).toContain("evt.preventDefault();");
+    expect(handler).toContain("commit();");
   });
 });
 

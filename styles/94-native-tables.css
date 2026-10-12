@@ -855,7 +855,13 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
 }
 /* WHICH KIND, AND THEN ITS SHAPE. The select sits between the name box and the
    ＋, and the three range fields are a second line under them — a four-control
-   add row at modal width would wrap mid-control. */
+   add row at modal width would wrap mid-control.
+
+   THE BOX ITSELF IS OBSIDIAN'S: the element carries `dropdown` as well as this
+   class (1.0.57), so its height, padding, border and chevron come from the app
+   and line up with the name box beside it. What is left here is how much room
+   it may take, and `.ca-tags-add` centres rather than stretches, so the two
+   controls agree on a baseline without either naming a height. */
 .ca-habits-type {
   flex: 0 0 auto;
   max-width: 11em;

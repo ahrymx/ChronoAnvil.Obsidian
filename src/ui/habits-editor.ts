@@ -409,8 +409,15 @@ export class HabitsEditor extends EditorModal {
     // THE WORDS ARE THE SETTINGS TAB'S, through `TRACKER_TYPE_LABELS` — a
     // reader who defines a habit here and then opens Settings → Trackers must
     // find it filed under the same phrase they picked.
+    // `dropdown` IS OBSIDIAN'S, AND IT WAS THE ONE SELECT IN THE PLUGIN
+    // WITHOUT IT (1.0.57). Every other `<select>` here — the capture window's
+    // destination, the diary link window's five, the settings tab's — carries
+    // it, because that class is the whole of a select's theming: without it the
+    // control falls back to the browser's native widget and renders as a pale
+    // box in a dark modal, which is not what a reader is looking for when they
+    // are looking for a control.
     const type = row.createEl("select", {
-      cls: "ca-habits-type",
+      cls: "dropdown ca-habits-type",
       attr: { "aria-label": "What kind of habit" },
     });
     for (const t of HABIT_TYPES) {
@@ -436,6 +443,9 @@ export class HabitsEditor extends EditorModal {
     // `newHabitDef` sets only the keys that were answered, for its own stated
     // reason about `min: null` being a bound of null.
     const shape = wrap.createDiv({ cls: "ca-habits-shape" });
+    // Collected so Enter can be wired onto every one of them below, once
+    // `commit` exists — see `enterAdds`.
+    const boxes: HTMLInputElement[] = [];
     const field = (
       value: string,
       placeholder: string,
@@ -457,6 +467,7 @@ export class HabitsEditor extends EditorModal {
         keep(box.value);
         this.clearError();
       });
+      boxes.push(box);
     };
     if (this.pendingType === "number") {
       field(this.pendingMin, "Least", "Smallest value", true, (v) => {
@@ -572,11 +583,36 @@ export class HabitsEditor extends EditorModal {
       this.pending = input.value;
       this.clearError();
     });
-    input.addEventListener("keydown", (evt) => {
-      if (evt.key !== "Enter") return;
-      evt.preventDefault();
-      commit();
-    });
+
+    // ── ENTER ADDS, FROM ANY BOX IN THIS ROW (1.0.57) ──────────────────
+    //
+    // THE ONE ASYMMETRY BETWEEN THE TWO TYPES' ADD PATHS, and it was reported
+    // as *"number habits can't be created, but booleans are working as
+    // intended"*. The name field has committed on Enter since this window
+    // existed; the three shape fields arrived in 1.0.56 with an `input`
+    // listener and nothing else. So the gesture that defines a habit — type
+    // it, press Enter — worked for a Yes/No, where the name box is the only
+    // box there is, and did nothing whatever once the reader had tabbed into
+    // "Least" to say how far a number runs. Nothing was written, nothing was
+    // refused, and the window sat there looking like it had not heard.
+    //
+    // A boolean could not reach the dead key and a number could barely avoid
+    // it, which is why one type looked broken and the other looked fine.
+    //
+    // ONE HANDLER OVER THE WHOLE ROW, so a fourth field cannot be added
+    // without it. The TYPE SELECT IS DELIBERATELY NOT IN IT: Enter on an open
+    // native dropdown means "take this option", which fires `change` and
+    // repaints — committing there as well would add a habit on the keystroke
+    // that picked what kind it is.
+    const enterAdds = (el: HTMLElement): void => {
+      el.addEventListener("keydown", (evt) => {
+        if (evt.key !== "Enter") return;
+        evt.preventDefault();
+        commit();
+      });
+    };
+    enterAdds(input);
+    for (const box of boxes) enterAdds(box);
     input.value = this.pending;
 
     const btn = row.createEl("button", {

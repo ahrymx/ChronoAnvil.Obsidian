@@ -5,6 +5,23 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.58] - 2026-10-12
+
+### Fixed
+
+- **A number habit could not be created from the Habits window.** Picking
+  *Number*, typing a name, filling in *Least* or *Most* and pressing Enter did
+  nothing whatever — no habit, no refusal, no sign the window had heard. The
+  name box has committed on Enter since this window existed; the three range
+  fields arrived in 1.0.56 with no key handling at all, so the gesture worked
+  for a Yes/No habit — where the name box is the only box there is — and failed
+  for a number as soon as the reader tabbed on to say how far it runs. Enter now
+  adds from any box in the add row, and the ✚ button was always a way through.
+- **The habit-type picker was the one dropdown in the plugin without
+  Obsidian's own styling**, so it fell back to the browser's native select and
+  drew as a pale box in a dark modal. It now matches every other dropdown in
+  ChronoAnvil, and lines up with the name box beside it.
+
 ## [1.0.57] - 2026-10-12
 
 ### Changed
