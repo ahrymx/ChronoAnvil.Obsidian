@@ -313,13 +313,27 @@ export function entriesOfGrain(
 // monthly, quarterly and yearly — and a scope narrower than what the widget
 // reads is exactly the defect this exists to prevent.
 export function diaryEntryScope(paths: DiaryPaths): (path: string) => boolean {
-  const prefixes = [
-    folderPrefix(paths.diaryRoot),
+  const prefixes = diaryEntryFolders(paths).map(folderPrefix);
+  return (path) => prefixes.some((p) => path.startsWith(p));
+}
+
+// The same six folders, unprefixed, for a watcher that wants the LIST.
+//
+// EXTRACTED IN 1.0.56, AND THE DEFECT IS WHY. `liveScopedWidget` takes folders
+// and applies `folderPrefix` itself, so a caller holding only the predicate
+// above had nothing it could hand over — and the Habits rollup, needing exactly
+// this, shipped 1.0.55 watching `paths.diaryDaily` instead. That is the
+// PRE-4.81 legacy folder: every entry written since then is filed under
+// `diaryRoot`'s period tree, so the rollup drew the right rows on first paint
+// and then sat there while habits were ticked underneath it. One expression,
+// two shapes, no second list to drift.
+export function diaryEntryFolders(paths: DiaryPaths): string[] {
+  return [
+    paths.diaryRoot,
     ...(Object.keys(CONTAINING_GRAIN) as TrackerClass[]).map((g) =>
-      folderPrefix(legacyGrainFolder(paths, g))
+      legacyGrainFolder(paths, g)
     ),
   ];
-  return (path) => prefixes.some((p) => path.startsWith(p));
 }
 
 // ── §2. THE CHAIN ABOVE ONE ENTRY ────────────────────────────────────────

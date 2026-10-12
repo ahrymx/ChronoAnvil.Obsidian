@@ -31,6 +31,21 @@
 //                                              `tracker-picker.ts` hands the
 //                                              editor on "+ New tracker…".
 //
+// WHAT A HABIT IS, AS OF 1.0.56, AND WHY THE WORD MOVED. It was "a boolean
+// tracker" through 1.0.55, and the reader has widened it: *"Habits should no
+// longer mean just the boolean tracker. Habits can be either boolean or number
+// trackers."* Both answer the same question about a day — did I, and how much —
+// and both were being drawn in a 66px cell that suits neither. `HABIT_TYPES` is
+// that sentence, read by everything downstream, and `isHabitType` is the only
+// place a type is compared against it.
+//
+// THE WIDENING IS NOT UNIFORM, AND THE ONE EXCEPTION IS THE CHIP. A habit's
+// resting place in the grid is a 14px chip with a tick in it, and a number has
+// no tick; so the grid's fold-in asks `def.type === "boolean"` directly
+// (`widgets/index.ts`) and a number habit keeps its own stepper cell until a
+// Habits section takes both off the grid. Everything else — this window, the
+// section, the rollup, the folder cloud — asks `isHabitType`.
+//
 // Nothing here writes. Every function is total and pure over its arguments,
 // which is what lets the window hold a draft, let the reader remove four
 // habits and change their mind, and touch the vault exactly once at Save.
@@ -54,6 +69,7 @@ import {
   uniquePropertyName,
   type TrackerDef,
   type TrackerSurface,
+  type TrackerType,
 } from "./trackers";
 
 // A habit's three states, as the chip cycles them: unset, done, not-done.
@@ -90,6 +106,26 @@ export function readHabitState(value: unknown): HabitState {
   return n >= 0.5 ? 1 : 0;
 }
 
+// What a frontmatter value means as a NUMBER habit's reading (1.0.56).
+//
+// `buildStepper`'s OWN COERCION, LIFTED OUT OF IT. That control already has to
+// decide what `""`, `"4.2"` and `"about three"` mean before it can add 1 to
+// them, and its answer — *"a non-numeric or empty stored value shows as '—' and
+// starts stepping from def.min/0"* — is the only answer the rest of the plugin
+// may give, or a reader's strip and a reader's stepper would disagree about
+// whether Tuesday was logged.
+//
+// A ZERO IS A READING. `0` is falsy and finite, and a habit logged as zero
+// kilometres is a day that was answered; the rollup counts it in `logged` and
+// the sparkline draws it at the floor. That is the whole reason this returns
+// `number | null` rather than leaning on `|| null` anywhere.
+export function readHabitNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 // The next state in the cycle the chip and the window share.
 export function nextHabitState(state: HabitState): HabitState {
   return state == null ? 1 : state === 1 ? 0 : null;
@@ -102,13 +138,33 @@ export function describeHabitState(state: HabitState): string {
 
 // ── which habits this note may carry ──────────────────────────────────────
 
+// ── WHICH TRACKER TYPES ARE HABITS (1.0.56) ───────────────────────────────
+//
+// TWO, AND THE LIST IS HERE SO NOTHING COUNTS THEM BY HAND. A boolean asks
+// *did I*, a number asks *how much*, and the reader's call is that both are
+// habits. The other five are not, each for its own reason: a `scale` was
+// offered and withdrawn (*"I changed my mind on emoji scale"*), a `time` and a
+// `date` answer *when* rather than *whether*, a `select` is a category, and
+// `tags` is a list that already has a cell of its own.
+//
+// AN ARRAY RATHER THAN A UNION BECAUSE THE WINDOW ITERATES IT. The add row
+// offers one control per member, so a third type would be a row in a window
+// rather than an edit to a condition.
+export const HABIT_TYPES = ["boolean", "number"] as const;
+
+export type HabitType = (typeof HABIT_TYPES)[number];
+
+export function isHabitType(type: TrackerType): type is HabitType {
+  return (HABIT_TYPES as readonly TrackerType[]).includes(type);
+}
+
 // Every registered habit a note of this surface is allowed to log.
 //
-// A HABIT IS A BOOLEAN TRACKER AND NOTHING ELSE — the same test
-// `habitTrackerFor` applies before it folds a directive into the cell, written
-// once here so the window cannot offer a row the cell would refuse to draw.
-// `derived` is excluded for the reason `TrackerDef.derived` gives: a computed
-// value has no input widget, so there is nothing to tick.
+// A HABIT IS A BOOLEAN OR A NUMBER — `isHabitType` above, which is the same
+// test `habitFromDirective` applies to a note's line, written once so the
+// window cannot offer a row the section would refuse to draw. `derived` is
+// excluded for the reason `TrackerDef.derived` gives: a computed value has no
+// input widget, so there is nothing to tick and nothing to step.
 //
 // SURFACE-FILTERED, because the alternative is a window that offers a monthly
 // habit on a Tuesday and then watches the add fail its own check. `null` means
@@ -120,7 +176,7 @@ export function habitsForSurface(
 ): TrackerDef[] {
   return trackers.filter(
     (t) =>
-      t.type === "boolean" &&
+      isHabitType(t.type) &&
       !t.derived &&
       (surface == null || surfaceAdmits(t.surface, surface))
   );
@@ -172,6 +228,13 @@ export function noteHasHabitsSection(text: string): boolean {
 // THE SURFACE TEST IS WHY A MISPLACED BOOLEAN IS NOT A HABIT HERE. A monthly
 // boolean written onto a daily entry takes the ordinary tracker path and draws
 // its visible refusal; answering `null` is what leaves it there to do that.
+//
+// BOTH HABIT TYPES, AS OF 1.0.56, AND THE GRID STILL ASKS A SECOND QUESTION.
+// This says *is this line a habit*; the grid's fold-in then asks *and is it a
+// boolean*, because only a boolean becomes a chip. Widening here is what makes
+// a number vacate its cell when a Habits section is on the note — the two
+// questions are separate on purpose, and `widgets/index.ts` carries the note
+// about why.
 export function habitFromDirective(
   trackers: readonly TrackerDef[],
   line: string,
@@ -181,7 +244,7 @@ export function habitFromDirective(
   const id = directiveTrackerId(body);
   if (!id) return null;
   const def = trackers.find((t) => t.id === id);
-  if (!def || def.type !== "boolean" || def.derived) return null;
+  if (!def || !isHabitType(def.type) || def.derived) return null;
   if (!directiveAllowedOn(trackers, body, surface)) return null;
   return def;
 }
@@ -234,17 +297,29 @@ export function habitsOnNote(
 export interface HabitUse {
   id: string;
   label: string;
+  // Which of the two the count is a sentence about — see the note below on why
+  // `4` means two different things for the two types.
+  type: HabitType;
   count: number;
 }
 
 // Each habit, with how many notes beneath `folder` have logged it done.
 //
-// DIRECTORY-SCOPED AND DONE-ONLY, for the two reasons `tagsInFolder` gives
+// DIRECTORY-SCOPED AND ANSWERED-ONLY, for the two reasons `tagsInFolder` gives
 // about its own survey. The useful list when logging a Tuesday is what the rest
-// of the week already tracks, not every boolean the vault has ever defined; and
+// of the week already tracks, not every habit the vault has ever defined; and
 // the number beside it has to mean something, so it counts the entries that
-// answered YES rather than the ones that carry the property — a habit seeded
-// blank onto thirty entries is not a habit used thirty times.
+// ANSWERED rather than the ones that carry the property — a habit seeded blank
+// onto thirty entries is not a habit used thirty times.
+//
+// "ANSWERED" IS NOT "DONE", AND 1.0.56 IS WHY. Through 1.0.55 this counted
+// `=== 1`, which is the only sentence a boolean has. A number habit has no
+// "yes": thirty entries logging 4.2km are thirty uses, and a count of zero
+// beside the busiest habit in the vault would be the pill lying about its own
+// list. `habitAnswered` is the per-type test, and the cloud's `title` says
+// which word it means — because for a boolean the two differ, and a reader
+// looking at `Gym 4` is owed the knowledge that four is how many days it was
+// kept and not how many days it was asked.
 //
 // Reads frontmatter through the metadata cache, so a habit logged before this
 // window existed still counts.
@@ -256,15 +331,21 @@ export function habitsInFolder(
   const counts = new Map<string, number>();
   for (const { fm } of pagesUnder(app, folder)) {
     for (const h of habits) {
-      if (readHabitState(fm[h.id]) === 1) {
-        counts.set(h.id, (counts.get(h.id) ?? 0) + 1);
-      }
+      // A boolean still counts the days it was KEPT, which is the stronger and
+      // more useful statement where the type can make it; a number counts the
+      // days it was logged at all, which is the only one it can.
+      const hit =
+        h.type === "number"
+          ? readHabitNumber(fm[h.id]) != null
+          : readHabitState(fm[h.id]) === 1;
+      if (hit) counts.set(h.id, (counts.get(h.id) ?? 0) + 1);
     }
   }
   return habits
     .map((h) => ({
       id: h.id,
       label: h.label || h.id,
+      type: h.type === "number" ? ("number" as const) : ("boolean" as const),
       count: counts.get(h.id) ?? 0,
     }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
@@ -307,6 +388,15 @@ export interface HabitDay {
 
 export interface HabitReading extends HabitDay {
   state: HabitState;
+  // The same stored value, read as a number (1.0.56).
+  //
+  // BOTH, FROM ONE WALK, AND NEITHER IS A SPARE FIELD. These are two readings
+  // of one property rather than two properties: the boolean column's dots want
+  // `state`, the number column's sparkline wants `value`, and which is
+  // meaningful depends on the HABIT, not on the day. So a reading of `4.2`
+  // honestly carries `state: 1` as well — nothing asks a number habit for its
+  // state, and the alternative is two vault walks for one week.
+  value: number | null;
   // Whether that day has an entry at all.
   //
   // TWO FACTS, ONE MARK, AND THE SECOND IS IN THE TOOLTIP. A day nobody wrote
@@ -356,6 +446,7 @@ export function habitWeekReadings(
     return {
       ...day,
       state: file ? readHabitState(frontmatterOf(app, file)[id]) : null,
+      value: file ? readHabitNumber(frontmatterOf(app, file)[id]) : null,
       written: file != null,
     };
   });
@@ -378,7 +469,62 @@ export interface HabitRow {
   // its chip, and a window that displayed it would be offering to rename one
   // thing while renaming another.
   label: string;
-  state: HabitState;
+  // Which control answers it (1.0.56). CARRIED, NOT LOOKED UP, for
+  // `directive`'s own reason one paragraph up: the window holds a draft, and a
+  // row that re-read the registry on every repaint would change shape under a
+  // reader who renamed the habit in Settings in another tab.
+  type: HabitType;
+  // What the reader has answered, as the number that will be written.
+  //
+  // ONE FIELD FOR BOTH TYPES, AND IT IS NOT A COMPROMISE. `HabitState` is
+  // `1 | 0 | null`, which is already a `number | null`, so a boolean's three
+  // states and a number's range are the same channel — and `HabitWrites.values`
+  // has been `[string, number | null][]` since this window existed. `habitWrites`
+  // therefore needs no branch at all: the difference between the draft and the
+  // note is one comparison whatever the type is, which is what keeps the
+  // cancelling-pair promise (a reading cycled back to where it started is not
+  // written) true for a stepper without re-earning it.
+  //
+  // Read a boolean row's state back with `habitRowState`, which narrows it
+  // through the same forgiving parse the chip uses.
+  reading: number | null;
+}
+
+// A boolean row's three-state reading, narrowed from the shared field.
+export function habitRowState(row: HabitRow): HabitState {
+  return readHabitState(row.reading);
+}
+
+// Which habit type a registry row is, as one of the two.
+//
+// NARROWING RATHER THAN ASSERTING. `TrackerDef.type` is one of seven, and every
+// caller of this has already been through `habitsForSurface` or
+// `habitFromDirective`, so the answer is known — but a `def.type as HabitType`
+// is the kind of cast that stops being true when an eighth type is added, and
+// this one simply cannot be wrong.
+export function habitTypeOf(def: TrackerDef): HabitType {
+  return def.type === "number" ? "number" : "boolean";
+}
+
+// The draft row for a habit the note carries, reading its stored value.
+//
+// ONE BUILDER FOR FIVE CALL SITES, which is why it exists: the per-type parse
+// (`readHabitNumber` for one, `readHabitState` for the other) is the thing that
+// would have been copied four times and gone wrong in the fourth. `value` is
+// the raw frontmatter value, or nothing for a habit being put on the entry now.
+export function habitRowFor(
+  def: TrackerDef,
+  directive: string,
+  value?: unknown
+): HabitRow {
+  const type = habitTypeOf(def);
+  return {
+    id: def.id,
+    directive,
+    label: def.label || def.id,
+    type,
+    reading: type === "number" ? readHabitNumber(value) : readHabitState(value),
+  };
 }
 
 export interface HabitDraft {
@@ -416,12 +562,16 @@ export function removeHabitRow(
 }
 
 // Set one row's reading, keeping its position.
-export function setHabitState(
+//
+// TAKES A NUMBER RATHER THAN A STATE (1.0.56), which is the one signature this
+// widening changed. A boolean caller passes `nextHabitState(habitRowState(row))`
+// and gets exactly the old behaviour; a stepper passes its value.
+export function setHabitReading(
   rows: readonly HabitRow[],
   id: string,
-  state: HabitState
+  reading: number | null
 ): HabitRow[] {
-  return rows.map((r) => (r.id === id ? { ...r, state } : r));
+  return rows.map((r) => (r.id === id ? { ...r, reading } : r));
 }
 
 // A habit's name as the reader typed it, or null if it could not be one.
@@ -452,22 +602,50 @@ export function normaliseHabitLabel(raw: string): string | null {
 // `taken` is passed rather than read off the plugin so a batch of names typed
 // in one sitting cannot collide: each call is given the ids the ones before it
 // claimed.
+//
+// THE SHAPE IS THE 1.0.56 ADDITION, and it is optional because the overwhelming
+// majority of habits typed into that field are booleans — a reader who picks
+// "Number" in the window has said so, and everything else keeps the one-argument
+// behaviour it had. `min`, `max` and `unit` are each optional WITHIN the number
+// shape too: `buildStepper` already handles all three being absent (it steps
+// from `def.min ?? 0` and shows a bare value), so a reader who wants a count and
+// not a range leaves them blank rather than inventing bounds. `step` is left
+// undefined and defaults to 1 at the control, which is the right unit for a
+// habit somebody is counting by hand.
+export interface HabitShape {
+  type: HabitType;
+  min?: number | null;
+  max?: number | null;
+  unit?: string | null;
+}
+
 export function newHabitDef(
   label: string,
   taken: Iterable<string>,
-  surface: TrackerSurface | null
+  surface: TrackerSurface | null,
+  shape: HabitShape = { type: "boolean" }
 ): TrackerDef | null {
   const name = normaliseHabitLabel(label);
   if (name == null) return null;
   const seedSurface = surface ?? diarySurface("daily");
-  return {
+  const def: TrackerDef = {
     id: uniquePropertyName(propertyNameFromLabel(name), taken),
     label: name,
-    type: "boolean",
+    type: shape.type,
     surface: seedSurface,
     showInTemplate: false,
     showInBase: diaryClassOf(seedSurface) != null,
   };
+  // SET ONLY WHERE THE READER ANSWERED. An explicit `min: undefined` on the
+  // object is not the same thing as an absent key once this round-trips
+  // through `JSON` into `data.json` — and a `min: null` would be a bound of
+  // null, which `buildStepper` clamps against.
+  if (shape.type === "number") {
+    if (shape.min != null) def.min = shape.min;
+    if (shape.max != null) def.max = shape.max;
+    if (shape.unit) def.unit = shape.unit;
+  }
+  return def;
 }
 
 // ── what Save has to do ───────────────────────────────────────────────────
@@ -504,7 +682,12 @@ export function habitWrites(
   for (const row of draft.rows) {
     const was = before.find((r) => r.id === row.id);
     if (!was) add.push(row.directive);
-    if ((was?.state ?? null) !== row.state) values.push([row.id, row.state]);
+    // ONE COMPARISON, BOTH TYPES — see `HabitRow.reading`. A row the reader
+    // never touched compares equal and is not written, which is what makes
+    // Save minimal and Cancel free.
+    if ((was?.reading ?? null) !== row.reading) {
+      values.push([row.id, row.reading]);
+    }
   }
   return { add, remove, values };
 }

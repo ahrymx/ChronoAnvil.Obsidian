@@ -287,6 +287,41 @@ export function isTrackerClass(v: unknown): v is TrackerClass {
   return typeof v === "string" && (TRACKER_CLASSES as string[]).includes(v);
 }
 
+// ── WHAT THE READER CALLS A TYPE AND A GRAIN ──────────────────────────────
+//
+// BESIDE THE THINGS THEY NAME, AS OF 1.0.56. Both tables lived in
+// `settings-editors.ts` because the settings tab was the only screen that
+// needed them. The Habits window needs both now — it offers a type when a habit
+// is defined and groups the rollup's list under grain headings — and a modal
+// importing a settings module to borrow a string is the import that becomes a
+// cycle. They are vocabulary about `TrackerType` and `TrackerClass`, so they
+// belong where those are declared, and `settings-editors` imports them from
+// here unchanged.
+//
+// THE GRAIN TABLE IS DERIVED, which is the property worth keeping: a new class
+// in `CLASS_DEFS` arrives in every dropdown and every heading without an edit
+// here. `SCOPE_LABELS` (`chart-ui.ts`) and `DERIVED_PATH_LABELS` are
+// hand-written copies of the same five words and predate this; nothing new
+// should add a fourth.
+export const TRACKER_TYPE_LABELS: Record<TrackerType, string> = {
+  number: "Number (stepper)",
+  // WAS "Yes/No (habit)" UNTIL 1.0.56, and the parenthesis had to go rather
+  // than move: a habit is a boolean OR a number now, so a label claiming the
+  // word for one of them contradicts the window that offers both. Callers that
+  // show a short form take `.split(" ")[0]`, which is "Yes/No" either way.
+  boolean: "Yes/No",
+  scale: "Scale (face picker)",
+  time: "Time",
+  date: "Date",
+  select: "Select (dropdown)",
+  tags: "Tags (list)",
+};
+
+export const TRACKER_CLASS_LABELS: Record<TrackerClass, string> = Object.
+  fromEntries(
+    TRACKER_CLASSES.map((c) => [c, `${CLASS_DEFS[c].label} entries`])
+  ) as Record<TrackerClass, string>;
+
 // ── Tracker surfaces ──────────────────────────────────────────────────
 //
 // A class says which *period* a tracker measures, and every field of

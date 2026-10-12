@@ -151,6 +151,7 @@ import {
   type HabitEntry,
 } from "../../trackers/habits";
 import { buildHabitsSection } from "./habits-section";
+import { diaryEntryFolders } from "../../diary/lineage";
 import { buildTrackerStat } from "../../trackers/tracker-stat";
 import {
   describeSurfaceMismatch,
@@ -1621,6 +1622,23 @@ export class Widgets implements
         // because the generic label wrapper is precisely what the chip
         // replaces: the tracker's name belongs *in* the chip, not in an
         // eyebrow above a lone checkbox.
+        //
+        // ── TWO QUESTIONS, IN THIS ORDER (1.0.56) ───────────────────────
+        //
+        // `habitTrackerFor` answers *is this line a habit*, and since 1.0.56 a
+        // habit is a boolean OR a number (`HABIT_TYPES`). The chip is not: it
+        // is 14px wide with a tick in it, and a number has no tick and a range
+        // to show. So the stand-down below is asked of BOTH types and the fold
+        // only of the boolean, which is the whole of the reader's call that
+        // "any tracker the section draws leaves the grid" while nothing changes
+        // for a note without one.
+        //
+        // A NUMBER HABIT WITH NO SECTION FALLS THROUGH, deliberately, and gets
+        // the ordinary `buildFromSpec` cell it has always had — stepper, label
+        // eyebrow, `attachTrackerRemove` ×. Widening the fold instead would
+        // have drawn a stepper into a 14px chip; narrowing the stand-down would
+        // have left a number's cell on the grid beside the section already
+        // drawing it, which is the same tracker twice.
         if (kind === "tracker") {
           const habit = this.habitTrackerFor(line, ctx);
           // ── UNLESS THE NOTE DRAWS A HABITS SECTION (1.0.54) ─────────
@@ -1637,13 +1655,15 @@ export class Widgets implements
           // thing that ever changed was which of the two surfaces drew them.
           //
           // ASKED ONCE PER FENCE, AND ONLY WHEN THERE IS A HABIT TO FOLD. The
-          // read is cheap but it is not free, and a fence with no boolean in it
+          // read is cheap but it is not free, and a fence with no habit in it
           // has no reason to ask.
           if (habit) {
             if (habitsElsewhere == null) {
               habitsElsewhere = noteHasHabitsSection(noteTextNow());
             }
             if (habitsElsewhere) continue;
+          }
+          if (habit && habit.type === "boolean") {
             if (!bar) {
             bar = openActionsBar();
           }
@@ -3444,21 +3464,33 @@ export class Widgets implements
         );
       }
       case "habit-rollup":
-        // LIVE OVER THE HABITS' OWN GRAIN FOLDER, which for every habit anybody
-        // has is the daily one. The widget is made of which entries exist and
-        // what they say, so it has to pass `shouldRefreshPath` — ticking a habit
-        // on today's entry must move the rate on the week's dashboard.
+        // LIVE OVER EVERY FOLDER A DIARY ENTRY CAN BE IN. The widget is made of
+        // which entries exist and what they say, so it has to pass
+        // `shouldRefreshPath` — ticking a habit on today's entry must move the
+        // rate on the week's dashboard.
         //
-        // ONE FOLDER, NOT THE GRAINS OF THE HABITS IT DRAWS. A subscription is
-        // made once, when the widget mounts, and the habits on it can change
-        // afterwards (the window is one click away) — so the scope is the folder
-        // the readings live in by construction rather than a set derived from
-        // this paint's rows. The period is resolved INSIDE the closure, for
-        // `entry-rollup`'s reason: a period-nav click re-reads it and repaints.
+        // ── THE DEFECT THIS LINE SHIPPED WITH, FIXED IN 1.0.56 ──────────
+        //
+        // It was `paths.diaryDaily`, on the reasoning that every habit anybody
+        // has is a daily one. Two things were wrong with that. `diaryDaily` is
+        // the PRE-4.81 folder (`02 - Diary/Daily`) and entries have been filed
+        // under `diaryRoot`'s period tree ever since, so in any vault written
+        // this year the scope matched nothing: the card drew the right rows on
+        // first paint and then sat there. And a habit is not necessarily daily
+        // — that is the whole of the reader's grain ask — so even the premise
+        // was the narrow case.
+        //
+        // `diaryEntryFolders` IS THE WHOLE UNION, derived from the same two
+        // expressions `entriesOfGrain` reads, which is how the reader and the
+        // watcher are kept from disagreeing about where an entry can be. NOT a
+        // set derived from this paint's rows: a subscription is made once when
+        // the widget mounts and the habits on it can change afterwards (the
+        // window is one click away). The period is resolved INSIDE the closure,
+        // for `entry-rollup`'s reason: a period-nav click re-reads and repaints.
         return liveScopedWidget(
           this.plugin,
           ctx,
-          this.plugin.settings.paths.diaryDaily,
+          diaryEntryFolders(this.plugin.settings.paths),
           () => buildHabitRollup(this.plugin, ctx, rest)
         );
       // ONE QUESTION, ONE WIDGET, TWO SPELLINGS (4.16 §1). `level-index` asks

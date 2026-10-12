@@ -5,6 +5,62 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.56] - 2026-10-12
+
+### Added
+
+- **A habit can be a number now, not only a yes/no.** "Habit" has meant the
+  boolean tracker since 1.0.54; it now means a boolean **or** a number (stepper)
+  tracker, everywhere the word appears — the Habits window, the Habits section,
+  the rollup, and the rule that lets a habit leave the 66-pixel grid. Chapters
+  read, kilometres run, glasses of water: the things you count are habits too.
+- **The Habits section splits into two columns.** Yes/no habits on one side,
+  numbers on the other, with a rule between them. A column with nothing in it is
+  not drawn at all, so a vault whose habits are all yes/no sees one full-width
+  list exactly as before, and on a narrow card the two stack. Each column is its
+  own grid on purpose — a 16-pixel tick and a 90-pixel stepper have nothing to
+  align with each other.
+- **A number row shows its stepper, its name, and the week as bars.** Each bar's
+  height is measured against that week's own least and greatest reading, so a
+  week between 3 km and 4 km is a readable shape rather than seven bars of one
+  length. A day with no reading draws no bar, just a faint baseline where it
+  would have been; a day logged at zero draws the shortest one.
+- **The Habits window defines both kinds.** The add box has a dropdown — Yes/No
+  or Number (stepper) — and picking Number reveals three optional fields for a
+  least value, a most and a unit. All three may be left blank, in which case the
+  habit simply counts. A number habit's row in the window carries the same
+  stepper the entry does, and you can type into it.
+- **The rollup reports numbers too.** Where a yes/no habit gets a rate, its runs
+  and a mark per day, a number habit gets its **Σ** total, its average over the
+  days it was *logged* — one 10 km run in a week reads as 10 km, not 1.4 — how
+  many days carried a reading at all, and a strip shaded by each day's size
+  against that period's own least and greatest. There is no streak for a number:
+  a run of a quantity is not a thing this reports.
+- **The rollup window groups habits by which entries they are read from**, with
+  a tick on each heading that shows or hides the whole group at once. A habit
+  logged on more than one kind of entry gets a dropdown of **its own** kinds:
+  left alone it follows the dashboard's own period where that is one of them, so
+  a weekly overview reads a daily-and-weekly habit weekly. Where it is not, the
+  habit waits under **Needs a grain** and the foot of the card counts it. The
+  directive carries the choice as `habit-rollup:stretch@weekly`.
+
+### Fixed
+
+- **A habit logged on more than one kind of entry never appeared in a rollup at
+  all** — no row, and no sentence saying why. The grain came from a function
+  whose whole contract is to refuse a set of more than one, so a habit on daily
+  *and* weekly entries, or one admitted on every surface, was dropped silently.
+  It is now read at the dashboard's own grain where it can be, and counted on
+  the card where it cannot. (1.0.55)
+- **Ticking a habit on today's entry did not repaint a rollup open on a
+  dashboard.** The widget watched `02 - Diary/Daily`, the folder entries were
+  filed in before 4.81, rather than the period tree they have been filed in
+  since. (1.0.55)
+- **A number habit's name in the Habits section would have been permanently
+  greyed**, including on a day with a reading in it: the contrast followed the
+  yes/no row's own done / not-done classes, which a stepper never wears. Caught
+  before it shipped.
+
 ## [1.0.55] - 2026-10-12
 
 ### Added

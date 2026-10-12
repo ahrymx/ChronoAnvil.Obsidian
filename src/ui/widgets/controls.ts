@@ -154,10 +154,19 @@ export function buildSelect(
   return wrap;
 }
 
+// `onChange` IS THE 1.0.56 ADDITION, and it exists for one caller with one
+// problem. The Habits section draws a number habit's week beside its stepper,
+// and this entry's own column is one of the seven — so a reader who steps the
+// value and watches the bar beside it stay put is reading a bug in the strip.
+// `wireHabit` grew the same parameter in 1.0.54 for the same reason about the
+// boolean's dots, and this is that shape: fired AFTER the value is settled
+// (clamped and rounded), so the caller repaints from what was actually stored
+// rather than from what was clicked.
 export function buildStepper(
   host: WidgetHost,
   def: TrackerDef,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  onChange?: (value: number) => void
 ): HTMLElement {
   const step = def.step ?? 1;
   const wrap = createSpan({ cls: "ca-journal-widget ca-journal-stepper" });
@@ -186,6 +195,7 @@ export function buildStepper(
     known = clamped;
     render(); // update immediately — don't wait on the write below
     void host.write(ctx, def.id, clamped);
+    onChange?.(clamped);
   };
 
   minus.addEventListener("click", () => commit((known ?? def.min ?? 0) - step));

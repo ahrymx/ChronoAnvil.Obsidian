@@ -34,13 +34,19 @@ import { statRing } from "../stat-strip";
 import { periodCoverage, today } from "../../core/util";
 import { formatPeriodLabel } from "../../charts/charts";
 import { resolvePeriodBounds } from "../../charts/chart-widgets";
-import { habitsForSurface } from "../../trackers/habits";
+import { habitsForSurface, habitTypeOf } from "../../trackers/habits";
+import type { TrackerClass, TrackerDef } from "../../trackers/trackers";
+import { sparkFraction } from "./habits-section";
 import { isManagedTemplate } from "../../trackers/entry-trackers";
 import {
+  grainOfUnit,
+  grainsOf,
   habitRollupRows,
   noteWithHabitRollup,
+  resolveGrain,
   rollupWindow,
   parseHabitRollupArg,
+  NEEDS_GRAIN,
   type HabitRollupAnswer,
   type HabitRollupRow,
   type HabitSlotReading,
@@ -105,6 +111,16 @@ export function stripCells(slots: readonly HabitSlotReading[]): StripCell[] {
 // the three facts the ring cannot carry.
 export function rollupSub(row: HabitRollupRow): string {
   if (!row.slots.length) return "nothing yet";
+  // A NUMBER HABIT HAS NO STREAK AND NO RATE, so it reports the two facts it
+  // does have: what a logged slot averaged, and how many slots were logged.
+  // `habitRuns` is not asked — a run of a quantity is not a defined thing, and
+  // "days above the mean" is a statistic nobody asked this card for.
+  if (row.type === "number") {
+    const unit = row.unit ? ` ${row.unit}` : "";
+    const avg =
+      row.mean == null ? "nothing logged" : `avg ${round1(row.mean)}${unit}`;
+    return `${avg} · ${row.logged} of ${row.slots.length} logged`;
+  }
   const parts = [`${row.done} of ${row.slots.length}`];
   // THE CURRENT RUN ONLY WHERE THERE IS ONE. "streak 0" is a true statement
   // that reads as a broken counter, and the best run below it already says
@@ -129,9 +145,86 @@ export function stripShade(ratio: number): number {
   return 1 + Math.floor(ratio * 3.999);
 }
 
+// One decimal, and no trailing `.0`.
+//
+// A FUNCTION BECAUSE TWO CALLERS MUST AGREE: the sub-line's average and a
+// bar's tooltip are the same quantity read twice, and `toFixed(1)` in one
+// place and `Math.round` in the other is a card disagreeing with its own
+// hover text.
+export function round1(value: number): string {
+  return String(Math.round(value * 10) / 10);
+}
+
+// The window's own least and greatest readings, or `null` where there are none.
+//
+// THE WINDOW'S RANGE AND NOT THE TRACKER'S DECLARED `min`/`max` — `drawStrip`
+// in `tracker-stat.ts` argues this and the Habits section's sparkline follows
+// it: *"a mood tracker scaled 1–5 whose readings all sit between 3 and 4 would
+// otherwise draw thirty cells of one shade"*.
+export function valueRange(
+  slots: readonly HabitSlotReading[]
+): { lo: number; hi: number } | null {
+  const nums = slots
+    .map((s) => s.value)
+    .filter((v): v is number => v != null);
+  if (!nums.length) return null;
+  return { lo: Math.min(...nums), hi: Math.max(...nums) };
+}
+
+// The marks for a number row.
+//
+// EVERY CELL IS SHADED, NEVER BINARY, which is why this is a second function
+// rather than a flag on the first. `stripCells` draws a single slot as
+// done / not done / nothing — 1.0.54's three-state vocabulary — and a quantity
+// has no such reading: 2 km is not "done" and 0 km is not "not done". So a
+// number's marks are the shade ramp at every width, grouped or not.
+//
+// A GROUP AVERAGES ITS LOGGED SLOTS, not its elapsed ones. A week with one
+// 10 km run reads as 10 km, not as 1.4 — the same `logged`-not-`written`
+// distinction the row's own mean makes, for the same reason.
+export function numberStripCells(
+  slots: readonly HabitSlotReading[],
+  unit: string | null
+): StripCell[] {
+  const range = valueRange(slots);
+  const step = slots.length <= STRIP_CELL_CAP ? 1 : STRIP_GROUP;
+  const said = unit ? ` ${unit}` : "";
+  const out: StripCell[] = [];
+  for (let at = 0; at < slots.length; at += step) {
+    const group = slots.slice(at, at + step);
+    const nums = group
+      .map((s) => s.value)
+      .filter((v): v is number => v != null);
+    const mean = nums.length
+      ? nums.reduce((sum, v) => sum + v, 0) / nums.length
+      : null;
+    const span =
+      step === 1
+        ? group[0].label
+        : `${group[0].label} – ${group[group.length - 1].label}`;
+    out.push({
+      ratio: mean == null || range == null
+        ? null
+        : sparkFraction(mean, range.lo, range.hi),
+      label:
+        mean == null
+          ? `${span}: nothing logged`
+          : `${span}: ${round1(mean)}${said}`,
+      single: false,
+      state: null,
+      written: group.some((g) => g.written),
+    });
+  }
+  return out;
+}
+
 function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
   const strip = parent.createDiv({ cls: "ca-hrollup-strip" });
-  for (const cell of stripCells(row.slots)) {
+  const number = row.type === "number";
+  const cells = number
+    ? numberStripCells(row.slots, row.unit)
+    : stripCells(row.slots);
+  for (const cell of cells) {
     const el = strip.createDiv({ cls: "ca-hrollup-cell" });
     if (cell.single) {
       el.toggleClass("is-done", cell.state === 1);
@@ -150,7 +243,12 @@ function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
     // in both places. No class at all for a group with nothing in it, rather
     // than a fifth stop named "none" — `drawStrip` in `tracker-stat.ts` argues
     // this at length and the base rule is what an empty cell looks like there.
-    if (cell.ratio != null && cell.ratio > 0) {
+    //
+    // `> 0` FOR A BOOLEAN GROUP AND NOT FOR A NUMBER. On a boolean, ratio 0
+    // means nothing was kept and the mark stays blank; on a number, fraction 0
+    // means the LEAST reading of the window, which was logged and must be
+    // visible — the sparkline's 12% floor is the same rule drawn as a height.
+    if (cell.ratio != null && (number || cell.ratio > 0)) {
       el.addClass(`ca-act-${stripShade(cell.ratio)}`);
     }
     el.setAttr("aria-label", cell.label);
@@ -188,10 +286,31 @@ export function buildHabitRollup(
   // `win`, NOT `window`: a local of that name shadows the global inside this
   // function, and the next line anybody writes here is `window.moment(...)`.
   const win = rollupWindow(period.start, period.end, todayIso);
-  const all = habitRollupRows(app, plugin.settings.paths, habits, win);
+  // THE DASHBOARD'S OWN GRAIN IS A FALLBACK AND NOT A FILTER. It decides only
+  // what a habit on several grains is read at when the reader has not said;
+  // a habit that names one grain is read there whatever dashboard this is.
+  const dash = grainOfUnit(period.unit);
+  const all = habitRollupRows(
+    app,
+    plugin.settings.paths,
+    habits,
+    win,
+    answer.grains,
+    dash
+  );
   const label = formatPeriodLabel(period.unit, period.start);
+  // THE SEEDS ARE BUILT HERE AND NOT IN THE DOOR, because the card's count of
+  // habits waiting for a grain and the window's list of them must be one
+  // answer. Two functions returning the same number is the shape that stays
+  // consistent until somebody edits one of them.
+  const seeds = rollupSeeds(habits, all, answer, dash);
+  const registry = rollupRegistry(habits);
+  const waiting = seeds.filter((s) => s.grain == null).length;
+  const asking = waiting
+    ? `${waiting} ${waiting === 1 ? "habit needs" : "habits need"} a grain`
+    : null;
 
-  if (!all.length) {
+  if (!seeds.length) {
     root.appendChild(
       emptyCallout(
         "check-check",
@@ -199,7 +318,7 @@ export function buildHabitRollup(
         "Add one in Settings → ChronoAnvil → Trackers, or on any diary entry, and it is reported here."
       )
     );
-    drawDoor(root, plugin, ctx, all, answer, label);
+    drawDoor(root, plugin, ctx, seeds, registry, dash, answer, label);
     return root;
   }
 
@@ -218,10 +337,16 @@ export function buildHabitRollup(
       emptyCallout(
         "check-check",
         `No habits are shown for ${label}.`,
-        "The habits this rollup names are no longer in the vault — choose some below."
+        // WHICH OF THE TWO REASONS IT IS. Until 1.0.56 a multi-grain habit
+        // vanished from this card with no sentence anywhere, which is the
+        // defect this round exists to fix — so where that is what happened,
+        // the refusal says so instead of blaming the vault.
+        asking
+          ? `${asking} before it can be read — choose one below.`
+          : "The habits this rollup names are no longer in the vault — choose some below."
       )
     );
-    drawDoor(root, plugin, ctx, all, answer, label);
+    drawDoor(root, plugin, ctx, seeds, registry, dash, answer, label);
     return root;
   }
 
@@ -235,21 +360,41 @@ export function buildHabitRollup(
     const el = list.createDiv({ cls: "ca-hrollup-row" });
     el.toggleClass("is-idle", row.done === 0);
 
-    const ring = el.createDiv({ cls: "ca-stat-ring-wrap" });
-    statRing(ring, row.rate ?? 0);
-    el.createSpan({
-      cls: "ca-hrollup-pct",
-      text: row.rate == null ? "—" : `${Math.round(row.rate * 100)}%`,
-    });
+    // A NUMBER HAS NO RATE, SO IT GETS NO RING. A ring is a part of a whole
+    // and there is no whole here — 3 km on a day is not 3 km out of anything —
+    // so the lead is the total, in the two tracks the ring and its percentage
+    // would have taken. One `grid-column: span 2` in the stylesheet, no second
+    // SVG, and the names still start in the same column down the card.
+    const lead =
+      row.type === "number"
+        ? el.createSpan({
+            cls: "ca-hrollup-total",
+            text: `Σ ${round1(row.total)}`,
+          })
+        : null;
+    if (!lead) {
+      const ring = el.createDiv({ cls: "ca-stat-ring-wrap" });
+      statRing(ring, row.rate ?? 0);
+      el.createSpan({
+        cls: "ca-hrollup-pct",
+        text: row.rate == null ? "—" : `${Math.round(row.rate * 100)}%`,
+      });
+      const rate =
+        row.rate == null
+          ? `${row.label} — nothing logged for ${label}`
+          : `${row.label} — ${Math.round(row.rate * 100)}% of ${label}, ${row.written} of ${row.slots.length} entries written`;
+      ring.setAttr("aria-label", rate);
+      ring.setAttr("title", rate);
+    } else {
+      const said = row.unit ? ` ${row.unit}` : "";
+      const total = row.logged
+        ? `${row.label} — ${round1(row.total)}${said} over ${label}, logged on ${row.logged} of ${row.slots.length}`
+        : `${row.label} — nothing logged for ${label}`;
+      lead.setAttr("aria-label", total);
+      lead.setAttr("title", total);
+    }
     el.createSpan({ cls: "ca-hrollup-name", text: row.label });
     el.createSpan({ cls: "ca-hrollup-sub", text: rollupSub(row) });
-
-    const rate =
-      row.rate == null
-        ? `${row.label} — nothing logged for ${label}`
-        : `${row.label} — ${Math.round(row.rate * 100)}% of ${label}, ${row.written} of ${row.slots.length} entries written`;
-    ring.setAttr("aria-label", rate);
-    ring.setAttr("title", rate);
 
     if (answer.strip && row.slots.length) drawStrip(el, row);
   }
@@ -262,16 +407,24 @@ export function buildHabitRollup(
   // the only other thing at the foot of the card, and a card whose last two
   // lines are each one short phrase is two rules of chrome under the content.
   const cover = periodCoverage(period.start, period.end, todayIso);
+  const so =
+    cover.partial && cover.started
+      ? `${cover.elapsed} of ${cover.total} days so far`
+      : null;
   drawDoor(
     root,
     plugin,
     ctx,
-    all,
+    seeds,
+    registry,
+    dash,
     answer,
     label,
-    cover.partial && cover.started
-      ? `${cover.elapsed} of ${cover.total} days so far`
-      : null
+    // BOTH SENTENCES OR EITHER. The coverage note has been on this row since
+    // 1.0.55 and the waiting count is the new one; they are both one short
+    // phrase about the card as a whole, and the foot is where such a phrase
+    // goes rather than taking a rule of its own.
+    [so, asking].filter(Boolean).join(" · ") || null
   );
   return root;
 }
@@ -288,14 +441,20 @@ function drawDoor(
   root: HTMLElement,
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
-  all: readonly HabitRollupRow[],
+  seeds: readonly HabitRollupSeed[],
+  // Registry order, which is what an all-ticked list collapses to. Passed in
+  // rather than read here so the card's list and the window's are one list.
+  registry: readonly string[],
+  // This dashboard's own grain, which the window asks `resolveGrain` for again
+  // after every chooser.
+  dashboard: TrackerClass | null,
   answer: HabitRollupAnswer,
   label: string,
   // The coverage sentence, which only a drawn rollup over a running period has.
   note: string | null = null
 ): void {
   const foot = root.createDiv({ cls: "ca-hrollup-foot" });
-  const text = all.length ? "Choose habits…" : "Add a habit";
+  const text = seeds.length ? "Choose habits…" : "Add a habit";
   // THE SAME DOOR AS THE HABITS SECTION'S, down to the class, because it is the
   // same control in the same family: a dashed row at the foot of a habits card
   // that opens the window behind it. Two spellings of one shape is what 1.0.49
@@ -319,10 +478,11 @@ function drawDoor(
         plugin.app,
         plugin,
         label,
-        rollupSeeds(all, answer.ids),
-        all.map((r) => r.id),
+        seeds,
+        registry,
         answer.strip,
-        (ids, strip) => apply(plugin, ctx, door, ids, strip)
+        dashboard,
+        (next: HabitRollupAnswer) => apply(plugin, ctx, door, next)
       ).open();
     });
   }
@@ -344,26 +504,74 @@ function drawDoor(
 // restated in the UI: the default means "follow the vault", so the window a
 // reader opens on an unanswered section shows them what they are starting from
 // rather than an empty list they have to fill in.
+// BUILT FROM THE DEFINITIONS AND NOT FROM THE ROWS, which is 1.0.56's change
+// and the only way the window can fix anything. A habit waiting for a grain has
+// no row by construction — that is what waiting means — so a window listing
+// rows would list every habit except the ones it exists to settle.
+//
+// A HABIT ON NO DIARY GRAIN IS NOT LISTED AT ALL. A journal tracker has no
+// slots on any of the four dashboards and never had; offering it a chooser of
+// five grains it is not logged on is a control that cannot help. `grainsOf`
+// returns the empty set for it and that is the gate, which is exactly the set
+// `habitRollupRows` skips.
+// The habits this card could report, in registry order.
+//
+// THE SAME GATE AS `rollupSeeds`' AND NOT A SECOND COPY OF IT, because this
+// list is what the all-ticked collapse is compared against: a registry holding
+// one id the seeds do not (or the other way about) makes the two lists
+// permanently unequal, and the window then writes out every id for ever
+// without anything on screen looking wrong.
+export function rollupRegistry(habits: readonly TrackerDef[]): string[] {
+  return habits.filter((h) => grainsOf(h).length > 0).map((h) => h.id);
+}
+
 export function rollupSeeds(
-  all: readonly HabitRollupRow[],
-  ids: readonly string[]
+  habits: readonly TrackerDef[],
+  rows: readonly HabitRollupRow[],
+  answer: HabitRollupAnswer,
+  dashboard: TrackerClass | null
 ): HabitRollupSeed[] {
-  const named = ids.length ? ids : all.map((r) => r.id);
+  const named = answer.ids.length ? answer.ids : habits.map((h) => h.id);
   const place = (id: string): number => {
     const at = named.indexOf(id);
     return at === -1 ? named.length : at;
   };
-  return all
-    .map((r, i) => ({
-      id: r.id,
-      label: r.label,
-      shown: named.includes(r.id),
-      done: r.done,
-      slots: r.slots.length,
-      // Registry position, so the hidden tail keeps the order Settings has it
-      // in rather than whatever the sort happens to do with equal keys.
-      i,
-    }))
+  return habits
+    .map((def, i) => ({ def, i }))
+    .filter(({ def }) => grainsOf(def).length > 0)
+    .map(({ def, i }) => {
+      const grains = grainsOf(def);
+      const chosen = answer.grains[def.id];
+      const grain = resolveGrain(grains, chosen, dashboard);
+      const row = rows.find((r) => r.id === def.id);
+      return {
+        id: def.id,
+        label: def.label || def.id,
+        shown: named.includes(def.id),
+        type: habitTypeOf(def),
+        grains,
+        // WHAT THE READER SAID, kept apart from what it resolved to. The
+        // chooser draws this one: a habit sitting in the Weekly group because
+        // the dashboard is weekly has chosen nothing, and a `<select>` showing
+        // "Weekly entries" as though it had would write that grain into the
+        // note the next time anything else was saved.
+        chosen: grains.includes(chosen) ? chosen : null,
+        // `null` IS "WAITING", and it is the card's count as well as the
+        // window's trailing group. A habit with no diary grain at all never
+        // reaches here, so the two meanings cannot be confused.
+        grain: grain === NEEDS_GRAIN ? null : grain,
+        // WHICHEVER COUNT THE TYPE MEANS. A number habit's `done` would be
+        // the slots whose reading happened to equal 1 — true, and about
+        // nothing — so a number seed carries the slots it was LOGGED on, which
+        // is the fact the row reports and the one a reader deciding what to
+        // leave out is entitled to see.
+        done: (habitTypeOf(def) === "number" ? row?.logged : row?.done) ?? 0,
+        slots: row?.slots.length ?? 0,
+        // Registry position, so the hidden tail keeps the order Settings has it
+        // in rather than whatever the sort happens to do with equal keys.
+        i,
+      };
+    })
     .sort((a, b) => place(a.id) - place(b.id) || a.i - b.i)
     .map(({ i: _i, ...seed }) => seed);
 }
@@ -378,8 +586,7 @@ async function apply(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   anchor: HTMLElement,
-  ids: readonly string[],
-  strip: boolean
+  answer: HabitRollupAnswer
 ): Promise<void> {
   const info = ctx.getSectionInfo(anchor);
   const file = plugin.app.vault.getFileByPath(ctx.sourcePath);
@@ -395,8 +602,7 @@ async function apply(
     lines
       .slice(info.lineStart + 1, info.lineEnd)
       .find((l) => /^\s*habit-rollup(:|\s*$)/.test(l)) ?? "",
-    ids,
-    strip
+    answer
   );
   if (!out) {
     // BOTH ANSWERS ARE REPORTED, and this is the one the window has already

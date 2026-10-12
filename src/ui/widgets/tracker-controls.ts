@@ -54,8 +54,8 @@ import {
   surfacePathConfig,
 } from "../../trackers/entry-trackers";
 import {
+  habitRowFor,
   habitsForSurface,
-  readHabitState,
   type HabitEntry,
   type HabitRow,
 } from "../../trackers/habits";
@@ -282,12 +282,9 @@ export function openHabitsWindow(
   const file = deps.fileOf(ctx);
   if (!file) return;
   const surface = noteSurfaceOf(deps.plugin.app, deps.plugin, ctx.sourcePath);
-  const before: HabitRow[] = entries.map((e) => ({
-    id: e.def.id,
-    directive: e.directive,
-    label: e.def.label || e.def.id,
-    state: readHabitState(deps.currentValue(ctx, e.def.id)),
-  }));
+  const before: HabitRow[] = entries.map((e) =>
+    habitRowFor(e.def, e.directive, deps.currentValue(ctx, e.def.id))
+  );
   new HabitsEditor(
     deps.plugin.app,
     deps.plugin,

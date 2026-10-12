@@ -685,7 +685,7 @@ export const WIDGETS: Record<string, WidgetSpec> = {
     // way `entry-rollup` does; this is the string the widget door offers.
     bar: "✅ Habits this period",
     blurb:
-      "Each habit's completion rate, current and best run, and a mark per day of this period.",
+      "Each habit over this period: a rate and its runs for a yes/no habit, a total and an average for a number, and a mark per day under both.",
     category: "trackers",
     // IT REFUSES, IN ITS OWN WORDS, and the sentence is `entry-rollup`'s
     // because the argument is the same one: this widget's whole scope is "the

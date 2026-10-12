@@ -85,7 +85,7 @@ Directives:
 - `sleep` — the coupled Wake-Up + Bedtime control with a live asleep/awake readout; re-derives the `Sleep` property on change.
 - `sleep-summary` — sleep stats across all daily entries (average, typical times, range).
 - `tracker-stat:<tracker>` — one tracker's latest reading, its average and its streak, over a month-long density strip. The tracker is named by its id from Settings → Trackers.
-- `habit-rollup[:<habit ids>][,no-strip]` — **Habits this week/month/quarter/year**: one row per habit, with the share of the period it was kept as a ring, the current and best runs, and a mark per day underneath — filled where it was kept, hollow where it was answered no, empty where nothing was written. A year draws one mark per week instead of per day. Scoped by the host note's `week-start` / `month-start` / `quarter-start` / `year-start` property, clipped to today, so a month half gone is measured against the days that have happened. Bare, it reports every habit the vault has; the **Choose habits…** row at the foot of the card opens a window to pick which of them, put them in order, and turn the strips off. Ships on all four period dashboards.
+- `habit-rollup[:<habit id>[@<grain>],…][,no-strip]` — **Habits this week/month/quarter/year**: one row per habit. A yes/no habit reports the share of the period it was kept as a ring, the current and best runs, and a mark per day underneath — filled where it was kept, hollow where it was answered no, empty where nothing was written. A number habit reports its total (**Σ**), its average over the days it was logged, and a strip shaded by how large each day's reading was against that period's own least and greatest. A year draws one mark per week instead of per day. Scoped by the host note's `week-start` / `month-start` / `quarter-start` / `year-start` property, clipped to today, so a month half gone is measured against the days that have happened. A habit logged on more than one kind of entry takes `@daily`, `@weekly`, `@monthly`, `@quarterly` or `@yearly` to say which to read; without one it follows this dashboard's own period where it can and waits to be told where it cannot. Bare, it reports every habit the vault has; the **Choose habits…** row at the foot of the card opens a window to pick which of them, put them in order, choose their grains, and turn the strips off. Ships on all four period dashboards.
 - `button:<action>[:arg]` — a button. Diary/chart actions: `today`, `this-month`, `new-diary`, `new-monthly`, `week-prev`/`week-this`/`week-next`, `month-prev`/`month-this`/`month-next`, `chart-add`/`chart-edit`/`chart-remove`, `tracker-add`/`tracker-remove`, `log:<trackerId>:<delta>`.
 - `button:<typeId>:<action>[:arg]` — a journal-type button, scoped to a registered type (`study` or a custom type id). Actions: `new-journal`, `new-container`/`new-topic`, `new-lesson:<folder>`, `new-practice:<folder>`, `refresh`. E.g. `button:study:new-lesson:<folder>`.
 - `entry-header[:home,week,month]` — the unified top strip: an editable title (writes the note's `title` property; empty shows the date plus an "Add a title…" hint), quick links, and a compact prev/next navigator, in one bar. Used at the top of the daily and monthly templates in place of separate links + nav rows.
@@ -229,9 +229,14 @@ other is the **+** in the cell's top-right corner, which sits beside the HABITS
 label rather than in the row so that no number or length of habit names can
 push it out of view.
 
-In the window — the Tags window's shape, for the same reason: each habit has
+A **habit** is a yes/no tracker or a number one — chapters read, kilometres run,
+glasses of water. Everything below holds for both; where they differ it is the
+control, because a quantity has no tick.
+
+In the window — the Tags window's shape, for the same reason: a yes/no habit has
 its **box** (the same unset → done → not-done cycle, so the habits behind the
-+N card are still tickable), can be **renamed** (pencil) or **removed from this
++N card are still tickable) and a number habit has a **stepper** you can also
+type into, both can be **renamed** (pencil) or **removed from this
 entry** (×); an add box takes a new one; and below that is every habit the
 registry holds, as pills you can tap to put on this entry or take off, each
 with a count of how many notes **in this note's own folder** have logged it
@@ -241,44 +246,67 @@ done. Two differences from Tags worth knowing:
   the pencil changes it in Settings → Trackers, on every entry, and in the
   `Diary.base` column header.
 - **A new name defines a habit.** Typing one that doesn't exist creates a
-  boolean tracker in Settings → Trackers — surface set to this note's,
-  **not** added to the template, with a `Diary.base` column — and puts it on
-  this entry. Existing entries are untouched. Typing a name that already is a
-  habit adds that one rather than defining a second with the same label.
+  tracker in Settings → Trackers — surface set to this note's, **not** added
+  to the template, with a `Diary.base` column — and puts it on this entry.
+  The dropdown beside the box says which kind: **Yes/No**, or **Number
+  (stepper)**, which reveals three optional fields for a least value, a most
+  and a unit (all three may be left blank — then it simply counts). Existing
+  entries are untouched. Typing a name that already is a habit adds that one
+  rather than defining a second with the same label.
 
 Nothing is written until you press Save, Cancel included: the whole thing — the
 ticks, the renames, the habits defined, what came on and off the entry — is one
 write at the end.
 
-**The Habits section.** The cell is 66 pixels tall, which is the right box for a
-number and the wrong box for a list — so habits can leave the grid instead. Add
-**Habits** from *Edit sections…* → **Trackers** on a diary entry and the same
-habits are drawn full width below the banner: one row each, with its box, its
-name, and **the week it sits in** behind it. The seven days are Monday to
-Sunday, read from the entries either side of this one, and this entry's own
-column is named at the top of the card. A filled dot is a day you marked done,
-a ring is a day you marked not-done, and a small faint dot is a day with nothing
-recorded — which covers both a day you have no entry for and a day whose habit
-you did not answer; hovering says which. The row at the foot of the card opens
-the same Habits window the cell's **+** does.
+**The Habits section.** The grid cell is 66 pixels tall, which is the right box
+for one reading and the wrong box for a list of them — so habits can leave the
+grid instead. Add **Habits** from *Edit sections…* → **Trackers** on a diary
+entry and the same habits are drawn full width below the banner, in **two
+columns**: the yes/no ones on the left and the numbers on the right, with a rule
+between them. A column that has nothing in it is not drawn at all, so a vault
+whose habits are all yes/no sees one full-width list, and on a narrow card the
+two stack.
 
-While the section is on the note the **Habits cell leaves the grid**, so the two
-are never both drawn and the grid closes up around the space. Nothing in the
-note is rewritten to do that: it is still one `tracker:<id>` line per habit, so
-removing the section puts the cell back with every chip and every reading
-intact. On a weekly entry or any other grain the rows are box and name with no
-week behind them — the box writes the property of the note you are on, and on a
-weekly entry the seven columns would be seven other notes.
+A yes/no row is its box, its name, and **the week it sits in** behind it: a
+filled dot is a day you marked done, a ring is a day you marked not-done, and a
+small faint dot is a day with nothing recorded — which covers both a day you
+have no entry for and a day whose habit you did not answer; hovering says which.
+A number row is its stepper, its name, and the same week drawn as **bars**,
+each one's height measured against that week's own least and greatest reading
+— so a week between 3 km and 4 km is still a readable shape rather than seven
+bars of one length. A day with no reading draws no bar, just a faint baseline
+where it would have been. The seven days are Monday to Sunday, read from the
+entries either side of this one, and this entry's own column is named at the top
+of each list. The row at the foot of the card opens the same Habits window the
+cell's **+** does.
+
+While the section is on the note **every habit leaves the grid**, both kinds, so
+the two are never both drawn and the grid closes up around the space. Nothing in
+the note is rewritten to do that: it is still one `tracker:<id>` line per habit,
+so removing the section puts the cells back with every chip and every reading
+intact. Because a number habit's cell goes with them, the window's × is where
+you take one off the entry while the section is on. On a weekly entry or any
+other grain the rows are the control and the name with no week behind them —
+the control writes the property of the note you are on, and on a weekly entry
+the seven columns would be seven other notes.
 
 **The Habits rollup.** The same habits, a period at a time. It ships on all four
 period overviews — week, month, quarter and year — and it is read-only: every
 mark on it belongs to another note, so there is nothing on the card a click
-could honestly change. One row per habit: the share of the period it was kept,
-drawn as a ring and said as a percentage; the current run and the best one; and
-under them a mark per day of the period, filled where it was kept, hollow where
-you answered no, and empty where nothing was written. A year draws one mark per
-*week* instead, shaded by how much of that week was kept — a mark that means one
-day is yes or no, and a mark that means seven days has an amount.
+could honestly change. One row per habit. For a **yes/no** habit: the share of
+the period it was kept, drawn as a ring and said as a percentage; the current run
+and the best one; and under them a mark per day of the period, filled where it
+was kept, hollow where you answered no, and empty where nothing was written. A
+year draws one mark per *week* instead, shaded by how much of that week was kept
+— a mark that means one day is yes or no, and a mark that means seven days has
+an amount.
+
+For a **number** habit: its **Σ** total where the ring would be, its average
+over the days it was *logged* — not over the days that have passed, so one
+10 km run in a week reads as 10 km — how many of those days carried a reading
+at all, and a strip shaded by each day's size against that period's own least
+and greatest. There is no streak: a run of a quantity is not a thing this
+reports.
 
 The rate is measured against the days that have **happened**, not the whole
 period, so a month half gone is not reported as half missed; the foot of the card
@@ -287,6 +315,18 @@ habit the vault has, including ones you define later. The **Choose habits…** r
 at the foot opens a window to pick which habits it reports, put them in the order
 you want to read them in, and turn the day strips off — the window's counts are
 this period's, so you can see what you are hiding before you hide it.
+
+**Which entries a habit is read from.** Not every tracker lives on daily
+entries, and some live on several. The window groups the habits by the kind of
+entry each is read from — **Daily entries**, **Weekly entries** and so on — with
+a tick on each heading that shows or hides the whole group at once. A habit
+logged on only one kind needs no choice and is simply filed under it. A habit
+logged on more than one gets a small dropdown of **its own** kinds: left at
+*Not chosen* it follows this dashboard's own period when that is one of them —
+so a weekly overview reads a daily-and-weekly habit weekly — and when it is not,
+it waits under **Needs a grain** and is left off the card until you say. The foot
+of the card counts those, so a habit missing from the rollup says so instead of
+simply not being there.
 
 It does not replace **Trends and statistics**. A chart draws a line over time;
 this draws a rate, two runs and a calendar of kept days, and both sit under

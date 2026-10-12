@@ -616,11 +616,12 @@ const ENTRY_DECLS: EntryDecl[] = [
     // specific types."*
     //
     // The grid above is one box per tracker, 66px tall and clipped, which is
-    // the right box for a number and the wrong box for a list — every boolean
-    // the reader keeps folds into ONE of those cells and gets two rows of 14px
-    // chips to do it in. This is the type leaving the grid: one row per habit,
-    // full width, with the week behind it. `habits-section.ts` carries the
-    // design; what is declared here is that an entry may have one.
+    // the right box for one reading and the wrong box for a list of them —
+    // every boolean the reader keeps folds into ONE of those cells and gets two
+    // rows of 14px chips to do it in. This is the types leaving the grid: one
+    // row per habit, full width, with the week behind it, in two columns since
+    // 1.0.56 — booleans one side, numbers the other. `habits-section.ts`
+    // carries the design; what is declared here is that an entry may have one.
     //
     // FIRST IN THE SHARED BAND, DIRECTLY UNDER THE GRID IT CAME OUT OF. The
     // band's order is this list's order, and a section that exists because the
@@ -628,7 +629,8 @@ const ENTRY_DECLS: EntryDecl[] = [
     // reader's prose.
     //
     // OPT-IN, ON `bridge`'s IDIOM AND FOR A STRONGER REASON THAN ITS OWN. A
-    // fresh vault defines no habits — no shipped tracker is a boolean — so a
+    // fresh vault defines no habits — no shipped tracker is a boolean, and the
+    // numbers it ships are derived or scale — so a
     // section composed by default would be an empty card on every entry ever
     // written, and the grain that does have habits has them in a cell that
     // already works. Returning null without `ctx.extra` is also what keeps
@@ -645,7 +647,7 @@ const ENTRY_DECLS: EntryDecl[] = [
     id: "habits",
     label: "Habits",
     blurb:
-      "Every habit this entry logs, one per row, with the week behind it.",
+      "Every habit this entry logs, one per row with the week behind it: yes/no habits one side, numbers the other.",
     icon: "✅",
     category: "trackers",
     locked: false,

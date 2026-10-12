@@ -53,8 +53,9 @@ import type ChronoAnvilPlugin from "../main";
 import { DEFAULT_MOOD_FACES } from "./constants";
 import {
   CLASS_DEFS,
+  TRACKER_CLASS_LABELS,
   TRACKER_CLASSES,
-  TrackerClass,
+  TRACKER_TYPE_LABELS,
   TrackerDef,
   TrackerSurface,
   TrackerType,
@@ -102,16 +103,6 @@ import {
 } from "../journals/kind-columns";
 import type { KindColumn, KindColumnKey } from "../journals/kind-columns";
 
-export const TRACKER_TYPE_LABELS: Record<TrackerType, string> = {
-  number: "Number (stepper)",
-  scale: "Scale (face picker)",
-  boolean: "Yes/No (habit)",
-  time: "Time",
-  date: "Date",
-  select: "Select (dropdown)",
-  tags: "Tags (list)",
-};
-
 // The types a reader may CREATE. `tags` is not one of them, for the reason
 // `derived` is not: it is a built-in the plugin owns, its property name is
 // Obsidian's rather than the registry's, and a second tracker writing a list
@@ -127,12 +118,12 @@ export const CREATABLE_TRACKER_TYPES: TrackerType[] = [
   "select",
 ];
 
-// Dropdown labels for the class, derived from the class table so a new class
-// arrives here without an edit.
-export const TRACKER_CLASS_LABELS: Record<TrackerClass, string> = Object.
-  fromEntries(
-    TRACKER_CLASSES.map((c) => [c, `${CLASS_DEFS[c].label} entries`])
-  ) as Record<TrackerClass, string>;
+// THE TWO LABEL TABLES MOVED TO `trackers.ts` IN 1.0.56 and are re-exported
+// here, because the Habits window needs them and a modal must not import this
+// module to get a string. Re-exported rather than relocated at every call site:
+// settings is still where most of them are read, and the alternative was a
+// twenty-file import churn in a release that is about habits.
+export { TRACKER_CLASS_LABELS, TRACKER_TYPE_LABELS };
 
 // Every surface a user-defined tracker may be given, as (key, label, surface)
 // triples in dropdown order: the diary classes first (shortest period first,

@@ -25,17 +25,31 @@ import {
   HABIT_ROLLUP_DIRECTIVE,
   HABIT_ROLLUP_PROBE,
   NO_STRIP_FLAG,
+  GRAIN_MARK,
+  NEEDS_GRAIN,
+  grainOfUnit,
+  grainsOf,
+  habitRollupAnswer,
   habitRollupArg,
-  habitRollupIds,
   habitRollupLine,
   habitRollupRows,
   habitRuns,
   habitSlots,
   noteWithHabitRollup,
   parseHabitRollupArg,
+  resolveGrain,
   rollupWindow,
+  type HabitRollupAnswer,
 } from "../src/trackers/habit-rollup";
-import { rollupSub, stripCells, stripShade } from "../src/ui/widgets/habit-rollup-view";
+import {
+  numberStripCells,
+  rollupSeeds,
+  rollupSub,
+  rollupRegistry,
+  stripCells,
+  stripShade,
+  valueRange,
+} from "../src/ui/widgets/habit-rollup-view";
 import { longestStreak } from "../src/review/year-stats";
 import { type HabitState } from "../src/trackers/habits";
 import { DEFAULT_PATHS } from "../src/core/constants";
@@ -46,7 +60,12 @@ import {
   detectDiarySections,
   diarySectionModel,
 } from "../src/diary/diary-sections";
-import { TRACKER_CLASSES, diarySurface, type TrackerDef } from "../src/trackers/trackers";
+import {
+  TRACKER_CLASSES,
+  diarySurface,
+  type TrackerClass,
+  type TrackerDef,
+} from "../src/trackers/trackers";
 import { readSrc, readCode, cssRule, cssRules, fnBody } from "./sources";
 import { BUNDLED_ASSETS } from "../generated/bundled-assets";
 
@@ -60,6 +79,33 @@ const habit = (id: string, grain = "daily"): TrackerDef =>
     surface: diarySurface(grain as (typeof TRACKER_CLASSES)[number]),
   }) as TrackerDef;
 
+// A number habit, 1.0.56 — the other half of what the word now means.
+const metre = (id: string, grain = "daily", unit?: string): TrackerDef =>
+  ({
+    id,
+    label: id,
+    type: "number",
+    unit,
+    surface: diarySurface(grain as (typeof TRACKER_CLASSES)[number]),
+  }) as TrackerDef;
+
+// A habit on SEVERAL grains, which is the shape 1.0.55 dropped without a word.
+const spread = (id: string, ...grains: string[]): TrackerDef =>
+  ({
+    id,
+    label: id,
+    type: "boolean",
+    surface: { kind: "diary", classes: grains },
+  }) as unknown as TrackerDef;
+
+// An answer, spelled out, so a test that cares about one field says so and the
+// other two cannot drift into being the thing it accidentally asserts.
+const ans = (
+  ids: string[] = [],
+  grains: HabitRollupAnswer["grains"] = {},
+  strip = true
+): HabitRollupAnswer => ({ ids, grains, strip });
+
 // ── THE GRAMMAR ───────────────────────────────────────────────────────────
 //
 // One line, two answers in it, and the ordinary form has neither. The flag is
@@ -68,7 +114,7 @@ const habit = (id: string, grain = "daily"): TrackerDef =>
 // note carries the argument, and these are the forms it claims to read.
 describe("the habit-rollup grammar", () => {
   it("reads the bare keyword as every habit, with strips", () => {
-    expect(parseHabitRollupArg("")).toEqual({ ids: [], strip: true });
+    expect(parseHabitRollupArg("")).toEqual(ans());
   });
 
   it("reads a list as the reader's order", () => {
@@ -79,13 +125,12 @@ describe("the habit-rollup grammar", () => {
   });
 
   it("reads the flag anywhere in the list, and takes it out of the ids", () => {
-    expect(parseHabitRollupArg("Read,no-strip")).toEqual({
-      ids: ["Read"],
-      strip: false,
-    });
+    expect(parseHabitRollupArg("Read,no-strip")).toEqual(
+      ans(["Read"], {}, false)
+    );
     // The `tasks-table:,period` idiom — a leading empty member is the "no
     // argument, one flag" spelling and must not arrive as an id.
-    expect(parseHabitRollupArg(",no-strip")).toEqual({ ids: [], strip: false });
+    expect(parseHabitRollupArg(",no-strip")).toEqual(ans([], {}, false));
     expect(parseHabitRollupArg("no-strip,Read").ids).toEqual(["Read"]);
     expect(parseHabitRollupArg(" NO-STRIP ").strip).toBe(false);
   });
@@ -97,10 +142,16 @@ describe("the habit-rollup grammar", () => {
       "habit-rollup:Read,Gym",
       "habit-rollup:no-strip",
       "habit-rollup:Read,Gym,no-strip",
+      // AND EVERY GRAIN FORM (1.0.56). A suffix that parses and re-emits
+      // differently is a window that rewrites a line it was only reading.
+      "habit-rollup:Read@weekly",
+      "habit-rollup:Read@weekly,Gym",
+      "habit-rollup:Read,Gym@monthly,no-strip",
+      "habit-rollup:Read@daily,Gym@yearly,Floss@quarterly",
     ]) {
       const arg = line.includes(":") ? line.slice(line.indexOf(":") + 1) : "";
       const answer = parseHabitRollupArg(arg);
-      expect(habitRollupLine(answer.ids, answer.strip)).toBe(line);
+      expect(habitRollupLine(answer)).toBe(line);
     }
   });
 
@@ -108,13 +159,15 @@ describe("the habit-rollup grammar", () => {
     // THE DEFAULT WRITES NOTHING — the attachments round's rule, pointed at
     // membership. A composed section is the bare keyword, so a habit defined
     // next month appears without anybody editing a note.
-    expect(habitRollupLine([], true)).toBe(HABIT_ROLLUP_DIRECTIVE);
-    expect(habitRollupArg([], true)).toBe("");
-    expect(habitRollupLine([], false)).toBe(`habit-rollup:${NO_STRIP_FLAG}`);
+    expect(habitRollupLine(ans())).toBe(HABIT_ROLLUP_DIRECTIVE);
+    expect(habitRollupArg(ans())).toBe("");
+    expect(habitRollupLine(ans([], {}, false))).toBe(
+      `habit-rollup:${NO_STRIP_FLAG}`
+    );
   });
 
   it("drops the blanks a hand-edited line can carry", () => {
-    expect(habitRollupArg([" Read ", "", "Gym"], true)).toBe("Read,Gym");
+    expect(habitRollupArg(ans([" Read ", "", "Gym"]))).toBe("Read,Gym");
   });
 
   it("is anchored at both ends", () => {
@@ -448,6 +501,185 @@ describe("habitRollupRows", () => {
     } as unknown as TrackerDef;
     expect(habitRollupRows(app, DEFAULT_PATHS, [journal], win)).toEqual([]);
   });
+
+  // ── DEFECT 1, WALKED (1.0.55 → 1.0.56) ─────────────────────────────────
+  //
+  // THE TEST THAT FAILS ON 1.0.55 AND IS THE REASON THIS ROUND EXISTS. A habit
+  // on two grains asked `scopesFor(def)[0]`, which answers through
+  // `diaryClassOf`, which returns `null` for a set of more than one ON PURPOSE
+  // — so the habit drew no row and no refusal either. Three fixtures, because
+  // the fix has three arms and only one of them is "it appears at all".
+  describe("a habit on more than one grain", () => {
+    const both = spread("Stretch", "daily", "weekly");
+    const ANY = {
+      id: "Stretch",
+      label: "Stretch",
+      type: "boolean",
+      surface: { kind: "any" },
+    } as unknown as TrackerDef;
+
+    const vault = () =>
+      vaultOf({
+        ...Object.fromEntries([
+          day("2026-10-01", { Stretch: 1 }),
+          day("2026-10-02", { Stretch: 1 }),
+        ]),
+        [`${DEFAULT_PATHS.diaryWeekly}/Week-2026-W41.md`]: {
+          "week-start": "2026-10-05",
+          Stretch: 1,
+        },
+      }).app;
+
+    it("is read at the dashboard's own grain when it names it", () => {
+      const [row] = habitRollupRows(vault(), DEFAULT_PATHS, [both], win, {}, "daily");
+      expect(row.grain).toBe("daily");
+      expect(row.done).toBe(2);
+    });
+
+    it("is read at the grain the reader chose, over the dashboard's", () => {
+      const month = { start: "2026-10-01", end: "2026-10-31" };
+      const [row] = habitRollupRows(
+        vault(),
+        DEFAULT_PATHS,
+        [both],
+        month,
+        { Stretch: "weekly" },
+        "daily"
+      );
+      expect(row.grain).toBe("weekly");
+      expect(row.done).toBe(1);
+      expect(row.slots.length).toBeLessThan(6);
+    });
+
+    it("draws no row where the dashboard's grain is not one of its own", () => {
+      // AND THIS IS NOT THE OLD BUG. The row is absent for a stated reason the
+      // card counts and the window fixes — 1.0.55 dropped it when the habit
+      // named TWO grains however well either fitted, which these three cases
+      // together are what separate.
+      const month = { start: "2026-10-01", end: "2026-10-31" };
+      expect(
+        habitRollupRows(vault(), DEFAULT_PATHS, [both], month, {}, "monthly")
+      ).toEqual([]);
+      // A STALE CHOICE IS NOT HONOURED EITHER. `quarterly` is not one of this
+      // habit's grains, so the line is read as saying nothing.
+      expect(
+        habitRollupRows(
+          vault(),
+          DEFAULT_PATHS,
+          [both],
+          month,
+          { Stretch: "quarterly" },
+          "monthly"
+        )
+      ).toEqual([]);
+    });
+
+    it("reads a tracker admitted everywhere at whatever grain the dashboard is", () => {
+      // `kind: "any"` FALLS OUT rather than being decided: every grain is
+      // among its own, so clause 3 always fires and there is nothing to ask.
+      const [row] = habitRollupRows(vault(), DEFAULT_PATHS, [ANY], win, {}, "daily");
+      expect(row.grain).toBe("daily");
+      const month = { start: "2026-10-01", end: "2026-10-31" };
+      const [weekly] = habitRollupRows(
+        vault(),
+        DEFAULT_PATHS,
+        [ANY],
+        month,
+        {},
+        "weekly"
+      );
+      expect(weekly.grain).toBe("weekly");
+    });
+
+    it("needs no dashboard and no choice for a habit that names one grain", () => {
+      // THE PROPERTY WORTH PROTECTING, and the reason clause 2 sits above
+      // clause 3: nothing changes denominator for the habits every vault
+      // already has. This is 1.0.55's behaviour, asserted so widening cannot
+      // quietly take it.
+      const [row] = habitRollupRows(
+        vault(),
+        DEFAULT_PATHS,
+        [habit("Stretch")],
+        win,
+        {},
+        "monthly"
+      );
+      expect(row.grain).toBe("daily");
+    });
+  });
+
+  // ── THE NUMBER HALF (1.0.56) ───────────────────────────────────────────
+  describe("a number habit", () => {
+    const NUM = Object.fromEntries([
+      day("2026-10-01", { Run: 5 }),
+      day("2026-10-02", { Run: 0 }),
+      day("2026-10-03", { Run: "nope" }),
+      // An entry that exists and never answered it: written, not logged.
+      day("2026-10-04", {}),
+      day("2026-10-06", { Run: 7 }),
+    ]);
+
+    it("totals, averages and counts the slots it was LOGGED on", () => {
+      const { app } = vaultOf(NUM);
+      const [run] = habitRollupRows(
+        app,
+        DEFAULT_PATHS,
+        [metre("Run", "daily", "km")],
+        win
+      );
+      expect(run.type).toBe("number");
+      expect(run.slots).toHaveLength(7);
+      // ZERO IS A READING. `0` is logged and counted, which is the boundary
+      // `readHabitNumber` exists for — a falsy check here would lose a day the
+      // reader recorded.
+      expect(run.logged).toBe(3);
+      expect(run.total).toBe(12);
+      expect(run.mean).toBe(4);
+      // AND THE DENOMINATORS DISAGREE ON PURPOSE: five entries exist, three of
+      // them carry a reading, and the period is seven days long. A fixture
+      // where any two of those coincided would prove none of it.
+      expect(run.written).toBe(5);
+      expect(run.unit).toBe("km");
+    });
+
+    it("refuses an average over nothing rather than reporting NaN", () => {
+      const { app } = vaultOf(Object.fromEntries([day("2026-10-01", {})]));
+      const [run] = habitRollupRows(app, DEFAULT_PATHS, [metre("Run")], win);
+      expect(run.logged).toBe(0);
+      expect(run.total).toBe(0);
+      expect(run.mean).toBeNull();
+      expect(run.unit).toBeNull();
+    });
+
+    it("averages a window of nothing but zeroes rather than refusing", () => {
+      // `numbers.length` AND NOT `total` is the guard, and these two fixtures
+      // are what separate them: a week of zeroes has a mean, and it is 0.
+      const { app } = vaultOf(
+        Object.fromEntries([day("2026-10-01", { Run: 0 }), day("2026-10-02", { Run: 0 })])
+      );
+      const [run] = habitRollupRows(app, DEFAULT_PATHS, [metre("Run")], win);
+      expect(run.mean).toBe(0);
+      expect(run.logged).toBe(2);
+    });
+
+    it("keeps both readings of one stored value, from one walk", () => {
+      // The slot carries `state` AND `value`: one vault walk, two column
+      // renderers. A boolean row reads the first and a number row the second.
+      const { app, reads } = vaultOf(NUM);
+      const [run] = habitRollupRows(app, DEFAULT_PATHS, [metre("Run")], win);
+      expect(run.slots[0].value).toBe(5);
+      expect(run.slots[1].value).toBe(0);
+      expect(run.slots[2].value).toBeNull();
+      expect(run.slots[0].state).toBe(1);
+      expect(reads()).toBe(Object.keys(NUM).length);
+    });
+
+    it("is a number row only because the definition is", () => {
+      const { app } = vaultOf(NUM);
+      const [bool] = habitRollupRows(app, DEFAULT_PATHS, [habit("Run")], win);
+      expect(bool.type).toBe("boolean");
+    });
+  });
 });
 
 // ── THE STRIP ─────────────────────────────────────────────────────────────
@@ -560,6 +792,11 @@ describe("rollupSub", () => {
       current: 5,
       best: 9,
       rate: 23 / 31,
+      type: "boolean",
+      logged: 0,
+      total: 0,
+      mean: null,
+      unit: null,
       ...over,
     }) as Parameters<typeof rollupSub>[0];
 
@@ -576,6 +813,138 @@ describe("rollupSub", () => {
   it("says so when the period has not started", () => {
     expect(rollupSub(row({ slots: [] }))).toBe("nothing yet");
   });
+
+  // ── THE NUMBER'S OWN SENTENCE (1.0.56) ─────────────────────────────────
+  const num = (over: Record<string, unknown>) =>
+    row({ type: "number", logged: 23, total: 128.4, mean: 128.4 / 23, ...over });
+
+  it("reports an average and a logged count, and no streak at all", () => {
+    // A RUN OF A QUANTITY IS NOT A DEFINED THING. `habitRuns` is not asked of a
+    // number row, and the fixture carries `current: 5` and `best: 9` so that a
+    // branch falling through to the boolean sentence says so.
+    expect(rollupSub(num({ unit: "km" }))).toBe("avg 5.6 km · 23 of 31 logged");
+    expect(rollupSub(num({}))).toBe("avg 5.6 · 23 of 31 logged");
+    expect(rollupSub(num({}))).not.toContain("streak");
+  });
+
+  it("averages over the slots it was LOGGED on, which the sentence says", () => {
+    // 128.4 OVER 23 AND NOT OVER 31: a mean over elapsed days answers a
+    // question nobody asked. The two denominators are both in the sentence, so
+    // a reader can see which one the average used.
+    expect(rollupSub(num({}))).toContain("23 of 31");
+    expect(rollupSub(num({ logged: 31, mean: 128.4 / 31 }))).toBe(
+      "avg 4.1 · 31 of 31 logged"
+    );
+  });
+
+  it("says nothing was logged rather than printing an empty average", () => {
+    expect(rollupSub(num({ logged: 0, total: 0, mean: null }))).toBe(
+      "nothing logged · 0 of 31 logged"
+    );
+    // AND A MEAN OF ZERO IS NOT NOTHING. `mean == null` and not `!mean`: a
+    // fortnight of zeroes averaged 0, and the refusal above is for a window
+    // with no readings in it at all.
+    expect(rollupSub(num({ logged: 2, total: 0, mean: 0 }))).toBe(
+      "avg 0 · 2 of 31 logged"
+    );
+  });
+
+  it("still says nothing yet for a period that has not started", () => {
+    expect(rollupSub(num({ slots: [] }))).toBe("nothing yet");
+  });
+});
+
+// ── THE NUMBER'S STRIP (1.0.56) ───────────────────────────────────────────
+describe("valueRange", () => {
+  const slots = (values: (number | null)[]) =>
+    values.map((v, i) => ({
+      key: `k${i}`,
+      label: `l${i}`,
+      state: null,
+      value: v,
+      written: v != null,
+    })) as Parameters<typeof valueRange>[0];
+
+  it("is the window's own least and greatest, not the tracker's declared range", () => {
+    // `drawStrip`'s RULE, carried to a fourth strip: a tracker scaled 1–5 whose
+    // readings all sit between 3 and 4 would otherwise draw thirty cells of one
+    // shade.
+    expect(valueRange(slots([3, 3.5, 4]))).toEqual({ lo: 3, hi: 4 });
+  });
+
+  it("ignores the slots with no reading, including the written ones", () => {
+    expect(valueRange(slots([null, 7, null, 2]))).toEqual({ lo: 2, hi: 7 });
+  });
+
+  it("is null for a window with nothing in it, which is not a range of zero", () => {
+    expect(valueRange(slots([null, null]))).toBeNull();
+    expect(valueRange(slots([0, 0]))).toEqual({ lo: 0, hi: 0 });
+  });
+});
+
+describe("numberStripCells", () => {
+  const slots = (values: (number | null)[]) =>
+    values.map((v, i) => ({
+      key: `k${i}`,
+      label: `l${i}`,
+      state: null,
+      value: v,
+      written: v != null,
+    })) as Parameters<typeof numberStripCells>[0];
+
+  it("shades every mark and never draws a binary one", () => {
+    // A QUANTITY HAS NO done/not-done READING — 2 km is not "done" and 0 km is
+    // not "not done" — so `single` is false at every width and `drawStrip`
+    // takes the shade arm for all of them.
+    const cells = numberStripCells(slots([1, 5, 10]), null);
+    expect(cells.map((c) => c.single)).toEqual([false, false, false]);
+    expect(cells.map((c) => c.ratio)).toEqual([0, 4 / 9, 1]);
+  });
+
+  it("gives the window's least reading fraction zero, which is still a mark", () => {
+    // AND THE DRAWING DOES NOT TREAT IT AS BLANK: the boolean arm's `> 0` is
+    // what would, which is why `drawStrip` asks the type before it asks the
+    // ratio.
+    const [least] = numberStripCells(slots([2, 9]), null);
+    expect(least.ratio).toBe(0);
+    expect(stripShade(least.ratio!)).toBe(1);
+    expect(readCode("habit-rollup-view")).toContain(
+      "if (cell.ratio != null && (number || cell.ratio > 0)) {"
+    );
+  });
+
+  it("draws a flat window full rather than empty", () => {
+    // `sparkFraction`'s OWN BOUNDARY, and the section's sparkline agrees with
+    // it: "every day the same" is not "every day the least".
+    expect(numberStripCells(slots([4, 4, 4]), null).map((c) => c.ratio)).toEqual(
+      [1, 1, 1]
+    );
+  });
+
+  it("says nothing for a slot with no reading", () => {
+    const [, blank] = numberStripCells(slots([5, null]), null);
+    expect(blank.ratio).toBeNull();
+    expect(blank.label).toContain("nothing logged");
+  });
+
+  it("names each mark with its value and its unit", () => {
+    const [one] = numberStripCells(slots([5.25]), "km");
+    expect(one.label).toBe("l0: 5.3 km");
+    expect(numberStripCells(slots([5.25]), null)[0].label).toBe("l0: 5.3");
+  });
+
+  it("groups a year into sevens and averages each group's LOGGED slots", () => {
+    // ONE 10 KM RUN IN A WEEK READS AS 10 KM, not as 1.4 — the same
+    // logged-not-written distinction the row's own mean makes.
+    const year = Array<number | null>(364).fill(null);
+    year[0] = 10;
+    const cells = numberStripCells(slots(year), "km");
+    expect(cells).toHaveLength(52);
+    expect(cells[0].label).toContain("l0");
+    expect(cells[0].label).toContain("l6");
+    expect(cells[0].label).toContain("10 km");
+    expect(cells[1].ratio).toBeNull();
+  });
 });
 
 // ── THE WRITE ─────────────────────────────────────────────────────────────
@@ -589,7 +958,7 @@ describe("noteWithHabitRollup", () => {
   const body = { from: 1, to: 3 };
 
   it("rewrites the one line, leaving every other byte alone", () => {
-    const out = noteWithHabitRollup(note, body, "habit-rollup", ["Read"], true);
+    const out = noteWithHabitRollup(note, body, "habit-rollup", ans(["Read"]));
     expect(out).toEqual([
       "```chronoanvil",
       "header:✅ Habits this month",
@@ -602,14 +971,13 @@ describe("noteWithHabitRollup", () => {
     // IDENTITY IS NOT A WRITE. The window's Save closes without touching the
     // file, which is what makes the `vault.modify` count a fact about the
     // reader's gesture rather than about every Save.
-    expect(noteWithHabitRollup(note, body, "habit-rollup", [], true)).toBeNull();
+    expect(noteWithHabitRollup(note, body, "habit-rollup", ans())).toBeNull();
     expect(
       noteWithHabitRollup(
         ["x", "habit-rollup:Read,Gym", "y"],
         { from: 0, to: 3 },
         "habit-rollup:Read,Gym",
-        ["Read", "Gym"],
-        true
+        ans(["Read", "Gym"])
       )
     ).toBeNull();
   });
@@ -618,10 +986,11 @@ describe("noteWithHabitRollup", () => {
     // The other half of the `null`, and the caller tells them apart by asking
     // first — a stale block range is a `notify.fail`, not a silent no-op.
     expect(
-      noteWithHabitRollup(note, { from: 1, to: 2 }, "habit-rollup", ["Read"], true)
+      noteWithHabitRollup(note, { from: 1, to: 2 }, "habit-rollup", ans(["Read"]))
     ).toBeNull();
-    expect(noteWithHabitRollup(note, body, "habit-rollup:Gone", ["Read"], true))
-      .toBeNull();
+    expect(
+      noteWithHabitRollup(note, body, "habit-rollup:Gone", ans(["Read"]))
+    ).toBeNull();
   });
 
   it("rewrites the line it was opened on, not the first one in the file", () => {
@@ -636,8 +1005,7 @@ describe("noteWithHabitRollup", () => {
       two,
       { from: 0, to: 3 },
       "habit-rollup:Gym",
-      ["Gym", "Read"],
-      true
+      ans(["Gym", "Read"])
     )!;
     expect(out[0]).toBe("habit-rollup:Read");
     expect(out[2]).toBe("habit-rollup:Gym,Read");
@@ -648,8 +1016,7 @@ describe("noteWithHabitRollup", () => {
       ["  habit-rollup"],
       { from: 0, to: 1 },
       "habit-rollup",
-      [],
-      false
+      ans([], {}, false)
     )!;
     expect(out[0]).toBe("  habit-rollup:no-strip");
   });
@@ -660,25 +1027,26 @@ describe("noteWithHabitRollup", () => {
       [line],
       { from: 0, to: 1 },
       line,
-      ["Gym", "Read"],
-      false
+      ans(["Gym", "Read"], {}, false)
     )!;
     expect(moved[0]).toBe("habit-rollup:Gym,Read,no-strip");
     const stripped = noteWithHabitRollup(
       [line],
       { from: 0, to: 1 },
       line,
-      ["Read", "Gym"],
-      true
+      ans(["Read", "Gym"])
     )!;
     expect(stripped[0]).toBe("habit-rollup:Read,Gym");
   });
 });
 
-describe("habitRollupIds", () => {
+describe("habitRollupAnswer", () => {
   const rows = (...on: [string, boolean][]) =>
     on.map(([id, shown]) => ({ id, shown }));
   const registry = ["Read", "Gym", "Floss"];
+  const ids = (
+    r: readonly { id: string; shown: boolean; grain?: TrackerClass | null }[]
+  ): string[] => habitRollupAnswer(r, registry, true).ids;
 
   it("collapses every habit ticked, in registry order, to the empty list", () => {
     // WHY THIS IS A FUNCTION rather than `rows.filter(shown).map(id)`. An
@@ -686,13 +1054,13 @@ describe("habitRollupIds", () => {
     // answer: it silently excludes the habit the reader defines next month, and
     // nothing on the dashboard would say why the new one never appeared.
     expect(
-      habitRollupIds(rows(["Read", true], ["Gym", true], ["Floss", true]), registry)
+      ids(rows(["Read", true], ["Gym", true], ["Floss", true]), registry)
     ).toEqual([]);
   });
 
   it("writes the list out when the reader hid one", () => {
     expect(
-      habitRollupIds(rows(["Read", true], ["Gym", false], ["Floss", true]), registry)
+      ids(rows(["Read", true], ["Gym", false], ["Floss", true]), registry)
     ).toEqual(["Read", "Floss"]);
   });
 
@@ -701,14 +1069,188 @@ describe("habitRollupIds", () => {
     // one row gets the full list — the alternative is a gesture the window
     // accepts and the note cannot hold.
     expect(
-      habitRollupIds(rows(["Gym", true], ["Read", true], ["Floss", true]), registry)
+      ids(rows(["Gym", true], ["Read", true], ["Floss", true]), registry)
     ).toEqual(["Gym", "Read", "Floss"]);
   });
 
   it("does not collapse a shorter list that happens to be in order", () => {
     expect(
-      habitRollupIds(rows(["Read", true], ["Gym", true], ["Floss", false]), registry)
+      ids(rows(["Read", true], ["Gym", true], ["Floss", false]), registry)
     ).toEqual(["Read", "Gym"]);
+  });
+});
+
+// ── WHICH GRAIN (1.0.56) ──────────────────────────────────────────────────
+describe("grainsOf", () => {
+  it("reads the SET, which is what scopesFor refuses to", () => {
+    expect(grainsOf(habit("Read"))).toEqual(["daily"]);
+    expect(grainsOf(spread("Stretch", "daily", "weekly"))).toEqual([
+      "daily",
+      "weekly",
+    ]);
+  });
+
+  it("returns the five in canonical order however the settings wrote them", () => {
+    // FILTERED THROUGH `TRACKER_CLASSES` rather than returned as stored, so the
+    // window's groups are in the registry's order and not in the order three
+    // checkboxes happened to be ticked in.
+    expect(grainsOf(spread("Odd", "yearly", "daily", "monthly"))).toEqual([
+      "daily",
+      "monthly",
+      "yearly",
+    ]);
+  });
+
+  it("is every grain for a tracker admitted everywhere, and none for a journal", () => {
+    expect(
+      grainsOf({ surface: { kind: "any" } } as unknown as TrackerDef)
+    ).toEqual([...TRACKER_CLASSES]);
+    expect(
+      grainsOf({
+        surface: { kind: "journal", journals: [] },
+      } as unknown as TrackerDef)
+    ).toEqual([]);
+  });
+});
+
+describe("resolveGrain", () => {
+  const two: TrackerClass[] = ["daily", "weekly"];
+
+  it("takes the reader's choice first", () => {
+    expect(resolveGrain(two, "weekly", "daily")).toBe("weekly");
+  });
+
+  it("refuses a choice the habit cannot honour", () => {
+    // A note carrying `stretch@monthly` for a habit since moved off months is a
+    // STALE LINE, not an instruction — and honouring it would read notes that
+    // hold no readings at all.
+    expect(resolveGrain(two, "monthly", "daily")).toBe("daily");
+    expect(resolveGrain(two, "monthly", "quarterly")).toBe(NEEDS_GRAIN);
+  });
+
+  it("asks nothing of a habit that names one grain", () => {
+    // CLAUSE 2 ABOVE CLAUSE 3, which is the property worth protecting: the
+    // dashboard is ignored entirely, so every habit in every vault today keeps
+    // the denominator 1.0.55 gave it.
+    expect(resolveGrain(["weekly"], undefined, "monthly")).toBe("weekly");
+    expect(resolveGrain(["weekly"], undefined, null)).toBe("weekly");
+  });
+
+  it("falls back to the dashboard's own grain where the habit names it", () => {
+    expect(resolveGrain(two, undefined, "daily")).toBe("daily");
+    expect(resolveGrain(two, undefined, "weekly")).toBe("weekly");
+  });
+
+  it("asks, rather than picking one of two defensible denominators", () => {
+    expect(resolveGrain(two, undefined, "quarterly")).toBe(NEEDS_GRAIN);
+    expect(resolveGrain(two, undefined, null)).toBe(NEEDS_GRAIN);
+  });
+
+  it("is null for a habit on no diary grain at all, which is not the same answer", () => {
+    // `null` AND `NEEDS_GRAIN` ARE DIFFERENT OUTCOMES: one is a journal tracker
+    // the rollup never could read, the other is a habit waiting to be told.
+    // The window lists the second and does not mention the first.
+    expect(resolveGrain([], undefined, "daily")).toBeNull();
+    expect(resolveGrain([], "daily", "daily")).toBeNull();
+  });
+});
+
+describe("grainOfUnit", () => {
+  it("maps a dashboard's period unit onto the grain of the same name", () => {
+    // DERIVED FROM `CLASS_DEFS` rather than hand-written, which is why the four
+    // are asserted here: `periodnav`'s Unit and `periodNoun` agreeing is the
+    // whole reason there is no fifth table.
+    expect(grainOfUnit("week")).toBe("weekly");
+    expect(grainOfUnit("month")).toBe("monthly");
+    expect(grainOfUnit("quarter")).toBe("quarterly");
+    expect(grainOfUnit("year")).toBe("yearly");
+    expect(grainOfUnit("day")).toBe("daily");
+  });
+
+  it("is null for no unit and for a word that is not one", () => {
+    expect(grainOfUnit(null)).toBeNull();
+    expect(grainOfUnit("fortnight")).toBeNull();
+  });
+});
+
+describe("the grain suffix", () => {
+  it("cuts at the LAST mark, so an id may hold one", () => {
+    // `@work` IS A LEGAL PROPERTY NAME, which is the documented collision this
+    // grammar accepts — `no-strip` accepts the same one as a habit label.
+    const answer = parseHabitRollupArg("@work@daily");
+    expect(answer.ids).toEqual(["@work"]);
+    expect(answer.grains).toEqual({ "@work": "daily" });
+  });
+
+  it("leaves a part that is nothing but a mark alone", () => {
+    // `> 0` AND NOT `>= 0`: cutting at position 0 would leave an empty id and
+    // a habit nothing can match.
+    expect(parseHabitRollupArg(`${GRAIN_MARK}daily`).ids).toEqual([
+      `${GRAIN_MARK}daily`,
+    ]);
+    expect(parseHabitRollupArg(`${GRAIN_MARK}daily`).grains).toEqual({});
+  });
+
+  it("reads an unrecognised word as part of the id, not as a half-refusal", () => {
+    // A HABIT CALLED `read@someday`, rather than a habit called `read` whose
+    // grain was dropped — the second would silently report the wrong thing.
+    const answer = parseHabitRollupArg("read@someday");
+    expect(answer.ids).toEqual(["read@someday"]);
+    expect(answer.grains).toEqual({});
+  });
+
+  it("takes the grain word in any case, like the flag beside it", () => {
+    expect(parseHabitRollupArg("Read@WEEKLY").grains).toEqual({
+      Read: "weekly",
+    });
+  });
+
+  it("survives the flag, in either order", () => {
+    expect(parseHabitRollupArg("Read@weekly,no-strip")).toEqual(
+      ans(["Read"], { Read: "weekly" }, false)
+    );
+    expect(parseHabitRollupArg("no-strip,Read@weekly")).toEqual(
+      ans(["Read"], { Read: "weekly" }, false)
+    );
+  });
+});
+
+describe("the all-ticked collapse and a chosen grain", () => {
+  const registry = ["Read", "Gym"];
+  const all = (grain?: TrackerClass) => [
+    { id: "Read", shown: true, grain: grain ?? null },
+    { id: "Gym", shown: true, grain: null },
+  ];
+
+  it("still writes nothing when nobody chose a grain", () => {
+    expect(habitRollupAnswer(all(), registry, true)).toEqual(ans());
+  });
+
+  it("writes the list out when one habit carries a grain", () => {
+    // THE COLLAPSE IS "SAY NOTHING AND FOLLOW THE VAULT", and a grain is
+    // something to say. A chooser the window accepts and the note drops is the
+    // same failure a dropped reorder would have been.
+    expect(habitRollupAnswer(all("weekly"), registry, true)).toEqual(
+      ans(["Read", "Gym"], { Read: "weekly" })
+    );
+    expect(habitRollupArg(habitRollupAnswer(all("weekly"), registry, true))).toBe(
+      "Read@weekly,Gym"
+    );
+  });
+
+  it("carries no grain for a habit the reader hid", () => {
+    // The grains map is built from the SHOWN rows, so a hidden habit's stale
+    // choice does not travel into a line that no longer names it.
+    expect(
+      habitRollupAnswer(
+        [
+          { id: "Read", shown: false, grain: "weekly" },
+          { id: "Gym", shown: true, grain: null },
+        ],
+        registry,
+        true
+      )
+    ).toEqual(ans(["Gym"]));
   });
 });
 
@@ -794,7 +1336,9 @@ describe("the rollup in the tables", () => {
 
   it("is listed in the shipped documentation, with its flag", () => {
     const doc = BUNDLED_ASSETS["documentation.md"];
-    expect(doc).toContain("`habit-rollup[:<habit ids>][,no-strip]`");
+    expect(doc).toContain(
+      "`habit-rollup[:<habit id>[@<grain>],…][,no-strip]`"
+    );
     // AND THE PROSE SAYS WHICH SURFACE EACH OF THE TWO IS FOR, which is the
     // one question a reader with both in the Trackers list will have.
     expect(doc).toContain("**The Habits rollup.**");
@@ -817,18 +1361,47 @@ describe("the card's shape", () => {
 
   it("is live over the entries it is made of", () => {
     // Memory `live-widget-path-scope`: a widget made of WHICH files exist must
-    // pass `shouldRefreshPath`, scoped to what its builder reads — the daily
-    // folder, not the diary root.
+    // pass `shouldRefreshPath`, scoped to what its builder reads.
+    //
+    // ── THE DEFECT 1.0.55 SHIPPED, AND THE TEST THAT MISSED IT ─────────
+    //
+    // This asserted `paths.diaryDaily` and passed, because that is what the arm
+    // said — and `paths.diaryDaily` is `02 - Diary/Daily`, the PRE-4.81 folder.
+    // Entries have been filed under `diaryRoot`'s period tree since, so in any
+    // vault written this year the scope matched nothing and the card never
+    // repainted. A test can only assert the folder is the RIGHT one by naming
+    // the function that computes it from the same expressions the reader uses,
+    // which is `diaryEntryFolders`; naming a path constant is how the first one
+    // agreed with the bug.
+    //
     // Comments stripped, because the arm carries a paragraph of them between
     // the `case` and the call this is about.
     const index = readCode("widgets");
     expect(index).toContain('case "habit-rollup":');
     expect(index).toMatch(
-      /case "habit-rollup":[\s\S]{0,80}liveScopedWidget\([\s\S]{0,120}paths\.diaryDaily/
+      /case "habit-rollup":[\s\S]{0,80}liveScopedWidget\([\s\S]{0,120}diaryEntryFolders\(this\.plugin\.settings\.paths\)/
+    );
+    expect(index).not.toMatch(
+      /case "habit-rollup":[\s\S]{0,200}paths\.diaryDaily/
     );
     expect(index).toMatch(
       /case "habit-rollup":[\s\S]{0,240}buildHabitRollup\(this\.plugin, ctx, rest\)/
     );
+  });
+
+  it("watches every folder an entry can be in, from one expression", () => {
+    // ONE LIST, TWO SHAPES. `diaryEntryScope` is the predicate the calendar
+    // watches with and `diaryEntryFolders` is the same six folders unprefixed,
+    // because `liveScopedWidget` applies `folderPrefix` itself. Derived from
+    // each other so a seventh folder cannot reach one and not the other.
+    const lineage = readCode("lineage");
+    expect(lineage).toContain(
+      "const prefixes = diaryEntryFolders(paths).map(folderPrefix);"
+    );
+    const folders = fnBody("diaryEntryFolders", "lineage");
+    expect(folders).toContain("paths.diaryRoot");
+    expect(folders).toContain("legacyGrainFolder(paths, g)");
+    expect(folders).toContain("Object.keys(CONTAINING_GRAIN)");
   });
 
   it("asks for the block's range at the save, never at the render", () => {
@@ -911,7 +1484,221 @@ describe("the card's shape", () => {
 
   it("opens on what the card is showing, every habit when nothing is chosen", () => {
     const seeds = fnBody("rollupSeeds", "habit-rollup-view");
-    expect(seeds).toContain("ids.length ? ids : all.map((r) => r.id)");
+    expect(seeds).toContain(
+      "answer.ids.length ? answer.ids : habits.map((h) => h.id)"
+    );
+  });
+
+  // ── THE NUMBER ROW'S LEAD (1.0.56) ─────────────────────────────────────
+  it("draws a total where a number has no rate, in the ring's own tracks", () => {
+    const code = readCode("habit-rollup-view");
+    // NO RING FOR A NUMBER: a ring is a part of a whole and there is no whole.
+    // The guard is asserted rather than the wording, so a branch that stops
+    // being reached fails rather than keeping its comment.
+    expect(code).toContain('row.type === "number"');
+    expect(code).toContain('cls: "ca-hrollup-total"');
+    expect(code).toContain("text: `Σ ${round1(row.total)}`");
+    // And the ring is still drawn exactly once, for the other type.
+    expect(code.match(/statRing\(/g)).toHaveLength(1);
+  });
+
+  it("counts the habits waiting for a grain from the list the window shows", () => {
+    // ONE ANSWER, NOT TWO. The card's count and the window's trailing group are
+    // the same array filtered the same way — a second function returning the
+    // same number is the shape that stays consistent until somebody edits one.
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    expect(build).toContain("const seeds = rollupSeeds(habits, all, answer, dash)");
+    expect(build).toContain("seeds.filter((s) => s.grain == null).length");
+    expect(build).toContain("const dash = grainOfUnit(period.unit)");
+    // The dashboard's grain reaches the read as a fallback, not as a filter.
+    expect(build).toContain("answer.grains,");
+  });
+
+  it("says which of the two reasons an empty card has", () => {
+    // Until 1.0.56 a multi-grain habit vanished with no sentence anywhere.
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    expect(build).toContain("before it can be read — choose one below.");
+    expect(build).toContain("no longer in the vault");
+  });
+
+  // ── THE WINDOW'S GROUPS (1.0.56) ───────────────────────────────────────
+  it("groups the window's rows by the model's own resolution", () => {
+    const code = readCode("habit-rollup-editor");
+    // `resolveGrain` AND NOT FOUR CLAUSES WRITTEN AGAIN: the card and the
+    // window must place a habit in the same grain, and asking the same function
+    // is the only way that survives an edit to it.
+    expect(code).toContain(
+      "resolveGrain(row.grains, row.chosen ?? undefined, this.dashboard)"
+    );
+    // The five grains in canonical order, and the waiting group last.
+    expect(code).toContain("[...TRACKER_CLASSES, NEEDS_GRAIN] as const");
+    // Headings are the registry's own words, not a fourth hand-copy of them.
+    expect(code).toContain("TRACKER_CLASS_LABELS[key]");
+    // An empty group is not drawn: five headings on an all-daily vault is four
+    // sentences about nothing.
+    expect(code).toContain("if (!members?.length) continue;");
+  });
+
+  it("sets a group rather than inverting it", () => {
+    // A reader who sees "some" and clicks wants all of them, not the
+    // complement of what they already have.
+    const code = readCode("habit-rollup-editor");
+    expect(code).toContain("for (const row of members) row.shown = !all;");
+    expect(code).not.toContain("row.shown = !row.shown;\n      }\n    });\n    const name");
+    // Three states, two glyphs: mixed is a class, not a mark nobody has met.
+    expect(code).toContain('tick.toggleClass("is-mixed", on > 0 && !all)');
+  });
+
+  it("gives a waiting row its chooser and no tick", () => {
+    // Ticking something the rollup cannot read is a control whose only effect
+    // is to write an id the renderer then skips.
+    const row = fnBody("renderRow", "habit-rollup-editor");
+    expect(row).toContain("const waiting = this.groupOf(row) === NEEDS_GRAIN;");
+    expect(row).toContain("if (!waiting) {");
+    expect(row).toContain("if (row.grains.length > 1) this.renderGrain(el, row);");
+  });
+
+  it("offers a habit its OWN grains and nothing else", () => {
+    // A habit on daily and weekly offered a monthly option is offered a grain
+    // with no slots in it — which is the 1.0.55 defect, through a dropdown.
+    const grain = fnBody("renderGrain", "habit-rollup-editor");
+    expect(grain).toContain("for (const grain of row.grains) {");
+    expect(grain).toContain('sel.createEl("option", { value: "", text: "Not chosen" })');
+    expect(grain).toContain("row.chosen = row.grains.find((g) => g === picked) ?? null;");
+    expect(grain).not.toContain("TRACKER_CLASSES");
+  });
+
+  it("moves a row within its group, and in the list the answer is built from", () => {
+    const row = fnBody("renderRow", "habit-rollup-editor");
+    expect(row).toContain("const can = to >= 0 && to < members.length;");
+    // THE SWAP IS IN `this.rows`: the group's array is a view, and a move made
+    // only in it is a gesture that survives until Save and then vanishes.
+    expect(row).toContain("const from = next.indexOf(row);");
+    expect(row).toContain("const onto = next.indexOf(members[to]);");
+    expect(row).toContain('btn.toggleClass("is-static", !can)');
+  });
+
+  it("refuses a list of habits that are all waiting, with the guard stated", () => {
+    const code = readCode("habit-rollup-editor");
+    expect(code).toContain(
+      "if (shown.length && shown.every((r) => this.groupOf(r) === NEEDS_GRAIN)) {"
+    );
+    expect(code).toContain("is waiting for a grain");
+  });
+
+  it("saves one answer, grains included", () => {
+    const code = readCode("habit-rollup-editor");
+    expect(code).toContain(
+      "this.rows.map((r) => ({ id: r.id, shown: r.shown, grain: r.chosen }))"
+    );
+    expect(code).toContain("habitRollupAnswer(");
+  });
+
+  it("says which count a number habit's row is showing", () => {
+    const row = fnBody("renderRow", "habit-rollup-editor");
+    expect(row).toContain('row.type === "number" ? " logged" : ""');
+  });
+});
+
+// ── THE WINDOW'S SEEDS (1.0.56) ───────────────────────────────────────────
+describe("rollupSeeds", () => {
+  const rowFor = (id: string, over: Record<string, unknown> = {}) =>
+    ({
+      id,
+      label: id,
+      grain: "daily",
+      type: "boolean",
+      slots: [{}, {}, {}],
+      done: 2,
+      written: 3,
+      current: 0,
+      best: 0,
+      rate: 2 / 3,
+      logged: 1,
+      total: 9,
+      mean: 9,
+      unit: null,
+      ...over,
+    }) as unknown as Parameters<typeof rollupSeeds>[1][number];
+
+  const journal = {
+    id: "Confident",
+    label: "Confident",
+    type: "boolean",
+    surface: { kind: "journal", journals: [] },
+  } as unknown as TrackerDef;
+
+  it("lists a habit the card has no row for, which is the whole point", () => {
+    // A HABIT WAITING FOR A GRAIN HAS NO ROW BY CONSTRUCTION — that is what
+    // waiting means — so a window built from rows would list every habit except
+    // the ones it exists to settle.
+    const seeds = rollupSeeds(
+      [spread("Stretch", "daily", "weekly")],
+      [],
+      ans(),
+      "monthly"
+    );
+    expect(seeds).toHaveLength(1);
+    expect(seeds[0].grain).toBeNull();
+    expect(seeds[0].grains).toEqual(["daily", "weekly"]);
+    // Nothing to report yet, and the window says so rather than printing 0 of 0.
+    expect(seeds[0].slots).toBe(0);
+  });
+
+  it("does not list a habit on no diary grain at all", () => {
+    // Offering a journal tracker a chooser of five grains it is not logged on
+    // is a control that cannot help — and it is exactly the set the card skips.
+    expect(rollupSeeds([journal], [], ans(), "daily")).toEqual([]);
+    expect(rollupRegistry([journal, habit("Read")])).toEqual(["Read"]);
+  });
+
+  it("keeps the reader's choice apart from what it resolved to", () => {
+    // A habit sitting in the Weekly group because the DASHBOARD is weekly has
+    // chosen nothing; a `<select>` showing it as chosen would write that grain
+    // into the note the next time anything else was saved.
+    const both = spread("Stretch", "daily", "weekly");
+    const [auto] = rollupSeeds([both], [], ans(), "weekly");
+    expect(auto.grain).toBe("weekly");
+    expect(auto.chosen).toBeNull();
+    const [said] = rollupSeeds([both], [], ans([], { Stretch: "daily" }), "weekly");
+    expect(said.grain).toBe("daily");
+    expect(said.chosen).toBe("daily");
+    // A STALE CHOICE IS NOT DRAWN AS ONE.
+    const [stale] = rollupSeeds(
+      [both],
+      [],
+      ans([], { Stretch: "monthly" }),
+      "weekly"
+    );
+    expect(stale.chosen).toBeNull();
+    expect(stale.grain).toBe("weekly");
+  });
+
+  it("carries the count each type means", () => {
+    // A number habit's `done` would otherwise be the slots whose reading
+    // happened to equal 1 — true, and about nothing.
+    const [bool] = rollupSeeds([habit("Read")], [rowFor("Read")], ans(), "daily");
+    expect(bool.done).toBe(2);
+    const [num] = rollupSeeds(
+      [metre("Run")],
+      [rowFor("Run", { type: "number" })],
+      ans(),
+      "daily"
+    );
+    expect(num.done).toBe(1);
+    expect(num.type).toBe("number");
+  });
+
+  it("ticks everything for a bare line, and the reader's order first", () => {
+    const habits = [habit("Read"), habit("Gym"), habit("Floss")];
+    expect(rollupSeeds(habits, [], ans(), "daily").map((x) => x.shown)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    const named = rollupSeeds(habits, [], ans(["Floss", "Read"]), "daily");
+    expect(named.map((x) => x.id)).toEqual(["Floss", "Read", "Gym"]);
+    expect(named.map((x) => x.shown)).toEqual([true, true, false]);
   });
 });
 
@@ -960,6 +1747,38 @@ describe("the rollup's CSS", () => {
         `var(--ca-act-${n})`
       );
     }
+  });
+
+  it("puts a number's total in the ring's two tracks rather than a fifth", () => {
+    // `span 2` AND NOT A FIFTH TRACK: a fifth would be an empty column on
+    // every boolean row and would move every name on the card to make room for
+    // something only some rows have.
+    const total = cssRule(".ca-hrollup-total");
+    expect(total).toContain("grid-column: span 2");
+    expect(total).toContain("font-variant-numeric: tabular-nums");
+    expect(total).toContain("text-align: right");
+    expect(cssRules(".ca-hrollup-list").some((r) => r.includes("span"))).toBe(
+      false
+    );
+  });
+
+  it("gives the window's group headings a row of their own", () => {
+    const group = cssRule(".ca-hrollup-group");
+    expect(group).toContain("display: flex");
+    expect(group).toContain("align-items: center");
+    // `.ca-tags-heading` is a block with its own bottom margin everywhere else
+    // in this family, and inside a flex row that margin takes the tick off the
+    // text's baseline.
+    expect(cssRule(".ca-hrollup-group .ca-tags-heading")).toContain(
+      "margin-bottom: 0"
+    );
+    // Air between groups and not above the first one, without a
+    // `:first-child` exception.
+    expect(cssRule(".ca-tags-list + .ca-hrollup-group")).toContain(
+      "margin-top"
+    );
+    expect(cssRules(".ca-hrollup-tick.is-mixed")).toHaveLength(1);
+    expect(cssRule(".ca-hrollup-grain")).toContain("max-width");
   });
 
   it("puts the door and the coverage sentence on one row", () => {

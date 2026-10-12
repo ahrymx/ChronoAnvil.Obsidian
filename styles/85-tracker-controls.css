@@ -513,6 +513,54 @@
   flex-direction: column;
   gap: var(--ca-space-2);
 }
+
+/* ── THE PAIR (1.0.56) ────────────────────────────────────────────────────
+
+   TWO COLUMNS, ONE FOR EACH HABIT TYPE, and this is the reader's own call:
+   *"one side for boolean habits and the other for ... stepper ... trackers"*.
+
+   A WRAPPER GRID AROUND TWO INDEPENDENT GRIDS, AND THAT IS DELIBERATE. The
+   note above says `.ca-habits-list` must stay ONE grid, because the 1.0.31
+   records-table bug is rows WITHIN a list each sizing their own `auto` tracks.
+   These two lists have the opposite requirement: a 16px tick box and a 90px
+   stepper must NOT size one shared track, or the boolean column would carry the
+   stepper's width as an empty gutter in front of every name. So each column is
+   its own grid and the pair only places them — which is `.ca-jld-pair`'s shape
+   in `60-heroes-and-banners.css`, the plugin's one other two-column split, down
+   to the `gap: 0` and the divider as a border rather than a rule element.
+
+   `gap: 0` AND A BORDER, NOT A GAP AND A RULE. A gap between the columns plus
+   padding inside them is two spacings to keep in step; one border with
+   symmetric padding either side of it is one. `.ca-jld-pair` settled this.
+
+   ONE TRACK WHEN ONE SIDE IS EMPTY. Every shipped preset is all-boolean, so a
+   vault that has never defined a number habit is the COMMON case and must not
+   get a divider down the middle of a half-empty card. `.is-single` is set by
+   `buildHabitsSection` rather than inferred with `:only-child`, because the
+   divider is a border on the SECOND column and a lone column is still the
+   first — `:only-child` would be true and change nothing. */
+.ca-habits-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.ca-habits-pair.is-single {
+  grid-template-columns: 1fr;
+}
+.ca-habits-col {
+  min-width: 0;
+  padding-inline: var(--ca-space-2);
+}
+.ca-habits-col:first-child {
+  padding-inline-start: 0;
+}
+.ca-habits-col:last-child {
+  padding-inline-end: 0;
+}
+.ca-habits-col + .ca-habits-col {
+  border-inline-start: var(--ca-rule-hair) solid var(--background-modifier-border);
+}
+
 .ca-habits-list {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -534,7 +582,13 @@
    window settled in 1.0.53: full contrast for a thing that is so, muted for a
    thing that is not. A habit nobody has answered today is not a habit this
    entry says no to — `HabitState` keeps those apart and so does this. */
-.ca-habits-row:not(.is-done):not(.is-not-done) .ca-habits-name {
+/* AND THE EXCLUSION IS NOT SYMMETRY, IT IS THE OTHER TYPE'S STATE. A number
+   row never wears `is-done` or `is-not-done` — a stepper has no such reading —
+   so the rule above muted every number habit's name permanently, including on a
+   day with 10 km in it. The number's own class is `is-logged`, set from the
+   entry's current value and added again when the stepper writes. */
+.ca-habits-row:not(.ca-habits-row-number):not(.is-done):not(.is-not-done) .ca-habits-name,
+.ca-habits-row-number:not(.is-logged) .ca-habits-name {
   color: var(--text-muted);
 }
 
@@ -594,6 +648,54 @@
   box-shadow: inset 0 0 0 var(--ca-rule) var(--text-muted);
 }
 
+/* ── THE NUMBER'S WEEK (1.0.56) ───────────────────────────────────────────
+
+   A SHAPE RATHER THAN SEVEN MARKS. A boolean's answer is one bit, so seven dots
+   say the week; a number's is a magnitude, and seven numbers at this size are
+   unreadable while seven dots would throw the magnitude away. So: a bar per
+   day, bottom-aligned, heights set inline by `paintBar` from the week's own
+   range — the normalisation rule `tracker-stat.ts` states and this sheet cannot.
+
+   IT REUSES `.ca-habit-week`'s SEVEN TRACKS, which is what keeps Tuesday under
+   Tuesday in both columns and under the same letter in the heads row. Only the
+   height, the alignment and the mark itself are new.
+
+   `align-items: end` IS WHAT MAKES A HEIGHT MEAN ANYTHING. The track is
+   `justify-items: center` from `.ca-habit-week`; a bar also needs to grow from
+   the floor, and the inherited `center` would grow it from the middle in both
+   directions — half the magnitude, twice over. */
+.ca-habit-spark {
+  align-items: end;
+  height: 22px;
+}
+.ca-habit-spark-bar {
+  width: 5px;
+  min-height: 1px;
+  border-radius: 1px;
+  background: var(--interactive-accent);
+}
+/* THE DAY NOBODY WROTE, AND IT KEEPS ITS SLOT. `paintBar` sets no height here
+   at all — `drawStrip`'s rule that *the gaps are the information* — so the
+   column is a hairline on the floor rather than a missing bar, and the week
+   still visibly has seven days in it. */
+.ca-habit-spark-bar.is-blank {
+  height: 0;
+  border-top: var(--ca-rule-hair) solid var(--text-faint);
+  background: none;
+}
+
+/* THE STEPPER IN THE FIRST TRACK, where the boolean column has its box.
+   Compact because the track is a gutter in front of a name, not a cell of its
+   own: `.ca-journal-stepper`'s grid-cell sizing would make the name column
+   start a third of the way across the card. */
+.ca-habits-stepper {
+  gap: 2px;
+  font-size: var(--ca-text-2xs);
+}
+.ca-habits-stepper .ca-journal-step-value {
+  min-width: 2.5em;
+}
+
 /* ── THE DOOR ─────────────────────────────────────────────────────────────
 
    A ROW AT THE END, NOT A ＋ IN THE CORNER. A full-width card's top-right
@@ -646,6 +748,28 @@
    box's tooltip and in the window, while the week is the thing this section
    exists to draw. So the gutters close and the name takes what is left — which
    `minmax(0, 1fr)` above has already made safe. */
+/* TWO COLUMNS NEED THE WIDTH OF TWO, and 560px is where `.ca-jld-pair` draws
+   the same line for the same reason: a three-track row with a seven-column
+   strip in it has a minimum, and two of them side by side reach it at twice
+   that width. Below this the pair stacks and each column is simply a list, so
+   the 360px rules under it still apply to whichever is on screen. */
+@container (max-width: 560px) {
+  .ca-habits-pair {
+    grid-template-columns: 1fr;
+  }
+  .ca-habits-col {
+    padding-inline: 0;
+  }
+  /* The divider becomes the rule BETWEEN two stacked lists rather than beside
+     them, which is the one thing a collapse has to remember to move. */
+  .ca-habits-col + .ca-habits-col {
+    margin-block-start: var(--ca-space-2);
+    padding-block-start: var(--ca-space-2);
+    border-inline-start: none;
+    border-block-start: var(--ca-rule-hair) solid var(--background-modifier-border);
+  }
+}
+
 @container (max-width: 360px) {
   .ca-habits-list {
     gap: 2px var(--ca-space-1);
@@ -729,6 +853,26 @@
    which is exactly the answer a reader opened a rollup to read. */
 .ca-hrollup-row.is-idle .ca-hrollup-name,
 .ca-hrollup-row.is-idle .ca-hrollup-pct {
+  color: var(--text-muted);
+}
+
+/* A NUMBER HABIT'S TOTAL, IN THE TWO TRACKS THE RING AND ITS PERCENTAGE HOLD.
+   `span 2` AND NOT A FIFTH TRACK: a fifth would be an empty column on every
+   boolean row and would move every name on the card rightwards to make room
+   for something only some rows have. Spanning means the two kinds of lead
+   occupy the same width and the names still start in one place — which is the
+   whole point of the single grid above.
+
+   RIGHT-ALIGNED AND TABULAR, like the percentage it stands in for, so a column
+   of totals reads as a column. */
+.ca-hrollup-total {
+  grid-column: span 2;
+  color: var(--text-normal);
+  font-size: var(--ca-text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ca-hrollup-row.is-idle .ca-hrollup-total {
   color: var(--text-muted);
 }
 
@@ -843,6 +987,44 @@
   font-size: var(--ca-text-xs);
   font-variant-numeric: tabular-nums;
 }
+/* ── THE GRAIN GROUPS (1.0.56) ────────────────────────────────────────────
+
+   A HEADING ROW, BECAUSE THE HEADING HAS A CONTROL ON IT. `.ca-tags-heading` is
+   a block with its own bottom margin everywhere else in this family; inside
+   this flex row the margin would push the tick off the text's baseline, so it
+   is moved onto the row and zeroed on the heading. */
+.ca-hrollup-group {
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  margin-bottom: var(--ca-space-3);
+}
+.ca-hrollup-group .ca-tags-heading {
+  margin-bottom: 0;
+}
+/* AIR BETWEEN GROUPS AND NOT ABOVE THE FIRST ONE. The sibling selector is what
+   makes that true without a `:first-child` exception: a group heading only
+   takes a top margin when a list of rows ended above it. */
+.ca-tags-list + .ca-hrollup-group {
+  margin-top: var(--ca-space-4);
+}
+/* SOME OF THEM, DRAWN AS NEITHER. `is-on` is the accent and a bare tick is the
+   muted `minus`; a mixed group wears the `minus` in the accent's own muted
+   tone, so it reads as "partly" rather than as a third mark nobody has met. */
+.ca-hrollup-tick.is-mixed {
+  color: var(--text-accent);
+  opacity: 0.7;
+}
+/* THE CHOOSER NEVER GROWS AND NEVER PUSHES THE NAME OFF. `max-width` rather
+   than a width, so "Daily entries" and "Quarterly entries" each take what they
+   need up to a cap, and the name truncates before the control that is the only
+   thing on a waiting row that can change anything. */
+.ca-hrollup-grain {
+  flex: 0 0 auto;
+  max-width: 11em;
+  font-size: var(--ca-text-xs);
+}
+
 /* A DISABLED ARROW IS STILL DRAWN. The first row's "up" and the last row's
    "down" go quiet rather than disappearing, because a row whose controls
    change in number as it moves is a row that jumps under the cursor. */

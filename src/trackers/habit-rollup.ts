@@ -31,8 +31,25 @@
 // because a field is authored at every grain. A tracker is logged on its own
 // surface and nowhere else, so a monthly dashboard rolling up weekly entries
 // would read four notes that hold no readings at all. Every row here reads the
-// habit's OWN grain across the whole period, which is the question
-// `scopesFor` already answers for charts.
+// habit's OWN grain across the whole period.
+//
+// ── THE DEFECT THAT ANSWER SHIPPED WITH, AND ITS FIX (1.0.56) ────────────
+//
+// 1.0.55 asked `scopesFor(def)[0]`, on the reasoning that charts had already
+// answered "which grain holds this tracker's readings". It had — for the
+// trackers that name ONE. `scopesFor` answers through `diaryClassOf`, and that
+// function returns `null` for `classes.length !== 1` *on purpose*: a tracker
+// logged on days AND weeks has no single scope a chart could plot. So
+// `scopesFor` returned `[]`, the row was skipped, and a habit on two grains —
+// or a `kind: "any"` habit — vanished from every rollup with no row, no
+// refusal and nothing in the card to say it had happened.
+//
+// Which is the reader's own ask: *"not all trackers are on daily entries"*.
+// `grainsOf` reads `surface.classes` DIRECTLY, which is what that field has
+// been since 2.57.8, and `resolveGrain` decides between them. `scopesFor` is
+// left exactly as it is — it is right about charts, and the same `null` makes a
+// multi-grain tracker unchartable, which is a different surface with its own
+// round to come.
 //
 // Pure except for `habitRollupRows`, which is the one vault read and is kept to
 // the end of the file for it.
@@ -40,12 +57,23 @@
 import type { App } from "obsidian";
 import { moment } from "../core/util";
 import { frontmatterOf, periodCoverage } from "../core/util";
-import { scopesFor } from "../charts/charts";
 import { currentEntryKey, entryDateKey, labelForGrain } from "../diary/nav";
 import { entriesOfGrain } from "../diary/lineage";
 import type { DiaryPaths } from "../diary/lineage";
-import { readHabitState, type HabitState } from "./habits";
-import { CLASS_DEFS, type TrackerClass, type TrackerDef } from "./trackers";
+import {
+  habitTypeOf,
+  readHabitNumber,
+  readHabitState,
+  type HabitState,
+  type HabitType,
+} from "./habits";
+import {
+  CLASS_DEFS,
+  TRACKER_CLASSES,
+  isTrackerClass,
+  type TrackerClass,
+  type TrackerDef,
+} from "./trackers";
 
 export const HABIT_ROLLUP_DIRECTIVE = "habit-rollup";
 
@@ -69,6 +97,96 @@ export const HABIT_ROLLUP_PROBE = new RegExp(
 // is literally `no-strip` reads as the flag. Said here rather than discovered.
 export const NO_STRIP_FLAG = "no-strip";
 
+// ── WHICH GRAIN A HABIT IS READ AT (1.0.56) ──────────────────────────────
+
+// The character that puts a grain on a member of the list.
+//
+// A SUFFIX ON A MEMBER, NOT A SECOND FLAG. The argument is a flat comma list
+// with one bare word in it and no namespace for another, so a rollup-wide
+// `grain=weekly` has nowhere to go — and it would be the wrong shape anyway:
+// the answer is PER HABIT, because a rollup drawing a daily habit beside a
+// weekly one is the ordinary case. `@` costs what `no-strip` costs, and in the
+// same way: a habit whose id contains an `@` followed by one of the five grain
+// words reads as that habit at that grain. `lastIndexOf` is what keeps
+// `@work@daily` resolving to the id `@work`.
+export const GRAIN_MARK = "@";
+
+// What the window hands back for a habit it cannot place.
+export const NEEDS_GRAIN = "ambiguous";
+
+// Every diary grain a habit is logged on, in canonical order.
+//
+// NOT `scopesFor`, AND THE FILE HEADER SAYS WHY AT LENGTH. This reads
+// `surface.classes` — the SET, which is what that field has held since 2.57.8 —
+// rather than asking a function whose whole contract is to refuse a set.
+//
+// `kind: "any"` IS EVERY GRAIN, which falls out rather than being decided: a
+// tracker admitted everywhere is admitted on each of the five, and the effect
+// in `resolveGrain` below is that such a habit reads at whatever grain the
+// dashboard is. A journal surface is NOT a diary grain at all and returns
+// nothing — the rollup lives on the four diary dashboards and a Study tracker
+// has no slots there.
+//
+// FILTERED THROUGH `TRACKER_CLASSES` RATHER THAN RETURNED AS STORED, so the
+// order is the canonical one however the settings checkboxes wrote it. The
+// window groups by this and "the one it names" below picks the first.
+export function grainsOf(def: TrackerDef): TrackerClass[] {
+  const surface = def.surface;
+  if (surface.kind === "any") return [...TRACKER_CLASSES];
+  if (surface.kind !== "diary") return [];
+  return TRACKER_CLASSES.filter((c) => surface.classes.includes(c));
+}
+
+// The grain this rollup reads a habit at, or why it cannot.
+//
+// `null`   — not a diary habit; it has no slots here and never had.
+// a grain  — read it there.
+// NEEDS_GRAIN — the reader has to say, and the card says how many are waiting.
+//
+// TAKES THE SET AND NOT THE DEFINITION, so the window can ask the same question
+// of a seed. The card and the window must agree about which habits are waiting
+// — a count drawn from one function and a list drawn from another is two
+// answers that LOOK consistent for as long as nobody edits either.
+//
+// THE ORDER OF THE FOUR CLAUSES IS THE READER'S ANSWER, which was *"nothing —
+// it must be chosen"* with the note *"or the dashboard own grain as default"*.
+// Both, arranged so each is true where it is the better answer:
+//
+//   1. A CHOICE WINS, and a choice the habit cannot honour does not. A note
+//      carrying `stretch@weekly` for a habit that has since been moved to days
+//      only is a stale line, not an instruction.
+//   2. ONE GRAIN NEEDS NO QUESTION. This is every habit in every vault today,
+//      and it is exactly 1.0.55's behaviour — nothing changes denominator for
+//      a habit that names one grain, which is the property worth protecting.
+//   3. THE DASHBOARD'S OWN GRAIN, where the habit names it. A weekly rollup of
+//      a daily+weekly habit reading its weekly entries is the answer somebody
+//      would have given by hand, and it is invisible rather than surprising.
+//   4. OTHERWISE, ASK. A daily+weekly habit on a QUARTERLY dashboard has two
+//      defensible denominators and the plugin should not pick one silently —
+//      which is what 1.0.55 did, by dropping the row.
+export function resolveGrain(
+  grains: readonly TrackerClass[],
+  chosen: TrackerClass | undefined,
+  dashboard: TrackerClass | null
+): TrackerClass | typeof NEEDS_GRAIN | null {
+  if (!grains.length) return null;
+  if (chosen && grains.includes(chosen)) return chosen;
+  if (grains.length === 1) return grains[0];
+  if (dashboard && grains.includes(dashboard)) return dashboard;
+  return NEEDS_GRAIN;
+}
+
+// The diary grain a dashboard's period unit names.
+//
+// DERIVED FROM `CLASS_DEFS`, not a fifth hand-written table. `periodNoun` is
+// already "week"/"month"/"quarter"/"year" and `periodnav`'s `Unit` is already
+// those four words, so the map exists and only needed reading. A `daily`
+// dashboard has no period property and never reaches here.
+export function grainOfUnit(unit: string | null): TrackerClass | null {
+  if (!unit) return null;
+  return TRACKER_CLASSES.find((c) => CLASS_DEFS[c].periodNoun === unit) ?? null;
+}
+
 /** What a `habit-rollup` line asks for. */
 export interface HabitRollupAnswer {
   // Empty means EVERY habit THE VAULT HAS, which is why ticking them all in the
@@ -82,6 +200,11 @@ export interface HabitRollupAnswer {
   // dropped in August would silently leave the August card, which is the month
   // a reader most wants to see it missing from.
   ids: string[];
+  // Which grain to read a habit at, by id, for the habits the reader has
+  // chosen one for (1.0.56). ABSENT IS NOT A DEFAULT — `resolveGrain` decides,
+  // and most habits never appear here because they name one grain and there is
+  // nothing to choose.
+  grains: Record<string, TrackerClass>;
   strip: boolean;
 }
 
@@ -91,25 +214,47 @@ export function parseHabitRollupArg(argument: string): HabitRollupAnswer {
     .map((p) => p.trim())
     .filter(Boolean);
   const flag = (p: string): boolean => p.toLowerCase() === NO_STRIP_FLAG;
-  return { ids: parts.filter((p) => !flag(p)), strip: !parts.some(flag) };
+  const ids: string[] = [];
+  const grains: Record<string, TrackerClass> = {};
+  for (const part of parts) {
+    if (flag(part)) continue;
+    // `lastIndexOf`, AND `> 0` RATHER THAN `>= 0`. A habit id may itself hold
+    // an `@` — a reader's property named `@work` is legal YAML — so the cut is
+    // taken at the LAST one, and a part that is nothing but a suffix keeps its
+    // `@`. An unrecognised word after it is not a grain, which makes the whole
+    // part an id: `read@someday` names a habit called `read@someday` rather
+    // than being half-refused into a habit called `read`.
+    const at = part.lastIndexOf(GRAIN_MARK);
+    if (at > 0) {
+      const word = part.slice(at + GRAIN_MARK.length).toLowerCase();
+      if (isTrackerClass(word)) {
+        const id = part.slice(0, at);
+        ids.push(id);
+        grains[id] = word;
+        continue;
+      }
+    }
+    ids.push(part);
+  }
+  return { ids, grains, strip: !parts.some(flag) };
 }
 
 /** The argument text for an answer, empty when the answer is the default. */
-export function habitRollupArg(
-  ids: readonly string[],
-  strip: boolean
-): string {
-  const parts = ids.map((s) => s.trim()).filter(Boolean);
-  if (!strip) parts.push(NO_STRIP_FLAG);
+export function habitRollupArg(answer: HabitRollupAnswer): string {
+  const parts = answer.ids
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((id) => {
+      const grain = answer.grains[id];
+      return grain ? `${id}${GRAIN_MARK}${grain}` : id;
+    });
+  if (!answer.strip) parts.push(NO_STRIP_FLAG);
   return parts.join(",");
 }
 
 /** The whole directive line, with no `:` at all when there is nothing to say. */
-export function habitRollupLine(
-  ids: readonly string[],
-  strip: boolean
-): string {
-  const arg = habitRollupArg(ids, strip);
+export function habitRollupLine(answer: HabitRollupAnswer): string {
+  const arg = habitRollupArg(answer);
   return arg ? `${HABIT_ROLLUP_DIRECTIVE}:${arg}` : HABIT_ROLLUP_DIRECTIVE;
 }
 
@@ -197,6 +342,12 @@ export function rollupWindow(
 
 export interface HabitSlotReading extends HabitSlot {
   state: HabitState;
+  // The same stored value read as a number, for a `number` habit (1.0.56).
+  // BOTH READINGS, FROM ONE WALK, and deliberately not a union: the walk is
+  // the expensive part and a row knows its own `type`, so the column that
+  // draws it reads the field it means and ignores the other. `HabitReading`
+  // carries the pair for the same reason.
+  value: number | null;
   // Whether that slot has an entry at all — 1.0.54's distinction, and the
   // reason this does not read `collectPoints`: the collector skips a null
   // value, so an unwritten day and an unanswered one arrive as the same
@@ -208,6 +359,10 @@ export interface HabitRollupRow {
   id: string;
   label: string;
   grain: TrackerClass;
+  // Which half of the card this row is, 1.0.56. A `boolean` row reports a rate
+  // and streaks; a `number` row reports a total, a mean and how many slots
+  // carried a reading at all.
+  type: HabitType;
   // Dense and in order, one per elapsed slot — which is what makes a run over
   // this array a run over the calendar. See `habitRuns`.
   slots: HabitSlotReading[];
@@ -220,6 +375,21 @@ export interface HabitRollupRow {
   // `done / slots.length`, and `null` for a period that has not started — a
   // ring drawn from 0/0 is a claim about nothing.
   rate: number | null;
+  // ── the number half, meaningless on a boolean row ──────────────────────
+  //
+  // `logged` IS NOT `written`. A day with an entry that never answered this
+  // habit is written and not logged, and on a number habit that difference is
+  // the whole denominator: a mean over elapsed days answers a question nobody
+  // asked ("how much per day of the month"), while a mean over logged days
+  // answers the reader's ("how much on the days I recorded it").
+  logged: number;
+  total: number;
+  // `total / logged`, and `null` when nothing was logged — the same refusal
+  // `rate` makes, for the same reason.
+  mean: number | null;
+  // The tracker's own unit, carried so the drawn row does not read the
+  // registry again. `null` when the definition names none.
+  unit: string | null;
 }
 
 // The current and longest runs of kept slots.
@@ -273,16 +443,23 @@ export function habitRollupRows(
   app: App,
   paths: DiaryPaths,
   defs: readonly TrackerDef[],
-  window: { start: string; end: string } | null
+  window: { start: string; end: string } | null,
+  // The grains the reader chose, by habit id — the window's answer, straight
+  // off the directive.
+  chosen: Readonly<Record<string, TrackerClass>> = {},
+  // The grain of the dashboard this rollup is drawn on, which is the fallback
+  // for a habit that lives on several and names this one among them.
+  dashboard: TrackerClass | null = null
 ): HabitRollupRow[] {
   const grainOf = new Map<string, TrackerClass>();
   for (const def of defs) {
-    // The FOLDER scope is first in `scopesFor` and the bucketed one second, so
-    // `[0]` is never `daily-by-month` — but the union says it could be, and a
-    // cast is the thing that stops being true when that list changes.
-    const scope = scopesFor(def)[0];
-    if (scope == null || scope === "daily-by-month") continue;
-    grainOf.set(def.id, scope);
+    // `resolveGrain`, NOT `scopesFor`. Until 1.0.56 this line read
+    // `scopesFor(def)[0]`, which answers through `diaryClassOf` and so returned
+    // nothing at all for a habit on two grains or on `kind: "any"` — the habit
+    // drew no row, and no refusal either. See this module's head.
+    const grain = resolveGrain(grainsOf(def), chosen[def.id], dashboard);
+    if (grain == null || grain === NEEDS_GRAIN) continue;
+    grainOf.set(def.id, grain);
   }
 
   const read = new Map<TrackerClass, Map<string, Record<string, unknown>>>();
@@ -308,19 +485,31 @@ export function habitRollupRows(
       return {
         ...slot,
         state: fm ? readHabitState(fm[def.id]) : null,
+        value: fm ? readHabitNumber(fm[def.id]) : null,
         written: fm != null,
       };
     });
     const done = slots.filter((s) => s.state === 1).length;
+    const numbers = slots
+      .map((s) => s.value)
+      .filter((v): v is number => v != null);
+    const total = numbers.reduce((sum, v) => sum + v, 0);
     rows.push({
       id: def.id,
       label: def.label || def.id,
       grain,
+      type: habitTypeOf(def),
       slots,
       done,
       written: slots.filter((s) => s.written).length,
       ...habitRuns(slots),
       rate: slots.length ? done / slots.length : null,
+      logged: numbers.length,
+      total,
+      // `numbers.length` AND NOT `total`, so a window of nothing but zeroes
+      // reads `avg 0` rather than refusing to average.
+      mean: numbers.length ? total / numbers.length : null,
+      unit: def.unit ?? null,
     });
   }
   return rows;
@@ -345,8 +534,7 @@ export function noteWithHabitRollup(
   lines: readonly string[],
   body: { from: number; to: number },
   current: string,
-  ids: readonly string[],
-  strip: boolean
+  answer: HabitRollupAnswer
 ): string[] | null {
   const want = current.trim();
   const to = Math.min(body.to, lines.length);
@@ -354,7 +542,7 @@ export function noteWithHabitRollup(
     const line = lines[i];
     if (line.trim() !== want) continue;
     const indent = line.slice(0, line.length - line.trimStart().length);
-    const next = `${indent}${habitRollupLine(ids, strip)}`;
+    const next = `${indent}${habitRollupLine(answer)}`;
     if (next === line) return null;
     const out = [...lines];
     out[i] = next;
@@ -375,13 +563,24 @@ export function noteWithHabitRollup(
 // Order is only expressible as a list, so a reader who ticks everything and
 // moves one row gets the full list — the alternative is a gesture the window
 // accepts and the note cannot hold.
-export function habitRollupIds(
-  rows: readonly { id: string; shown: boolean }[],
-  registry: readonly string[]
-): string[] {
-  const shown = rows.filter((r) => r.shown).map((r) => r.id);
+//
+// A CHOSEN GRAIN ALSO FORCES THE LIST, and that is 1.0.56's addition. The
+// collapse is "say nothing and follow the vault", and a grain is something to
+// say — so an answer carrying one is written out even when every habit is
+// ticked in registry order. The alternative is a chooser the window accepts and
+// the note drops, which is the same failure a reorder would have been.
+export function habitRollupAnswer(
+  rows: readonly { id: string; shown: boolean; grain?: TrackerClass | null }[],
+  registry: readonly string[],
+  strip: boolean
+): HabitRollupAnswer {
+  const shown = rows.filter((r) => r.shown);
+  const grains: Record<string, TrackerClass> = {};
+  for (const row of shown) if (row.grain) grains[row.id] = row.grain;
+  const ids = shown.map((r) => r.id);
   const same =
-    shown.length === registry.length &&
-    shown.every((id, i) => id === registry[i]);
-  return same ? [] : shown;
+    !Object.keys(grains).length &&
+    ids.length === registry.length &&
+    ids.every((id, i) => id === registry[i]);
+  return same ? { ids: [], grains: {}, strip } : { ids, grains, strip };
 }

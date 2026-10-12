@@ -17,9 +17,11 @@
 import { describe, it, expect } from "vitest";
 import { App, TFile } from "obsidian";
 import {
+  HABIT_TYPES,
   addHabitRow,
   describeHabitState,
   habitLabelOf,
+  habitRowState,
   habitWeek,
   habitWeekReadings,
   habitWrites,
@@ -27,18 +29,24 @@ import {
   habitsInFolder,
   habitsOnNote,
   hasHabit,
+  isHabitType,
   newHabitDef,
   nextHabitState,
   noteHasHabitsSection,
   normaliseHabitLabel,
   readHabitState,
   removeHabitRow,
-  setHabitState,
+  setHabitReading,
   type HabitDraft,
   type HabitRow,
 } from "../src/trackers/habits";
 import { planDirectiveEdits } from "../src/trackers/entry-trackers";
-import { habitsDoorLabel } from "../src/ui/widgets/habits-section";
+import {
+  SPARK_FLOOR,
+  habitsDoorLabel,
+  sparkFraction,
+  sparkHeight,
+} from "../src/ui/widgets/habits-section";
 import { monthGrid } from "../src/diary/diary-link";
 import { entryPath } from "../src/diary/lineage";
 import { DEFAULT_PATHS } from "../src/core/constants";
@@ -60,7 +68,7 @@ import {
   normalizeTrackers,
   type TrackerDef,
 } from "../src/trackers/trackers";
-import { readCode, readSrc, readCss, cssRule } from "./sources";
+import { readCode, readSrc, readCss, cssRule, cssRules } from "./sources";
 
 // A habit definition, as the registry holds one.
 const habit = (id: string, over: Partial<TrackerDef> = {}): TrackerDef => ({
@@ -73,11 +81,23 @@ const habit = (id: string, over: Partial<TrackerDef> = {}): TrackerDef => ({
   ...over,
 });
 
-const row = (id: string, state: 1 | 0 | null = null): HabitRow => ({
+// A boolean habit's draft row. `reading` rather than `state` since 1.0.56 —
+// one field for both types, because `HabitState` is already a `number | null`.
+const row = (id: string, reading: number | null = null): HabitRow => ({
   id,
   directive: `tracker:${id}`,
   label: id,
-  state,
+  type: "boolean",
+  reading,
+});
+
+// A number habit's draft row, which travels the same channel.
+const numRow = (id: string, reading: number | null = null): HabitRow => ({
+  id,
+  directive: `tracker:${id}`,
+  label: id,
+  type: "number",
+  reading,
 });
 
 const draftOf = (rows: HabitRow[], over: Partial<HabitDraft> = {}): HabitDraft => ({
@@ -155,16 +175,35 @@ describe("habitsForSurface", () => {
     { ...habit("Mood"), type: "scale" },
     { ...habit("Steps"), type: "number" },
     { ...habit("Tags"), type: "tags" },
+    { ...habit("Clock"), type: "time" },
+    { ...habit("Day"), type: "date" },
+    { ...habit("Pick"), type: "select" },
   ];
 
-  it("is boolean trackers and nothing else", () => {
-    // The same test `habitTrackerFor` applies before folding a directive into
-    // the cell — written once, so the window cannot offer a row the cell would
-    // refuse to draw.
+  it("is boolean AND number trackers, and nothing else", () => {
+    // THE 1.0.56 WIDENING, AND THE FIVE REFUSALS ARE THE POINT. The reader
+    // moved the word — *"Habits can be either boolean or number trackers"* —
+    // and a test that only asserted the two admitted would pass on a predicate
+    // that admitted all seven. `scale` is named first because it was OFFERED
+    // and withdrawn (*"I changed my mind on emoji scale"*), so it is the one a
+    // later round is most likely to let back in by accident.
     const ids = habitsForSurface(registry, null).map((t) => t.id);
+    expect(ids).toContain("Steps");
+    expect(ids).toContain("Medication");
     expect(ids).not.toContain("Mood");
-    expect(ids).not.toContain("Steps");
     expect(ids).not.toContain("Tags");
+    expect(ids).not.toContain("Clock");
+    expect(ids).not.toContain("Day");
+    expect(ids).not.toContain("Pick");
+  });
+
+  it("names the two types once, so nothing counts them by hand", () => {
+    expect([...HABIT_TYPES]).toEqual(["boolean", "number"]);
+    expect(isHabitType("boolean")).toBe(true);
+    expect(isHabitType("number")).toBe(true);
+    for (const t of ["scale", "time", "date", "select", "tags"] as const) {
+      expect(isHabitType(t)).toBe(false);
+    }
   });
 
   it("leaves out a derived one, which has nothing to tick", () => {
@@ -175,7 +214,7 @@ describe("habitsForSurface", () => {
 
   it("offers a daily note what a daily note may log", () => {
     const ids = habitsForSurface(registry, diarySurface("daily")).map((t) => t.id);
-    expect(ids).toEqual(["Medication", "Exercise", "Anywhere"]);
+    expect(ids).toEqual(["Medication", "Exercise", "Anywhere", "Steps"]);
     // A window that offered a monthly habit on a Tuesday would watch its own
     // add fail `directiveAllowedOn` afterwards.
     expect(ids).not.toContain("Monthly");
@@ -191,6 +230,7 @@ describe("habitsForSurface", () => {
       "Monthly",
       "Anywhere",
       "Study",
+      "Steps",
     ]);
   });
 });
@@ -358,16 +398,32 @@ describe("the draft's three edits", () => {
   });
 
   it("sets a reading without moving the row", () => {
-    const rows = setHabitState([row("A"), row("B"), row("C")], "B", 1);
+    const rows = setHabitReading([row("A"), row("B"), row("C")], "B", 1);
     expect(rows.map((r) => r.id)).toEqual(["A", "B", "C"]);
-    expect(rows[1].state).toBe(1);
+    expect(rows[1].reading).toBe(1);
+  });
+
+  it("takes a number, not a state — one channel for both types", () => {
+    // THE 1.0.56 SIGNATURE. A `HabitState` parameter would have typed out the
+    // stepper entirely: `setHabitReading(rows, "B", 4.2)` has to compile, and a
+    // test that only set 1/0/null would pass against the narrower signature.
+    const rows = setHabitReading([numRow("A"), numRow("B")], "B", 4.2);
+    expect(rows[1].reading).toBe(4.2);
+    // And a boolean row narrows back through the same forgiving parse.
+    expect(habitRowState(row("A", 1))).toBe(1);
+    expect(habitRowState(row("A", 0))).toBe(0);
+    expect(habitRowState(row("A", null))).toBeNull();
+    // A reading no boolean wrote still reads as a state rather than throwing —
+    // `readHabitState`'s own >= 0.5 rule, which is what makes the shared field
+    // safe when a tracker's type is changed in Settings under a draft.
+    expect(habitRowState(numRow("A", 4.2))).toBe(1);
   });
 
   it("returns new lists, so Cancel is free", () => {
     const before = [row("A")];
     addHabitRow(before, row("B"));
     removeHabitRow(before, "A");
-    setHabitState(before, "A", 1);
+    setHabitReading(before, "A", 1);
     expect(before).toEqual([row("A")]);
   });
 });
@@ -427,7 +483,13 @@ describe("habitWrites", () => {
     // line, and a remove that guessed `tracker:Medication` would hand the write
     // a string the note does not contain.
     const before: HabitRow[] = [
-      { id: "Med", directive: "tracker:Med|Morning meds", label: "Med", state: 1 },
+      {
+        id: "Med",
+        directive: "tracker:Med|Morning meds",
+        label: "Med",
+        type: "boolean",
+        reading: 1,
+      },
     ];
     expect(habitWrites(before, draftOf([])).remove).toEqual([
       "tracker:Med|Morning meds",
@@ -528,8 +590,8 @@ describe("the Habits window", () => {
     // is the only way to reach the seven. A membership-only editor would have
     // made the overflow a loss of function.
     const s = src();
-    expect(s).toContain("nextHabitState(row.state)");
-    expect(s).toContain("setHabitState(this.rows, row.id,");
+    expect(s).toContain("nextHabitState(state)");
+    expect(s).toContain("setHabitReading(this.rows, row.id,");
     expect(s).toContain("ca-journal-habit-box");
   });
 
@@ -540,7 +602,7 @@ describe("the Habits window", () => {
     const at = s.indexOf("box.addEventListener");
     expect(at).toBeGreaterThan(0);
     const body = s.slice(at, at + 700);
-    expect(body).toContain("this.rows = setHabitState");
+    expect(body).toContain("this.rows = setHabitReading");
     expect(body).toContain("this.renderBody()");
   });
 
@@ -699,8 +761,15 @@ describe("the Habits cell", () => {
     expect(at).toBeGreaterThan(0);
     const body = s.slice(at, s.indexOf("\n}\n", at));
     expect(body).toContain("entries: readonly HabitEntry[]");
-    expect(body).toContain("state: readHabitState(deps.currentValue(");
     expect(body).toContain("const before: HabitRow[] = entries.map(");
+    // NAMES `deps.currentValue`, NOT THE PARSE (1.0.56). The per-type read
+    // moved into `habitRowFor`, so `readHabitState` is no longer spelled here —
+    // what must still be spelled is the HOST'S LIVE VALUE, which is the whole
+    // property this test exists for. Asserted as the full call so a row built
+    // without the third argument (every reading `null`, silently) fails.
+    expect(body).toContain(
+      "habitRowFor(e.def, e.directive, deps.currentValue(ctx, e.def.id))"
+    );
     // And no host computes one to pass in.
     expect(s).not.toContain("rowsNow");
     const cell = s.slice(s.indexOf("export function finishHabitsCell("));
@@ -1329,6 +1398,22 @@ describe("the grid lets the type go", () => {
     // from the same function the section's rows do, so the two surfaces cannot
     // disagree about what a renamed habit is called.
     expect(code).toContain("habitLabelOf(habit, line),");
+    // ── AND THE CHIP STILL REFUSES A NUMBER (1.0.56) ────────────────────
+    //
+    // THE ASSERTION THAT KILLS THE NAIVE WIDENING, and it has to be the guard
+    // rather than the prose around it: `habitsForSurface` now admits a number,
+    // so every caller followed in one edit and exactly ONE of them had to get
+    // narrower. A 14px chip has one tick in it and no room for a stepper, so a
+    // number habit with no section on the note keeps its own 66px cell.
+    expect(code).toContain('if (habit && habit.type === "boolean") {');
+    // THE TWO QUESTIONS, IN THIS ORDER: the stand-down is asked of BOTH types
+    // and only the fold is narrowed, which is the whole of the reader's second
+    // call. A `continue` inside the boolean branch would leave a number cell
+    // drawn beside the section that already draws it.
+    expect(loop.indexOf("if (habitsElsewhere) continue;")).toBeGreaterThan(0);
+    expect(
+      code.indexOf("if (habitsElsewhere) continue;")
+    ).toBeLessThan(code.indexOf('if (habit && habit.type === "boolean") {'));
   });
 
   it("reads the live note, and keeps the last answer it got", () => {
@@ -1394,6 +1479,16 @@ describe("the section itself", () => {
     expect(opens).toHaveLength(1);
   });
 
+  // The two row builders, sliced out so an assertion about one cannot pass on
+  // the other — they share `paintBar`/`paintDay` vocabulary and most of a shape.
+  const boolRow = (): string =>
+    code.slice(
+      code.indexOf("function drawBoolRow"),
+      code.indexOf("function drawNumRow")
+    );
+  const numRow = (): string =>
+    code.slice(code.indexOf("function drawNumRow"), code.indexOf("function drawDoor"));
+
   it("uses the chip's own control and not a second cycle", () => {
     // SAME CLASSES, SAME GLYPHS, SAME THREE-STATE CYCLE, so one habit is one
     // control wherever a reader meets it — and `nextHabitState` is not
@@ -1403,9 +1498,14 @@ describe("the section itself", () => {
     // EACH ROW READS ITS OWN HABIT'S WEEK, by the id of the tracker that row
     // is — one strip shared by every row is a plausible optimisation and a
     // wrong answer four rows out of five.
-    expect(code).toContain(
-      "habitWeekReadings(app, plugin.settings.paths, entry.def.id, iso)"
-    );
+    //
+    // ASSERTED AS A SHAPE, NOT A LINE (1.0.56). Both row builders call this and
+    // the call is wrapped across five lines in each, so a single string would
+    // be asserting the formatter. What must hold is that the ARGUMENT is the
+    // row's own tracker: a `habits[0].id` or a hoisted `readings` would both
+    // fail this, and both are the mistake it exists to catch.
+    expect(code.match(/habitWeekReadings\(/g)).toHaveLength(2);
+    expect(code.match(/entry\.def\.id,\s+iso\s+\)/g)).toHaveLength(2);
     // AND THE ROW IS NAMED BY THE NOTE'S OWN LINE, not by the registry: an
     // inline `tracker:<id>|Label` names this habit here, exactly as it names
     // the chip the grid would have drawn.
@@ -1431,10 +1531,99 @@ describe("the section itself", () => {
     // AND THE HOST'S OWN DOT FOLLOWS A TICK, repainted from the same function
     // the first paint used: this entry's column is one of the seven, so a tick
     // that did not move it would read as a bug in the strip.
-    const wired = code.slice(code.indexOf("wireHabit(deps, box"), code.indexOf("drawDoor(root, deps, entries, ctx);\n  return root;"));
+    const wired = boolRow();
     expect(wired).toContain("dots.find(({ day }) => day.iso === iso)");
     expect(wired).toContain("paintDay(");
     expect(wired).toContain("written: true");
+  });
+
+  // ── the second column (1.0.56) ────────────────────────────────────────
+
+  it("splits by type into two independent grids, and collapses to one", () => {
+    // THE READER'S CALL: *"one side for boolean habits and the other for ...
+    // stepper ... trackers"*. Asserted as the filter rather than the drawing,
+    // because the filter is where a `!==` would silently put every habit in
+    // one column.
+    expect(code).toContain(
+      'const booleans = entries.filter((e) => habitTypeOf(e.def) === "boolean")'
+    );
+    expect(code).toContain(
+      'const numbers = entries.filter((e) => habitTypeOf(e.def) === "number")'
+    );
+    // TWO CALLS TO `column`, which is what makes them two grids — the 1.0.31
+    // two-grid trap is rows within ONE list, and these must not share tracks.
+    expect(code.match(/= column\(pair, week, iso\)/g)).toHaveLength(2);
+    expect(code).toContain('createDiv({ cls: "ca-habits-list" })');
+    // AND A LONE COLUMN DRAWS FULL WIDTH. Every shipped preset is all-boolean,
+    // so this is the common case and not the edge one.
+    expect(code).toContain(
+      'pair.toggleClass("is-single", !booleans.length || !numbers.length)'
+    );
+    // TWO TRACKS, AND ONE WHEN A COLUMN IS EMPTY. Asserted as the track lists
+    // themselves: a pair declared `1fr` draws one column with both lists
+    // stacked inside it, which looks like the collapse and is not it.
+    expect(cssRule(".ca-habits-pair")).toContain(
+      "grid-template-columns: 1fr 1fr"
+    );
+    expect(cssRule(".ca-habits-pair.is-single")).toContain(
+      "grid-template-columns: 1fr"
+    );
+    // THE DIVIDER IS BESIDE THE COLUMNS AND BETWEEN THEM, which is the one
+    // thing a container-query collapse has to remember to move: an inline-start
+    // border on a stacked list is a rule down the left of the second half.
+    expect(cssRule(".ca-habits-col + .ca-habits-col")).toContain(
+      "border-inline-start: var(--ca-rule-hair)"
+    );
+    const stacked = cssRules(".ca-habits-col + .ca-habits-col");
+    expect(stacked).toHaveLength(2);
+    expect(stacked[1]).toContain("border-inline-start: none");
+    expect(stacked[1]).toContain("border-block-start: var(--ca-rule-hair)");
+    expect(cssRules(".ca-habits-pair")).toHaveLength(2);
+  });
+
+  it("gives a number row the entry's own stepper, repainting its bar", () => {
+    const body = numRow();
+    // `buildStepper` ITSELF — the control this tracker had in its grid cell,
+    // writing through the same `host.write`. A second stepper here would be two
+    // controls that agree until one of them is changed.
+    expect(body).toContain("buildStepper(deps, entry.def, ctx, (value) =>");
+    expect(body).toContain("ca-habit-spark");
+    // THE RANGE IS CAPTURED ONCE AND NOT RECOMPUTED ON A STEP, or the other six
+    // bars jump around while the reader steps one number.
+    expect(body).toContain("paintBar(");
+    const at = body.indexOf("const repaint");
+    expect(at).toBeGreaterThan(0);
+    const inside = body.slice(at, body.indexOf("if (!week.length) return;"));
+    expect(inside).not.toContain("Math.min(");
+    expect(inside).not.toContain("Math.max(");
+  });
+
+  it("normalises a bar over the week's own range, flat weeks included", () => {
+    // `drawStrip`'s RULE, not the tracker's declared min/max: a 0–10000 step
+    // counter whose week sits between 8000 and 9000 would otherwise draw seven
+    // bars at the floor.
+    expect(sparkFraction(5, 0, 10)).toBeCloseTo(0.5);
+    expect(sparkFraction(0, 0, 10)).toBe(0);
+    expect(sparkFraction(10, 0, 10)).toBe(1);
+    expect(sparkFraction(8500, 8000, 9000)).toBeCloseTo(0.5);
+    // A FLAT WEEK IS FULL HEIGHT. "Every day the same" is not "every day the
+    // least" — the boundary a `span === 0 ? 0` would quietly invert.
+    expect(sparkFraction(4, 4, 4)).toBe(1);
+    expect(sparkFraction(0, 0, 0)).toBe(1);
+  });
+
+  it("floors a drawn bar so the least day is not an empty column", () => {
+    // A 0%-tall bar cannot be told from the day nobody wrote, which is the one
+    // distinction `HabitReading.written` exists to carry.
+    expect(SPARK_FLOOR).toBe(12);
+    expect(sparkHeight(0)).toBe("12%");
+    expect(sparkHeight(1)).toBe("100%");
+    expect(sparkHeight(0.5)).toBe("56%");
+    // AND AN UNWRITTEN DAY GETS NO HEIGHT AT ALL — `drawStrip`'s rule that the
+    // gaps are the information, so the column keeps its slot and the
+    // stylesheet gives it a hairline.
+    expect(code).toContain('bar.style.removeProperty("height")');
+    expect(readCss()).toMatch(/\.ca-habit-spark-bar\.is-blank\b/);
   });
 
   it("says what is behind the door, and refuses it on a managed template", () => {
@@ -1452,6 +1641,19 @@ describe("the section itself", () => {
     expect(src).not.toMatch(/\bdelete a habit\b/i);
   });
 
+  it("tells a logged number row from an unanswered one, which its name follows", () => {
+    // THE SOURCE HALF OF THE SAME FIX. The class is set from the entry's own
+    // current value — so a row drawn on a note that already has a reading is
+    // not muted — and added again when the stepper writes, because
+    // `buildStepper` always writes a number and there is no path through it
+    // that clears a reading back to nothing.
+    const num = numRow();
+    expect(num).toContain('row.toggleClass(');
+    expect(num).toContain('"is-logged",');
+    expect(num).toContain("readHabitNumber(deps.currentValue(ctx, entry.def.id)) != null");
+    expect(num).toContain('row.addClass("is-logged")');
+  });
+
   it("is one grid and not a grid per row", () => {
     // THE 1.0.31 RECORDS-TABLE BUG, which this shape would have reproduced: an
     // `auto` track is sized by the content of ITS OWN grid, so a heads row
@@ -1467,6 +1669,22 @@ describe("the section itself", () => {
     // content, so a long habit name would push the week off the card instead
     // of truncating, which looks like a layout bug rather than a long name.
     expect(cssRule(".ca-habits-name")).toContain("text-overflow: ellipsis");
+    // ── THE NAME'S CONTRAST, PER TYPE (1.0.56) ───────────────────────────
+    //
+    // A NUMBER ROW NEVER WEARS `is-done` OR `is-not-done` — a stepper has no
+    // such reading — so the boolean rule muted every number habit's name
+    // permanently, including on a day with 10 km in it. Found before it
+    // shipped, and this is the pair of selectors that separates the two types:
+    // the boolean rule must EXCLUDE the number row, and the number row must
+    // have its own state class.
+    const muted = cssRule(
+      ".ca-habits-row:not(.ca-habits-row-number):not(.is-done):not(.is-not-done) .ca-habits-name"
+    );
+    expect(
+      cssRule(".ca-habits-row-number:not(.is-logged) .ca-habits-name")
+    ).toContain("var(--text-muted)");
+    expect(muted).toContain("var(--text-muted)");
+    expect(cssRules(".ca-habits-row:not(.is-done):not(.is-not-done) .ca-habits-name")).toHaveLength(0);
     // THE MARK IS A SIZE AND A FILL, which is how three readings fit on one dot
     // without a third colour: nothing-recorded is the SMALL faint base form,
     // and a reading grows it. A base that was already dot-sized would make an

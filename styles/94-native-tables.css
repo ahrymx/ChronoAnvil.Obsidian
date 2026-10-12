@@ -822,6 +822,58 @@ body.is-mobile .ca-journal-tasks-table .ca-jtt-row .ca-journal-task-check {
    one takes both away. Same sentence, same place, same size; the second class
    joins the selector rather than copying the four declarations, because a
    second copy is what later disagrees. */
+/* ── THE HABITS WINDOW'S OWN CONTROLS ─────────────────────────────────────
+
+   A NUMBER ROW'S STEPPER IS THE ENTRY'S STEPPER, down to the class: the row
+   wears `.ca-journal-stepper` and `.ca-journal-step-btn` exactly as the Habits
+   section does, so the control the reader met on a diary entry is the control
+   they meet here. These rules are only what a MODAL row needs on top of it —
+   it must not grow, and it must leave the name its space.
+
+   `obsidian-button-height` APPLIES TO THE ± BUTTONS and is already paid for by
+   `.ca-journal-step-btn`'s own rule; nothing here may set a height, or it
+   becomes a second answer to that bug. */
+.ca-habits-step {
+  flex: 0 0 auto;
+}
+/* THE VALUE IS AN `<input>` AND NOT A SPAN, which is the one place this parts
+   company with the entry's control — a reader with 40 pages to record should
+   not press ＋ forty times. Narrow and tabular, so a two-digit and a
+   three-digit reading do not move the unit beside them. */
+.ca-habits-step-value {
+  width: 4em;
+  background: none;
+  border: none;
+  color: var(--text-normal);
+  font-size: var(--ca-text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.ca-habits-step-unit {
+  color: var(--text-muted);
+  font-size: var(--ca-text-2xs);
+}
+/* WHICH KIND, AND THEN ITS SHAPE. The select sits between the name box and the
+   ＋, and the three range fields are a second line under them — a four-control
+   add row at modal width would wrap mid-control. */
+.ca-habits-type {
+  flex: 0 0 auto;
+  max-width: 11em;
+  font-size: var(--ca-text-xs);
+}
+.ca-habits-shape {
+  display: flex;
+  gap: var(--ca-space-2);
+  margin-top: var(--ca-space-2);
+}
+/* EACH FIELD TAKES AN EQUAL SHARE and none of them a fixed width: "Least",
+   "Most" and "Unit" are three short boxes whose contents are two characters
+   each, and a fixed width that fits "Unit" on the desktop clips it on a
+   phone. */
+.ca-habits-shape-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
 .ca-habits-note,
 .ca-attach-cats-note {
   margin-top: var(--ca-space-2);
