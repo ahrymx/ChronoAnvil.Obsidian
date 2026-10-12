@@ -187,6 +187,45 @@ export function grainOfUnit(unit: string | null): TrackerClass | null {
   return TRACKER_CLASSES.find((c) => CLASS_DEFS[c].periodNoun === unit) ?? null;
 }
 
+/** One grain's rows, drawn under one heading. */
+export interface HabitRollupGroup {
+  grain: TrackerClass;
+  rows: HabitRollupRow[];
+}
+
+// The rows gathered by the grain they are read at, in `TRACKER_CLASSES` order
+// (1.0.61).
+//
+// HERE AND NOT IN THE VIEW, which is this pair of files' own division: the
+// arithmetic is this module and `-view` is the DOM over it. An ordering is a
+// claim about rows, and the suite has no DOM to check a claim made inside a
+// loop body.
+//
+// A STABLE PARTITION AND NOT A SORT. A reader who moved Read above Gym with the
+// window's chevron still sees that order inside the group — `habitRollupIds`
+// writes an explicit list precisely so the sequence is theirs, and a comparator
+// over grain indices would be free to reshuffle ties. Five passes over a list
+// of habits, and stability is structural rather than a property of a comparator
+// somebody may later change.
+//
+// AND IT IS THE ORDER THE WINDOW ALREADY MOVES THINGS IN. `HabitRollupEditor`'s
+// chevrons swap a habit *"in its own group's members, not in `this.rows`"*, so
+// a per-group order is the only one the UI can produce; the card was the one
+// surface ignoring it. Nothing is rewritten — the stored list keeps whatever
+// order it has, and this partitions it for drawing.
+//
+// NOT UNIFIED WITH THE EDITOR'S OWN `groupOf`, which groups SEEDS — their grain
+// is `TrackerClass | null` and they need the `NEEDS_GRAIN` bucket this cannot
+// have, since a habit waiting for a grain has no row at all.
+export function rollupGroups(
+  rows: readonly HabitRollupRow[]
+): HabitRollupGroup[] {
+  return TRACKER_CLASSES.map((grain) => ({
+    grain,
+    rows: rows.filter((r) => r.grain === grain),
+  })).filter((g) => g.rows.length > 0);
+}
+
 /** What a `habit-rollup` line asks for. */
 export interface HabitRollupAnswer {
   // Empty means EVERY habit THE VAULT HAS, which is why ticking them all in the

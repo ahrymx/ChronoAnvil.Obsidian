@@ -123,6 +123,54 @@ body.ca-grain-subtle {
   --ca-grain-tint: rgba(var(--ca-grain-accent-rgb), 0.03);
 }
 
+/* --- A Habit Rollup Row's Own Grain (1.0.61) -----------------
+
+   THE CARD GROUPS ITS HABITS BY THE GRAIN THEY ARE READ AT, and a kept mark in
+   the strip wears that grain's colour. These five rules are how the colour
+   arrives.
+
+   A ROW MUST NEVER WEAR `data-ca-grain`, AND MUST NEVER DECLARE
+   `--ca-grain-accent`. Either one repaints that row's own ring, which is the
+   one thing this was not allowed to do. The selector `[data-ca-grain]
+   .ca-stat-ring-val` below is only half the mechanism: a `var()` is substituted
+   on the element that DECLARES the property, so a ring resolves
+   `--ca-grain-accent` against its nearest declaring ancestor. Today that is the
+   leaf, carrying the DASHBOARD's grain — and a row that declared its own would
+   simply win, attribute or no attribute.
+
+   So: a private attribute name, which that selector cannot match, binding a
+   private property, which no rule but the strip's reads. The default is in
+   00-tokens.css, on `body` because it reads a theme colour.
+
+   NOT KEYED ON `[data-ca-row-grain]` ALONE. The class is in the selector so
+   this file cannot accidentally grant the attribute meaning anywhere else. */
+.ca-hrollup-row[data-ca-row-grain="daily"] {
+  --ca-hrollup-grain: var(--ca-grain-daily);
+}
+.ca-hrollup-row[data-ca-row-grain="weekly"] {
+  --ca-hrollup-grain: var(--ca-grain-weekly);
+}
+.ca-hrollup-row[data-ca-row-grain="monthly"] {
+  --ca-hrollup-grain: var(--ca-grain-monthly);
+}
+.ca-hrollup-row[data-ca-row-grain="quarterly"] {
+  --ca-hrollup-grain: var(--ca-grain-quarterly);
+}
+.ca-hrollup-row[data-ca-row-grain="yearly"] {
+  --ca-hrollup-grain: var(--ca-grain-yearly);
+}
+/* AND MONOCHROME STILL MEANS MONOCHROME. The modifier above resets
+   `--ca-grain-accent` and its three companions, which is every channel the
+   grain palette had until this one — the five rules above read the raw palette
+   tokens, which that preset never touches, so a reader who asked for one
+   colour would have got five of them in the strip. Specificity (0,2,1) beats
+   the bindings' (0,2,0), so it wins wherever it sits; it is placed after them
+   so the sheet reads in the order it resolves. `ca-grain-subtle` only lowers a
+   tint alpha and needs nothing. */
+body.ca-grain-monochrome .ca-hrollup-row {
+  --ca-hrollup-grain: var(--interactive-accent);
+}
+
 /* --- Micro-Spine & Eyebrow Accents on Page Head & Banner ----
 
    THE PAGE HEAD'S EIGHT SELECTORS ARE GONE FROM HERE (5.31.2), and this is where

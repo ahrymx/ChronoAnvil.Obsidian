@@ -979,6 +979,28 @@ body {
      token that reads a variable `:root` does not itself define, so this cannot
      drift back one alias at a time. */
 
+  /* ── a habit rollup mark's grain (1.0.61) ─────────────────────────────
+     WHAT A KEPT SLOT IS PAINTED WITH, defaulting to the vault's own accent so
+     a strip on a row with no grain of its own is exactly the picture it was
+     before this token existed. The five overrides are in
+     99-aesthetic-presets.css beside the other grain bindings, keyed on
+     `[data-ca-row-grain]`.
+
+     HERE AND NOT ON `:root`, for the reason at the head of this block: it
+     reads `--interactive-accent`, which is a theme colour.
+
+     A PRIVATE PROPERTY, AND THAT IS THE WHOLE POINT OF IT. The obvious route
+     was `data-ca-grain` on the row, which binds `--ca-grain-accent` five ways
+     — and one of the rules reading that is `[data-ca-grain] .ca-stat-ring-val`.
+     A `var()` is substituted on the element that DECLARES the property, which
+     is this block's own first paragraph: so a rollup row that declared
+     `--ca-grain-accent`, by the attribute or by hand, would have repainted its
+     OWN ring in its own grain — whether or not it wore the attribute the
+     selector matches. The reader ruled that out; the tint is on the filled
+     strip cells and nowhere else. A property only this card reads cannot reach
+     a rule that was never told about it. */
+  --ca-hrollup-grain: var(--interactive-accent);
+
   /* ── the grid's own surfaces (1.0.19) ─────────────────────────────────
      HERE AND NOT BESIDE `--ca-tg-gutter`, for the reason at the head of this
      block: all four read a theme colour and three of them mix one.

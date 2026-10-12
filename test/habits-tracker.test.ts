@@ -47,6 +47,7 @@ import {
   sparkFraction,
   sparkHeight,
 } from "../src/ui/widgets/habits-section";
+import { boundsNote, readingText } from "../src/ui/habit-reading-window";
 import { monthGrid } from "../src/diary/diary-link";
 import { entryPath } from "../src/diary/lineage";
 import { DEFAULT_PATHS } from "../src/core/constants";
@@ -1741,6 +1742,19 @@ describe("the grid lets the type go", () => {
   });
 });
 
+// `fnBody` resolves a top-level function by module; these are class members, so
+// the slice is local. To the next `\n  ` member or the end, whichever is nearer.
+const fnBodyOf = (code: string, name: string): string => {
+  let at = code.indexOf(`  protected ${name}(`);
+  if (at < 0) at = code.indexOf(`  protected async ${name}(`);
+  if (at < 0) throw new Error(`no member ${name}`);
+  const rest = code.slice(at + 10);
+  const ends = ["\n  private ", "\n  protected ", "\n  public "]
+    .map((m) => rest.indexOf(m))
+    .filter((i) => i > 0);
+  return rest.slice(0, ends.length ? Math.min(...ends) : rest.length);
+};
+
 describe("the section itself", () => {
   const src = readSrc("habits-section");
   const code = readCode("habits-section");
@@ -1772,7 +1786,12 @@ describe("the section itself", () => {
     // control wherever a reader meets it — and `nextHabitState` is not
     // re-implemented here, which is the drift that would give the section and
     // the cell different ideas of what follows ✗.
-    expect(code).toContain("wireHabit(deps, box, box, entry.def, ctx,");
+    // TWO DIFFERENT ELEMENTS (1.0.61). `wireHabit` has taken the mark and the
+    // press apart since it was written, and the reader's *"the boolean name can
+    // become its toggle"* is simply the first caller to use that: the mark is a
+    // span inside the button and the press is the button round the name.
+    // Passing one element twice is the mutant this kills.
+    expect(code).toContain("wireHabit(deps, box, press, entry.def, ctx,");
     // EACH ROW READS ITS OWN HABIT'S WEEK, by the id of the tracker that row
     // is — one strip shared by every row is a plausible optimisation and a
     // wrong answer four rows out of five.
@@ -1788,7 +1807,6 @@ describe("the section itself", () => {
     // inline `tracker:<id>|Label` names this habit here, exactly as it names
     // the chip the grid would have drawn.
     expect(code).toContain("habitLabelOf(entry.def, entry.directive)");
-    expect(code).toContain("cls: \"ca-journal-habit-box\"");
     expect(code).not.toContain("nextHabitState");
     // THE BOX IS THE PRESS, NOT THE ROW: a row-wide target would make a click
     // on Wednesday's dot tick today, which is the one gesture this must not
@@ -1830,8 +1848,13 @@ describe("the section itself", () => {
     );
     // TWO CALLS TO `column`, which is what makes them two grids — the 1.0.31
     // two-grid trap is rows within ONE list, and these must not share tracks.
-    expect(code.match(/= column\(pair, week, iso\)/g)).toHaveLength(2);
-    expect(code).toContain('createDiv({ cls: "ca-habits-list" })');
+    // TWO CALLS TO `column`, EACH NAMING ITS KIND (1.0.61) — the two sides no
+    // longer have the same tracks, since the boolean's control is its name and
+    // the number's is one button, so the list has to know which it is.
+    expect(code).toContain('column(pair, "boolean", week, iso)');
+    expect(code).toContain('column(pair, "number", week, iso)');
+    expect(code.match(/= column\(pair, /g)).toHaveLength(2);
+    expect(code).toContain('createDiv({ cls: `ca-habits-list is-${kind}` })');
     // AND A LONE COLUMN DRAWS FULL WIDTH. Every shipped preset is all-boolean,
     // so this is the common case and not the edge one.
     expect(code).toContain(
@@ -1861,10 +1884,18 @@ describe("the section itself", () => {
 
   it("gives a number row the entry's own stepper, repainting its bar", () => {
     const body = numRow();
-    // `buildStepper` ITSELF — the control this tracker had in its grid cell,
-    // writing through the same `host.write`. A second stepper here would be two
-    // controls that agree until one of them is changed.
-    expect(body).toContain("buildStepper(deps, entry.def, ctx, (value) =>");
+    // ── THE STEPPER IS GONE FROM THIS ROW (1.0.61) ──────────────────────
+    //
+    // *"make unit clickable to bring up a dialogue to alter the count (this
+    // would save some horizontal space by leaving plus and minus buttons
+    // out)."* The figure and the unit are ONE button, which is what gives a
+    // habit with no declared unit — most of them — something to aim at.
+    expect(body).not.toContain("buildStepper(");
+    expect(body).toContain('cls: "ca-habits-reading"');
+    expect(body).toContain("readingText(reading, entry.def.unit)");
+    // AND `buildStepper` IS STILL THE GRID'S CONTROL. Only a habit this section
+    // has taken over stops drawing one; `dead-code.test.ts` is the other half.
+    expect(readSrc("controls")).toContain("export function buildStepper(");
     expect(body).toContain("ca-habit-spark");
     // THE RANGE IS CAPTURED ONCE AND NOT RECOMPUTED ON A STEP, or the other six
     // bars jump around while the reader steps one number.
@@ -1874,6 +1905,114 @@ describe("the section itself", () => {
     const inside = body.slice(at, body.indexOf("if (!week.length) return;"));
     expect(inside).not.toContain("Math.min(");
     expect(inside).not.toContain("Math.max(");
+  });
+
+  // ── THE NAME BECAME THE TOGGLE (1.0.61) ────────────────────────────────
+  it("presses the name and marks it, with no box of its own", () => {
+    const row = boolRow();
+    // THE 20px BOX IS GONE FROM THIS CARD. *"The boolean box is too heavy."* On
+    // the narrower of two columns it was a fifth of the row spent on a control
+    // the reader was aiming past.
+    expect(row).not.toContain("ca-journal-habit-box");
+    expect(row).toContain('cls: "ca-habits-toggle"');
+    // THE MARK IS INSIDE THE BUTTON AND IN FRONT OF THE NAME, which is the
+    // order on screen and so must be the order here.
+    const mark = row.indexOf('cls: "ca-habits-mark"');
+    const name = row.indexOf('cls: "ca-habits-name"');
+    expect(mark).toBeGreaterThan(0);
+    expect(name).toBeGreaterThan(mark);
+    expect(row).toContain('const box = press.createSpan({ cls: "ca-habits-mark" })');
+  });
+
+  it("keeps the box's own argument now that the box is the name", () => {
+    // *"A row-wide press target would make a click on Wednesday's dot tick
+    // today"* — the one gesture this section must not have. The press is the
+    // name button and stops there; `row` is never the press.
+    const row = boolRow();
+    expect(row).not.toMatch(/wireHabit\(deps, [a-z]+, row,/);
+    expect(row).toContain("wireHabit(deps, box, press,");
+  });
+
+  it("draws the unanswered state as the mark's own base rule", () => {
+    // `wireHabit` SETS NO TEXT FOR UNSET — `mark.setText(known === 1 ? "✓" :
+    // known === 0 ? "✗" : "")` — so the third reading has to come from the
+    // element being empty, which makes the base rule the last of the three
+    // exactly as `.ca-habit-day`'s is. A colour alone is not a mark.
+    expect(readSrc("tracker-controls")).toContain(
+      'mark.setText(known === 1 ? "✓" : known === 0 ? "✗" : "")'
+    );
+    expect(cssRule(".ca-habits-mark:empty::before")).toContain("content:");
+    expect(cssRule(".ca-habits-mark.is-done")).toContain(
+      "var(--interactive-accent)"
+    );
+    expect(cssRule(".ca-habits-mark.is-not-done")).toContain("var(--text-muted)");
+  });
+
+  it("resets the height of both new buttons", () => {
+    // Memory `obsidian-button-height`: a chip-shaped `<button>` is 30px of
+    // padded chrome until it is reset, and "no visual change" is the signature
+    // of forgetting. Both of these are grid items in a 2px-gap list.
+    for (const sel of [".ca-habits-toggle", ".ca-habits-reading"]) {
+      const rule = cssRule(sel);
+      expect(rule, sel).toContain("height: auto");
+      expect(rule, sel).toContain("min-height: 0");
+      expect(rule, sel).toContain("box-shadow: none");
+    }
+    // AND THE BUTTON IS THE TRACK'S ITEM NOW, so it is the thing that has to be
+    // allowed to be narrow — `.ca-habits-name`'s ellipsis only works if what
+    // contains it can shrink.
+    expect(cssRule(".ca-habits-toggle")).toContain("min-width: 0");
+  });
+
+  // ── THE READING IS THE DOOR (1.0.61) ───────────────────────────────────
+  it("opens a window on the reading, and repaints from its save", () => {
+    const row = numRow();
+    expect(row).toContain("new HabitReadingWindow(");
+    // AND ALL THREE READOUTS MOVE WITH IT: the button's figure, the row's
+    // muting, and this entry's own bar in the week beside it.
+    //
+    // SLICED TO THE CALLBACK, which `vacuous-sweep-rule` is the reason for.
+    // `say()` is called twice in this row — once here and once as the initial
+    // paint — so a `toContain` over the whole function was satisfied by the
+    // call that had not been mutated. Measured: the mutant survived.
+    const from = row.indexOf("async (value: number | null) => {");
+    const to = row.indexOf(").open();");
+    expect(from).toBeGreaterThan(0);
+    expect(to).toBeGreaterThan(from);
+    const save = row.slice(from, to);
+    expect(save).toContain("await deps.write(ctx, entry.def.id, value)");
+    expect(save).toContain("reading = value;");
+    expect(save).toContain("say();");
+    expect(save).toContain("repaint(value);");
+  });
+
+  it("spells the figure and its unit in one place", () => {
+    // THE ROW AND THE WINDOW CANNOT DISAGREE, because there is one function and
+    // the row's button is built from it.
+    expect(readingText(5, "km")).toBe("5 km");
+    expect(readingText(5, undefined)).toBe("5");
+    // `—` IS `buildStepper`'S OWN EMPTY READING, so a number habit reads the
+    // same before and after it left the stepper behind.
+    expect(readingText(null, "km")).toBe("—");
+    expect(readSrc("controls")).toContain('const shown = known == null ? "—"');
+  });
+
+  it("matches each column's head spacers to its own track count", () => {
+    // THE INVARIANT THAT IS SILENT WHEN BROKEN. The heads row is
+    // `display: contents`, so a spacer too few puts every day letter one column
+    // to the left — over the names instead of over the marks — and a spacer too
+    // many pushes the strip out of the grid entirely. The counts differ by kind
+    // as of 1.0.61, which is the whole reason `column` takes one.
+    const col = code.slice(
+      code.indexOf("function column("),
+      code.indexOf("function drawDoor")
+    );
+    const before = col.slice(0, col.indexOf('cls: "ca-habit-week"'));
+    expect(before.match(/heads\.createSpan/g)).toHaveLength(2);
+    expect(before).toContain('heads.createSpan({ cls: "ca-habits-name" })');
+    expect(before).toContain(
+      'if (kind === "number") heads.createSpan({ cls: "ca-habits-pad" })'
+    );
   });
 
   it("normalises a bar over the week's own range, flat weeks included", () => {
@@ -1926,10 +2065,19 @@ describe("the section itself", () => {
     // `buildStepper` always writes a number and there is no path through it
     // that clears a reading back to nothing.
     const num = numRow();
-    expect(num).toContain('row.toggleClass(');
-    expect(num).toContain('"is-logged",');
-    expect(num).toContain("readHabitNumber(deps.currentValue(ctx, entry.def.id)) != null");
-    expect(num).toContain('row.addClass("is-logged")');
+    expect(num).toContain(
+      "let reading = readHabitNumber(deps.currentValue(ctx, entry.def.id))"
+    );
+    expect(num).toContain('row.toggleClass("is-logged", reading != null)');
+    // ── AND IT HAS TO COME BACK OFF AGAIN (1.0.61) ──────────────────────
+    //
+    // `row.addClass("is-logged")` was right while a stepper was the only
+    // control: there is no path through plus and minus that takes a reading
+    // back to nothing, so a stepped row was logged by definition. The window
+    // can CLEAR one — an empty field is a real answer — so a one-way `addClass`
+    // would leave a cleared habit drawn as though it still had a value.
+    expect(num).toContain('row.toggleClass("is-logged", value != null)');
+    expect(num).not.toContain('row.addClass("is-logged")');
   });
 
   it("is one grid and not a grid per row", () => {
@@ -1938,7 +2086,24 @@ describe("the section itself", () => {
     // carrying an empty span and habit rows carrying a 1.6em box would size
     // their first track differently and the column letters would sit beside
     // the dots they name rather than over them.
-    expect(cssRule(".ca-habits-list")).toContain("grid-template-columns: auto minmax(0, 1fr) auto");
+    // EACH KIND'S OWN TRACK LIST (1.0.61): the boolean column's control IS its
+    // name, so it is two tracks; the number's is name, reading, spark.
+    //
+    // THE SEMICOLON IS LOAD-BEARING. `minmax(0, 1fr) auto auto` CONTAINS
+    // `minmax(0, 1fr) auto`, so without it the boolean column's assertion was
+    // satisfied by the number column's track list and a mutant giving both
+    // three tracks survived. Measured, which is the only way that shape is
+    // ever found — `vacuous-sweep-rule`'s first shape, on a declaration
+    // instead of a class name.
+    expect(cssRule(".ca-habits-list.is-boolean")).toContain(
+      "grid-template-columns: minmax(0, 1fr) auto;"
+    );
+    expect(cssRule(".ca-habits-list.is-number")).toContain(
+      "grid-template-columns: minmax(0, 1fr) auto auto;"
+    );
+    // AND STILL ONE GRID PER LIST, with the row carrying no tracks of its own.
+    expect(cssRule(".ca-habits-list")).toContain("display: grid");
+    expect(cssRule(".ca-habits-list")).not.toContain("grid-template-columns");
     expect(cssRule(".ca-habits-heads")).toContain("display: contents");
     expect(cssRule(".ca-habits-row")).toContain("display: contents");
     // SEVEN EQUAL TRACKS, so Tuesday is under Tuesday on every row.
@@ -1984,5 +2149,95 @@ describe("the section itself", () => {
     expect(door).toContain("height: auto");
     expect(door).toContain("min-height: 0");
     expect(door).toContain("dashed");
+  });
+});
+
+// ── THE READING WINDOW (1.0.61) ───────────────────────────────────────────
+//
+// The control the stepper's three buttons became. A stepper could reach 10 km
+// from 0 in twenty presses, could not reach 7.5 at all unless `step` said so,
+// and could never get a reading back to nothing.
+describe("boundsNote", () => {
+  const def = (over: Record<string, unknown> = {}) =>
+    ({ id: "Run", label: "Run", type: "number", ...over }) as TrackerDef;
+
+  it("names both bounds, one bound, or neither", () => {
+    expect(boundsNote(def({ min: 0, max: 10, unit: "km" }))).toBe(
+      "Between 0 and 10 km"
+    );
+    expect(boundsNote(def({ min: 0, unit: "km" }))).toBe("0 km or more");
+    expect(boundsNote(def({ max: 10, unit: "km" }))).toBe("10 km or less");
+  });
+
+  it("does not announce the absence of a rule", () => {
+    // BLANK IS THE COMMON CASE — `newHabitDef`'s own note on why — and a
+    // subtitle reading "No limit" is louder about the rule than the rule.
+    expect(boundsNote(def({ unit: "km" }))).toBe("A number of km");
+    expect(boundsNote(def({}))).toBe("A number");
+  });
+
+  it("is zero-safe on both sides", () => {
+    // `min: 0` IS A BOUND AND `!min` IS NOT THE TEST. A habit floored at zero
+    // is the ordinary shape for anything counted, and a `!= null` that became a
+    // truthiness check would drop it silently.
+    expect(boundsNote(def({ min: 0 }))).toBe("0 or more");
+    expect(boundsNote(def({ max: 0 }))).toBe("0 or less");
+  });
+});
+
+describe("the reading window's own shape", () => {
+  const src = readSrc("habit-reading-window");
+  const code = readCode("habit-reading-window");
+
+  it("reads the field once, for the refusal and for the write", () => {
+    // TWO CALLERS MUST AGREE: a window that validated one reading of the field
+    // and stored another is the defect this shape makes unreachable.
+    expect(code).toContain("private parsed(): number | null {");
+    expect(fnBodyOf(code, "validate")).toContain("const value = this.parsed()");
+    expect(fnBodyOf(code, "commit")).toContain("const value = this.parsed()");
+  });
+
+  it("lets an empty field clear the reading", () => {
+    // THE ONLY CONTROL THAT EVER COULD. There is no path through plus and minus
+    // that takes a number back to nothing, which is why a stepped row was
+    // logged by definition. Asserted as the guard, not the comment.
+    expect(code).toContain('if (!raw) return null;');
+    expect(fnBodyOf(code, "validate")).toContain("if (value == null) return null;");
+  });
+
+  it("refuses a number outside the range rather than clamping it", () => {
+    // `buildStepper` CLAMPS AND IS RIGHT TO: a `+` press past the ceiling has
+    // no other sensible answer. A reader who TYPED 40 into a field bounded at
+    // 10 meant something, and silently writing 10 while they watch is the
+    // window reporting a value it did not store.
+    const v = fnBodyOf(code, "validate");
+    expect(v).toContain("if (this.def.min != null && value < this.def.min)");
+    expect(v).toContain("if (this.def.max != null && value > this.def.max)");
+    expect(v).not.toContain("Math.min(");
+    expect(v).not.toContain("Math.max(");
+    // AND THE REFUSAL IS THE SUBTITLE'S OWN SENTENCE, so the window cannot
+    // offer one rule and enforce another.
+    expect(v.match(/boundsNote\(this\.def\)/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("takes its step off the definition", () => {
+    expect(code).toContain("step: String(this.def.step ?? 1)");
+  });
+
+  it("leaves Enter to the frame", () => {
+    // 1.0.59: the frame's `contentEl` listener submits from a single-line field
+    // UNLESS that field claimed the keystroke. A number box claims nothing, so
+    // Enter saves for free — and a `keydown` here would be the one thing that
+    // broke it.
+    expect(code).not.toContain("keydown");
+    expect(readSrc("editor-modal")).toContain("if (e.defaultPrevented) return;");
+  });
+
+  it("puts the unit beside the field and not inside it", () => {
+    // A placeholder vanishes the moment the reader types, which is exactly when
+    // they want to know what the number is being counted in.
+    expect(code).toContain('cls: "ca-habit-reading-unit"');
+    expect(src).not.toContain('placeholder: this.def.unit');
+    expect(cssRule(".ca-habit-reading-row")).toContain("display: flex");
   });
 });

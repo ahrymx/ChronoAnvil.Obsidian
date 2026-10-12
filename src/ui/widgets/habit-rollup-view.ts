@@ -31,11 +31,16 @@ import type ChronoAnvilPlugin from "../../main";
 import { emptyCallout } from "../empty";
 import { notify } from "../../core/notify";
 import { statRing } from "../stat-strip";
-import { periodCoverage, today } from "../../core/util";
+import { periodCoverage, plural, today } from "../../core/util";
 import { formatPeriodLabel } from "../../charts/charts";
 import { resolvePeriodBounds } from "../../charts/chart-widgets";
 import { habitsForSurface, habitTypeOf } from "../../trackers/habits";
-import type { TrackerClass, TrackerDef } from "../../trackers/trackers";
+import {
+  CLASS_DEFS,
+  TRACKER_CLASS_LABELS,
+  type TrackerClass,
+  type TrackerDef,
+} from "../../trackers/trackers";
 import { sparkFraction } from "./habits-section";
 import { isManagedTemplate } from "../../trackers/entry-trackers";
 import {
@@ -44,6 +49,7 @@ import {
   habitRollupRows,
   noteWithHabitRollup,
   resolveGrain,
+  rollupGroups,
   rollupWindow,
   parseHabitRollupArg,
   NEEDS_GRAIN,
@@ -107,10 +113,35 @@ export function stripCells(slots: readonly HabitSlotReading[]): StripCell[] {
   return out;
 }
 
+// What this row's slots ARE, named, and agreeing with the count in front of
+// it (1.0.61).
+//
+// THE DENOMINATOR IS THE ONLY THING ON THIS CARD THAT SAID THE GRAIN, and it
+// said it by arithmetic: a daily habit on a quarter reads `1 of 92` and a
+// weekly one `1 of 13`, one under the other, and a reader had to know how many
+// days are in a quarter to tell which calendar they were looking at. The
+// headings group the rows and this names the unit inside the row — the reader
+// asked for both, and each covers a case the other cannot: `@container
+// (max-width: 360px)` hides this line entirely, and a reader scrolled past a
+// heading still has the noun in front of them.
+//
+// OFF `periodNoun`, which is `CLASS_DEFS`' own word for one slot of a grain and
+// is already what four other surfaces say ("Jump to week", "this month"). A
+// sixth hand-written table of five nouns is how two of them come to disagree.
+//
+// IT AGREES WITH THE COUNT AFTER IT, not with the row: "1 of 12 days" and
+// "1 of 1 day". The denominator is the thing being counted, so it is the
+// denominator the noun answers to.
+export function slotNoun(row: HabitRollupRow): string {
+  const noun = CLASS_DEFS[row.grain].periodNoun;
+  return row.slots.length === 1 ? noun : plural(noun);
+}
+
 // What a row says beside its name. The rate is drawn as the ring, so this is
 // the three facts the ring cannot carry.
 export function rollupSub(row: HabitRollupRow): string {
   if (!row.slots.length) return "nothing yet";
+  const noun = slotNoun(row);
   // A NUMBER HABIT HAS NO STREAK AND NO RATE, so it reports the two facts it
   // does have: what a logged slot averaged, and how many slots were logged.
   // `habitRuns` is not asked — a run of a quantity is not a defined thing, and
@@ -119,9 +150,13 @@ export function rollupSub(row: HabitRollupRow): string {
     const unit = row.unit ? ` ${row.unit}` : "";
     const avg =
       row.mean == null ? "nothing logged" : `avg ${round1(row.mean)}${unit}`;
-    return `${avg} · ${row.logged} of ${row.slots.length} logged`;
+    return `${avg} · ${row.logged} of ${row.slots.length} ${noun} logged`;
   }
-  const parts = [`${row.done} of ${row.slots.length}`];
+  // THE STREAKS STAY BARE. "23 of 31 days · streak 5 days · best 9 days" says
+  // the noun three times in one line of a card that has already grouped itself
+  // under a heading carrying it — and a streak is a run of consecutive slots,
+  // which is the one count on this line whose unit is never in doubt.
+  const parts = [`${row.done} of ${row.slots.length} ${noun}`];
   // THE CURRENT RUN ONLY WHERE THERE IS ONE. "streak 0" is a true statement
   // that reads as a broken counter, and the best run below it already says
   // what the habit is capable of.
@@ -153,6 +188,57 @@ export function stripShade(ratio: number): number {
 // hover text.
 export function round1(value: number): string {
   return String(Math.round(value * 10) / 10);
+}
+
+// The lead cell, for either type: the proportion the ring draws, and the figure
+// printed beside it (1.0.61).
+//
+// ONE SHAPE FOR BOTH ROWS, which is the reader's call and is why this is a
+// function rather than two arms of the drawing code. Until now a boolean led
+// with a ring and a percentage and a number led with `Σ 128` spanning both of
+// their tracks — two different pictures down one card, and the Σ was a symbol
+// the card never explained. Every row now reads *picture, figure, name*.
+//
+// THE PROPORTION IS NOT `row.rate` ON A NUMBER, and this is the whole reason
+// the arithmetic is lifted out where it can be stated and mutated. `rate` is
+// `done / slots.length`, and `done` counts slots whose `state === 1` — which
+// for a number is `readHabitState` rounding the stored value to >= 0.5. A ring
+// drawn from that reports "the share of days I ran at least half a kilometre",
+// which is not a question anybody asked. `logged / slots.length` is "the share
+// of the period this habit has an answer on", which is the same question
+// `done / slots.length` asks a boolean, and it is the same pair `rollupSub`
+// already prints on each side of the card: `23 of 31` and `23 of 31 logged`.
+//
+// `null` IS A PERIOD WITH NO SLOTS, for `rate`'s own stated reason: a ring
+// drawn from 0/0 is a claim about nothing.
+export function rollupLead(row: HabitRollupRow): {
+  frac: number | null;
+  figure: string;
+} {
+  if (row.type === "number") {
+    const said = row.unit ? ` ${row.unit}` : "";
+    return {
+      frac: row.slots.length ? row.logged / row.slots.length : null,
+      figure: row.logged ? `${round1(row.total)}${said}` : "—",
+    };
+  }
+  return {
+    frac: row.rate,
+    figure: row.rate == null ? "—" : `${Math.round(row.rate * 100)}%`,
+  };
+}
+
+// Whether this row has nothing in it at all — which mutes its name and its
+// figure, and is the type's own idea of nothing (1.0.61).
+//
+// A SECOND READING OF THE 1.0.56 `is-logged` DEFECT. That one muted every
+// number habit's name on a diary entry for ever, because the contrast rule
+// keyed on `is-done` and a stepper never wears it; this card made the mirror
+// mistake, asking `row.done === 0` of a row whose `done` is "slots that rounded
+// to >= 0.5". A habit logged at 0.2 km on twenty days was drawn muted above its
+// own sub line reading `avg 0.2 km · 20 of 31 days logged`.
+export function rollupIdle(row: HabitRollupRow): boolean {
+  return row.type === "number" ? row.logged === 0 : row.done === 0;
 }
 
 // The window's own least and greatest readings, or `null` where there are none.
@@ -221,6 +307,10 @@ export function numberStripCells(
 function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
   const strip = parent.createDiv({ cls: "ca-hrollup-strip" });
   const number = row.type === "number";
+  // THE SLOT IS NOT ALWAYS A DAY, and this string said it was. A weekly habit's
+  // unwritten mark read "no entry for that day" on a card that had just drawn
+  // thirteen of them across a quarter. `periodNoun` again — see `slotNoun`.
+  const noun = CLASS_DEFS[row.grain].periodNoun;
   const cells = number
     ? numberStripCells(row.slots, row.unit)
     : stripCells(row.slots);
@@ -235,7 +325,7 @@ function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
           : cell.state === 0
             ? "not done"
             : "nothing recorded"
-        : "no entry for that day";
+        : `no entry for that ${noun}`;
       el.setAttr("aria-label", `${cell.label}: ${said}`);
       continue;
     }
@@ -351,52 +441,45 @@ export function buildHabitRollup(
   }
 
   const list = root.createDiv({ cls: "ca-hrollup-list" });
-  for (const row of rows) {
-    // ONE GRID FOR THE LIST, AND EVERY ROW `display: contents` — the 1.0.31
-    // records-table fix. The same track list declared on each row AS ITS OWN
-    // GRID sizes each `auto` track to that row's content, so the rates would
-    // not line up down the card and the names would start at a different place
-    // on every line.
-    const el = list.createDiv({ cls: "ca-hrollup-row" });
-    el.toggleClass("is-idle", row.done === 0);
-
-    // A NUMBER HAS NO RATE, SO IT GETS NO RING. A ring is a part of a whole
-    // and there is no whole here — 3 km on a day is not 3 km out of anything —
-    // so the lead is the total, in the two tracks the ring and its percentage
-    // would have taken. One `grid-column: span 2` in the stylesheet, no second
-    // SVG, and the names still start in the same column down the card.
-    const lead =
-      row.type === "number"
-        ? el.createSpan({
-            cls: "ca-hrollup-total",
-            text: `Σ ${round1(row.total)}`,
-          })
-        : null;
-    if (!lead) {
-      const ring = el.createDiv({ cls: "ca-stat-ring-wrap" });
-      statRing(ring, row.rate ?? 0);
-      el.createSpan({
-        cls: "ca-hrollup-pct",
-        text: row.rate == null ? "—" : `${Math.round(row.rate * 100)}%`,
-      });
-      const rate =
-        row.rate == null
-          ? `${row.label} — nothing logged for ${label}`
-          : `${row.label} — ${Math.round(row.rate * 100)}% of ${label}, ${row.written} of ${row.slots.length} entries written`;
-      ring.setAttr("aria-label", rate);
-      ring.setAttr("title", rate);
-    } else {
-      const said = row.unit ? ` ${row.unit}` : "";
-      const total = row.logged
-        ? `${row.label} — ${round1(row.total)}${said} over ${label}, logged on ${row.logged} of ${row.slots.length}`
-        : `${row.label} — nothing logged for ${label}`;
-      lead.setAttr("aria-label", total);
-      lead.setAttr("title", total);
-    }
-    el.createSpan({ cls: "ca-hrollup-name", text: row.label });
-    el.createSpan({ cls: "ca-hrollup-sub", text: rollupSub(row) });
-
-    if (answer.strip && row.slots.length) drawStrip(el, row);
+  // EVERY GRAIN PRESENT GETS A HEADING, INCLUDING WHEN THERE IS ONLY ONE, and
+  // the single-grain case is the one that decided it. Suppressing a lone
+  // heading was the obvious economy — chrome that separates one thing from
+  // nothing is chrome — and it fails on the two counts that matter:
+  //
+  //   `@container (max-width: 360px)` HIDES `.ca-hrollup-sub` ENTIRELY. On a
+  //   phone the sub line's noun is gone, so a suppressed heading leaves an
+  //   all-daily card saying nothing whatsoever about its grain — which is the
+  //   exact complaint this round answers, in the one configuration where the
+  //   heading is the sole carrier of the answer.
+  //
+  //   AND THE WINDOW ALREADY DRAWS IT. `HabitRollupEditor.renderRows` skips
+  //   EMPTY groups, which on an all-daily vault is one heading reading "Daily
+  //   entries". "Draw the groups you have" is then one rule on both sides of
+  //   the door; "suppress a lone one" would be a second rule only the card had.
+  //
+  // It also keeps the card's shape off facts outside the rows: defining one
+  // weekly habit would otherwise shift every existing row down a line.
+  for (const group of rollupGroups(rows)) {
+    // THE HEADING IS A CHILD OF THE LIST, NOT A WRAPPER ROUND A GROUP. The list
+    // is ONE grid with every row `display: contents` — see below — and a group
+    // in its own `<div>` would be a second grid per heading, which is the exact
+    // 1.0.31 bug that shape exists to prevent. `grid-column: 1 / -1` is how an
+    // item spans the whole list, and the strip has done it since 1.0.55.
+    //
+    // ON `list` AND NEVER ON THE ROW, for a second reason: `.is-idle` mutes a
+    // row's children, and a grain is a fact about where a habit is logged
+    // rather than about whether anything was kept. A heading greyed out over
+    // three idle rows reads as a disabled section.
+    //
+    // AND IT SAYS WHAT THE WINDOW BEHIND THE DOOR SAYS. `TRACKER_CLASS_LABELS`
+    // is `HabitRollupEditor`'s own heading table, derived from `CLASS_DEFS`;
+    // until now the window grouped by grain and the card did not, so the two
+    // sides of one door described one list in two different languages.
+    list.createDiv({
+      cls: "ca-hrollup-head",
+      text: TRACKER_CLASS_LABELS[group.grain],
+    });
+    for (const row of group.rows) drawRow(list, row, label, answer.strip);
   }
 
   // HOW MUCH OF THE PERIOD IS BEHIND THE NUMBERS, where the numbers are a rate
@@ -427,6 +510,69 @@ export function buildHabitRollup(
     [so, asking].filter(Boolean).join(" · ") || null
   );
   return root;
+}
+
+// One habit's line, and its strip under it.
+//
+// A FUNCTION SO THE ROW IS REACHABLE, which is what `test/sources.ts`'s
+// `fnBody` needs: the suite has no DOM, so every claim about what this draws is
+// a claim about this text, and a loop body nested two deep inside a 170-line
+// builder cannot be sliced out of it.
+function drawRow(
+  list: HTMLElement,
+  row: HabitRollupRow,
+  label: string,
+  strip: boolean
+): void {
+  // ONE GRID FOR THE LIST, AND EVERY ROW `display: contents` — the 1.0.31
+  // records-table fix. The same track list declared on each row AS ITS OWN
+  // GRID sizes each `auto` track to that row's content, so the rates would
+  // not line up down the card and the names would start at a different place
+  // on every line.
+  const el = list.createDiv({ cls: "ca-hrollup-row" });
+  el.toggleClass("is-idle", rollupIdle(row));
+  // THE GRAIN AS A COLOUR, AND NOT UNDER THE NAME `data-ca-grain`. Five rules
+  // in `99-aesthetic-presets.css` bind `--ca-grain-accent` off that attribute,
+  // and one of the rules READING it is `[data-ca-grain] .ca-stat-ring-val`. A
+  // `var()` is substituted on the element that DECLARES the property, so a row
+  // that bound `--ca-grain-accent` — by wearing that attribute or by hand —
+  // would repaint its own ring in its own grain. The reader's call was the
+  // filled strip cells and nothing else: the ring keeps the DASHBOARD's grain,
+  // which `vault-banner.ts` has stamped on the leaf since 1.0.42. A private
+  // attribute binding a private property reaches nothing it was not pointed at.
+  el.setAttr("data-ca-row-grain", row.grain);
+
+  // ONE LEAD SHAPE FOR BOTH TYPES (1.0.61) — the mark, then the figure, then
+  // the name, on every row. `rollupLead` holds which proportion and which
+  // figure each type means.
+  //
+  // AND THE NUMBER'S MARK IS THE QUIETER ONE. Two readings share this track: a
+  // boolean's is a RATE (of the slots, how many were kept) and a number's is
+  // COVERAGE (of the slots, how many have an answer at all). The figure beside
+  // it already tells them apart — a percentage against a total with its unit —
+  // but a reader scanning the column sees geometry first, so `is-cover` draws a
+  // thinner, softer arc. It sets no `stroke`, so the dashboard's grain still
+  // wins on colour.
+  const lead = rollupLead(row);
+  const ring = el.createDiv({ cls: "ca-stat-ring-wrap ca-hrollup-lead" });
+  ring.toggleClass("is-cover", row.type === "number");
+  statRing(ring, lead.frac ?? 0);
+  el.createSpan({ cls: "ca-hrollup-pct", text: lead.figure });
+  const noun = slotNoun(row);
+  const said =
+    row.type === "number"
+      ? row.logged
+        ? `${row.label} — ${lead.figure} over ${label}, logged on ${row.logged} of ${row.slots.length} ${noun}`
+        : `${row.label} — nothing logged for ${label}`
+      : row.rate == null
+        ? `${row.label} — nothing logged for ${label}`
+        : `${row.label} — ${lead.figure} of ${label}, ${row.written} of ${row.slots.length} ${noun} written`;
+  ring.setAttr("aria-label", said);
+  ring.setAttr("title", said);
+  el.createSpan({ cls: "ca-hrollup-name", text: row.label });
+  el.createSpan({ cls: "ca-hrollup-sub", text: rollupSub(row) });
+
+  if (strip && row.slots.length) drawStrip(el, row);
 }
 
 // The door onto the window.

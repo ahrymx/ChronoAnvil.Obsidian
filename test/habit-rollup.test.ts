@@ -38,14 +38,19 @@ import {
   noteWithHabitRollup,
   parseHabitRollupArg,
   resolveGrain,
+  rollupGroups,
   rollupWindow,
   type HabitRollupAnswer,
+  type HabitRollupRow,
 } from "../src/trackers/habit-rollup";
 import {
   numberStripCells,
+  rollupIdle,
+  rollupLead,
   rollupSeeds,
   rollupSub,
   rollupRegistry,
+  slotNoun,
   stripCells,
   stripShade,
   valueRange,
@@ -801,13 +806,51 @@ describe("rollupSub", () => {
     }) as Parameters<typeof rollupSub>[0];
 
   it("says the counts the ring cannot carry, in the accepted order", () => {
-    expect(rollupSub(row({}))).toBe("23 of 31 · streak 5 · best 9");
+    expect(rollupSub(row({}))).toBe("23 of 31 days · streak 5 · best 9");
   });
 
   it("omits a current run of zero", () => {
     // "streak 0" is a true statement that reads as a broken counter, and the
     // best run beside it already says what the habit is capable of.
-    expect(rollupSub(row({ current: 0 }))).toBe("23 of 31 · best 9");
+    expect(rollupSub(row({ current: 0 }))).toBe("23 of 31 days · best 9");
+  });
+
+  // ── AND THE DENOMINATOR SAYS WHICH CALENDAR (1.0.61) ───────────────────
+  //
+  // THE WHOLE TABLE AND NOT ONE GRAIN, driven over `TRACKER_CLASSES` so a sixth
+  // one fails this rather than passing it. A `toContain("1 of 12")` here would
+  // be satisfied by every grain at once, which is the shape that measures
+  // nothing.
+  it("names the unit the denominator counts, for every grain", () => {
+    const said = TRACKER_CLASSES.map((grain) =>
+      rollupSub(row({ grain, slots: Array(12).fill({ state: 1 }), done: 1, current: 1, best: 3 }))
+    );
+    expect(said).toEqual([
+      "1 of 12 days · streak 1 · best 3",
+      "1 of 12 weeks · streak 1 · best 3",
+      "1 of 12 months · streak 1 · best 3",
+      "1 of 12 quarters · streak 1 · best 3",
+      "1 of 12 years · streak 1 · best 3",
+    ]);
+  });
+
+  // BOTH HALVES OF THE PLURAL IN ONE TEST. Either one alone passes against a
+  // `slotNoun` that never pluralises or one that always does.
+  it("agrees with the count in front of it, not with the row", () => {
+    const one = { slots: [{ state: 1 }], done: 1, current: 1, best: 1 };
+    expect(rollupSub(row({ grain: "weekly", ...one }))).toBe(
+      "1 of 1 week · streak 1 · best 1"
+    );
+    expect(
+      rollupSub(row({ grain: "weekly", slots: Array(2).fill({ state: 1 }), done: 1, current: 1, best: 1 }))
+    ).toBe("1 of 2 weeks · streak 1 · best 1");
+  });
+
+  // THE STREAKS STAY BARE, which is a decision and not an oversight: the noun
+  // is already on the denominator and in the heading above the row.
+  it("leaves the two runs without a noun", () => {
+    expect(rollupSub(row({}))).toContain("streak 5 · best 9");
+    expect(rollupSub(row({}))).not.toContain("streak 5 days");
   });
 
   it("says so when the period has not started", () => {
@@ -822,8 +865,10 @@ describe("rollupSub", () => {
     // A RUN OF A QUANTITY IS NOT A DEFINED THING. `habitRuns` is not asked of a
     // number row, and the fixture carries `current: 5` and `best: 9` so that a
     // branch falling through to the boolean sentence says so.
-    expect(rollupSub(num({ unit: "km" }))).toBe("avg 5.6 km · 23 of 31 logged");
-    expect(rollupSub(num({}))).toBe("avg 5.6 · 23 of 31 logged");
+    expect(rollupSub(num({ unit: "km" }))).toBe(
+      "avg 5.6 km · 23 of 31 days logged"
+    );
+    expect(rollupSub(num({}))).toBe("avg 5.6 · 23 of 31 days logged");
     expect(rollupSub(num({}))).not.toContain("streak");
   });
 
@@ -833,24 +878,191 @@ describe("rollupSub", () => {
     // a reader can see which one the average used.
     expect(rollupSub(num({}))).toContain("23 of 31");
     expect(rollupSub(num({ logged: 31, mean: 128.4 / 31 }))).toBe(
-      "avg 4.1 · 31 of 31 logged"
+      "avg 4.1 · 31 of 31 days logged"
     );
   });
 
   it("says nothing was logged rather than printing an empty average", () => {
     expect(rollupSub(num({ logged: 0, total: 0, mean: null }))).toBe(
-      "nothing logged · 0 of 31 logged"
+      "nothing logged · 0 of 31 days logged"
     );
     // AND A MEAN OF ZERO IS NOT NOTHING. `mean == null` and not `!mean`: a
     // fortnight of zeroes averaged 0, and the refusal above is for a window
     // with no readings in it at all.
     expect(rollupSub(num({ logged: 2, total: 0, mean: 0 }))).toBe(
-      "avg 0 · 2 of 31 logged"
+      "avg 0 · 2 of 31 days logged"
     );
   });
 
   it("still says nothing yet for a period that has not started", () => {
     expect(rollupSub(num({ slots: [] }))).toBe("nothing yet");
+  });
+});
+
+// ── GRAIN ON THE CARD (1.0.61) ────────────────────────────────────────────
+//
+// `HabitRollupRow.grain` has existed since 1.0.56 and had no reader in the view
+// at all: on a quarterly dashboard a daily habit drew 92 marks saying `1 of 92`
+// and a weekly one 13 saying `1 of 13`, one under the other, with nothing on
+// the card naming a calendar. These are the three answers to that.
+describe("rollupGroups", () => {
+  const row = (id: string, grain: TrackerClass) =>
+    ({ id, label: id, grain, type: "boolean" }) as HabitRollupRow;
+
+  it("gathers the rows in canonical grain order however they arrive", () => {
+    // THE FIXTURE IS OUT OF ORDER ON PURPOSE. A partition that kept
+    // first-appearance order would give the reverse of this and pass a test
+    // written over an already-sorted list.
+    const got = rollupGroups([
+      row("a", "weekly"),
+      row("b", "daily"),
+      row("c", "yearly"),
+    ]);
+    expect(got.map((g) => g.grain)).toEqual(["daily", "weekly", "yearly"]);
+  });
+
+  it("keeps the reader's own order inside a group", () => {
+    // `habitRollupIds` writes an explicit list precisely so the sequence is
+    // theirs, and the window's chevrons move a habit within its group. A
+    // comparator over grain indices would be free to reshuffle ties.
+    const got = rollupGroups([row("c", "daily"), row("a", "daily"), row("b", "daily")]);
+    expect(got[0].rows.map((r) => r.id)).toEqual(["c", "a", "b"]);
+    expect(fnBody("rollupGroups", "habit-rollup")).not.toContain(".sort(");
+  });
+
+  it("emits nothing for a grain with no rows", () => {
+    const got = rollupGroups([row("a", "daily")]);
+    // BOTH CLAIMS. A `toBeGreaterThan(0)` on the length alone passes on five
+    // groups, four of them empty, which is the shape this is guarding.
+    expect(got).toHaveLength(1);
+    expect(got.every((g) => g.rows.length > 0)).toBe(true);
+  });
+
+  it("is empty for no rows at all", () => {
+    expect(rollupGroups([])).toEqual([]);
+  });
+});
+
+describe("slotNoun", () => {
+  const row = (grain: TrackerClass, slots: number) =>
+    ({ grain, slots: Array(slots).fill({ state: null }) }) as HabitRollupRow;
+
+  it("is CLASS_DEFS' own word for one slot of the grain", () => {
+    expect(TRACKER_CLASSES.map((c) => slotNoun(row(c, 1)))).toEqual([
+      "day",
+      "week",
+      "month",
+      "quarter",
+      "year",
+    ]);
+  });
+
+  it("agrees with the count, not with the row", () => {
+    expect(slotNoun(row("quarterly", 1))).toBe("quarter");
+    expect(slotNoun(row("quarterly", 4))).toBe("quarters");
+  });
+});
+
+describe("rollupLead", () => {
+  // EVERY NUMBER IN THIS FIXTURE IS DIFFERENT, which is `vacuous-sweep-rule`'s
+  // second shape: `logged`, `written`, `done`, `slots.length` and `rate` must
+  // all disagree, or a mutant swapping two of them survives.
+  const num = (over: Partial<HabitRollupRow> = {}) =>
+    ({
+      label: "Run",
+      grain: "daily",
+      type: "number",
+      slots: Array(8).fill({ state: null }),
+      done: 2,
+      written: 6,
+      rate: 2 / 8,
+      logged: 4,
+      total: 128.4,
+      mean: 32.1,
+      unit: "km",
+      ...over,
+    }) as HabitRollupRow;
+
+  const bool = (over: Partial<HabitRollupRow> = {}) =>
+    ({
+      label: "Read",
+      grain: "daily",
+      type: "boolean",
+      slots: Array(31).fill({ state: 1 }),
+      done: 23,
+      written: 26,
+      rate: 23 / 31,
+      logged: 0,
+      total: 0,
+      mean: null,
+      unit: null,
+      ...over,
+    }) as HabitRollupRow;
+
+  it("draws a boolean's rate, exactly as the card always did", () => {
+    expect(rollupLead(bool())).toEqual({ frac: 23 / 31, figure: "74%" });
+  });
+
+  it("refuses a figure and a proportion for a period with no slots", () => {
+    // `rate == null` IS A CLAIM ABOUT NOTHING, which is the refusal `rate`
+    // itself makes: a ring drawn from 0/0 is not a reading.
+    expect(rollupLead(bool({ slots: [], rate: null }))).toEqual({
+      frac: null,
+      figure: "—",
+    });
+    expect(rollupLead(num({ slots: [], logged: 0 }))).toEqual({
+      frac: null,
+      figure: "—",
+    });
+  });
+
+  it("draws a number's COVERAGE and never its done-rate", () => {
+    // THE WHOLE REASON THIS FUNCTION EXISTS. `rate` is `done / slots`, and on a
+    // number row `done` counts slots `readHabitState` rounded to >= 0.5 — so a
+    // ring drawn from it reports "the share of days I ran at least half a
+    // kilometre". The fixture's `rate` is 0.25 and its coverage 0.5.
+    expect(rollupLead(num()).frac).toBe(4 / 8);
+    expect(rollupLead(num()).frac).not.toBe(num().rate);
+  });
+
+  it("counts the slots with a READING, not the slots with an entry", () => {
+    // `logged` IS NOT `written`: a day with an entry that never answered this
+    // habit is written and not logged, and on a number that is the denominator.
+    expect(rollupLead(num({ logged: 1, written: 7 })).frac).toBe(1 / 8);
+  });
+
+  it("divides by the slots and not by the readings", () => {
+    expect(rollupLead(num({ logged: 1, slots: Array(2).fill({ state: null }) })).frac).toBe(0.5);
+  });
+
+  it("prints a number's total with its unit, and no sigma", () => {
+    expect(rollupLead(num()).figure).toBe("128.4 km");
+    expect(rollupLead(num({ unit: null })).figure).toBe("128.4");
+  });
+
+  it("tells a logged window of zeroes from a window with nothing in it", () => {
+    // THE PAIR, because either one alone passes against a `!row.total` guard.
+    expect(rollupLead(num({ logged: 2, total: 0 })).figure).toBe("0 km");
+    expect(rollupLead(num({ logged: 0, total: 0 })).figure).toBe("—");
+  });
+});
+
+describe("rollupIdle", () => {
+  it("is the type's own idea of nothing", () => {
+    // THE 1.0.56 `is-logged` DEFECT, ON THE SECOND SURFACE. That one muted
+    // every number habit's name on a diary entry for ever; this card asked
+    // `done === 0` of a row whose `done` is "slots that rounded to >= 0.5", so a
+    // habit logged at 0.2 km on twenty days was drawn muted above its own sub
+    // line reading `avg 0.2 km · 20 of 31 days logged`.
+    const num = { type: "number", done: 0, written: 20, logged: 20 } as HabitRollupRow;
+    expect(rollupIdle(num)).toBe(false);
+    expect(rollupIdle({ ...num, logged: 0 })).toBe(true);
+  });
+
+  it("is still the kept count on a boolean", () => {
+    const row = { type: "boolean", done: 0, written: 2, logged: 5 } as HabitRollupRow;
+    expect(rollupIdle(row)).toBe(true);
+    expect(rollupIdle({ ...row, done: 1 })).toBe(false);
   });
 });
 
@@ -1353,7 +1565,7 @@ describe("the card's shape", () => {
     // SVG here would pass "the ring exists" and be the drift the extraction was
     // done to prevent.
     const view = readSrc("habit-rollup-view");
-    expect(view).toContain("statRing(ring, row.rate ?? 0)");
+    expect(view).toContain("statRing(ring, lead.frac ?? 0)");
     expect(view).not.toContain("<circle");
     expect(readSrc("stat-strip")).toContain("export function statRing(");
     expect(fnBody("statStrip", "stat-strip")).toContain("statRing(");
@@ -1489,17 +1701,96 @@ describe("the card's shape", () => {
     );
   });
 
-  // ── THE NUMBER ROW'S LEAD (1.0.56) ─────────────────────────────────────
-  it("draws a total where a number has no rate, in the ring's own tracks", () => {
+  // ── ONE LEAD SHAPE FOR BOTH ROW TYPES (1.0.61) ─────────────────────────
+  //
+  // 1.0.56's `Σ 128` IS THE THING THIS REVERSES, and the reader reversed it:
+  // a number had no rate so it got no ring, which left two different pictures
+  // down one column and a symbol the card never explained. Every row now reads
+  // *picture, figure, name*.
+  it("leads every row with one mark and one figure", () => {
+    const row = fnBody("drawRow", "habit-rollup-view");
     const code = readCode("habit-rollup-view");
-    // NO RING FOR A NUMBER: a ring is a part of a whole and there is no whole.
-    // The guard is asserted rather than the wording, so a branch that stops
-    // being reached fails rather than keeping its comment.
-    expect(code).toContain('row.type === "number"');
-    expect(code).toContain('cls: "ca-hrollup-total"');
-    expect(code).toContain("text: `Σ ${round1(row.total)}`");
-    // And the ring is still drawn exactly once, for the other type.
+    // ONE `statRing` CALL AND NO BRANCH BEFORE IT, which is what "one shape"
+    // means in the code rather than only on screen.
     expect(code.match(/statRing\(/g)).toHaveLength(1);
+    expect(row).toContain("statRing(ring, lead.frac ?? 0)");
+    expect(row).toContain('el.createSpan({ cls: "ca-hrollup-pct", text: lead.figure })');
+    // The Σ and the span it labelled are both gone from the tree.
+    expect(code).not.toContain("Σ");
+    expect(code).not.toContain("ca-hrollup-total");
+    // AND THE TWO READINGS ARE STILL TOLD APART. The arc is the quieter one on
+    // a number, because the figure beside it (a total, not a percentage) is
+    // read second.
+    expect(row).toContain('ring.toggleClass("is-cover", row.type === "number")');
+  });
+
+  // ── THE GRAIN GROUPS ON THE CARD (1.0.61) ──────────────────────────────
+  it("heads each grain's rows with the window's own words", () => {
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    // THE HEADING IS CREATED ON THE LIST AND NOT ON THE ROW. Two reasons, and
+    // both are silent failures: on the row it would be a child of a
+    // `display: contents` element and would land inside that row's own line,
+    // and it would inherit `.is-idle`'s muting.
+    expect(build).toMatch(
+      /for \(const group of rollupGroups\(rows\)\) \{[\s\S]*?list\.createDiv\(\{\s*cls: "ca-hrollup-head",\s*text: TRACKER_CLASS_LABELS\[group\.grain\],/
+    );
+    expect(build).not.toContain('el.createDiv({ cls: "ca-hrollup-head"');
+    // AND THE ROWS COME AFTER IT, inside the same group.
+    expect(build).toContain(
+      "for (const row of group.rows) drawRow(list, row, label, answer.strip);"
+    );
+  });
+
+  it("draws the heading even when every habit shares one grain", () => {
+    // THE CASE THAT DECIDED IT. Suppressing a lone heading was the obvious
+    // economy and fails twice: `@container (max-width: 360px)` hides
+    // `.ca-hrollup-sub`, so on a phone an all-daily card would say nothing at
+    // all about its grain — and the window behind the door draws exactly one
+    // heading on such a vault, so the card would be the only surface with a
+    // second rule.
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    expect(build).not.toMatch(/groups\.length\s*>\s*1/);
+    expect(build).not.toMatch(/new Set\([\s\S]{0,60}grain/);
+  });
+
+  it("takes its heading words from the table the window reads", () => {
+    const code = readCode("habit-rollup-view");
+    expect(code).toContain("TRACKER_CLASS_LABELS[group.grain]");
+    // NO SIXTH HAND-WRITTEN TABLE OF THE FIVE WORDS. `TRACKER_CLASS_LABELS` is
+    // derived from `CLASS_DEFS`, and the window's headings are the same read.
+    expect(code).not.toMatch(/"(Daily|Weekly|Monthly|Quarterly|Yearly) entries"/);
+    expect(readCode("habit-rollup-editor")).toContain("TRACKER_CLASS_LABELS[");
+  });
+
+  it("stamps the row's grain under a name the ring cannot see", () => {
+    // THE HAZARD, AND IT IS NOT HYPOTHETICAL. `[data-ca-grain]` binds
+    // `--ca-grain-accent` five ways in the presets sheet, and one of the rules
+    // reading it is `[data-ca-grain] .ca-stat-ring-val`. A `var()` is
+    // substituted on the element that DECLARES the property, so a row wearing
+    // that attribute would repaint its OWN ring in its own grain — which the
+    // reader ruled out: the tint is on the filled strip cells and nowhere else.
+    const row = fnBody("drawRow", "habit-rollup-view");
+    expect(row).toContain('el.setAttr("data-ca-row-grain", row.grain)');
+    // `readCode`, SO THE PROSE ABOVE MAY NAME THE TRAP it is warning about.
+    const code = readCode("habit-rollup-view");
+    expect(code).not.toContain('"data-ca-grain"');
+    expect(code).not.toContain("--ca-grain-accent");
+  });
+
+  it("names the slot in the strip's own tooltip", () => {
+    // `"no entry for that day"` WAS HARDCODED, on a card that draws thirteen
+    // weekly marks across a quarter. The expression and not the wording, since
+    // a refusal whose condition is gone keeps its sentence.
+    const strip = fnBody("drawStrip", "habit-rollup-view");
+    expect(strip).toContain("const noun = CLASS_DEFS[row.grain].periodNoun");
+    expect(strip).toContain("`no entry for that ${noun}`");
+    expect(readCode("habit-rollup-view")).not.toContain("no entry for that day");
+  });
+
+  it("mutes a row by the type's own idea of nothing", () => {
+    expect(fnBody("drawRow", "habit-rollup-view")).toContain(
+      'el.toggleClass("is-idle", rollupIdle(row))'
+    );
   });
 
   it("counts the habits waiting for a grain from the list the window shows", () => {
@@ -1749,16 +2040,101 @@ describe("the rollup's CSS", () => {
     }
   });
 
-  it("puts a number's total in the ring's two tracks rather than a fifth", () => {
-    // `span 2` AND NOT A FIFTH TRACK: a fifth would be an empty column on
-    // every boolean row and would move every name on the card to make room for
-    // something only some rows have.
-    const total = cssRule(".ca-hrollup-total");
-    expect(total).toContain("grid-column: span 2");
-    expect(total).toContain("font-variant-numeric: tabular-nums");
-    expect(total).toContain("text-align: right");
+  it("gives both kinds of lead the same two tracks (1.0.61)", () => {
+    // `.ca-hrollup-total` AND ITS `span 2` ARE GONE. A number used to take the
+    // ring's track and the figure's with one span; both types now lead with a
+    // ring and a figure, so there is nothing to span and one cell does both
+    // figures.
+    expect(cssRules(".ca-hrollup-total")).toHaveLength(0);
+    const pct = cssRule(".ca-hrollup-pct");
+    expect(pct).toContain("font-variant-numeric: tabular-nums");
+    expect(pct).toContain("text-align: right");
     expect(cssRules(".ca-hrollup-list").some((r) => r.includes("span"))).toBe(
       false
+    );
+    // THE COVERAGE ARC CHANGES WEIGHT AND NOT COLOUR. Its stroke is the
+    // dashboard's grain, set in the presets sheet, and this rule must not take
+    // that over — see the `[data-ca-grain] .ca-stat-ring-val` sweep below.
+    const cover = cssRule(".ca-hrollup-lead.is-cover .ca-stat-ring-val");
+    expect(cover).toContain("stroke-width");
+    expect(cover).not.toMatch(/\bstroke:/);
+  });
+
+  it("heads a grain's group across the one grid (1.0.61)", () => {
+    // `grid-column: 1 / -1` IS THE STRIP'S OWN TRICK, and the reason no group
+    // gets a container of its own: the list is one grid with every row
+    // `display: contents`, so a wrapper would be a second grid per heading —
+    // the exact 1.0.31 bug that shape exists to prevent.
+    const head = cssRule(".ca-hrollup-head");
+    expect(head).toContain("grid-column: 1 / -1");
+    expect(head).toContain("text-transform: uppercase");
+    expect(head).toContain("var(--text-muted)");
+    // Air above the second group and not the first, with no `:first-child`
+    // exception to keep in step.
+    expect(cssRule(".ca-hrollup-list > .ca-hrollup-head:not(:first-child)")).toContain(
+      "margin-top"
+    );
+    // EXACTLY ONE RULE IN THE WHOLE SHEET, so no narrow-width override can hide
+    // the one line that still says the grain once `.ca-hrollup-sub` goes.
+    expect(cssRules(".ca-hrollup-head")).toHaveLength(1);
+    // AND THE MUTING NEVER REACHES IT. The heading is the row's sibling, so
+    // this needs no rule — and must not acquire one.
+    expect(cssRules(".ca-hrollup-row.is-idle .ca-hrollup-head")).toHaveLength(0);
+  });
+
+  it("tints a kept mark with its row's grain, and nothing else (1.0.61)", () => {
+    expect(cssRule(".ca-hrollup-cell.is-done")).toContain(
+      "background: var(--ca-hrollup-grain)"
+    );
+    // THE BASE RULE, THE OUTLINE AND THE FOUR SHADES ARE UNTOUCHED. A single
+    // mark is a STATE and wears the grain; a grouped mark is a QUANTITY on the
+    // ramp whose whole promise is that a colour means the same amount wherever
+    // this plugin draws one. A number's marks are all quantity, so a number's
+    // strip takes no tint at all.
+    expect(cssRule(".ca-hrollup-cell")).not.toContain("--ca-hrollup-grain");
+    expect(cssRule(".ca-hrollup-cell.is-not-done")).not.toContain(
+      "--ca-hrollup-grain"
+    );
+    for (const n of [1, 2, 3, 4]) {
+      expect(cssRule(`.ca-hrollup-cell.ca-act-${n}`)).toBe(
+        cssRule(`.ca-hrollup-cell.ca-act-${n}`).replace("--ca-hrollup-grain", "")
+      );
+    }
+  });
+
+  it("binds the grain through a private property, never the page's (1.0.61)", () => {
+    const palette: Record<string, string> = {
+      daily: "--ca-grain-daily",
+      weekly: "--ca-grain-weekly",
+      monthly: "--ca-grain-monthly",
+      quarterly: "--ca-grain-quarterly",
+      yearly: "--ca-grain-yearly",
+    };
+    for (const grain of TRACKER_CLASSES) {
+      const rule = cssRule(`.ca-hrollup-row[data-ca-row-grain="${grain}"]`);
+      expect(rule).toContain(`--ca-hrollup-grain: var(${palette[grain]})`);
+      // THE SAME HAZARD BY THE OTHER DOOR. Binding `--ca-grain-accent` here
+      // would recolour this row's ring whether or not the selector that reads
+      // it matches, because a `var()` resolves against the declaring ancestor.
+      expect(rule).not.toContain("--ca-grain-accent");
+    }
+    // The default is declared once, on `body` and not `:root`, because it reads
+    // a theme colour (4.42) — `tokens.test.ts` is the general form of that.
+    expect(cssRule("body")).toContain(
+      "--ca-hrollup-grain: var(--interactive-accent)"
+    );
+    expect(cssRule(":root")).not.toContain("--ca-hrollup-grain");
+    // AND NO ROLLUP SELECTOR ANYWHERE SETS A RING'S STROKE.
+    expect(cssRules(".ca-hrollup-lead.is-cover .ca-stat-ring-val")).toHaveLength(1);
+  });
+
+  it("keeps monochrome monochrome (1.0.61)", () => {
+    // `body.ca-grain-monochrome` resets `--ca-grain-accent` and its three
+    // companions — every channel the grain palette had until this one. The five
+    // bindings above read the raw palette tokens, which that preset never
+    // touches, so without this a reader who asked for one colour got five.
+    expect(cssRule("body.ca-grain-monochrome .ca-hrollup-row")).toContain(
+      "--ca-hrollup-grain: var(--interactive-accent)"
     );
   });
 

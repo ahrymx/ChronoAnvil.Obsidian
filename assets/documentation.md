@@ -85,7 +85,7 @@ Directives:
 - `sleep` — the coupled Wake-Up + Bedtime control with a live asleep/awake readout; re-derives the `Sleep` property on change.
 - `sleep-summary` — sleep stats across all daily entries (average, typical times, range).
 - `tracker-stat:<tracker>` — one tracker's latest reading, its average and its streak, over a month-long density strip. The tracker is named by its id from Settings → Trackers.
-- `habit-rollup[:<habit id>[@<grain>],…][,no-strip]` — **Habits this week/month/quarter/year**: one row per habit. A yes/no habit reports the share of the period it was kept as a ring, the current and best runs, and a mark per day underneath — filled where it was kept, hollow where it was answered no, empty where nothing was written. A number habit reports its total (**Σ**), its average over the days it was logged, and a strip shaded by how large each day's reading was against that period's own least and greatest. A year draws one mark per week instead of per day. Scoped by the host note's `week-start` / `month-start` / `quarter-start` / `year-start` property, clipped to today, so a month half gone is measured against the days that have happened. A habit logged on more than one kind of entry takes `@daily`, `@weekly`, `@monthly`, `@quarterly` or `@yearly` to say which to read; without one it follows this dashboard's own period where it can and waits to be told where it cannot. Bare, it reports every habit the vault has; the **Choose habits…** row at the foot of the card opens a window to pick which of them, put them in order, choose their grains, and turn the strips off. Ships on all four period dashboards.
+- `habit-rollup[:<habit id>[@<grain>],…][,no-strip]` — **Habits this week/month/quarter/year**: one row per habit, **grouped under the grain each one is read at** — DAILY ENTRIES, WEEKLY ENTRIES and so on, the same headings the window behind the card uses. Every row reads the same way: a mark, a figure, the name. A yes/no habit's mark is the share of the period it was kept and its figure that share as a percentage, with the current and best runs beside the name and a mark per day underneath — filled where it was kept, hollow where it was answered no, empty where nothing was written. A number habit's mark is the share of the period it has a reading on, drawn as a quieter arc, and its figure is the total; beside the name are its average over the days it was logged and a strip shaded by how large each day's reading was against that period's own least and greatest. The counts name their own unit — "23 of 31 days", "1 of 2 weeks" — so two rows read at different grains cannot be mistaken for each other, and a **kept mark wears its grain's colour**. A year draws one mark per week instead of per day. Scoped by the host note's `week-start` / `month-start` / `quarter-start` / `year-start` property, clipped to today, so a month half gone is measured against the days that have happened. A habit logged on more than one kind of entry takes `@daily`, `@weekly`, `@monthly`, `@quarterly` or `@yearly` to say which to read; without one it follows this dashboard's own period where it can and waits to be told where it cannot. Bare, it reports every habit the vault has; the **Choose habits…** row at the foot of the card opens a window to pick which of them, put them in order, choose their grains, and turn the strips off. Ships on all four period dashboards.
 - `button:<action>[:arg]` — a button. Diary/chart actions: `today`, `this-month`, `new-diary`, `new-monthly`, `week-prev`/`week-this`/`week-next`, `month-prev`/`month-this`/`month-next`, `chart-add`/`chart-edit`/`chart-remove`, `tracker-add`/`tracker-remove`, `log:<trackerId>:<delta>`.
 - `button:<typeId>:<action>[:arg]` — a journal-type button, scoped to a registered type (`study` or a custom type id). Actions: `new-journal`, `new-container`/`new-topic`, `new-lesson:<folder>`, `new-practice:<folder>`, `refresh`. E.g. `button:study:new-lesson:<folder>`.
 - `entry-header[:home,week,month]` — the unified top strip: an editable title (writes the note's `title` property; empty shows the date plus an "Add a title…" hint), quick links, and a compact prev/next navigator, in one bar. Used at the top of the daily and monthly templates in place of separate links + nav rows.
@@ -267,11 +267,13 @@ between them. A column that has nothing in it is not drawn at all, so a vault
 whose habits are all yes/no sees one full-width list, and on a narrow card the
 two stack.
 
-A yes/no row is its box, its name, and **the week it sits in** behind it: a
-filled dot is a day you marked done, a ring is a day you marked not-done, and a
-small faint dot is a day with nothing recorded — which covers both a day you
-have no entry for and a day whose habit you did not answer; hovering says which.
-A number row is its stepper, its name, and the same week drawn as **bars**,
+A yes/no row is **its name, which is its toggle** — press the name to cycle
+unset → done → not-done, with a small ✓ / ✗ / · in front of it saying which —
+and **the week it sits in** behind it: a filled dot is a day you marked done, a
+ring is a day you marked not-done, and a small faint dot is a day with nothing
+recorded — which covers both a day you have no entry for and a day whose habit
+you did not answer; hovering says which.
+A number row is its name, **its reading**, and the same week drawn as **bars**,
 each one's height measured against that week's own least and greatest reading
 — so a week between 3 km and 4 km is still a readable shape rather than seven
 bars of one length. A day with no reading draws no bar, just a faint baseline
@@ -279,6 +281,13 @@ where it would have been. The seven days are Monday to Sunday, read from the
 entries either side of this one, and this entry's own column is named at the top
 of each list. The row at the foot of the card opens the same Habits window the
 cell's **+** does.
+
+The reading is a button — the figure and its unit together, or **—** where
+nothing is recorded — and pressing it opens a small window with a number field,
+the unit beside it and the habit's range in the subtitle. **Enter** saves.
+Typing a number outside that range is refused rather than quietly rounded into
+it, and **leaving the field empty clears the reading**, which is the one thing
+the +/− stepper it replaced could never do.
 
 While the section is on the note **every habit leaves the grid**, both kinds, so
 the two are never both drawn and the grid closes up around the space. Nothing in

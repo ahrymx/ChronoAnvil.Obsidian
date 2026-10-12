@@ -76,11 +76,14 @@ import {
   type HabitReading,
   type HabitState,
 } from "../../trackers/habits";
-import { buildStepper } from "./controls";
 import { isManagedTemplate, noteSurfaceOf } from "../../trackers/entry-trackers";
 import { entryDateKey } from "../../diary/nav";
 import type { TrackerClass } from "../../trackers/trackers";
 import { openHabitsWindow, wireHabit } from "./tracker-controls";
+import {
+  HabitReadingWindow,
+  readingText,
+} from "../habit-reading-window";
 import type { EntryControlHost } from "./controls";
 
 // What the door says, which depends on whether there is anything behind it.
@@ -250,11 +253,11 @@ export function buildHabitsSection(
   pair.toggleClass("is-single", !booleans.length || !numbers.length);
 
   if (booleans.length) {
-    const list = column(pair, week, iso);
+    const list = column(pair, "boolean", week, iso);
     for (const entry of booleans) drawBoolRow(deps, list, entry, week, iso, ctx);
   }
   if (numbers.length) {
-    const list = column(pair, week, iso);
+    const list = column(pair, "number", week, iso);
     for (const entry of numbers) drawNumRow(deps, list, entry, week, iso, ctx);
   }
 
@@ -267,22 +270,31 @@ export function buildHabitsSection(
 // The column heads come off the same seven days the marks are drawn from —
 // never a typed `["M","T",…]`, which is a second list that can disagree about
 // which column is which.
+// One side of the pair, and the day letters over its marks.
+//
+// THE TWO COLUMNS NO LONGER HAVE THE SAME TRACKS (1.0.61), which is why this
+// takes the kind. Both used to be `[control] [name] [week]`; now the boolean's
+// control IS its name, so that side is two tracks and the number's — name,
+// reading, week — is three. They are separate grids and always were, for the
+// reason at the head of this file, so they are free to differ.
 function column(
   pair: HTMLElement,
+  kind: "boolean" | "number",
   week: readonly HabitDay[],
   iso: string
 ): HTMLElement {
   const list = pair
     .createDiv({ cls: "ca-habits-col" })
-    .createDiv({ cls: "ca-habits-list" });
+    .createDiv({ cls: `ca-habits-list is-${kind}` });
   if (!week.length) return list;
 
   const heads = list.createDiv({ cls: "ca-habits-heads" });
-  // The two cells a head has nothing to put in. Present rather than skipped:
-  // the row is a three-column grid and a strip that landed in the name's
-  // track would sit over the names instead of over the marks.
-  heads.createSpan({ cls: "ca-habits-pad" });
+  // THE CELLS A HEAD HAS NOTHING TO PUT IN, one per track in front of the
+  // strip. Present rather than skipped: the row is a grid and a strip that
+  // landed in the name's track would sit over the names instead of the marks —
+  // and the count has to match the kind, or the letters are off by a column.
   heads.createSpan({ cls: "ca-habits-name" });
+  if (kind === "number") heads.createSpan({ cls: "ca-habits-pad" });
   const strip = heads.createDiv({ cls: "ca-habit-week" });
   for (const day of week) {
     const head = strip.createSpan({
@@ -312,14 +324,28 @@ function drawBoolRow(
   const app = deps.plugin.app;
   const name = habitLabelOf(entry.def, entry.directive);
   const row = list.createDiv({ cls: "ca-habits-row" });
-  // The chip's and the window's own control, for the third time: same
-  // classes, same glyphs, same three-state cycle, so one habit is one
-  // control wherever a reader meets it.
-  const box = row.createEl("button", {
-    cls: "ca-journal-habit-box",
+  // ── THE NAME IS THE TOGGLE (1.0.61) ───────────────────────────────────
+  //
+  // *"The boolean box is too heavy. The boolean name can become its toggle."*
+  // It was a 20px `.ca-journal-habit-box` in a track of its own in front of the
+  // name, which on the narrower of two columns is a fifth of the row spent on a
+  // control the reader was aiming past: the name is the thing they read and the
+  // thing they point at.
+  //
+  // `wireHabit` NEEDED NO CHANGE, because it has taken the mark and the press
+  // as two elements since it was written. The mark is now a span inside the
+  // button rather than the button itself.
+  //
+  // AND THE MARK IS STILL A MARK. `✓` / `✗` / `·`, not a colour: *"a colour
+  // alone is not a mark for a reader who cannot see it as one"* — this card's
+  // own sentence about the day dots. `wireHabit` sets no text for unset, so the
+  // `·` is the element's base rule, which is `.ca-habit-day`'s trick too.
+  const press = row.createEl("button", {
+    cls: "ca-habits-toggle",
     attr: { type: "button" },
   });
-  row.createSpan({ cls: "ca-habits-name", text: name });
+  const box = press.createSpan({ cls: "ca-habits-mark" });
+  press.createSpan({ cls: "ca-habits-name", text: name });
 
   const dots: { day: HabitReading; el: HTMLElement }[] = [];
   if (week.length) {
@@ -336,10 +362,12 @@ function drawBoolRow(
     }
   }
 
-  // THE BOX IS THE PRESS, NOT THE ROW. A row-wide press target would make a
+  // THE NAME IS THE PRESS, NOT THE ROW. A row-wide press target would make a
   // click on Wednesday's dot tick today — the one gesture this section must
   // not have, since the dots are a readout and six of them are other notes.
-  wireHabit(deps, box, box, entry.def, ctx, (known) => {
+  // That was the box's argument and it is unchanged by the box going; it is
+  // now the reason the button wraps the name and stops there.
+  wireHabit(deps, box, press, entry.def, ctx, (known) => {
     row.toggleClass("is-done", known === 1);
     row.toggleClass("is-not-done", known === 0);
     // THIS ENTRY'S OWN COLUMN IS ONE OF THE SEVEN, so a tick that did not
@@ -374,35 +402,66 @@ function drawNumRow(
   // ever, including on a day the reader logged 10 km. `is-logged` is the
   // number's side of that same 1.0.53 rule: full contrast for a thing that is
   // so, muted for a thing that is not.
-  row.toggleClass(
-    "is-logged",
-    readHabitNumber(deps.currentValue(ctx, entry.def.id)) != null
-  );
 
-  // `buildStepper` ITSELF, not a copy of it. It is already the control this
-  // tracker had in its grid cell, it already writes through `host.write`, and
-  // the host here IS an `EntryControlHost` — so a number habit's reading is
-  // answered by the same code before and after the type left the grid. The
-  // window's stepper is the one that had to be rewritten, and only because
-  // nothing there may write until Save.
-  const stepper = buildStepper(deps, entry.def, ctx, (value) => repaint(value));
-  stepper.addClass("ca-habits-stepper");
-  row.appendChild(stepper);
+  // ── THE READING IS THE DOOR (1.0.61) ──────────────────────────────────
+  //
+  // *"The number should [trackers name] [number] [unit], and make unit
+  // clickable to bring up a dialogue to alter the count (this would save some
+  // horizontal space by leaving plus and minus buttons out)."* So the name
+  // leads, exactly as the boolean column's does now, and `buildStepper`'s three
+  // controls become one.
+  //
+  // THE FIGURE AND THE UNIT ARE ONE BUTTON, and not the unit alone. A habit
+  // that declares no unit — most of them; see `newHabitDef` on why blank is a
+  // real answer — would have nothing to click. `readingText` is the one place
+  // the pair is spelled, so the row and the window cannot disagree.
+  //
+  // `buildStepper` IS NOT TOUCHED AND IS NOT DEAD. Every number tracker still
+  // in the 66px grid draws one; only a habit the section has taken over stops.
   row.createSpan({ cls: "ca-habits-name", text: name });
+  let reading = readHabitNumber(deps.currentValue(ctx, entry.def.id));
+  row.toggleClass("is-logged", reading != null);
+  const open = row.createEl("button", {
+    cls: "ca-habits-reading",
+    attr: { type: "button" },
+  });
+  const say = (): void => {
+    const said = readingText(reading, entry.def.unit);
+    open.setText(said);
+    const text = `${name}: ${reading == null ? "nothing recorded" : said}`;
+    open.setAttr("aria-label", text);
+    open.setAttr("title", text);
+  };
+  open.addEventListener("click", () => {
+    new HabitReadingWindow(
+      app,
+      deps.plugin,
+      entry.def,
+      reading,
+      async (value: number | null) => {
+        await deps.write(ctx, entry.def.id, value);
+        reading = value;
+        say();
+        repaint(value);
+      }
+    ).open();
+  });
+  say();
 
   let here: { day: HabitReading; el: HTMLElement } | undefined;
   let lo = 0;
   let hi = 0;
-  const repaint = (value: number): void => {
+  const repaint = (value: number | null): void => {
     // THIS ENTRY'S OWN BAR MOVES WITH THE STEPPER, which is `wireHabit`'s
     // argument about the dots applied to the other type. The RANGE is not
     // recomputed: a bar that redrew the whole week's normalisation on every
     // click would make the other six jump around while the reader steps one
     // number, and the week they are reading is the week they opened.
-    // AND THE NAME COMES UP WITH IT. `buildStepper` writes a number, so a row
-    // the reader has just stepped is logged by definition — there is no path
-    // through that control that clears a reading back to nothing.
-    row.addClass("is-logged");
+    // AND THE NAME FOLLOWS IT BOTH WAYS NOW. A stepper wrote a number and
+    // nothing else, so a stepped row was logged by definition and this could
+    // simply add the class. The window can CLEAR a reading — the only control
+    // that ever could — so the muting has to be able to come back.
+    row.toggleClass("is-logged", value != null);
     if (here) {
       paintBar(
         here.el,

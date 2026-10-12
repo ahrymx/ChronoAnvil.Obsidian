@@ -5,6 +5,45 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.61] - 2026-10-12
+
+### Changed
+
+- **A habit rollup says which calendar it is drawing.** The card groups its rows
+  under grain headings — DAILY ENTRIES, WEEKLY ENTRIES — the same headings the
+  window behind it has used since 1.0.56, and every count now names its own unit
+  ("23 of 31 days", "1 of 2 weeks"). A daily habit drawing 92 marks over a
+  quarter and a weekly one drawing 13 were previously told apart only by
+  arithmetic on the denominator. A kept mark in the strip wears its grain's
+  colour; the shade ramp a grouped mark uses is unchanged, so a colour still
+  means the same amount of activity wherever the plugin draws one.
+- **One lead shape for both kinds of rollup row.** Every row reads mark, figure,
+  name. A number habit's mark is the share of the period it has a reading on,
+  drawn as a quieter arc than a yes/no habit's kept-rate, and its figure is the
+  total — the `Σ` that labelled it is gone.
+- **A yes/no habit's name is its toggle** on the Habits section. The 20px box in
+  front of it is gone; the name carries a small ✓ / ✗ / · and presses to cycle
+  the three states. Both columns now begin with the name.
+- **A number habit's reading is a button that opens a window.** The +/− stepper
+  leaves the Habits section — the reader's "leaving plus and minus buttons out" —
+  replaced by the figure and its unit as one control. The window takes a typed
+  number, names the habit's range, saves on Enter, refuses a number outside that
+  range rather than rounding it into it, and **clears the reading when the field
+  is left empty**, which no stepper could do. Every number tracker still in the
+  66px grid keeps its stepper.
+
+### Fixed
+
+- A number habit's whole rollup row was drawn muted whenever none of its
+  readings reached 0.5 — so a habit logged at 0.2 km on twenty days appeared
+  idle above its own line reading `avg 0.2 km · 20 of 31 days logged`. Idle now
+  means the type's own nothing: no reading at all for a number, nothing kept for
+  a yes/no habit. The same mistake as the 1.0.56 `is-logged` defect, on the
+  other surface.
+- An unwritten mark in a rollup strip said "no entry for that day" whatever
+  grain the row was read at, including on a weekly habit drawing thirteen marks
+  across a quarter.
+
 ## [1.0.60] - 2026-10-12
 
 ### Fixed
