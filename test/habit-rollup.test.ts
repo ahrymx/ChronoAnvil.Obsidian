@@ -45,6 +45,7 @@ import {
 } from "../src/trackers/habit-rollup";
 import {
   numberStripCells,
+  rollupFoldKey,
   rollupIdle,
   rollupFigure,
   rollupSeeds,
@@ -1891,20 +1892,102 @@ describe("the card's shape", () => {
   });
 
   // ── THE GRAIN GROUPS ON THE CARD (1.0.61) ──────────────────────────────
-  it("heads each grain's rows with the window's own words", () => {
+  it("gives each grain a section of head and body (1.0.65)", () => {
     const build = fnBody("buildHabitRollup", "habit-rollup-view");
-    // THE HEADING IS CREATED ON THE LIST AND NOT ON THE ROW. Two reasons, and
-    // both are silent failures: on the row it would be a child of a
-    // `display: contents` element and would land inside that row's own line,
-    // and it would inherit `.is-idle`'s muting.
+    // ONE SECTION PER GROUP, ON THE LIST, with the head and the rows inside it.
+    // 1.0.61 refused this wrapper and was right to: a container is a second
+    // grid, and every group's figures would line up only with each other —
+    // 1.0.31's records-table bug for the fourth time. Subgrid is what made the
+    // container free, and the stylesheet carries that argument.
     expect(build).toMatch(
-      /for \(const group of rollupGroups\(rows\)\) \{[\s\S]*?list\.createDiv\(\{\s*cls: "ca-hrollup-head",\s*text: TRACKER_CLASS_LABELS\[group\.grain\],/
+      /for \(const group of rollupGroups\(rows\)\) \{[\s\S]*?const sect = list\.createDiv\(\{ cls: "ca-hrollup-sect" \}\);/
     );
-    expect(build).not.toContain('el.createDiv({ cls: "ca-hrollup-head"');
-    // AND THE ROWS COME AFTER IT, inside the same group.
+    expect(build).toContain('sect.createEl("button", {');
+    expect(build).toContain('cls: "ca-hrollup-head"');
+    expect(build).toContain("text: TRACKER_CLASS_LABELS[group.grain],");
+    // THE HEAD IS A `<button>` AND NOT A DIV WITH A CLICK ON IT. It toggles its
+    // section, so Enter and Space have to work, and nothing in this file should
+    // be re-implementing either.
+    expect(build).not.toContain('createDiv({ cls: "ca-hrollup-head"');
+    // AND THE ROWS GO IN THE BODY, which is the half that folds.
+    expect(build).toContain('const body = sect.createDiv({ cls: "ca-hrollup-body" });');
     expect(build).toContain(
-      "for (const row of group.rows) drawRow(list, row, label, answer.strip);"
+      "for (const row of group.rows) drawRow(body, row, label, answer.strip);"
     );
+    const head = build.indexOf('cls: "ca-hrollup-head"');
+    const body = build.indexOf("const body =");
+    expect(head).toBeGreaterThan(0);
+    expect(body).toBeGreaterThan(head);
+  });
+
+  it("says how many habits a closed section is holding", () => {
+    // A HEADER THAT FOLDS EIGHT HABITS AWAY AND THEN READS AS IT DID WITH ONE
+    // is a control whose own state is invisible. The count is off the group's
+    // own rows, so it cannot disagree with what unfolding shows.
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    expect(build).toMatch(
+      /cls: "ca-hrollup-head-count",\s*text: String\(group\.rows\.length\),/
+    );
+    // IT IS THE DRAWN ROWS AND NOT THE REGISTRY'S. `rows` is already the
+    // reader's own list where the directive names one, so a habit they hid is
+    // not counted in the section it is not in.
+    expect(build).not.toContain("String(all.length)");
+    expect(build).not.toContain("String(seeds.length)");
+  });
+
+  it("folds the body and never the head", () => {
+    // `foldableSection`'s OWN RULE, and the reason: a section that folded itself
+    // away entirely would leave the reader nothing to click to get it back.
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    expect(build).toContain('sect.toggleClass("is-closed", closed)');
+    expect(build).not.toContain('head.toggleClass("is-closed"');
+    // THE STATE IS SAID OUT LOUD AS WELL AS DRAWN. A chevron that only turns is
+    // a fold a screen reader cannot report.
+    expect(build).toContain('head.setAttr("aria-expanded", String(!closed))');
+    // AND THE CLICK ASKS THE STORE, NOT THE DOM. Reading the class back would
+    // work until something else toggled it, and the store is the thing that has
+    // to end up agreeing with the picture.
+    expect(build).toContain("const next = !folds.isCollapsed(key);");
+    expect(build).toContain("folds.setCollapsed(key, next);");
+    // THE RULE'S BODY AND NOT ITS SELECTOR. `toContain` on the selector alone
+    // measured VACUOUS — `opacity: 0.5` under the same selector survives it, and
+    // a "folded" section that is merely faint still takes its whole height.
+    //
+    // AND IT IS OUTSIDE THE `@supports` BLOCK, so the fold works whether or not
+    // the section got a box: `display: none` here outranks the
+    // `display: contents` on the plain `.ca-hrollup-body` on specificity alone.
+    expect(cssRule(".ca-hrollup-sect.is-closed .ca-hrollup-body")).toContain(
+      "display: none"
+    );
+  });
+
+  it("remembers a closed section per note and grain, storing only the closure", () => {
+    const code = readCode("habit-rollup-view");
+    // THE ONE RECORD EVERY FOLD IN THIS PLUGIN KEEPS ITS ANSWER IN, namespaced
+    // so it cannot collide with a title a reader wrote — the rule `::frame:`,
+    // `::note:`, `::reveal:` and `::calendar:` all followed.
+    expect(code).toContain("`${sourcePath}::hrollup:${grain}`");
+    expect(rollupFoldKey("Diary/2026-Q4.md", "weekly")).toBe(
+      "Diary/2026-Q4.md::hrollup:weekly"
+    );
+    expect(rollupFoldKey("a.md", "daily")).not.toBe(rollupFoldKey("b.md", "daily"));
+    expect(rollupFoldKey("a.md", "daily")).not.toBe(rollupFoldKey("a.md", "weekly"));
+    // ── ABSENT MEANS OPEN, SO ONLY A CLOSURE IS STORED ────────────────────
+    //
+    // `Widgets.foldStore()`'s policy and not `directive-regions.ts`'. The
+    // calendar's two panels ship CLOSED, so "the reader opened this" is a fact
+    // only a stored `false` can carry; these ship OPEN, so a stored `false`
+    // would be a row recording that nothing happened — in a map that is pruned
+    // by path and otherwise only ever grows.
+    const store = fnBody("rollupFolds", "habit-rollup-view");
+    expect(store).toContain("if (value) map[key] = true;");
+    expect(store).toContain("else delete map[key];");
+    expect(store).toContain("=== true");
+    // FIRE AND FORGET, as every other fold write is: a failed save costs a
+    // remembered section, not correctness, and awaiting it would make a click
+    // on a header wait for disk.
+    expect(store).toContain("void plugin.saveSettings();");
+    expect(store).not.toContain("await");
   });
 
   it("draws the heading even when every habit shares one grain", () => {
@@ -1928,19 +2011,28 @@ describe("the card's shape", () => {
     expect(readCode("habit-rollup-editor")).toContain("TRACKER_CLASS_LABELS[");
   });
 
-  it("stamps the row's grain under a name the ring cannot see", () => {
+  it("stamps the SECTION's grain under a name the ring cannot see", () => {
     // THE HAZARD, AND IT IS NOT HYPOTHETICAL. `[data-ca-grain]` binds
     // `--ca-grain-accent` five ways in the presets sheet, and one of the rules
     // reading it is `[data-ca-grain] .ca-stat-ring-val`. A `var()` is
-    // substituted on the element that DECLARES the property, so a row wearing
-    // that attribute would repaint its OWN ring in its own grain — which the
-    // reader ruled out: the tint is on the filled strip cells and nowhere else.
-    const row = fnBody("drawRow", "habit-rollup-view");
-    expect(row).toContain('el.setAttr("data-ca-row-grain", row.grain)');
+    // substituted on the element that DECLARES the property, so an element
+    // wearing that attribute would repaint any ring inside it — which the
+    // reader ruled out in 1.0.61: the tint is the strip's and nowhere else.
+    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    expect(build).toContain('sect.setAttr("data-ca-row-grain", group.grain)');
+    // ONE STAMP PER SECTION, NOT ONE PER ROW (1.0.65). A group IS one grain, so
+    // the row was writing a fact about its section n times — and the header
+    // strip cannot tint itself with a property its own children declare. The
+    // rows still read it, because a custom property inherits through
+    // `display: contents`, which is what the section is without subgrid.
+    expect(fnBody("drawRow", "habit-rollup-view")).not.toContain(
+      "data-ca-row-grain"
+    );
     // `readCode`, SO THE PROSE ABOVE MAY NAME THE TRAP it is warning about.
     const code = readCode("habit-rollup-view");
     expect(code).not.toContain('"data-ca-grain"');
     expect(code).not.toContain("--ca-grain-accent");
+    expect(code.match(/data-ca-row-grain/g)).toHaveLength(1);
   });
 
   it("names the slot in the strip's own tooltip", () => {
@@ -2318,26 +2410,83 @@ describe("the rollup's CSS", () => {
     expect(bare).not.toMatch(/\.ca-hrollup[\w-]*[^{}]*\.ca-stat-ring/);
   });
 
-  it("heads a grain's group across the one grid (1.0.61)", () => {
-    // `grid-column: 1 / -1` IS THE STRIP'S OWN TRICK, and the reason no group
-    // gets a container of its own: the list is one grid with every row
-    // `display: contents`, so a wrapper would be a second grid per heading —
-    // the exact 1.0.31 bug that shape exists to prevent.
+  it("heads a grain's section across the one grid (1.0.65)", () => {
+    // `grid-column: 1 / -1` IS THE STRIP'S OWN TRICK, now spanning the SECTION's
+    // subgridded tracks rather than the list's — which are the same tracks, and
+    // that is the whole of why a container is safe here and was not in 1.0.61.
     const head = cssRule(".ca-hrollup-head");
     expect(head).toContain("grid-column: 1 / -1");
     expect(head).toContain("text-transform: uppercase");
     expect(head).toContain("var(--text-muted)");
-    // Air above the second group and not the first, with no `:first-child`
-    // exception to keep in step.
-    expect(cssRule(".ca-hrollup-list > .ca-hrollup-head:not(:first-child)")).toContain(
-      "margin-top"
-    );
-    // EXACTLY ONE RULE IN THE WHOLE SHEET, so no narrow-width override can hide
-    // the one line that still says the grain once `.ca-hrollup-sub` goes.
+    // ── `obsidian-button-height` ──────────────────────────────────────────
+    //
+    // A chip-shaped `<button>` is 30px in this app until all three of these are
+    // reset, and "no visual change" is the signature of forgetting one. The
+    // head became a button in 1.0.65 because it toggles its section.
+    expect(head).toContain("height: auto");
+    expect(head).toContain("min-height: 0");
+    expect(head).toContain("border: 0");
+    expect(head).toContain("cursor: pointer");
+    // TINTED WITH ITS OWN GRAIN, which is the one thing on the card that names
+    // the section without being read. It works only because the stamp moved up
+    // to the section: the head is a child of the element that declares it.
+    expect(head).toContain("var(--ca-hrollup-grain)");
+    // EXACTLY ONE RULE AND ONE HOVER, so no narrow-width override can hide the
+    // one line that still says the grain once `.ca-hrollup-sub` goes.
     expect(cssRules(".ca-hrollup-head")).toHaveLength(1);
-    // AND THE MUTING NEVER REACHES IT. The heading is the row's sibling, so
-    // this needs no rule — and must not acquire one.
+    expect(cssRules(".ca-hrollup-head:hover")).toHaveLength(1);
+    // THE AIR BETWEEN SECTIONS IS THE LIST'S ROW GAP NOW. The old
+    // `:not(:first-child)` margin was an exception to keep in step with; the
+    // list's only children are sections, so the gap is simply between them.
+    expect(
+      cssRules(".ca-hrollup-list > .ca-hrollup-head:not(:first-child)")
+    ).toHaveLength(0);
+    // AND THE MUTING NEVER REACHES IT. The head is the body's sibling, so this
+    // needs no rule — and must not acquire one.
     expect(cssRules(".ca-hrollup-row.is-idle .ca-hrollup-head")).toHaveLength(0);
+  });
+
+  it("frames and bands a section, and only where subgrid exists (1.0.65)", () => {
+    // ── A `display: contents` ELEMENT HAS NO BOX, SO IT CANNOT BE PAINTED ───
+    //
+    // The 1.0.63 lesson on a second surface. Subgrid gives the section and the
+    // row a box while still using the LIST's tracks, so a frame and a band
+    // become possible without the second grid that 1.0.61 refused the wrapper
+    // over. Everything paintable therefore lives behind the `@supports` guard
+    // and the fallback is the 1.0.64 card, unframed and unbanded.
+    for (const sel of [".ca-hrollup-sect", ".ca-hrollup-body"]) {
+      const rules = cssRules(sel);
+      expect(rules[0]).toContain("display: contents");
+      expect(rules.some((r) => r.includes("grid-template-columns: subgrid"))).toBe(
+        true
+      );
+    }
+    const sect = cssRules(".ca-hrollup-sect");
+    expect(sect.some((r) => r.includes("border-radius"))).toBe(true);
+    // `overflow: hidden` IS WHAT MAKES THE CORNERS MEAN ANYTHING — the head's
+    // tint and the first band both run to the edge, and an unclipped child
+    // squares them off again.
+    expect(sect.some((r) => r.includes("overflow: hidden"))).toBe(true);
+    // ONE BAND PER HABIT, COVERING ITS STRIP, RESTARTING AT EACH SECTION. All
+    // three fall out of the shape rather than out of a declaration: the ROW is
+    // the box, the strip is inside it, and `:nth-child` counts within the body.
+    expect(cssRule(".ca-hrollup-row:nth-child(odd)")).toContain(
+      "background: var(--ca-zebra)"
+    );
+    expect(cssRules(".ca-hrollup-strip:nth-child(odd)")).toHaveLength(0);
+    expect(cssRules(".ca-hrollup-cell:nth-child(odd)")).toHaveLength(0);
+    // AND THE STRIP'S OWN MARGIN BECOMES PADDING INSIDE THE BAND. A margin
+    // there would leave a stripe of card showing through every band.
+    expect(cssRule(".ca-hrollup-row .ca-hrollup-strip")).toContain(
+      "margin-bottom: 0"
+    );
+    // NO INLINE PADDING ON A SUBGRID, ANYWHERE. A subgrid's padding comes out of
+    // its first and last tracks, so a section that padded itself would hold its
+    // figure column somewhere no other section does — the exact misalignment
+    // this whole shape exists to prevent.
+    for (const r of [...sect, ...cssRules(".ca-hrollup-body"), ...cssRules(".ca-hrollup-row")]) {
+      expect(r).not.toMatch(/padding(-inline|-left|-right)?:/);
+    }
   });
 
   it("ramps every filled mark in the row's own grain (1.0.64)", () => {
@@ -2411,7 +2560,12 @@ describe("the rollup's CSS", () => {
       yearly: "--ca-grain-yearly",
     };
     for (const grain of TRACKER_CLASSES) {
-      const rule = cssRule(`.ca-hrollup-row[data-ca-row-grain="${grain}"]`);
+      // ON THE SECTION AS OF 1.0.65. A group IS one grain, and the header strip
+      // tints itself with this property — which it can only do if the element
+      // declaring it is an ancestor of the head. The rows still read it: a
+      // custom property inherits through `display: contents`, which is what a
+      // section is on a browser without subgrid.
+      const rule = cssRule(`.ca-hrollup-sect[data-ca-row-grain="${grain}"]`);
       expect(rule).toContain(`--ca-hrollup-grain: var(${palette[grain]})`);
       // THE SAME HAZARD BY THE OTHER DOOR. Binding `--ca-grain-accent` here
       // would recolour this row's ring whether or not the selector that reads
@@ -2431,7 +2585,13 @@ describe("the rollup's CSS", () => {
     // that property through a DESCENDANT selector onto any ring a later round
     // puts back. A private attribute binding a private property reaches nothing
     // it was not pointed at.
-    expect(readCss()).not.toContain(".ca-hrollup-row[data-ca-grain");
+    // `[data-ca-grain=…]` ITSELF IS NOT THE THING TO FORBID — the presets sheet
+    // binds the DASHBOARD's grain through it five ways and has since 4.80, and
+    // `vault-banner.ts` stamps it on the leaf. What must never exist is a
+    // selector that puts it on a part of this card.
+    for (const sel of ["row", "sect", "head", "cell", "strip"]) {
+      expect(readCss()).not.toContain(`.ca-hrollup-${sel}[data-ca-grain`);
+    }
   });
 
   it("keeps monochrome monochrome (1.0.61)", () => {

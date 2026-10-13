@@ -123,13 +123,19 @@ body.ca-grain-subtle {
   --ca-grain-tint: rgba(var(--ca-grain-accent-rgb), 0.03);
 }
 
-/* --- A Habit Rollup Row's Own Grain (1.0.61) -----------------
+/* --- A Habit Rollup Section's Own Grain (1.0.61, moved 1.0.65) ------
 
    THE CARD GROUPS ITS HABITS BY THE GRAIN THEY ARE READ AT, and a kept mark in
    the strip wears that grain's colour. These five rules are how the colour
    arrives.
 
-   A ROW MUST NEVER WEAR `data-ca-grain`, AND MUST NEVER DECLARE
+   ON THE SECTION AND NO LONGER ON THE ROW. A group IS one grain, so the row was
+   stamping a fact about its section once per habit — and the section's header
+   strip could not tint itself with a property its own children declared.
+   Custom properties inherit through `display: contents`, so the rows read it
+   whether or not the browser gives the section a box.
+
+   AN ELEMENT HERE MUST NEVER WEAR `data-ca-grain`, AND MUST NEVER DECLARE
    `--ca-grain-accent`. Either one repaints that row's own ring, which is the
    one thing this was not allowed to do. The selector `[data-ca-grain]
    .ca-stat-ring-val` below is only half the mechanism: a `var()` is substituted
@@ -144,19 +150,19 @@ body.ca-grain-subtle {
 
    NOT KEYED ON `[data-ca-row-grain]` ALONE. The class is in the selector so
    this file cannot accidentally grant the attribute meaning anywhere else. */
-.ca-hrollup-row[data-ca-row-grain="daily"] {
+.ca-hrollup-sect[data-ca-row-grain="daily"] {
   --ca-hrollup-grain: var(--ca-grain-daily);
 }
-.ca-hrollup-row[data-ca-row-grain="weekly"] {
+.ca-hrollup-sect[data-ca-row-grain="weekly"] {
   --ca-hrollup-grain: var(--ca-grain-weekly);
 }
-.ca-hrollup-row[data-ca-row-grain="monthly"] {
+.ca-hrollup-sect[data-ca-row-grain="monthly"] {
   --ca-hrollup-grain: var(--ca-grain-monthly);
 }
-.ca-hrollup-row[data-ca-row-grain="quarterly"] {
+.ca-hrollup-sect[data-ca-row-grain="quarterly"] {
   --ca-hrollup-grain: var(--ca-grain-quarterly);
 }
-.ca-hrollup-row[data-ca-row-grain="yearly"] {
+.ca-hrollup-sect[data-ca-row-grain="yearly"] {
   --ca-hrollup-grain: var(--ca-grain-yearly);
 }
 /* AND MONOCHROME STILL MEANS MONOCHROME. The modifier above resets

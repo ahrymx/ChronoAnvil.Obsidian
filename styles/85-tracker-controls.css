@@ -1126,56 +1126,138 @@
    AND THE RING'S TRACK IS GONE WITH THE RING. Eight rings down a card, most of
    them drawn empty, were the largest thing on it and the least said; the strip
    under each row draws the same proportion slot by slot. */
+/* THE ROW GAP IS BETWEEN SECTIONS (1.0.65), because sections are now the list's
+   only children. Inside one, a row's own `padding-block` is the air — a gap
+   there would be a stripe of card showing through every band. */
 .ca-hrollup-list {
   display: grid;
   grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
   align-items: center;
-  gap: 2px var(--ca-space-2);
+  gap: var(--ca-space-2) var(--ca-space-2);
 }
 .ca-hrollup-row {
   display: contents;
 }
 
-/* ── THE GRAIN HEADING (1.0.61) ───────────────────────────────────────────
+/* ── A GRAIN IS A SECTION (1.0.65) ────────────────────────────────────────
 
-   A FULL-WIDTH ITEM INSIDE THE ONE GRID, which is `.ca-hrollup-strip`'s trick
-   forty lines down and for the same reason: the list is one grid with every
-   row `display: contents`, so a group wrapped in its own element would be a
-   second grid per heading and every group's rings would line up only with each
-   other. `grid-column: 1 / -1` on an item whose row is full puts it on the
-   next line of the list.
+   *"Give each grain a section like appearance; zebra pattern background and
+   collapsible headers for the sections. The goal is to improve visual
+   boundaries."*
 
-   DRAWN ONLY WHERE THERE ARE TWO GRAINS TO SEPARATE — see `buildHabitRollup`.
+   THE WRAPPER THAT 1.0.61 REFUSED TO BUILD, AND WHY IT IS SAFE NOW. That round
+   put the heading on the list as a `grid-column: 1 / -1` item precisely so that
+   no group would get a container, because a container is a second grid and the
+   figures and names would then line up only within their own group — 1.0.31's
+   records-table bug for the fourth time. **Subgrid is what makes the container
+   free**: `grid-template-columns: subgrid` on an item spanning `1 / -1` gives
+   the element a BOX while still using the parent's tracks, so a section can
+   carry a border, a background and a fold and still measure its names against
+   every other section's. 1.0.63 used exactly this on the entry card's rows and
+   `94-native-tables.css` used it first, with the same `@supports` guard.
+
+   THREE SUBGRIDS DEEP — list > section > body > row — and each one spans
+   `1 / -1`, so the tracks are the LIST's at every level. The row is a box of
+   its own because the band has to cover a habit's figure line and the strip
+   under it as one unit: a habit is one thing, and banding half of it is the
+   defect the band was drawn to fix.
+
+   NO INLINE PADDING ON A SUBGRID, ANYWHERE. A subgrid's own padding comes out
+   of its first and last tracks, so a section that padded itself would hold its
+   figure column in a different place from a section that did not — which is the
+   misalignment the whole shape exists to prevent. Padding goes on the head,
+   which is an ordinary full-width item and not a subgrid, and the bands run
+   edge to edge inside the frame. */
+.ca-hrollup-sect,
+.ca-hrollup-body {
+  display: contents;
+}
+
+/* THE HEADER STRIP. A `<button>`, because it is one: it toggles its section and
+   must answer to Enter and Space without this file inventing either.
+
+   `obsidian-button-height` — a chip-shaped `<button>` is 30px in this app until
+   the three properties below are reset, and "no visual change" is the signature
+   of forgetting one.
+
+   TINTED WITH ITS OWN GRAIN, which is the one thing on the card that says which
+   section this is without being read. `--ca-hrollup-grain` is declared on the
+   section (see the five rules below) and the head is its first child, so the
+   head reads the property its own section binds — that is why the stamp moved
+   off the row in 1.0.65.
 
    THE WORDS ARE `TRACKER_CLASS_LABELS`', which is the window's own heading
    table: "Daily entries", "Weekly entries". Upper-cased and tracked out here
    rather than in the string, because the string is shared with a window that
    draws it as a sentence.
 
-   MUTED AT ALL TIMES, AND NEVER BY `.is-idle`. It is a column label, so it must
+   MUTED AT ALL TIMES, AND NEVER BY `.is-idle`. It is a section label, so it must
    not compete with the names under it and must not change weight when they do —
    and a grain is a fact about where a habit is logged rather than about whether
    anything was kept. The muting rule below reaches `.ca-hrollup-row`'s CHILDREN
-   and the heading is the row's sibling, so this needs no rule of its own; the
-   builder creates it on the list for exactly that reason.
+   and the head is the body's sibling, so this needs no rule of its own.
 
    NOT TOUCHED BY THE NARROW-WIDTH BLOCK AT THE FOOT, which is the point of it:
    `.ca-hrollup-sub` is hidden at 360px, so below that width this line is the
    only thing on the card that says which calendar it is drawing. */
 .ca-hrollup-head {
   grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: var(--ca-space-1) var(--ca-space-2);
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ca-hrollup-grain) 14%, transparent);
+  box-shadow: none;
   color: var(--text-muted);
+  cursor: pointer;
   font-size: var(--ca-text-2xs);
   font-weight: 600;
   letter-spacing: 0.06em;
+  text-align: left;
   text-transform: uppercase;
 }
-/* AIR ABOVE THE SECOND GROUP AND NOT THE FIRST, expressed against the list's own
-   children so there is no `:first-child` exception to keep in step. It is needed
-   independently of the strip's `margin-bottom`: `no-strip` takes that away and
-   the groups would then run together. */
-.ca-hrollup-list > .ca-hrollup-head:not(:first-child) {
-  margin-top: var(--ca-space-2);
+.ca-hrollup-head:hover {
+  background: color-mix(in srgb, var(--ca-hrollup-grain) 24%, transparent);
+  color: var(--text-normal);
+}
+/* THE COUNT GOES TO THE FAR END, which is where a closed section is read: the
+   name says which grain and this says how much is behind the chevron. Tabular,
+   because two sections' counts sit one under the other. */
+.ca-hrollup-head-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  opacity: 0.8;
+}
+/* THE CHEVRON TURNS, IT DOES NOT SWAP. One icon and one transform: a second
+   `setIcon` call on the closed state is two glyphs to keep in step, and the
+   rotation is also what makes the state legible mid-animation. */
+.ca-hrollup-chev {
+  display: flex;
+  align-items: center;
+  transition: transform 120ms ease;
+}
+.ca-hrollup-chev .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.ca-hrollup-sect.is-closed .ca-hrollup-chev {
+  transform: rotate(-90deg);
+}
+/* THE BODY FOLDS AND THE HEAD DOES NOT — `foldableSection`'s rule, and the
+   reason a section that folded itself away entirely would leave the reader
+   nothing to click to get it back.
+
+   DECLARED OUTSIDE THE `@supports` BLOCK so the fold works whether or not the
+   section is a subgrid. `display: none` on this selector outranks the
+   `display: contents` above it on specificity alone. */
+.ca-hrollup-sect.is-closed .ca-hrollup-body {
+  display: none;
 }
 
 /* A `.ca-hrollup-lead` RING USED TO SIT HERE, with an `is-cover` variant
@@ -1392,6 +1474,64 @@
   }
   .ca-hrollup-foot-note {
     text-align: left;
+  }
+}
+
+/* ── THE SECTION BECOMES A BOX (1.0.65) ───────────────────────────────────
+
+   AFTER THE CONTAINER QUERIES, DELIBERATELY. Everything in here is an upgrade
+   of a rule above it, and both blocks are plain class selectors: written first,
+   the 360px block's `grid-template-columns` would win on source order and the
+   narrow card would lose its two-track list.
+
+   `display: contents` IS THE FALLBACK AND IT IS A GOOD ONE — the card draws
+   exactly as it did in 1.0.64, headers and all, with no frame and no bands.
+   What a browser without subgrid cannot do is give a section or a row a box,
+   and a box is the only thing that can be painted.
+
+   PAINTING THE CELLS INSTEAD WAS THE ALTERNATIVE AND IT IS WRONG: the list has
+   a `var(--ca-space-2)` column gap, so a band drawn per cell comes out as three
+   stripes with two slits down them.
+
+   NO INLINE PADDING ON ANY OF THE THREE. A subgrid's padding comes out of its
+   first and last tracks, so a section that padded itself would hold its figure
+   column somewhere no other section does. */
+@supports (grid-template-columns: subgrid) {
+  .ca-hrollup-sect,
+  .ca-hrollup-body,
+  .ca-hrollup-row {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    align-self: stretch;
+    row-gap: 0;
+  }
+  /* THE HAIRLINE FRAME, which is the reader's own call out of three: *"header
+     bar + hairline frame"*. `overflow: hidden` is what makes the corners mean
+     anything — the head's tint and the first band both run to the edge, and an
+     unclipped child squares them off again. */
+  .ca-hrollup-sect {
+    border: var(--ca-rule) solid var(--background-modifier-border);
+    border-radius: var(--ca-radius-sm);
+    overflow: hidden;
+  }
+  .ca-hrollup-row {
+    align-items: center;
+    padding-block: 2px;
+  }
+  /* ONE BAND PER HABIT, COVERING ITS STRIP, RESTARTING AT EACH SECTION.
+     All three are the reader's call and all three fall out of the shape: the
+     row is the box, the strip is inside it, and `:nth-child` counts within the
+     body — so a section's first habit is banded whatever came before it. */
+  .ca-hrollup-row:nth-child(odd) {
+    background: var(--ca-zebra);
+  }
+  /* AND THE AIR UNDER THE STRIP GOES INSIDE THE BAND. Its `margin-bottom` was
+     the only thing separating one habit from the next; now the frame and the
+     band do that, and a margin would put a gap in the band instead. */
+  .ca-hrollup-row .ca-hrollup-strip {
+    margin-bottom: 0;
+    padding-bottom: var(--ca-space-1);
   }
 }
 

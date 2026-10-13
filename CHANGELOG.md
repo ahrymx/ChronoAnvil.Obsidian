@@ -5,6 +5,20 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.65] - 2026-10-13
+
+### Changed
+
+- **Each grain on a habit rollup is now a section.** A framed box with a header
+  bar tinted in that grain's own colour, so where one calendar ends and the next
+  begins is visible rather than inferred from a line of small capitals.
+- **A section's header folds it.** Click it and the habits inside go away,
+  leaving the bar and a count of what is behind it; the dashboard remembers
+  which sections you closed, per note and per grain.
+- **Rows inside a section are banded.** A habit's figure line and the strip
+  under it share one band, so a habit reads as one thing, and the alternation
+  starts over in each section.
+
 ## [1.0.64] - 2026-10-12
 
 ### Changed

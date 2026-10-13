@@ -57,6 +57,7 @@ import {
   type HabitSlotReading,
 } from "../../trackers/habit-rollup";
 import { HabitRollupEditor, type HabitRollupSeed } from "../habit-rollup-editor";
+import type { FoldStore } from "../section-frame";
 
 // Past this many slots the strip groups them, which on the only period that
 // reaches it means a year of days drawn as a year of weeks.
@@ -372,6 +373,57 @@ function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
   }
 }
 
+// ── WHERE A GRAIN SECTION REMEMBERS THAT IT IS CLOSED (1.0.65) ───────────
+//
+// `settings.collapsedNoteSections`, the one record every fold in this plugin
+// keeps its answer in: `"<notePath>::<title>"` for a header bar, `"::frame:"`
+// for a `frame: section`, `"::note:"` for a diary field, `"::reveal:"` for a
+// banner chevron, `"::calendar:"` for a diary card's footer panel — and now
+// `"::hrollup:<grain>"`. Namespaced so it cannot collide with a title a reader
+// wrote, which is the rule every one of those followed.
+//
+// THE KEY IS THE NOTE AND THE GRAIN, NOT THE BLOCK. Two habit rollups on one
+// note would share a fold, and that is the right answer rather than a
+// limitation: they are the same list of grains over the same period, and a
+// reader who closed Weekly on one of them meant Weekly. A block index would also
+// go stale the moment a line was added above — `openGroupTabs` is the one record
+// that takes that risk and says so.
+export function rollupFoldKey(sourcePath: string, grain: TrackerClass): string {
+  return `${sourcePath}::hrollup:${grain}`;
+}
+
+// ── ABSENT MEANS OPEN, SO A CLOSED SECTION IS THE ONLY THING STORED ──────
+//
+// `Widgets.foldStore()`'s policy and not `directive-regions.ts`', and the
+// difference is the default. The calendar's two panels ship CLOSED, so "the
+// reader opened this" is a fact only a stored `false` can carry; these ship
+// OPEN, so a `false` would be a row recording that nothing happened. Deleting
+// the key is what keeps a record that only ever grows from doing so.
+//
+// A FOURTH ADAPTER AND NOT A FIFTH POLICY. Nine files write this map and each
+// builds the smallest reader it needs; what must not happen is one that
+// disagrees about what an absent key means, which is why the sentence above is
+// here rather than assumed.
+//
+// Fire-and-forget on the write, as every other fold is: a failed save costs a
+// remembered section, not correctness, and awaiting it would make a click on a
+// header wait for disk.
+function rollupFolds(plugin: ChronoAnvilPlugin): FoldStore {
+  return {
+    isCollapsed: (key) =>
+      plugin.settings.collapsedNoteSections?.[key] === true,
+    setCollapsed: (key, value) => {
+      if (!plugin.settings.collapsedNoteSections) {
+        plugin.settings.collapsedNoteSections = {};
+      }
+      const map = plugin.settings.collapsedNoteSections;
+      if (value) map[key] = true;
+      else delete map[key];
+      void plugin.saveSettings();
+    },
+  };
+}
+
 export function buildHabitRollup(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
@@ -468,6 +520,7 @@ export function buildHabitRollup(
   }
 
   const list = root.createDiv({ cls: "ca-hrollup-list" });
+  const folds = rollupFolds(plugin);
   // EVERY GRAIN PRESENT GETS A HEADING, INCLUDING WHEN THERE IS ONLY ONE, and
   // the single-grain case is the one that decided it. Suppressing a lone
   // heading was the obvious economy — chrome that separates one thing from
@@ -502,11 +555,58 @@ export function buildHabitRollup(
     // is `HabitRollupEditor`'s own heading table, derived from `CLASS_DEFS`;
     // until now the window grouped by grain and the card did not, so the two
     // sides of one door described one list in two different languages.
-    list.createDiv({
+    const sect = list.createDiv({ cls: "ca-hrollup-sect" });
+    // THE GRAIN AS A COLOUR, AND NOT UNDER THE NAME `data-ca-grain`. Five rules
+    // in `99-aesthetic-presets.css` bind `--ca-grain-accent` off that attribute,
+    // and one of the rules READING it is `[data-ca-grain] .ca-stat-ring-val`. A
+    // `var()` is substituted on the element that DECLARES the property, so an
+    // element that bound `--ca-grain-accent` — by wearing that attribute or by
+    // hand — would repaint any ring inside it. A private attribute binding a
+    // private property reaches nothing it was not pointed at.
+    //
+    // ON THE SECTION AND NO LONGER ON EACH ROW (1.0.65). A group IS one grain —
+    // that is what `rollupGroups` returns — so the row was stamping a fact about
+    // its section n times, and the section head could not read a property its
+    // own children declared. Custom properties inherit through `display:
+    // contents`, so the fallback arm of the stylesheet is unaffected.
+    sect.setAttr("data-ca-row-grain", group.grain);
+
+    const key = rollupFoldKey(ctx.sourcePath, group.grain);
+    const head = sect.createEl("button", {
       cls: "ca-hrollup-head",
+      attr: { type: "button" },
+    });
+    const chev = head.createSpan({ cls: "ca-hrollup-chev" });
+    setIcon(chev, "chevron-down");
+    head.createSpan({
+      cls: "ca-hrollup-head-name",
       text: TRACKER_CLASS_LABELS[group.grain],
     });
-    for (const row of group.rows) drawRow(list, row, label, answer.strip);
+    // THE COUNT IS WHAT A CLOSED SECTION STILL SAYS. A header that folds away
+    // eight habits and then reads exactly as it did with one is a control whose
+    // own state is invisible — the settings tab's groups have carried their
+    // count for the same reason since 4.x.
+    head.createSpan({
+      cls: "ca-hrollup-head-count",
+      text: String(group.rows.length),
+    });
+
+    const body = sect.createDiv({ cls: "ca-hrollup-body" });
+    for (const row of group.rows) drawRow(body, row, label, answer.strip);
+
+    // THE BODY FOLDS AND THE HEAD DOES NOT, which is `foldableSection`'s own
+    // rule: a section that folded itself away entirely would leave the reader
+    // nothing to click to get it back.
+    const apply = (closed: boolean): void => {
+      sect.toggleClass("is-closed", closed);
+      head.setAttr("aria-expanded", String(!closed));
+    };
+    apply(folds.isCollapsed(key));
+    head.addEventListener("click", () => {
+      const next = !folds.isCollapsed(key);
+      apply(next);
+      folds.setCollapsed(key, next);
+    });
   }
 
   // HOW MUCH OF THE PERIOD IS BEHIND THE NUMBERS, where the numbers are a rate
@@ -546,7 +646,7 @@ export function buildHabitRollup(
 // a claim about this text, and a loop body nested two deep inside a 170-line
 // builder cannot be sliced out of it.
 function drawRow(
-  list: HTMLElement,
+  host: HTMLElement,
   row: HabitRollupRow,
   label: string,
   strip: boolean
@@ -556,18 +656,8 @@ function drawRow(
   // GRID sizes each `auto` track to that row's content, so the rates would
   // not line up down the card and the names would start at a different place
   // on every line.
-  const el = list.createDiv({ cls: "ca-hrollup-row" });
+  const el = host.createDiv({ cls: "ca-hrollup-row" });
   el.toggleClass("is-idle", rollupIdle(row));
-  // THE GRAIN AS A COLOUR, AND NOT UNDER THE NAME `data-ca-grain`. Five rules
-  // in `99-aesthetic-presets.css` bind `--ca-grain-accent` off that attribute,
-  // and one of the rules READING it is `[data-ca-grain] .ca-stat-ring-val`. A
-  // `var()` is substituted on the element that DECLARES the property, so a row
-  // that bound `--ca-grain-accent` — by wearing that attribute or by hand —
-  // would repaint its own ring in its own grain. The reader's call was the
-  // filled strip cells and nothing else: the ring keeps the DASHBOARD's grain,
-  // which `vault-banner.ts` has stamped on the leaf since 1.0.42. A private
-  // attribute binding a private property reaches nothing it was not pointed at.
-  el.setAttr("data-ca-row-grain", row.grain);
 
   // ── THE RING IS GONE (1.0.64) ───────────────────────────────────────────
   //
