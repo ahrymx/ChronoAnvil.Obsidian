@@ -470,7 +470,13 @@ describe("what the window writes", () => {
     expect(src()).toContain("else out.missed++;");
     // AND THE CATALOGUE IS READ BEFORE THE WINDOW OPENS, because a render is
     // not asynchronous — the same posture `linkedPeriods` has, for its reason.
-    const open = src().slice(src().indexOf("export async function linkPageToDiary("));
+    //
+    // READ OUT OF THE WINDOW'S FILE SINCE 1.0.66, where `linkPageToDiary` now
+    // lives. It stood in `diary-link.ts` and the `import { DiaryLinkWindow }`
+    // it needed closed a cycle — see `test/module-cycles.test.ts` for what that
+    // cost and how it is checked now.
+    const door = readSrc("ui/diary-link-window.ts");
+    const open = door.slice(door.indexOf("export async function linkPageToDiary("));
     expect(open).toContain("const cats = await categoryCatalogue(plugin, anchor);");
     expect(open.indexOf("await categoryCatalogue")).toBeLessThan(
       open.indexOf("new DiaryLinkWindow(")
@@ -904,7 +910,12 @@ describe("the shape of the window", () => {
     // THE READER'S ASK. The two jobs the suggester could not hold — saying what
     // the note is already filed under, and taking one of those back — are both
     // list-shaped, and neither survives a control that closes on contact.
-    expect(readSrc("diary/diary-link.ts")).toContain("new DiaryLinkWindow(");
+    // THE OPENER IS IN THE WINDOW'S OWN FILE (1.0.66), not in the model's —
+    // the model may not reach for the window, which is what kept the cycle.
+    expect(win()).toContain("new DiaryLinkWindow(");
+    // `readCode`, because the comment left where the opener stood names the
+    // class in order to say where it went.
+    expect(readCode("diary/diary-link.ts")).not.toContain("DiaryLinkWindow");
     expect(readSrc("diary/diary-link.ts")).not.toContain("promptDetailedSuggester");
     expect(readSrc("diary/diary-link.ts")).not.toContain("Move the list to which date?");
     expect(win()).toContain("export class DiaryLinkWindow extends EditorModal {");

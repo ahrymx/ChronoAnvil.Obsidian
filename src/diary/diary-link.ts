@@ -150,7 +150,7 @@
 // them gets it composed rather than counted as a miss. `landLink` is that
 // write, and it is pure.
 
-import { Notice, TFile } from "obsidian";
+import { TFile } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
 import { JOURNAL_DATE_PROPERTY } from "../core/constants";
 import {
@@ -182,7 +182,6 @@ import {
   ENTRY_SECTIONS,
   addSectionToNote,
 } from "./entry-sections";
-import { DiaryLinkWindow } from "../ui/diary-link-window";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -1086,45 +1085,13 @@ export function linkNotice(result: DiaryLinkResult, only: string | null): string
   return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
 }
 
-export async function linkPageToDiary(
-  plugin: ChronoAnvilPlugin,
-  notePath: string
-): Promise<void> {
-  const file = getFile(plugin.app, notePath);
-  if (!file) {
-    new Notice("Open a note first.");
-    return;
-  }
-
-  // ANCHORED ON THE PAGE'S OWN DATE WHERE IT HAS ONE, and today where it does
-  // not. That is what keeps the list short without making it shallow: a page
-  // stating `date: 2019-06-14` opens on June 2019 and its five containing
-  // periods are the first rows of each group. It is no longer a LIMIT, which is
-  // the 1.0.51 change — the list reaches both ways from here and the find box
-  // moves it anywhere at all.
-  const already = statedDate(frontmatterOf(plugin.app, file));
-  const anchor = already ?? today();
-  const linked = await linkedPeriods(plugin, file.path);
-  const cats = await categoryCatalogue(plugin, anchor);
-
-  new DiaryLinkWindow(
-    plugin.app,
-    plugin,
-    file,
-    anchor,
-    already,
-    linked,
-    cats,
-    async (edits, dest) => {
-      if (!edits.length) return;
-      const result = await applyDiaryLinks(plugin, file, edits, dest);
-      const one = edits.length === 1 && edits[0].link
-        ? labelForGrain(edits[0].target.grain, edits[0].target.key)
-        : null;
-      new Notice(linkNotice(result, one));
-    }
-  ).open();
-}
+// ── THE OPENER LIVES WITH THE WINDOW (1.0.66) ───────────────────────────
+//
+// `linkPageToDiary` used to stand here, and the `import { DiaryLinkWindow }`
+// above it closed a cycle: this module imported the window and the window
+// imports nine functions back out of this one. See `ui/diary-link-window.ts`,
+// which now holds it — everything it needs out of this file is already exported
+// for the window's own use, so the move cost nothing but the import line.
 
 // Put a link to `page` on one of `entry`'s shelves.
 //

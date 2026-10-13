@@ -35,7 +35,7 @@
 
 import type { IconName } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
-import { linkPageToDiary } from "../diary/diary-link";
+import { linkPageToDiary } from "../ui/diary-link-window";
 import { changePageIcon } from "../ui/page-icon";
 import type { ResolvedSurface } from "../ui/section-insert";
 

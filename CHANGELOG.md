@@ -5,6 +5,27 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.66] - 2026-10-13
+
+### Fixed
+
+- **The diary link no longer imports its own window.** `linkPageToDiary` sat in
+  `diary/diary-link.ts` and reached into `ui/diary-link-window.ts` for the modal
+  it opens, while that window read four words back out of the model at load
+  time. Under the vitest the lockfile pins, whichever file was reached first
+  decided whether that read found a function, and twenty-five test suites
+  stopped collecting with `TypeError: stateWord is not a function`. The opener
+  has moved into the window's own file — the model holds the arithmetic and the
+  writes, and building a modal is neither.
+
+### Added
+
+- **The module graph is checked.** `test/module-cycles.test.ts` names every
+  group of modules that import each other's values, imports each member as the
+  entry point so a load-time read across one fails here rather than in CI, and
+  carries a checked-in pair under `test/fixtures/module-cycle/` whose only job
+  is to prove that check can still see the fault.
+
 ## [1.0.65] - 2026-10-13
 
 ### Changed

@@ -96,24 +96,30 @@
 // the find box the reader is typing in and take the caret with it, which is the
 // bug the tags window records against its own rename field.
 
-import { App, TFile, setIcon } from "obsidian";
+import { App, Notice, TFile, setIcon } from "obsidian";
 import { EditorModal } from "./editor-modal";
+import { labelForGrain } from "../diary/nav";
 import type ChronoAnvilPlugin from "../main";
 import { CLASS_DEFS, TRACKER_CLASSES } from "../trackers/trackers";
 import type { TrackerClass } from "../trackers/trackers";
-import { moment, today } from "../core/util";
+import { frontmatterOf, getFile, moment, today } from "../core/util";
 import {
   REACH,
   anchorFromQuery,
+  applyDiaryLinks,
   attachSections,
+  categoryCatalogue,
   defaultDest,
   describeTarget,
   groupOf,
   isNow,
+  linkNotice,
+  linkedPeriods,
   monthGrid,
   periodsAround,
   rowSentence,
   stateWord,
+  statedDate,
   targetId,
   weekdayHeads,
 } from "../diary/diary-link";
@@ -764,4 +770,65 @@ export class DiaryLinkWindow extends EditorModal {
   protected async commit(): Promise<void> {
     await this.onSave(this.edits(), this.dest);
   }
+}
+
+// ── THE DOOR ONTO THIS WINDOW (moved here 1.0.66) ───────────────────────
+//
+// IT LIVED IN `diary/diary-link.ts` AND THAT WAS A CYCLE. This module imports
+// nine functions out of that one — `stateWord`, `rowSentence`, `monthGrid` and
+// the rest — and that one imported `DiaryLinkWindow` back, for this function
+// alone. A cycle is survivable while nothing is *evaluated* across it, and
+// `STATE_KEYS` near the top of this file calls `stateWord` AT MODULE LOAD, so
+// which half of the pair a runner happens to reach first decides whether the
+// call sees a function or `undefined`.
+//
+// IT IS NOT A HYPOTHETICAL AND IT WAS NOT CAUGHT HERE. The suite passed on the
+// development box, where a stale `node_modules/.bin` symlink meant `npm test`
+// ran a NEWER vitest than the lockfile pins, whose transform tolerates it; CI
+// installs the locked one and twenty-five suites failed to collect with
+// `TypeError: stateWord is not a function`. `test/module-cycles.test.ts` is the
+// check that now fails instead.
+//
+// THE UI LAYER IS WHERE IT BELONGED ANYWAY. Everything in `diary-link.ts` is
+// the arithmetic and the writes; this function builds a modal and opens it,
+// which is this file's whole job. Nothing else moved: every helper it calls was
+// already exported for the window's own use.
+export async function linkPageToDiary(
+  plugin: ChronoAnvilPlugin,
+  notePath: string
+): Promise<void> {
+  const file = getFile(plugin.app, notePath);
+  if (!file) {
+    new Notice("Open a note first.");
+    return;
+  }
+
+  // ANCHORED ON THE PAGE'S OWN DATE WHERE IT HAS ONE, and today where it does
+  // not. That is what keeps the list short without making it shallow: a page
+  // stating `date: 2019-06-14` opens on June 2019 and its five containing
+  // periods are the first rows of each group. It is no longer a LIMIT, which is
+  // the 1.0.51 change — the list reaches both ways from here and the find box
+  // moves it anywhere at all.
+  const already = statedDate(frontmatterOf(plugin.app, file));
+  const anchor = already ?? today();
+  const linked = await linkedPeriods(plugin, file.path);
+  const cats = await categoryCatalogue(plugin, anchor);
+
+  new DiaryLinkWindow(
+    plugin.app,
+    plugin,
+    file,
+    anchor,
+    already,
+    linked,
+    cats,
+    async (edits, dest) => {
+      if (!edits.length) return;
+      const result = await applyDiaryLinks(plugin, file, edits, dest);
+      const one = edits.length === 1 && edits[0].link
+        ? labelForGrain(edits[0].target.grain, edits[0].target.key)
+        : null;
+      new Notice(linkNotice(result, one));
+    }
+  ).open();
 }
