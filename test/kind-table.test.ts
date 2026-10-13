@@ -171,9 +171,22 @@ describe("how a date column resolves its cell", () => {
     // The bare fallthrough is gone. Anchored on the brace, because `} else {`
     // appears in half the file.
     expect(loop).not.toMatch(/\}\s*else\s*\{/);
-    for (const key of ["date", "status", "created", "modified", "statusdate", "rating"]) {
+    for (const key of ["status", "created", "modified", "statusdate", "rating"]) {
       expect(loop).toContain(`col.key === "${key}"`);
     }
+    // AND `date` HAS NO BRANCH, as of 1.0.68. Anchored on the full comparison,
+    // because `statusdate` contains the word and a bare `toContain("date")`
+    // would pass on it — the prefix trap this surface is the sharpest instance
+    // of. The property is untouched: `sortKindRows` still orders on it, which
+    // the row map above the loop still reads.
+    expect(loop).not.toContain('col.key === "date"');
+    // ANCHORED ON THE ROW MAP'S OWN LINE, not on `isoDate(p.fm["date"])`:
+    // that call appears three times in this file, so the loose form passed
+    // against a mutant that blanked this one. 1.0.57's two-call-site `toContain`
+    // made exactly this mistake.
+    const t2 = readSrc("tables");
+    expect(t2).toContain('date: isoDate(p.fm["date"]),');
+    expect(t2.match(/date: isoDate\(p\.fm\["date"\]\),/g)).toHaveLength(1);
   });
 
   it("falls back to the creation time for a status that never moved", () => {

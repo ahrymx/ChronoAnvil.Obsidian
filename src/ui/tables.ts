@@ -2440,7 +2440,7 @@ export function kindTable(
   // would shift the whole row's columns under the pointer.
   const { row: addRow } = recordList(root, cols.map((c) => c.heading), true);
 
-  for (const { note, date, done } of sorted) {
+  for (const { note, done } of sorted) {
     const { main, actions, row } = addRow({
       title: note.file.basename,
       titleRender: (slot) =>
@@ -2480,10 +2480,14 @@ export function kindTable(
     // role nobody has written a branch for draws NOTHING — which is the failure
     // the next column added here should get, because an empty cell is a missing
     // branch and a gauge is a wrong answer.
+    //
+    // `date` HAS NO BRANCH HERE ANY MORE (1.0.68), and the row above still
+    // reads the property: `sortKindRows` orders on it and always has. What
+    // changed is that it stopped being a COLUMN — `kind-columns.ts` holds the
+    // argument. An anchor the reader moves is not a fact to report, and beside
+    // `created` it read as a worse copy of one.
     for (const col of cols.slice(1)) {
-      if (col.key === "date") {
-        recordCell(main, date ?? EMPTY_CELL);
-      } else if (col.key === "status") {
+      if (col.key === "status") {
         recordCell(main, statusOf(note.fm) || EMPTY_CELL, "is-text");
       } else if (col.key === "created") {
         // `recencyMs`, WHICH IS THE LADDER `journal-recent` ALREADY RANKS ON:

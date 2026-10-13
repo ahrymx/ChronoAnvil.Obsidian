@@ -5,6 +5,35 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.68] - 2026-10-13
+
+### Changed
+
+- **A note type's table no longer draws a `date` column.** It had been the
+  second column on every one of these tables from the beginning, and beside the
+  **Created** column that arrived in 1.0.67 it read as a worse copy of it —
+  both are filled from the same call when a note is made, so they agree on
+  every note nobody has backdated.
+
+  They are not the same thing, and the column was the wrong place for the
+  difference. `date:` is an **anchor**, not a report: it decides which day the
+  banner shows under the title, which day an index counts as its last activity,
+  where the note sits on a chart's x-axis, and — the one that bites — which
+  daily note a tracker written from that note is logged into. `created:` is
+  provenance, and must not be edited, because the Recent list and every table
+  tie-break rank on it.
+
+  **The property is untouched.** Every journal note still carries `date:`, the
+  templates still write it, **Link to diary** still stamps it on an undated
+  note, and the journal's Bases file still lists it in `properties:` and in
+  every view — which is where an anchor is worth querying from. Nothing
+  migrates; what is gone is the column, its heading override and its **Rename
+  "Date"…** row in a group's `⋯` menu.
+
+  One consequence worth stating: an index note that had renamed its Date column
+  is holding a word for a column that no longer draws, and the next write of
+  that page's frontmatter drops it.
+
 ## [1.0.67] - 2026-10-13
 
 ### Added

@@ -23,8 +23,8 @@
 //
 // ── ROLES, NOT PROPERTY NAMES ───────────────────────────────────────────
 //
-// The override is keyed by what the column IS — `name`, `date`, `rating`,
-// `status` — and not by the tracker it happens to read. A kind re-rated from
+// The override is keyed by what the column IS — `name`, `rating`, `status` —
+// and not by the tracker it happens to read. A kind re-rated from
 // Confidence to Accuracy keeps the word the reader chose for its rating column,
 // which is the answer that needs no explaining; keying on the tracker id would
 // have silently dropped it and left a stale entry behind under the old id.
@@ -36,15 +36,38 @@
 // status IS and had no way of saying how long it had been that way, which is
 // the question an index is for.
 //
-// So the set is now four columns about WHAT THE NOTE SAYS — its name, its own
-// date, its rating, its status — and three about WHEN SOMETHING HAPPENED to it:
-// `created`, `modified` and `statusdate`. The split matters because the three
-// resolve differently from the four. A `what` column reads a frontmatter
-// property, and `kindTableProperties` is the list of those; of the three `when`
-// columns, ONE IS NOT A PROPERTY AT ALL (`modified` is the file's own mtime) and
-// one appears only on a transition (`statusdate` is absent until a status
-// changes). `kindTableProperties` therefore does NOT grow — it would be
-// promising the template writes keys it does not.
+// So the set is now columns about WHAT THE NOTE SAYS — its name, its rating,
+// its status — and three about WHEN SOMETHING HAPPENED to it: `created`,
+// `modified` and `statusdate`. The split matters because the two kinds resolve
+// differently. A `what` column reads a frontmatter property, and
+// `kindTableProperties` is the list of those; of the three `when` columns, ONE
+// IS NOT A PROPERTY AT ALL (`modified` is the file's own mtime) and one appears
+// only on a transition (`statusdate` is absent until a status changes).
+// `kindTableProperties` therefore does NOT grow — it would be promising the
+// template writes keys it does not.
+//
+// ── AND `date` IS NOT ONE OF THEM, AS OF 1.0.68 ─────────────────────────
+//
+// It was the second column here from the beginning and it has been removed, on
+// the reader's call, after they read the table and asked whether `date` was
+// defunct. It is the opposite of defunct — it is the busiest date the journal
+// system has — but none of what it does is REPORTING, which is all a column can
+// do. `date:` decides which day the banner subtitle says, which day an index
+// counts as its last activity, where a note sits on a chart's x-axis, and —
+// the one that bites — WHICH DAILY NOTE A TRACKER WRITTEN FROM THIS NOTE LANDS
+// IN (`ui/widgets/tracker-controls.ts`, `diary/capture.ts`). It is an anchor
+// the reader may move, not a fact about the note's history.
+//
+// Beside `created` it also read as a worse copy of it, which is how this came
+// up: both are filled from the same `fillTemplate` call at creation, so they
+// agree on every note nobody has backdated — and `created` is the one of the
+// pair that must NOT be edited, because `recencyMs` ranks on it.
+//
+// THE PROPERTY IS UNTOUCHED. Nothing migrates, `templateFrontmatter` still
+// writes `date:` on every leaf, `diary-link` still stamps it, and the generated
+// Bases file still lists it in `properties:` and in every view — which is the
+// surface a reader queries an anchor from. What is gone is the column, its
+// heading override and its rename row in the group's `⋯`.
 //
 // They are OPTIONAL in the way `rating` already is, and that is the whole of why
 // the presence rule below is not new machinery. `rating` is absent where the
@@ -68,14 +91,13 @@ import type { TrackerDef } from "../trackers/trackers";
 
 // The column roles a kind's table can have, in the order the table draws them.
 //
-// THE FOUR `what` COLUMNS FIRST, THEN THE THREE `when` ONES, and the order is
-// the drawn order rather than a grouping for the reader of this file: a table
-// reads left to right as the note's own facts and then its history. Appending
-// rather than interleaving also means a reader who ticks a date column on sees
-// it arrive at the end instead of pushing their status column along.
+// THE `what` COLUMNS FIRST, THEN THE THREE `when` ONES, and the order is the
+// drawn order rather than a grouping for the reader of this file: a table reads
+// left to right as the note's own facts and then its history. Appending rather
+// than interleaving also means a reader who ticks a date column on sees it
+// arrive at the end instead of pushing their status column along.
 export const KIND_COLUMN_KEYS = [
   "name",
-  "date",
   "rating",
   "status",
   "created",
@@ -86,7 +108,7 @@ export const KIND_COLUMN_KEYS = [
 export type KindColumnKey = (typeof KIND_COLUMN_KEYS)[number];
 
 // The three a kind decides for itself, which is the same list again without the
-// four that are never a choice. Derived from nothing — spelled out, because it
+// ones that are never a choice. Derived from nothing — spelled out, because it
 // is also the tick order in Settings and the two must agree.
 export const KIND_DATE_KEYS = ["created", "modified", "statusdate"] as const;
 
@@ -185,7 +207,6 @@ export function kindColumns(
 
   const out: KindColumn[] = [
     { key: "name", property: "", fallback: kind.label, heading: "" },
-    { key: "date", property: "date", fallback: "Date", heading: "" },
   ];
   if (ratingId) {
     out.push({

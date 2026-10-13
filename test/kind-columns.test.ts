@@ -61,7 +61,7 @@ const keys = (kind: Parameters<typeof kindColumns>[1]): string[] =>
 
 // 1.0.67 PUT A COLUMN ON EVERY TABLE, so the `what` columns of every assertion
 // written before it now end in one more word. Spelling `Modified` into each of
-// them would have pinned the default in eleven places; this names the four that
+// them would have pinned the default in eleven places; this names the ones that
 // are about the kind's own facts and leaves the date half to its own describe.
 const said = (kind: Parameters<typeof kindColumns>[1]): string[] => {
   const cols = kindColumns(plugin(), kind);
@@ -78,7 +78,6 @@ describe("what a kind's table calls its columns", () => {
     // migration story for journals that already exist: there isn't one.
     expect(said({ label: "Lesson", rating: "confidence" })).toEqual([
       "Lesson",
-      "Date",
       "Confidence",
       "Status",
     ]);
@@ -87,11 +86,7 @@ describe("what a kind's table calls its columns", () => {
   it("drops the rating column where the kind is not rated", () => {
     // `kindTableProperties`' rule since it was written: *"its rating if it
     // declares one and nothing where it doesn't"*.
-    expect(said({ label: "Cheatsheet" })).toEqual([
-      "Cheatsheet",
-      "Date",
-      "Status",
-    ]);
+    expect(said({ label: "Cheatsheet" })).toEqual(["Cheatsheet", "Status"]);
   });
 
   it("lets the kind overrule any of them", () => {
@@ -104,7 +99,7 @@ describe("what a kind's table calls its columns", () => {
         rating: "accuracy",
         headings: { name: "Exercise", rating: "Score", status: "State" },
       })
-    ).toEqual(["Exercise", "Date", "Score", "State"]);
+    ).toEqual(["Exercise", "Score", "State"]);
   });
 
   it("keys the override by role, never by the tracker it reads", () => {
@@ -112,8 +107,8 @@ describe("what a kind's table calls its columns", () => {
     // column was given. Keyed by tracker id this would have silently reverted
     // and left a stale entry behind under the old id.
     const kind = { label: "Drill", rating: "confidence", headings: { rating: "Score" } };
-    expect(words(kind)[2]).toBe("Score");
-    expect(words({ ...kind, rating: "accuracy" })[2]).toBe("Score");
+    expect(words(kind)[1]).toBe("Score");
+    expect(words({ ...kind, rating: "accuracy" })[1]).toBe("Score");
   });
 
   it("treats an empty box as the derived word, not as a blank heading", () => {
@@ -123,7 +118,7 @@ describe("what a kind's table calls its columns", () => {
     expect(words({ label: "Lesson", headings: { name: "   " } })[0]).toBe(
       "Lesson"
     );
-    expect(headingOf({ label: "x" }, "date", "Date")).toBe("Date");
+    expect(headingOf({ label: "x" }, "status", "Status")).toBe("Status");
   });
 
   it("still strips the registry's glyph off a derived tracker word", () => {
@@ -140,7 +135,7 @@ describe("what a kind's table calls its columns", () => {
     // A kind rated on something no longer in the registry: the column reads the
     // property it is actually reading rather than an empty heading — and that
     // is precisely the case a reader most wants a box for.
-    expect(words({ label: "Drill", rating: "recall_pct" })[2]).toBe("recall_pct");
+    expect(words({ label: "Drill", rating: "recall_pct" })[1]).toBe("recall_pct");
   });
 });
 
@@ -163,7 +158,7 @@ describe("what gets stored", () => {
   it("stores the ones that say something, trimmed", () => {
     expect(boxes([
       ["name", " Exercise ", "Drill"],
-      ["date", "Date", "Date"],
+      ["status", "State", "State"],
       ["rating", "Score", "Accuracy"],
     ])).toEqual({ name: "Exercise", rating: "Score" });
   });
@@ -182,13 +177,12 @@ describe("what gets stored", () => {
   });
 
   it("lists the roles a column can have, in the order they are drawn", () => {
-    // THE FOUR `what` COLUMNS, THEN THE THREE `when` ONES (1.0.67). The order is
-    // the drawn order: a table reads left to right as the note's own facts and
-    // then its history, and appending means a reader who ticks a date column on
-    // does not watch their status column move.
+    // THE `what` COLUMNS, THEN THE THREE `when` ONES (1.0.67). The order is the
+    // drawn order: a table reads left to right as the note's own facts and then
+    // its history, and appending means a reader who ticks a date column on does
+    // not watch their status column move.
     expect([...KIND_COLUMN_KEYS]).toEqual([
       "name",
-      "date",
       "rating",
       "status",
       "created",
@@ -198,7 +192,15 @@ describe("what gets stored", () => {
     // And the three a kind chooses are the tail of that list, not a second
     // vocabulary — the tick row in Settings reads this one.
     expect([...KIND_DATE_KEYS]).toEqual(["created", "modified", "statusdate"]);
-    expect(KIND_COLUMN_KEYS.slice(4)).toEqual(KIND_DATE_KEYS);
+    expect(KIND_COLUMN_KEYS.slice(3)).toEqual(KIND_DATE_KEYS);
+
+    // AND `date` IS NOT ONE OF THEM, AS OF 1.0.68. It was the second key here
+    // from the beginning. The property is untouched and still written on every
+    // leaf — what left is the column, because `date:` is an ANCHOR the reader
+    // moves (which diary day the note files under, which daily note a tracker
+    // written from it lands in) rather than a fact about the note to report,
+    // and beside `created` it read as a worse copy of one.
+    expect([...KIND_COLUMN_KEYS]).not.toContain("date");
   });
 });
 
@@ -218,7 +220,6 @@ describe("the date columns a kind draws", () => {
     // made before this release and on a note edited outside the plugin.
     expect(keys({ label: "Lesson", rating: "confidence" })).toEqual([
       "name",
-      "date",
       "rating",
       "status",
       "modified",
@@ -228,14 +229,12 @@ describe("the date columns a kind draws", () => {
   it("adds exactly the column a tick asks for", () => {
     expect(keys({ label: "Lesson", dates: { created: true } })).toEqual([
       "name",
-      "date",
       "status",
       "created",
       "modified",
     ]);
     expect(keys({ label: "Lesson", dates: { statusdate: true } })).toEqual([
       "name",
-      "date",
       "status",
       "modified",
       "statusdate",
@@ -244,7 +243,7 @@ describe("the date columns a kind draws", () => {
     // the same three ticks draw them the same way round.
     expect(
       keys({ label: "Lesson", dates: { statusdate: true, created: true } })
-    ).toEqual(["name", "date", "status", "created", "modified", "statusdate"]);
+    ).toEqual(["name", "status", "created", "modified", "statusdate"]);
   });
 
   it("takes Modified away when the kind unticks it", () => {
@@ -253,7 +252,6 @@ describe("the date columns a kind draws", () => {
     // had to be `[]` and be indistinguishable from absent.
     expect(keys({ label: "Lesson", dates: { modified: false } })).toEqual([
       "name",
-      "date",
       "status",
     ]);
   });

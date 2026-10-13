@@ -172,36 +172,44 @@ describe("a date column on one page", () => {
     // And the merge does not carry one either: a page cannot re-tick a column.
     expect(pageKind(LESSON, { headings: { modified: "Touched" } }).dates).toBeUndefined();
   });
+
+  it("stops understanding a stored heading for the retired date column (1.0.68)", () => {
+    // THE ONE COST OF REMOVING THE COLUMN, PINNED RATHER THAN DISCOVERED.
+    // `HEADING_KEYS` is `new Set(KIND_COLUMN_KEYS)`, so a page that had renamed
+    // its Date column is now holding a word for a column that no longer draws,
+    // and the next write of that page's frontmatter drops it. That is what this
+    // function does with everything a build does not understand — the point of
+    // asserting it is that the loss is SILENT, so it belongs somewhere a reader
+    // of this file can find it rather than in a vault.
+    expect(cleanOverride({ date: "When" })).toBeNull();
+    expect(cleanOverride({ date: "When", rating: "Score" })).toEqual({
+      headings: { rating: "Score" },
+    });
+  });
 });
 
 describe("what the page draws", () => {
   it("draws the journal's own answer where the note says nothing", () => {
-    expect(words({})).toEqual(["Lesson", "Date", "Confidence", "Status"]);
+    expect(words({})).toEqual(["Lesson", "Confidence", "Status"]);
   });
 
   it("re-rates the table for this page only", () => {
-    expect(words({ rated: "accuracy" })).toEqual([
-      "Lesson",
-      "Date",
-      "Accuracy",
-      "Status",
-    ]);
+    expect(words({ rated: "accuracy" })).toEqual(["Lesson", "Accuracy", "Status"]);
   });
 
   it("takes the rating column away where the page says nothing scores them", () => {
-    expect(words({ rated: RATED_NONE })).toEqual(["Lesson", "Date", "Status"]);
+    expect(words({ rated: RATED_NONE })).toEqual(["Lesson", "Status"]);
   });
 
   it("gives a rating column to a kind the journal does not rate", () => {
     expect(
       said(kindColumns(plugin(), pageKind({ label: "Cheatsheet" }, { rated: "accuracy" })))
-    ).toEqual(["Cheatsheet", "Date", "Accuracy", "Status"]);
+    ).toEqual(["Cheatsheet", "Accuracy", "Status"]);
   });
 
   it("puts the page's words over the journal's", () => {
     expect(words({ headings: { name: "Exercise", rating: "Score" } })).toEqual([
       "Exercise",
-      "Date",
       "Score",
       "Status",
     ]);
@@ -210,10 +218,10 @@ describe("what the page draws", () => {
   it("keeps the journal's word for a column the page does not name", () => {
     // The merge is per ROLE, not all-or-nothing — a page that renames one column
     // must not silently drop the other three back to their derivations.
-    const kind = { label: "Lesson", rating: "confidence", headings: { date: "When" } };
+    const kind = { label: "Lesson", rating: "confidence", headings: { status: "State" } };
     expect(
       said(kindColumns(plugin(), pageKind(kind, { headings: { name: "Exercise" } })))
-    ).toEqual(["Exercise", "When", "Confidence", "Status"]);
+    ).toEqual(["Exercise", "Confidence", "State"]);
   });
 
   it("keeps the page's rating word when the page re-rates the kind", () => {
@@ -221,7 +229,6 @@ describe("what the page draws", () => {
     // IS, so re-rating does not strand the word under an old tracker id.
     expect(words({ rated: "accuracy", headings: { rating: "Score" } })).toEqual([
       "Lesson",
-      "Date",
       "Score",
       "Status",
     ]);
@@ -265,7 +272,7 @@ describe("writing one answer at a time", () => {
 
   it("keeps the rating while a heading changes, and the headings while it does", () => {
     const over = { rated: "accuracy", headings: { name: "Exercise" } };
-    expect(withHeading(over, "date", "When", "Date").rated).toBe("accuracy");
+    expect(withHeading(over, "status", "State", "Status").rated).toBe("accuracy");
     expect(withRated(over, RATED_NONE).headings).toEqual({ name: "Exercise" });
   });
 
