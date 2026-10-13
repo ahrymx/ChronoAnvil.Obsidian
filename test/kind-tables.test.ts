@@ -40,7 +40,7 @@ import {
   withRated,
 } from "../src/journals/kind-tables";
 import type { KindTableOverride } from "../src/journals/kind-tables";
-import { kindColumns } from "../src/journals/kind-columns";
+import { KIND_DATE_KEYS, kindColumns } from "../src/journals/kind-columns";
 import { slugify } from "../src/core/util";
 import type ChronoAnvilPlugin from "../src/main";
 import { readSrc } from "./sources";
@@ -56,8 +56,19 @@ const plugin = (): ChronoAnvilPlugin =>
 
 const LESSON = { label: "Lesson", rating: "confidence" };
 
-const words = (over: KindTableOverride): string[] =>
-  kindColumns(plugin(), pageKind(LESSON, over)).map((c) => c.heading);
+// THE `what` COLUMNS ONLY. 1.0.67 put a Modified column on every table, and
+// this file's subject is a page overruling the four columns that are about the
+// note's own facts — spelling the date default into eleven assertions would have
+// pinned it here as well as in `kind-columns.test.ts`, where it belongs.
+const words = (over: KindTableOverride): string[] => said(columns(over));
+
+const columns = (over: KindTableOverride) =>
+  kindColumns(plugin(), pageKind(LESSON, over));
+
+const said = (cols: { key: string; heading: string }[]): string[] =>
+  cols
+    .filter((c) => !(KIND_DATE_KEYS as readonly string[]).includes(c.key))
+    .map((c) => c.heading);
 
 // What one note's frontmatter looks like once the writer has been through it.
 const fmWith = (all: Record<string, KindTableOverride>) => ({
@@ -118,6 +129,51 @@ describe("reading what a note says", () => {
   });
 });
 
+describe("a date column on one page", () => {
+  it("takes a heading override like any other role (1.0.67)", () => {
+    // FOR FREE, AND THAT IS THE POINT. `cleanOverride` filters on
+    // `KIND_COLUMN_KEYS`, so widening that const gave every date column a
+    // per-index heading without a line of new code — a role is a role.
+    const col = columns({ headings: { modified: "Touched" } }).find(
+      (c) => c.key === "modified"
+    );
+    expect(col?.heading).toBe("Touched");
+    expect(cleanOverride({ modified: "Touched" })).toEqual({
+      headings: { modified: "Touched" },
+    });
+    expect(cleanOverride({ statusdate: "Moved" })).toEqual({
+      headings: { statusdate: "Moved" },
+    });
+  });
+
+  it("round trips a date heading through the stored property", () => {
+    const stored = storedKindTables({ lesson: { headings: { created: "Written" } } });
+    expect(stored).toEqual({ lesson: { created: "Written" } });
+    expect(kindTableOverride({ [KIND_TABLES_KEY]: stored }, "lesson")).toEqual({
+      headings: { created: "Written" },
+    });
+  });
+
+  it("cannot say WHICH date columns one page draws, on purpose (1.0.67)", () => {
+    // HEADINGS YES, PRESENCE NO, and the reason is storage rather than scope.
+    // The stored entry is flat and two levels deep on purpose — *"A third level
+    // of YAML buys nothing"* — and a presence answer there would have to be a
+    // list whose EMPTY value means "none on this page" while its ABSENCE means
+    // "inherit the journal". Those two are the same value through a property
+    // editor, which is `entry-widget-toggle-1-0-42`'s lesson about storing an
+    // answer as an absence. The ticks are a fact about the KIND, which is what
+    // the reader asked for.
+    //
+    // So a `dates` key on a page's entry is not an answer, and is dropped like
+    // any other word that is not a role.
+    expect(cleanOverride({ dates: "created" } as never)).toBeNull();
+    const over = cleanOverride({ rated: "accuracy", dates: "created" } as never);
+    expect(over).toEqual({ rated: "accuracy" });
+    // And the merge does not carry one either: a page cannot re-tick a column.
+    expect(pageKind(LESSON, { headings: { modified: "Touched" } }).dates).toBeUndefined();
+  });
+});
+
 describe("what the page draws", () => {
   it("draws the journal's own answer where the note says nothing", () => {
     expect(words({})).toEqual(["Lesson", "Date", "Confidence", "Status"]);
@@ -138,9 +194,7 @@ describe("what the page draws", () => {
 
   it("gives a rating column to a kind the journal does not rate", () => {
     expect(
-      kindColumns(plugin(), pageKind({ label: "Cheatsheet" }, { rated: "accuracy" })).map(
-        (c) => c.heading
-      )
+      said(kindColumns(plugin(), pageKind({ label: "Cheatsheet" }, { rated: "accuracy" })))
     ).toEqual(["Cheatsheet", "Date", "Accuracy", "Status"]);
   });
 
@@ -158,9 +212,7 @@ describe("what the page draws", () => {
     // must not silently drop the other three back to their derivations.
     const kind = { label: "Lesson", rating: "confidence", headings: { date: "When" } };
     expect(
-      kindColumns(plugin(), pageKind(kind, { headings: { name: "Exercise" } })).map(
-        (c) => c.heading
-      )
+      said(kindColumns(plugin(), pageKind(kind, { headings: { name: "Exercise" } })))
     ).toEqual(["Exercise", "When", "Confidence", "Status"]);
   });
 

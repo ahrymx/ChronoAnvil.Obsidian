@@ -29,8 +29,11 @@
 // fine and the structure would be gone.
 
 import { App, Modal, Setting, TFile, setIcon } from "obsidian";
+import type ChronoAnvilPlugin from "../main";
 import { notify } from "../core/notify";
-import { frontmatterOf } from "../core/util";
+import { frontmatterOf, nowTimestamp } from "../core/util";
+import { stampStatusChange } from "../journals/kind-columns";
+import { getBuiltinTracker } from "../trackers/trackers";
 
 /** What kind of control a value gets, decided once. */
 type Shape = "text" | "number" | "boolean" | "list" | "opaque";
@@ -114,8 +117,8 @@ export function propertyIconOf(
   return "lines-of-text";
 }
 
-export function openProperties(app: App, file: TFile): void {
-  new PropertiesModal(app, file).open();
+export function openProperties(plugin: ChronoAnvilPlugin, file: TFile): void {
+  new PropertiesModal(plugin, file).open();
 }
 
 // The properties ChronoAnvil writes, in the order it writes them — so the window
@@ -134,8 +137,15 @@ const CHRONOANVIL_FIRST = [
 ] as const;
 
 class PropertiesModal extends Modal {
-  constructor(app: App, private file: TFile) {
-    super(app);
+  // TAKES THE PLUGIN AND NOT ONLY THE APP, as of 1.0.67, for one reason: this
+  // window can set or clear ANY key, the status among them, and a status changed
+  // here is still a status changed. Resolving the status property means reading
+  // the tracker registry, which is on the plugin. See `write` below.
+  constructor(
+    private plugin: ChronoAnvilPlugin,
+    private file: TFile
+  ) {
+    super(plugin.app);
   }
 
   onOpen(): void {
@@ -262,16 +272,44 @@ class PropertiesModal extends Modal {
   // reach both: an empty `Mood:` is what a template writes, and a template's
   // field that is gone is a field the note has opted out of.
   private async write(key: string, value: unknown): Promise<void> {
+    const statusId = this.statusProperty();
+    const now = nowTimestamp();
     await this.app.fileManager.processFrontMatter(this.file, (fm) => {
+      const before = fm[key];
       fm[key] = value;
+      stampStatusChange(fm, key, statusId, before, now);
     });
   }
 
   private async remove(key: string): Promise<void> {
+    const statusId = this.statusProperty();
+    const now = nowTimestamp();
     await this.app.fileManager.processFrontMatter(this.file, (fm) => {
+      const before = fm[key];
       delete fm[key];
+      stampStatusChange(fm, key, statusId, before, now);
     });
     this.render();
+  }
+
+  // ── WHY THIS GENERIC WINDOW KNOWS ABOUT ONE PROPERTY (1.0.67) ──────────
+  //
+  // It does not, quite: it knows that one property has a stamp beside it and
+  // asks `stampStatusChange` whether the key it just wrote was that one. Every
+  // judgement — which key, whether the value moved, what to write — is in that
+  // function, beside the dropdown's copy of the same call, so the two channels
+  // cannot drift.
+  //
+  // AND THE LEAK THAT REMAINS IS NAMED. A reader who types `status:` into the
+  // frontmatter by hand, or uses Obsidian's own property panel, changes a status
+  // this plugin never sees, and `statusdate` then dates the previous change. That
+  // is deliberate and it is the same boundary `diary-link`'s date write draws —
+  // *"a control labelled 'link' may not rewrite a date the reader put there
+  // themselves"*. The column's fallback ladder is what makes it survivable: no
+  // stamp reads as `created`, which is when the status WAS set, so the cell is
+  // never emptier than the truth.
+  private statusProperty(): string {
+    return getBuiltinTracker(this.plugin, "status")?.id ?? "status";
   }
 
   private async addProperty(): Promise<void> {

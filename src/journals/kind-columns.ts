@@ -21,7 +21,7 @@
 // chart legend and in every other journal that uses it. A table's column
 // heading is a fact about THAT TABLE, and it had no field.
 //
-// ── FOUR ROLES, NOT FOUR PROPERTY NAMES ─────────────────────────────────
+// ── ROLES, NOT PROPERTY NAMES ───────────────────────────────────────────
 //
 // The override is keyed by what the column IS — `name`, `date`, `rating`,
 // `status` — and not by the tracker it happens to read. A kind re-rated from
@@ -29,9 +29,28 @@
 // which is the answer that needs no explaining; keying on the tracker id would
 // have silently dropped it and left a stale entry behind under the old id.
 //
-// Four is also the whole set. These are not arbitrary columns: `kindTable-
-// Properties` decides what a kind's table has, and it has exactly a date, a
-// rating where the kind declares one, and a status.
+// ── AND THREE MORE, WHICH ARE WHEN RATHER THAN WHAT (1.0.67) ─────────────
+//
+// Four was the whole set until the reader asked for *"the way date flags are
+// used and updated"* to become legible: the table could say what a note's
+// status IS and had no way of saying how long it had been that way, which is
+// the question an index is for.
+//
+// So the set is now four columns about WHAT THE NOTE SAYS — its name, its own
+// date, its rating, its status — and three about WHEN SOMETHING HAPPENED to it:
+// `created`, `modified` and `statusdate`. The split matters because the three
+// resolve differently from the four. A `what` column reads a frontmatter
+// property, and `kindTableProperties` is the list of those; of the three `when`
+// columns, ONE IS NOT A PROPERTY AT ALL (`modified` is the file's own mtime) and
+// one appears only on a transition (`statusdate` is absent until a status
+// changes). `kindTableProperties` therefore does NOT grow — it would be
+// promising the template writes keys it does not.
+//
+// They are OPTIONAL in the way `rating` already is, and that is the whole of why
+// the presence rule below is not new machinery. `rating` is absent where the
+// kind declares none; these are absent where the kind has not ticked them. The
+// difference is only that their default is not "off" for all three — see
+// `KIND_DATE_DEFAULTS`.
 //
 // ── WHY IT IS ITS OWN MODULE ────────────────────────────────────────────
 //
@@ -48,9 +67,62 @@ import { getBuiltinTracker, getTracker } from "../trackers/trackers";
 import type { TrackerDef } from "../trackers/trackers";
 
 // The column roles a kind's table can have, in the order the table draws them.
-export const KIND_COLUMN_KEYS = ["name", "date", "rating", "status"] as const;
+//
+// THE FOUR `what` COLUMNS FIRST, THEN THE THREE `when` ONES, and the order is
+// the drawn order rather than a grouping for the reader of this file: a table
+// reads left to right as the note's own facts and then its history. Appending
+// rather than interleaving also means a reader who ticks a date column on sees
+// it arrive at the end instead of pushing their status column along.
+export const KIND_COLUMN_KEYS = [
+  "name",
+  "date",
+  "rating",
+  "status",
+  "created",
+  "modified",
+  "statusdate",
+] as const;
 
 export type KindColumnKey = (typeof KIND_COLUMN_KEYS)[number];
+
+// The three a kind decides for itself, which is the same list again without the
+// four that are never a choice. Derived from nothing — spelled out, because it
+// is also the tick order in Settings and the two must agree.
+export const KIND_DATE_KEYS = ["created", "modified", "statusdate"] as const;
+
+export type KindDateKey = (typeof KIND_DATE_KEYS)[number];
+
+// WHICH OF THE THREE A SILENT KIND DRAWS.
+//
+// The reader's call: *"Modified by default"*, the other two offered. "When did I
+// last touch this" is the question an index gets asked, and it is the one of the
+// three that needs no setting up — it reads the file, so it is right on a note
+// made before this release and on a note edited outside the plugin.
+//
+// NOT ALL-OFF, which is what made a departures record necessary rather than a
+// plain list of what is on. See `packDates`.
+export const KIND_DATE_DEFAULTS: Record<KindDateKey, boolean> = {
+  created: false,
+  modified: true,
+  statusdate: false,
+};
+
+// THE PROPERTY A STATUS CHANGE IS STAMPED INTO. 1.0.67.
+//
+// ONE LOWERCASE WORD, which is `PAGE_TEMPLATE_KEY`'s rule — *"matching
+// `created`, `status`, `parent` and `order`, the four other properties this
+// plugin writes into a note and reads back"*. `statusdate` reads as *the date on
+// the status*; `changed` on its own would have been a synonym for `modified`
+// sitting next to it in the same frontmatter, which is a key a reader has to
+// guess at.
+//
+// IT IS THE ONE NEW STORED FACT IN THIS ROUND, and it has to be stored: the
+// instant a status changed is not recoverable from the note afterwards.
+// `modified` is the file's mtime and `created` already exists, so neither is
+// written. `review.ts` states the rule both of those follow — *"DERIVED, NOT
+// STORED … writing a third property back to disk would be storing an answer we
+// can always recompute"* — and this is the case it does not cover.
+export const STATUS_DATE_KEY = "statusdate";
 
 // "Confidence" from "🎯 Confidence" — the registry label with its leading glyph
 // stripped.
@@ -89,6 +161,9 @@ export interface KindColumnSource {
   label: string;
   rating?: string;
   headings?: Record<string, string>;
+  // Which of the three date columns this kind draws, as DEPARTURES from
+  // `KIND_DATE_DEFAULTS`. Absent means the defaults whole. See `packDates`.
+  dates?: Record<string, boolean>;
 }
 
 // A kind's table columns, in order, each with the word it shows and the word it
@@ -127,8 +202,142 @@ export function kindColumns(
     heading: "",
   });
 
+  // ── AND THE DATE COLUMNS THIS KIND HAS TICKED ON (1.0.67) ──────────────
+  //
+  // In `KIND_DATE_KEYS` order rather than the record's, so two kinds with the
+  // same three ticks draw them the same way round.
+  const ticks = datesOf(kind);
+  for (const key of KIND_DATE_KEYS) {
+    if (!ticks[key]) continue;
+    out.push({
+      key,
+      // `modified` READS NO PROPERTY, and the empty string already means that
+      // here — it is what `name` carries, which reads the note's filename. The
+      // cell goes to `file.stat.mtime`; there is no `modified:` key in a vault
+      // and this round deliberately does not create one.
+      property:
+        key === "created" ? "created" : key === "statusdate" ? STATUS_DATE_KEY : "",
+      // "Status changed", OFF THE STATUS TRACKER'S OWN WORD. A reader who
+      // renames Status to State gets "State changed" — which is 1.0.32's rule
+      // and the whole reason a column is keyed by its role. A literal here
+      // would be the fourth place the word lived.
+      fallback:
+        key === "created"
+          ? "Created"
+          : key === "modified"
+            ? "Modified"
+            : `${ratingNoun(statusDef, "Status")} changed`,
+      heading: "",
+    });
+  }
+
   for (const col of out) col.heading = headingOf(kind, col.key, col.fallback);
   return out;
+}
+
+// Which date columns a kind draws: the defaults with its own answers over them.
+//
+// READ THROUGH HERE AND NOWHERE ELSE, so the default is applied once. A caller
+// testing `kind.dates?.modified` would get `undefined` for the common case and
+// read it as off, which is the one mistake this field's shape invites.
+export function datesOf(kind: KindColumnSource): Record<KindDateKey, boolean> {
+  const out = { ...KIND_DATE_DEFAULTS };
+  for (const key of KIND_DATE_KEYS) {
+    const said = kind.dates?.[key];
+    if (typeof said === "boolean") out[key] = said;
+  }
+  return out;
+}
+
+// What to store, given what the ticks hold.
+//
+// DEPARTURES FROM THE DEFAULT ONLY, WHICH IS `packHeadings`' RULE ON A BOOLEAN.
+// A kind that wants exactly what every kind wants stores nothing, so the common
+// case leaves no record and `settings.json` does not grow three keys per note
+// type to say "as expected".
+//
+// IT ALSO SETTLES THE AMBIGUITY A PLAIN LIST WOULD HAVE HAD. `dates: []` and no
+// `dates` at all are the same value through enough of the stack to be worth
+// avoiding — a `normaliseKinds` pass, a JSON round trip, a reader's own edit —
+// and with a non-empty default they have to mean opposite things: "none" and
+// "the defaults". A record of departures has no empty case: all three off is
+// `{ modified: false }`, which is present and says so.
+export function packDates(
+  ticks: Record<KindDateKey, boolean>
+): Record<string, boolean> | undefined {
+  const out: Record<string, boolean> = {};
+  for (const key of KIND_DATE_KEYS) {
+    if (ticks[key] !== KIND_DATE_DEFAULTS[key]) out[key] = ticks[key];
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+// What survives a round trip through the editor, given what was stored.
+//
+// CARRIED, NOT REBUILT, for keys this build does not know about — `cleanHeadings`
+// below records why, and a fourth date column added here would be in exactly
+// that position for one release.
+export function cleanDates(raw: unknown): Record<string, boolean> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value !== "boolean") continue;
+    out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+// ── THE STAMP, WRITTEN IN THE TRANSACTION THAT MOVES THE STATUS ──────────
+//
+// Called from inside a `processFrontMatter` callback, which is why it takes the
+// map and returns nothing: the value and its date land in ONE transaction, so
+// the pair can never be read half-written or lag a cache pass. That is exactly
+// `recomputeSleepInFrontmatter`'s arrangement — Wake-Up and Bedtime re-derive
+// Sleep in the same callback — and this is the second instance of it.
+//
+// HERE RATHER THAN BESIDE ITS CALLERS, because there are two of them and they
+// may not import each other: the widget renderer's `write` is the dropdown's
+// channel, and the generic Properties window can set or clear any key including
+// this one. A status changed from the property editor is still a status changed,
+// and one helper is what makes both answers the same. It is the same argument
+// the head of this file makes for `ratingNoun` living here.
+//
+// ONLY ON A CHANGE, which is the part worth measuring. Re-picking the status a
+// note already has must not move its date — a reader who opens the dropdown,
+// looks, and picks what was already there has changed nothing, and a table
+// saying otherwise is worse than one saying nothing. This is the no-op-write
+// rule (`header-title.ts`, `entryheader.ts`) applied one level in: *"a
+// processFrontMatter that leaves a file identical still moves its modified time,
+// which is a lie about the reader's vault that sync then propagates."*
+//
+// A CLEARED STATUS CLEARS THE DATE rather than stamping one. "No status" has no
+// date to report, which is the reading `pruneProperties` takes of an emptied
+// tracker property, and leaving the old stamp behind would date a status the
+// note no longer has.
+export function stampStatusChange(
+  fm: Record<string, unknown>,
+  prop: string,
+  statusId: string,
+  before: unknown,
+  now: string
+): void {
+  if (prop !== statusId) return;
+  const after = fm[statusId];
+  if (sameStatus(before, after)) return;
+  if (after == null || after === "") delete fm[STATUS_DATE_KEY];
+  else fm[STATUS_DATE_KEY] = now;
+}
+
+// Whether the status is the one it already was.
+//
+// STRINGIFIED AND TRIMMED, on `isCompletedStatus`' argument — *"`status` is a
+// property a reader can type by hand as easily as pick from the dropdown"*, so
+// the stored value may be anything YAML made of it. Absent and empty are the
+// same answer here; both mean the note does not say.
+function sameStatus(a: unknown, b: unknown): boolean {
+  const word = (v: unknown): string =>
+    v == null ? "" : String(v).trim();
+  return word(a) === word(b);
 }
 
 // The word one column shows. Blank and whitespace are NOT an override — a

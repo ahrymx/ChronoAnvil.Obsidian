@@ -100,6 +100,17 @@ export interface JournalKindConfig {
   // ABSENT IS THE DERIVATION, which is what every journal written before this
   // existed has and goes on having. There is nothing to migrate.
   headings?: Record<string, string>;
+  // WHICH OF THE THREE DATE COLUMNS THIS KIND'S TABLE DRAWS, as departures from
+  // `KIND_DATE_DEFAULTS`. 1.0.67.
+  //
+  // DEPARTURES AND NOT A LIST OF WHAT IS ON, because the default is not "none":
+  // `modified` ships ticked, so a plain list would need `[]` and absent to mean
+  // opposite things — and those two are the same value through a JSON round trip
+  // and through a reader's own edit. `packDates` carries the whole argument.
+  //
+  // ABSENT IS THE DEFAULTS WHOLE, which is what every journal written before
+  // this existed has and goes on having. There is nothing to migrate.
+  dates?: Record<string, boolean>;
   // NOT ONE OF THE JOURNAL'S DEFAULTS — a note type that lives on one index
   // page. 1.0.33.
   //

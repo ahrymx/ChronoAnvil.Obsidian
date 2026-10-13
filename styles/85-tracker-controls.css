@@ -3546,6 +3546,42 @@ input.ca-kind-label {
   font-size: var(--ca-text-2xs);
   line-height: 1.4;
 }
+/* ── Which date columns a kind draws (1.0.67) ────────────────────────────
+   Three ticks on the `Rated on` row's shape, sitting immediately above the
+   heading boxes they summon. Each is a `<label>` wrapping its own checkbox, so
+   the word is part of the hit area — three 13px boxes are three targets nobody
+   wants to aim at, and a `for`/`id` pair would need an id unique across every
+   kind row in the modal.
+
+   LAID OUT ON ONE LINE AND ALLOWED TO WRAP, which is `.ca-kind-cols-boxes`'
+   arrangement one row down and for the same reason: "Status changed" is twice
+   the width of "Created", and three fixed tracks would size all three to the
+   longest. */
+.ca-kind-dates-boxes {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.ca-kind-date {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  color: var(--text-muted);
+  font-size: var(--ca-text-sm);
+  cursor: pointer;
+}
+/* Obsidian's own checkbox sizing, reset the way every other inline tick in this
+   plugin is: a settings checkbox carries a top margin that lifts it off the
+   baseline of the word beside it. */
+.ca-kind-date input[type="checkbox"] {
+  margin: 0;
+}
+.ca-kind-date:hover {
+  color: var(--text-normal);
+}
+
 /* ── A kind's column headings (1.0.32) ───────────────────────────────────
    Up to four boxes on the `Rated on` row's shape, each holding one column's
    word. They SHARE the line and wrap onto the next when the modal is narrow,

@@ -18,7 +18,7 @@
 
 import { App, MarkdownPostProcessorContext, normalizePath, setIcon, TFile, TFolder } from "obsidian";
 import type ChronoAnvilPlugin from "../main";
-import { childNotes, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, noteTypeOf, openFile, openGlobalSearch } from "../core/util";
+import { childNotes, filesUnder, folderPrefix, frontmatterOf, getFile, getFolder, isVaultRoot, isoDate, moment, noExt, noteTypeOf, openFile, openGlobalSearch, stampLabel } from "../core/util";
 import { pagesUnder, recencyMs, relativeActivity, tagsOf } from "../core/query";
 import type { PageInfo } from "../core/query";
 import { formatPeriodLabel } from "../charts/charts";
@@ -49,7 +49,7 @@ import {
   registeredJournalTypes,
 } from "../journals/journal";
 import { kindPlural, plural, typeRating } from "../journals/journal-sections";
-import { kindColumns, ratingNoun } from "../journals/kind-columns";
+import { kindColumns, ratingNoun, STATUS_DATE_KEY } from "../journals/kind-columns";
 import { kindTableOverrideOf, pageKind, pageTypesOf } from "../journals/kind-tables";
 import { isPromotedPath, pageOrderOf, reorderedPages } from "../journals/page-default";
 import { promptAddKind } from "../journals/kind-create";
@@ -2472,12 +2472,36 @@ export function kindTable(
     // drew as its title. Iterating the same list the headings came from is what
     // keeps a cell under its own heading — the two used to be built from two
     // lists that agreed by construction, and one of them has a reader in it now.
+    // EVERY ROLE NAMED, AND NO BARE `else` (1.0.67). This loop used to end in
+    // an `else` that meant "the rating", which was true while the rating was
+    // the only column left. It is not any more: three date roles arrived, and
+    // each of them would have fallen into that branch and drawn a segmented
+    // gauge out of `Number(undefined)`. The rating has its own name now, and a
+    // role nobody has written a branch for draws NOTHING — which is the failure
+    // the next column added here should get, because an empty cell is a missing
+    // branch and a gauge is a wrong answer.
     for (const col of cols.slice(1)) {
       if (col.key === "date") {
         recordCell(main, date ?? EMPTY_CELL);
       } else if (col.key === "status") {
         recordCell(main, statusOf(note.fm) || EMPTY_CELL, "is-text");
-      } else {
+      } else if (col.key === "created") {
+        // `recencyMs`, WHICH IS THE LADDER `journal-recent` ALREADY RANKS ON:
+        // the `created:` property, falling back to the file's own ctime. So a
+        // note made before the plugin wrote one still reads.
+        recordCell(main, stampLabel(recencyMs(note.fm, note.file)) ?? EMPTY_CELL, "is-stamp");
+      } else if (col.key === "modified") {
+        // THE FILE, NOT A PROPERTY. There is no `modified:` key in any vault and
+        // this round deliberately does not create one: a property saying when a
+        // note last changed would have to be written by the thing it measures,
+        // and `header-title.ts` records what a write that changes nothing costs
+        // — *"a lie about the reader's vault that sync then propagates"*. The
+        // mtime is free, correct for an edit made outside this plugin, and needs
+        // no migration.
+        recordCell(main, stampLabel(note.file.stat.mtime) ?? EMPTY_CELL, "is-stamp");
+      } else if (col.key === "statusdate") {
+        recordCell(main, stampLabel(statusMs(note)) ?? EMPTY_CELL, "is-stamp");
+      } else if (col.key === "rating") {
         const v = Number(note.fm[col.property]);
         const cell = recordCell(main, "");
         ratingCell(cell, v, ratingDef);
@@ -2486,6 +2510,29 @@ export function kindTable(
   }
 
   return root;
+}
+
+// WHEN THIS NOTE'S STATUS LAST MOVED, with `created` beneath it.
+//
+// A NOTE WHOSE STATUS HAS NEVER CHANGED READS ITS CREATION TIME, and that is
+// not a fudge: `templateFrontmatter` writes `status: in-progress` at creation,
+// so the instant the status was set IS the instant the note was made. `—` would
+// be the wrong answer — it would say "unknown" about the one case where the
+// answer is certain — and it would be the answer for every note in a vault
+// upgrading to this release, which would make the column look broken rather
+// than new.
+//
+// `recencyMs` BENEATH, NOT `created` DIRECTLY, so the ladder is three deep and
+// matches the Created column exactly: the stamp, then the `created:` property,
+// then the file's ctime. Two columns reading the same note cannot disagree about
+// what its creation time was.
+function statusMs(note: PageInfo): number {
+  const said = note.fm[STATUS_DATE_KEY];
+  if (said != null && said !== "") {
+    const t = Date.parse(String(said));
+    if (!Number.isNaN(t)) return t;
+  }
+  return recencyMs(note.fm, note.file);
 }
 
 // A bounded number, drawn as filled segments rather than written as a digit.

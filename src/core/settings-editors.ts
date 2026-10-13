@@ -97,11 +97,19 @@ import { notify } from "./notify";
 import { journalFoldersOnDisk, removeJournal } from "./journal-removal";
 import { holdsTypedNotes } from "../journals/journal-import";
 import {
+  cleanDates,
   cleanHeadings,
+  datesOf,
+  KIND_DATE_KEYS,
   kindColumns,
+  packDates,
   packHeadings,
 } from "../journals/kind-columns";
-import type { KindColumn, KindColumnKey } from "../journals/kind-columns";
+import type {
+  KindColumn,
+  KindColumnKey,
+  KindDateKey,
+} from "../journals/kind-columns";
 
 // The types a reader may CREATE. `tags` is not one of them, for the reason
 // `derived` is not: it is a built-in the plugin owns, its property name is
@@ -1185,6 +1193,14 @@ export function normaliseKinds(
         const headings = cleanHeadings(row.headings);
         return headings ? { headings } : {};
       })(),
+      // AND THE DATE TICKS THROUGH THE SAME DOOR (1.0.67). `cleanDates` is
+      // `cleanHeadings`' twin on a boolean and keeps an unrecognised key for
+      // exactly the reason above — a fourth date column added later would be in
+      // `plural`'s position for one release.
+      ...((): { dates?: Record<string, boolean> } => {
+        const dates = cleanDates(row.dates);
+        return dates ? { dates } : {};
+      })(),
       // AND THE SAME CARRY AGAIN, FOR A FIELD THIS WINDOW CANNOT SEE (1.0.33).
       // A kind added from an index card is marked `local` and `paintKinds`
       // draws no row for it — *"The only place the defaults should be
@@ -2236,6 +2252,61 @@ export class JournalEditModal extends SteppedEditorModal {
         text: kind.rating
           ? "What a Recall sitting grades into, and what this journal's trend charts plot."
           : "Notes of this kind aren't scored.",
+      });
+
+      // ── Which date columns this kind's table draws (1.0.67) ────────────
+      //
+      // The reader's ask: *"the way date flags are used and updated should
+      // become clearer and more functional … the variants should be created,
+      // modified, and status changed on. All three are tracked, and can be put
+      // into the column header of the kind."*
+      //
+      // IMMEDIATELY ABOVE THE HEADING BOXES, AND THE ORDER IS THE POINT. This
+      // row decides which columns EXIST and the one below it names them, so a
+      // reader ticking `Created` watches its box appear underneath — which is
+      // the gesture `Rated on` already has three rows up, for the one other
+      // column whose existence is a decision. Below the boxes it would be a
+      // control whose effect happened above it.
+      //
+      // ONE TICK PER COLUMN, LABELLED WITH THE WORD THE COLUMN USES, so the
+      // tick and the placeholder in the box it summons read the same. For
+      // `statusdate` that word is the status tracker's own — rename Status to
+      // State and this says "State changed" too.
+      const dateRow = row.createDiv({ cls: "ca-kind-field ca-kind-dates" });
+      dateRow.createSpan({
+        cls: "ca-kind-field-label",
+        text: "Date columns",
+      });
+      const ticksBox = dateRow.createDiv({ cls: "ca-kind-dates-boxes" });
+      const ticks = datesOf(kind);
+      // THE WORDS COME OUT OF `kindColumns`, NOT OUT OF A LIST HERE. A column
+      // that is off draws no column object, so the labels are read from a probe
+      // with all three ticked on — which is the only way the tick for a column
+      // that is currently off can carry the same word as the box it will
+      // summon. A second table of nouns in this file is how the Confidence
+      // heading came to live in four places; see `kind-columns.ts`.
+      const dateWords = new Map(
+        kindColumns(this.plugin, {
+          ...kind,
+          dates: { created: true, modified: true, statusdate: true },
+        })
+          .filter((c) => (KIND_DATE_KEYS as readonly string[]).includes(c.key))
+          .map((c) => [c.key as KindDateKey, c.fallback])
+      );
+      for (const key of KIND_DATE_KEYS) {
+        const label = ticksBox.createEl("label", { cls: "ca-kind-date" });
+        const box = label.createEl("input", { type: "checkbox" });
+        box.checked = ticks[key];
+        label.createSpan({ text: dateWords.get(key) ?? key });
+        box.addEventListener("change", () => {
+          ticks[key] = box.checked;
+          kind.dates = packDates(ticks);
+          this.paintKinds();
+        });
+      }
+      dateRow.createSpan({
+        cls: "ca-kind-field-note",
+        text: "When each note was made, last edited, and last moved to a new status. Modified reads the file itself — nothing is written into the note.",
       });
 
       // ── What this kind's table calls its columns (1.0.32) ──────────────

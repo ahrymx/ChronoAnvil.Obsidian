@@ -315,6 +315,18 @@ export interface JournalKind {
   // absent key, both mean the derived word.
   headings?: Record<string, string>;
 
+  // WHICH OF THE THREE DATE COLUMNS THIS KIND'S TABLE DRAWS, as departures from
+  // `KIND_DATE_DEFAULTS`. 1.0.67.
+  //
+  // DEPARTURES AND NOT A LIST OF WHAT IS ON, because the default is not "none":
+  // `modified` ships ticked, so a plain list would need `[]` and absent to mean
+  // opposite things — and those two are the same value through a JSON round trip
+  // and through a reader's own edit. `packDates` carries the whole argument.
+  //
+  // ABSENT IS THE DEFAULTS WHOLE, which is what every journal written before
+  // this existed has and goes on having. There is nothing to migrate.
+  dates?: Record<string, boolean>;
+
   // NOT ONE OF THE JOURNAL'S DEFAULTS — a note type that lives on one index
   // page. 1.0.33.
   //
@@ -869,6 +881,8 @@ export function buildJournalType(cfg: JournalConfig): JournalType {
     // map would make a relabelled column on one journal a relabelled column on
     // every journal built from the same config object.
     ...(k.headings ? { headings: { ...k.headings } } : {}),
+    // AND THE SAME COPY FOR THE DATE TICKS, for the same reason (1.0.67).
+    ...(k.dates ? { dates: { ...k.dates } } : {}),
     // CARRIED, LIKE EVERY OTHER STORED FIELD ON THIS MAP. A kind that lost its
     // `local` on the way through here would be composed onto every index note
     // in the journal the next time one was reconciled, which is the whole of

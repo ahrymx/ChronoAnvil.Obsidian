@@ -26,7 +26,8 @@ import {
 } from "../src/journals/journal-sections";
 import { composeTemplate } from "../src/journals/custom-journal";
 import { studyTemplate } from "./study-template";
-import { readCode } from "./sources";
+import { readCode, readSrc, cssRule, fnBody } from "./sources";
+import { nowTimestamp, stampLabel } from "../src/core/util";
 
 // ── kind-table ────────────────────────────────────────────────────────────
 //
@@ -103,6 +104,120 @@ describe("which columns a kind's table carries", () => {
     // displayName the base table set. Nothing in this list should name it.
     expect(kindTableProperties(kindOf("recipe"))).not.toContain("file.name");
     expect(kindTableProperties(kindOf("recipe"))).not.toContain("title");
+  });
+
+  it("does NOT grow with the date columns (1.0.67)", () => {
+    // THIS LIST IS WHAT A KIND'S NOTES CARRY, and two of the three date columns
+    // are not properties: `modified` is the file's own mtime, and `statusdate`
+    // is absent until a status changes. Growing this would promise the template
+    // writes keys it does not — and the column that IS a property, `created`,
+    // is already written by the template and still not in here, because this
+    // list is the table's RATED/DATED/STATUS triple and nothing else.
+    const all = kindTableProperties(kindOf("recipe"));
+    expect(all).toEqual(["date", "difficulty", "status"]);
+    for (const key of ["created", "modified", "statusdate"]) {
+      expect(all).not.toContain(key);
+    }
+  });
+});
+
+// ── THE DATE CELLS (1.0.67) ─────────────────────────────────────────────
+//
+// The one loop that turns a column role into a cell. Bounded on `statusMs`,
+// which is defined immediately after `kindTable` returns — an anchor inside the
+// function would have been `return root;`, and that string appears five times in
+// this file. A slice that silently comes back empty is a sweep that passes for
+// `vacuous-sweep-rule`'s second reason, so the helper refuses one.
+const cellLoop = (t: string): string => {
+  const from = t.indexOf("for (const col of cols.slice(1)) {");
+  const to = t.indexOf("function statusMs(");
+  expect(from).toBeGreaterThan(-1);
+  expect(to).toBeGreaterThan(from);
+  return t.slice(from, to);
+};
+
+describe("how a date column resolves its cell", () => {
+  it("reads each of the three off its own source", () => {
+    const t = readSrc("tables");
+    const loop = cellLoop(t);
+    // `created` THROUGH `recencyMs`, which is the key-then-ctime ladder
+    // `journal-recent` already ranks on — so a note made before the plugin
+    // wrote a `created:` still reads.
+    expect(loop).toContain(
+      'stampLabel(recencyMs(note.fm, note.file)) ?? EMPTY_CELL, "is-stamp"'
+    );
+    // `modified` OFF THE FILE. There is no `modified:` key in any vault.
+    expect(loop).toContain(
+      'stampLabel(note.file.stat.mtime) ?? EMPTY_CELL, "is-stamp"'
+    );
+    expect(loop).toContain('stampLabel(statusMs(note)) ?? EMPTY_CELL, "is-stamp"');
+    // AND MTIME IS NOT CTIME. The two are one character apart and name opposite
+    // ends of a note's life.
+    expect(loop).not.toContain("note.file.stat.ctime");
+  });
+
+  it("names every role, so a date column cannot draw a rating gauge", () => {
+    // THE TRAP THIS ROUND WALKED INTO. The loop used to end in an `else` that
+    // meant "the rating", which was true while the rating was the only column
+    // left. Three date roles would each have fallen into it and drawn a
+    // segmented gauge out of `Number(undefined)`.
+    //
+    // A role nobody has written a branch for now draws NOTHING, which is the
+    // failure the next column added here should get: an empty cell is a missing
+    // branch, a gauge is a wrong answer.
+    const t = readSrc("tables");
+    const loop = cellLoop(t);
+    expect(loop).toContain('} else if (col.key === "rating") {');
+    // The bare fallthrough is gone. Anchored on the brace, because `} else {`
+    // appears in half the file.
+    expect(loop).not.toMatch(/\}\s*else\s*\{/);
+    for (const key of ["date", "status", "created", "modified", "statusdate", "rating"]) {
+      expect(loop).toContain(`col.key === "${key}"`);
+    }
+  });
+
+  it("falls back to the creation time for a status that never moved", () => {
+    // NOT `—`. `templateFrontmatter` writes `status: in-progress` at creation,
+    // so the instant the status was set IS the instant the note was made. An em
+    // dash would say "unknown" about the one case where the answer is certain —
+    // and it would be the answer for every note in a vault upgrading to this
+    // release, which would make the column look broken rather than new.
+    const body = fnBody("statusMs", "tables");
+    expect(body).toContain("fm[STATUS_DATE_KEY]");
+    // `recencyMs` BENEATH, NOT `created` DIRECTLY, so this ladder is three deep
+    // and matches the Created column's exactly — two cells reading one note
+    // cannot disagree about when it was made.
+    expect(body).toContain("return recencyMs(note.fm, note.file);");
+    expect(body).not.toContain("EMPTY_CELL");
+  });
+
+  it("writes a stamp to the minute, with no T and no seconds", () => {
+    // `nowTimestamp` writes `2026-10-13T00:42:11` because that is a sortable
+    // machine value and `created` has been that shape since the plugin had one.
+    // It is not a cell: nineteen characters of which the last three are noise,
+    // in a column sized to its own content, beside a `date` cell that is ten.
+    // The STORED format does not move — nothing is migrated.
+    // `Date.UTC` RATHER THAN `Date.parse`, because the stub's moment formats in
+    // UTC throughout — see its header. The real one formats local, which is the
+    // right answer for a reader and the wrong one to assert against here.
+    expect(stampLabel(Date.UTC(2026, 9, 13, 0, 42, 11))).toBe("2026-10-13 00:42");
+    expect(nowTimestamp()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+    // NULL RATHER THAN THE EM DASH: the dash is a table's answer and this is a
+    // date formatter. The caller applies `EMPTY_CELL`, which is the shape the
+    // `date` cell beside these three already has.
+    expect(stampLabel(null)).toBeNull();
+    expect(stampLabel(Number.NaN)).toBeNull();
+  });
+
+  it("gives a stamp cell its own class, quieter than a status (1.0.67)", () => {
+    // Sixteen characters, and a table may now carry three of them — more ink
+    // than the title they sit beside. The `tabular-nums` and the `nowrap` come
+    // off `.ca-list-cell`; the second matters more than it did, because `auto`
+    // tracks sized to a wrapped date would move the column width per row.
+    const rule = cssRule(".ca-list-cell.is-stamp");
+    expect(rule).toContain("var(--text-muted)");
+    expect(rule).toContain("var(--ca-text-xs)");
+    expect(cssRule(".ca-list-cell")).toContain("white-space: nowrap");
   });
 });
 

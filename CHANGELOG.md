@@ -5,6 +5,37 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.67] - 2026-10-13
+
+### Added
+
+- **A note type's table can show when each note was made, last edited, and last
+  moved to a new status.** The tables on an index note could say what a note's
+  status *is* and had no way of saying how long it had been that way, which is
+  most of what an index gets asked.
+
+  **Settings → Journals → a journal → Structure** gives every note type a
+  **Date columns** row with three ticks — **Created**, **Modified** and **Status
+  changed**. Modified is on to begin with; the other two are a tick each. Each
+  one is a column like any other, so it can be renamed on the note type or on a
+  single index page through the group's `⋯`, and **Status changed** takes its
+  word from the Status tracker — rename that to State and the column says *State
+  changed*.
+
+- **A status change is now dated.** Moving a note to a new status writes the
+  moment it happened, in the same edit as the status itself. Picking the status a
+  note already has does not touch it, and clearing the status clears the date.
+  A note whose status has never changed reads its creation time, because that is
+  when its status was set.
+
+### Changed
+
+- **Modified reads the file rather than a property.** Nothing is written into
+  the note for it: a property recording when a note last changed would have to be
+  written by the thing it measures, and it would then be wrong for every edit
+  made outside this plugin. Nothing needs migrating and nothing can fall out of
+  step.
+
 ## [1.0.66] - 2026-10-13
 
 ### Fixed

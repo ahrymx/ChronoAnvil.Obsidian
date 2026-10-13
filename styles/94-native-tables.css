@@ -93,6 +93,19 @@
 .ca-list-cell.is-text {
   font-size: var(--ca-text-sm);
 }
+/* A TIMESTAMP (1.0.67). `2026-10-13 00:42` is sixteen characters and a kind's
+   table may now carry three of them, which is more ink than the title they sit
+   beside. Smaller and fainter, on `is-text`'s own argument carried one step
+   further: a date here is reference rather than reading, and a reader scanning
+   this table is looking for a note, not for a clock.
+
+   The `tabular-nums` and the `nowrap` are already on `.ca-list-cell` — the
+   second matters more than usual now, because `auto` tracks sized to a wrapped
+   date would move the column width per row. */
+.ca-list-cell.is-stamp {
+  color: var(--text-muted);
+  font-size: var(--ca-text-xs);
+}
 
 /* A finished note recedes rather than disappearing.
    The ```base table this replaces opened on a "Not Completed" view, so its

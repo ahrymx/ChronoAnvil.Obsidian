@@ -567,7 +567,7 @@ export class VaultBanner {
     if (props > 0) {
       propsBtn.createSpan({ cls: "ca-avb-props-count", text: String(props) });
     }
-    const openProps = (): void => openProperties(this.app, file);
+    const openProps = (): void => openProperties(this.plugin, file);
     propsBtn.addEventListener("click", openProps);
     propsBtn.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter" || evt.key === " ") {

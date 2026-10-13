@@ -409,6 +409,18 @@ export function moment(input?: unknown): MomentShim {
     }
     return makeMoment(new Date(), false);
   }
+  // A NUMBER IS EPOCH MILLIS, as it is in moment itself (1.0.67).
+  //
+  // IT USED TO FALL THROUGH TO "NOW", SILENTLY. `stampLabel(ms)` is called by
+  // the three date columns on a kind's table, and under this stub every one of
+  // them formatted the moment the test ran — so an assertion that a cell shows
+  // a note's mtime passed while reading the clock. That is the shape
+  // `diary-link-picker-1-0-29` records two date bugs hiding behind, and the
+  // reason the `startOf`/`endOf` branches above throw rather than no-op.
+  if (typeof input === "number") {
+    if (!Number.isFinite(input)) return makeMoment(new Date(), false);
+    return makeMoment(new Date(input), true);
+  }
   const d = input instanceof Date ? input : new Date();
   return makeMoment(d, true);
 }

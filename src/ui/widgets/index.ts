@@ -29,11 +29,12 @@ import { buildJournalContext } from "../../journals/study-header";
 // The one copy of what each superseded band spelling means. See the two arms
 // in `buildFromSpec` that read it.
 import { STATS_BAND_ALIASES } from "../../journals/stats-band";
+import { stampStatusChange } from "../../journals/kind-columns";
 import {
   buildMonthSummary,
   buildWeekSummary,
 } from "../../diary/calendar";
-import { frontmatterOf, parseHeaderDirective } from "../../core/util";
+import { frontmatterOf, nowTimestamp, parseHeaderDirective } from "../../core/util";
 import { HeaderBar } from "../headerbar";
 import { HeaderSite, attachHeaderRename, boundsOf } from "../header-title";
 import {
@@ -2997,10 +2998,18 @@ export class Widgets implements
     const wake = getBuiltinTracker(this.plugin, "wake");
     const bed = getBuiltinTracker(this.plugin, "bed");
     const affectsSleep = prop === wake?.id || prop === bed?.id;
+    // AND WRITING THE STATUS STAMPS WHEN IT CHANGED, in the same transaction
+    // and for the same reason (1.0.67). The id comes off the registry, never the
+    // literal `"status"`: the built-in is re-keyable and every other reader of
+    // it — `kindColumns`, `kindTable`, the review queue — resolves it this way.
+    const statusId = getBuiltinTracker(this.plugin, "status")?.id ?? "status";
+    const now = nowTimestamp();
     await this.app.fileManager.processFrontMatter(file, (fm) => {
+      const before = fm[prop];
       if (value === null || value === "") delete fm[prop];
       else fm[prop] = value;
       if (affectsSleep) recomputeSleepInFrontmatter(this.plugin, fm);
+      stampStatusChange(fm, prop, statusId, before, now);
     });
   }
 

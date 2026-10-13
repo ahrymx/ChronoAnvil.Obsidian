@@ -195,6 +195,31 @@ export function nowTimestamp(): string {
   return moment().format("YYYY-MM-DDTHH:mm:ss");
 }
 
+// A stored stamp as a table cell. 1.0.67.
+//
+// MINUTE PRECISION, AND A SPACE WHERE THE `T` WAS. `nowTimestamp` writes
+// `2026-10-13T00:42:11` because that is a sortable machine value and `created`
+// has been that shape since the plugin had one. It is not a cell: nineteen
+// characters of which the last three are noise, in a column sized to its own
+// content, beside a `date` cell that is ten. The stored format does not move —
+// nothing is migrated and `Date.parse` still reads it — and the reading of it
+// does.
+//
+// TAKES MILLIS, not a string, because the three columns that call it reach
+// their answer three different ways: `created` through `recencyMs`'s
+// key-then-ctime ladder, `modified` off `file.stat.mtime`, and `statusdate`
+// through its own key with `created` beneath it. Each resolves to an instant
+// before it gets here, so there is one place that decides what an instant looks
+// like.
+// NULL RATHER THAN THE EM DASH, because the dash is a TABLE's answer and this
+// is a date formatter. `EMPTY_CELL` is spelled once, in `tables.ts`, and the
+// caller applies it — which is the shape the `date` cell beside these three
+// already has: `recordCell(main, date ?? EMPTY_CELL)`.
+export function stampLabel(ms: number | null): string | null {
+  if (ms == null || !Number.isFinite(ms)) return null;
+  return moment(ms).format("YYYY-MM-DD HH:mm");
+}
+
 // ── THE HOME-HERO HELPERS ARE DELETED (4.13.1 §3) ──────────────────────
 // `greetingForHour`, `countInMonth` and `entryStreak` were the pure half of the
 // diary hero: the greeting, "entries this month" and the streak. The hero is
