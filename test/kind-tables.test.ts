@@ -357,49 +357,20 @@ describe("where it is read and written", () => {
   });
 });
 
-describe("the control that writes it", () => {
-  it("hangs on the group's own head, in the mode 1.0.24 opened", () => {
-    const b = readSrc("below-edit");
-    expect(b).toContain("private syncOptions(): void {");
-    expect(b).toContain("buildKindOptions({ plugin, type, path }, head, kind);");
-    // Cleared with the rest of the marks, or a mode left on would leave a live
-    // control on somebody else's element — `release`'s own argument.
-    expect(b).toContain("this.clearOptions();");
-    // Drawn before the removal, so the destructive control is the last one.
-    expect(b.indexOf("this.syncOptions();")).toBeLessThan(
-      b.indexOf("this.syncRemovals();\n    this.refresh();")
-    );
-  });
+// ── THE CONTROL THAT WRITES IT (MOVED, 1.0.69) ───────────────────────────
+//
+// A `describe("the control that writes it")` of five tests stood here, pinning
+// the `⋯` that `below-edit.ts` synced onto each group's head inside the picking
+// mode and the flat menu `kind-options-menu.ts` opened from it: the sync, the
+// *The note type's own (…)* row, the re-read at the click, the no-submenu rule
+// and the per-group title.
+//
+// `src/ui/widgets/kind-options-menu.ts` is deleted. The reader's second call was
+// *remove it regardless* — everything type-level is behind one cog now — and
+// every one of those claims is asserted against the Note types window in
+// `test/note-types-window.test.ts`, which is the door that writes this record.
+//
+// WHAT STAYED IN THIS FILE is the record itself: `kindTableOverrideOf`,
+// `pageKind`, `withHeading`, `withRated`, `cleanOverride` and the two-levels-deep
+// storage shape. The writer moved; what it writes did not.
 
-  it("offers the note type's own answer as a choice, not only as an absence", () => {
-    const m = readSrc("kind-options-menu");
-    expect(m).toContain("`The note type's own (${word(kind.rating)})`");
-    expect(m).toContain("setChecked(over.rated === undefined)");
-    // And `Nothing` only where it would change something — a kind nobody rates
-    // already draws no rating column.
-    expect(m).toContain("if (kind.rating) {");
-  });
-
-  it("re-reads the note at the click rather than trusting the draw", () => {
-    // `block-drag.ts`' rule: the menu was built when the `⋯` opened and a click
-    // is a second gesture, so the answer it merges into is re-read.
-    const m = readSrc("kind-options-menu");
-    expect(m).toContain("function overrideNow(");
-    expect(m).toContain("withHeading(overrideNow(ctx, file, kind), col.key, typed, inherited)");
-  });
-
-  it("is flat, with no submenu to probe for", () => {
-    // 4.47 §5, which `kind-row-menu.ts` and `stats-band-menu.ts` both apply.
-    // The CALL, not the word — the file names it in the doctrine that explains
-    // why it is not used, and a sweep that forbade the explanation would be
-    // forbidding the reason.
-    expect(readSrc("kind-options-menu")).not.toContain(".setSubmenu(");
-    expect(readSrc("kind-options-menu")).toContain("setIsLabel(true)");
-  });
-
-  it("names itself after the group, because a card carries several", () => {
-    expect(readSrc("kind-options-menu")).toContain(
-      "`Options for ${plural(kind.label)} on this note`"
-    );
-  });
-});

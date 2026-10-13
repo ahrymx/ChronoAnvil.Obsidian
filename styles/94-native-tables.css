@@ -1703,3 +1703,76 @@ body.is-mobile .ca-list.is-editing {
 .ca-dl-off {
   display: none;
 }
+
+/* ── The Note types window (1.0.69) ───────────────────────────────────────
+ *
+ * The Categories window's list, with one addition: a row can OPEN. What a page
+ * calls a type's columns and what it scores them on are four or five fields,
+ * which is too many to sit on a row and too few to be worth a window of their
+ * own — so they unfold under the row they belong to, one at a time, which is
+ * the single-open rule the tags window already states.
+ *
+ * IT INHERITS `.ca-tags-*` RATHER THAN RE-SPELLING IT. The row, the name, the
+ * count, the add field and the section heading are the same components doing
+ * the same job; what is below only names what is new. */
+.ca-note-type {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.ca-note-type:last-child { border-bottom: none; }
+.ca-note-type > .ca-tags-row { border-bottom: none; }
+
+/* SAID ON THE ROW, because the answers are behind a fold. A reader scanning the
+   list for the type they changed should not have to open three to find it. */
+.ca-note-type-said {
+  font-size: var(--ca-text-2xs);
+  color: var(--text-accent);
+  white-space: nowrap;
+}
+
+.ca-note-type-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ca-space-3);
+  padding: 0 0 var(--ca-space-4) var(--ca-space-4);
+}
+.ca-note-type-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ca-space-3);
+}
+.ca-note-type-label {
+  flex: 0 0 auto;
+  width: 5.5em;
+  padding-top: var(--ca-space-2);
+  font-size: var(--ca-text-xs);
+  color: var(--text-muted);
+}
+.ca-note-type-rated { flex: 1 1 auto; min-width: 0; }
+
+/* ONE BOX PER COLUMN, WRAPPING. A type with a rating and all three date columns
+   draws six, which is more than a dialogue is wide — so they flow, and each one
+   keeps a width it can show a word in rather than being squeezed to a share. */
+.ca-note-type-boxes {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ca-space-2);
+}
+.ca-note-type-col {
+  flex: 1 1 8em;
+  min-width: 0;
+}
+.ca-note-type-reset {
+  align-self: flex-start;
+  margin-left: 5.5em;
+}
+/* THE PICK BUTTON LEADS THE FOOTER, which is where a control that is neither
+   Cancel nor Save belongs: `margin-right: auto` puts it at the far end from the
+   pair, so the two that end the sitting stay together. */
+.ca-note-types-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ca-space-2);
+  margin-right: auto;
+}

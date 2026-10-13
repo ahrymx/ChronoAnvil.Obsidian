@@ -198,40 +198,6 @@
   justify-content: flex-end;
   gap: 4px 8px;
 }
-/* ── THE `⋯` A KIND GROUP'S HEAD WEARS IN EDIT MODE (1.0.33) ────────
- *
- * `.ca-list-menu`'S RULE, MINUS THE HOVER REVEAL. That control is one of ten on
- * a table and rests invisible so a list of rows is a list of rows; this one is
- * one per group and exists only while the reader is IN the mode they opened to
- * use it, so hiding it until the pointer finds it would be hiding the thing they
- * just asked for. `@media (hover: none)` therefore has nothing to correct here
- * either — the touch rule over there exists because there is no hover to reveal
- * with, and there is nothing to reveal.
- *
- * SIZED IN PIXELS, NOT OFF `--ca-row-action-w`. That token is the RESERVE a record
- * row spends so its columns do not shift under the pointer; a header bar reserves
- * nothing, and borrowing a width whose whole job is elsewhere is how a tuning
- * there becomes a surprise here. 22 × 20 is `.ca-list-menu`'s own box.
- */
-.ca-journal-kind-options {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: color 0.12s ease, background 0.12s ease;
-}
-.ca-journal-kind-options svg {
-  width: 0.9em;
-  height: 0.9em;
-}
-.ca-journal-kind-options:hover {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-}
 /* ONE AUTO MARGIN PER ROW, AND AT LEVEL 2 IT IS THE ACTIONS' (4.13 §1b).
  *
  * Two `margin-left: auto` in one flex line is one too many, and the failure is
@@ -478,6 +444,42 @@
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
+/* ── THE NOTE TYPES COG (1.0.69) ─────────────────────────────────────────
+ *
+ * The Attachments cog's twin, and sharing its rules rather than copying them.
+ * Both sit in `headTools` on a section's title row, both wear `settings`, both
+ * open a window onto a list the section owns — the reader asked for this one in
+ * exactly those terms: *"just a cog wheel (matching those other sections)"*.
+ *
+ * SO IT IS A SELECTOR ON THE RULES ABOVE, NOT A BLOCK BELOW THEM. A second
+ * block of the same twelve declarations is two places for the 30px reset to be
+ * forgotten in — and `obsidian-button-height` is how that trap announces itself
+ * on a `<button>` in a ~20px head. */
+.ca-journal-note-types-cog {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: var(--ca-bar-glyph);
+  width: 1.4em;
+  height: 1.4em;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--ca-radius-sm);
+  background: none;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ca-journal-note-types-cog .svg-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+.ca-journal-note-types-cog:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
 /* THE STRIP'S SCALE, WHICH IS LEVEL 2'S AND IS NOW BOTH LEVELS'. 50-entry-
    header.css sized a nested bar's buttons down to `--ca-text-2xs` and argued it as
    a fact about level 2; the argument turns out to be about a PLACE — chrome under
@@ -567,27 +569,28 @@
    meant to press the quietest thing on the surface. They are already held a tier
    down by the strip's scale, ~22px against a title line, which is the frame's
    own way of saying subordinate and does not cost the affordance. */
-/* ── THE SLOT FOR THE NEXT GROUP (1.1) ─────────────────────────────────
+/* ── THE CARD'S FOOT (1.1, EMPTIED 1.0.69) ─────────────────────────────
  *
- * `What's below` lists a journal's note kinds, one group each, and the row at
- * the end of that list is how another one is added. It wears `.ca-jld-add` —
- * dashed edge, no ground, muted ink, lifting to the accent on hover — which is
- * already how a tracker is added to an entry and how a journal is added to the
- * Journals section, so this is a vocabulary a reader has met rather than a
- * third way of being offered a blank.
+ * `What's below` lists a journal's note kinds, one group each, and a strip under
+ * the last of them is where anything that acts on the whole list goes. It held
+ * two things for eight patches — a dashed `+ Add note type` slot and an `Edit`
+ * toggle — and holds neither now: adding a type is a field in the Note types
+ * window and the ticks are that window's *Select notes…*. What is left is the
+ * picking bar, which is built when the mode turns on and taken away when it
+ * turns off.
  *
- * A ROW, BECAUSE THE THING IT ADDS IS A ROW. `.ca-jld-add-tile` is the
- * card-shaped variant, for a grid that lists cards; a card whose body is a stack
- * of head-over-table groups gets the width of the card and the height of a line.
- * There is no `min-height` here for the same reason the tile has one: the tile
- * stands in a row of cards and has to match them, and this stands under a table
- * and has nothing to match.
+ * WHICH MAKES THE WRAPPER EMPTY AT REST, and the `:empty` rule below is the
+ * whole of the consequence — an empty flex row would otherwise spend
+ * `--ca-sec-gap` under every index note in the vault. The wrapper itself could
+ * not go: the reveal claims it BY NAME (1.0.12's defect — it carries no
+ * `data-ca-line` stamp because no directive drew it), and `BelowEdit` is the
+ * render child anchored on it, which is what makes Obsidian's own unload the
+ * teardown for every tick it put in somebody else's row.
  *
- * THE GAP IS THE GROUPS' OWN, AND IT BELONGS TO THE FOOT NOW (1.0.14). Nothing
- * about this changed except the element that pays it: `--ca-sec-gap` is what
- * separates one group head from the table above it, so the strip sits where the
- * next head would rather than at a distance chosen for it — and the strip is what
- * has a top edge, the slot inside it no longer does. */
+ * THE GAP IS THE GROUPS' OWN, AND IT BELONGS TO THE FOOT (1.0.14).
+ * `--ca-sec-gap` is what separates one group head from the table above it, so
+ * the strip sits where the next head would rather than at a distance chosen for
+ * it — and the strip is what has a top edge, nothing inside it does. */
 .ca-journal-widget-block > .ca-journal-below-foot {
   display: flex;
   align-items: stretch;
@@ -600,97 +603,25 @@
   gap: var(--ca-space-2);
   margin-top: var(--ca-sec-gap);
 }
-/* ONE MODE AT A TIME, AND THIS IS WHAT ENFORCES IT (1.0.15). The controller had
-   been setting `el.hidden`, which does nothing to either of these: `[hidden]`
-   is a user-agent rule and both elements are given a `display` by an author
-   one — see the essay over `hide()` in `below-edit.ts`. So the dashed slot and
-   the picking bar were on screen together, which is the arrangement the mode
-   exists to prevent. Named through the foot and, for the button, through its
-   element too, so a theme cannot out-rank it either. */
-.ca-journal-below-foot > .ca-journal-kind-add.is-hidden,
-.ca-journal-below-foot > button.ca-journal-below-edit.is-hidden {
+/* NOTHING AT REST (1.0.69). The foot held `+ Add note type` and the `Edit`
+   toggle; both are in the Note types window now, behind the cog on the card's
+   title bar. What is left is the picking bar, which exists only while the mode
+   is on — so the wrapper is empty the rest of the time, and this is what stops
+   it spending `--ca-sec-gap` under every card in the vault. The wrapper itself
+   stays: the reveal claims it by name (1.0.12) and the controller is anchored
+   on it. */
+.ca-journal-widget-block > .ca-journal-below-foot:empty {
   display: none;
-}
-.ca-journal-below-foot > .ca-journal-kind-add {
-  /* `flex` RATHER THAN `width: 100%`. The slot was the only child of the block
-     and took the whole width; it is now the wide half of a two-control strip, so
-     it grows into whatever the Edit button leaves and keeps its dashed edge over
-     exactly that. */
-  flex: 1 1 auto;
-  padding: var(--ca-space-2) var(--ca-space-3);
-  border-radius: var(--ca-radius-md);
-  font-size: var(--ca-text-sm);
-}
-
-/* ── THE FOOT'S SECOND CONTROL, AND THE MODE IT OPENS (1.0.14) ──────────
- *
- * *"what's below would benefit from a 'edit' button which allows selection of
- * entries to either delete or move."*
- *
- * ONE CLASS IS NOT ENOUGH TO HOLD A `<button>`, which this file learned the
- * expensive way in 5.31.2 and states in full over the reveal strip: a single
- * class is (0,1,0), and an app or theme rule needs only to name the element
- * beside a class — `button:not(.clickable-icon)`, `.markdown-rendered button` —
- * to reach (0,1,1) and take every property a rule here leaves at a default. The
- * reveal pills shipped a release sitting on a `#333333` ground their own rule
- * called transparent. So every rule below names the parent, the element AND the
- * class, and states its ground, its edge and its shadow rather than trusting any
- * of the three to be nothing.
- *
- * IT IS NOT DRESSED AS THE SLOT BESIDE IT. `.ca-jld-add`'s dashed edge means
- * *"there could be another one of these here"*, which is true of a note kind and
- * false of a mode. This is an ordinary quiet control — a hairline, a full radius
- * — which is the reveal pill's shape, because both are "press this to change what
- * you can see and do here" and a reader who has met one should not have to learn
- * a second. */
-.ca-journal-below-foot > button.ca-journal-below-edit {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  min-height: 0;
-  padding: var(--ca-space-2) var(--ca-space-3);
-  border: var(--ca-rule-hair) solid var(--background-modifier-border);
-  border-radius: var(--ca-radius-md);
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-muted);
-  font-size: var(--ca-text-sm);
-  line-height: 1.2;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-.ca-journal-below-foot > button.ca-journal-below-edit:hover {
-  background: var(--background-modifier-hover);
-  border-color: var(--background-modifier-border-hover);
-  color: var(--text-normal);
-}
-/* PICKING READS AS PRESSED, on the reveal toggle's own argument: while the mode
-   is on, the control is the only thing on screen that says which gesture opened
-   it — the ticks say a mode is on and not what turns it off. */
-.ca-journal-below-foot > button.ca-journal-below-edit.is-on {
-  background: var(--background-modifier-hover);
-  border-color: var(--background-modifier-border-hover);
-  color: var(--text-normal);
-}
-.ca-journal-below-edit-icon {
-  display: inline-flex;
-  align-items: center;
-}
-.ca-journal-below-edit-icon svg {
-  width: var(--ca-bar-glyph);
-  height: var(--ca-bar-glyph);
 }
 
 /* ── THE PICKING BAR ────────────────────────────────────────────────────
  *
- * It REPLACES the add row rather than sitting under it, which the controller
- * does by hiding one and building the other — `+ Add note type` alters the card
- * and this acts on notes, and leaving a live card-altering slot beside a
- * destructive act is what 4.37 deleted a row-shaped slot from a card for.
+ * It IS the foot now rather than replacing something in it. It used to be built
+ * beside a hidden `+ Add note type`, because leaving a live card-altering slot
+ * next to a destructive act is what 4.37 deleted a row-shaped slot from a card
+ * for; since 1.0.69 that slot is in a window and the pairing cannot arise, so
+ * the controller builds this into an empty strip and empties it again on the way
+ * out.
  *
  * THE COUNT LEADS AND THE WAY OUT TRAILS, with the two acts between them, so the
  * reading order is *what is selected → what can be done → how to stop*. The

@@ -5,6 +5,55 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.69] - 2026-10-13
+
+### Changed
+
+- **One cog on *What's below*, where four controls used to be.** The card that
+  lists a journal's note types carried a dashed **+ Add note type** row and an
+  **Edit** toggle in its foot, and — only once that toggle had been pressed — a
+  **⋯** and an **✕** on every group's head. Three of the four were reachable
+  only from inside a mode a reader had to know to turn on first, and none of
+  them looked like anything else on a section bar.
+
+  The card's title line now carries a **settings icon**, in the same slot, the
+  same size and the same shape as the one an Attachments section has, and it
+  opens a **Note types** window holding the whole list: every type the card
+  lists with a count beside it, a field for adding one, each type's own column
+  words and rating for *this* index page, an **✕** on the ones with nothing in
+  them, and **Use the note type's own settings** to put a type back the way the
+  journal has it. Nothing is written until **Save**, and only the types that
+  actually changed are written.
+
+- **Selecting notes is now a door out of that window rather than a toggle on
+  the card.** It stayed a mode, because what it acts on is the rows you are
+  looking at — a window would have to draw the tables again, and then you would
+  be ticking a copy. So **Select notes…** in the window's footer saves, closes
+  and turns the ticks on. It is absent where the card's tables are all empty,
+  and the mode asks the card again at that moment rather than trusting the
+  count the window opened with — a note can be filed while a form is being
+  read. The way out is the bar's own **Done**, as it was.
+
+- **Removing an empty note type keeps its own confirmation.** The **✕** closes
+  the window first and then asks the question it always asked — whether
+  anything anywhere in the journal is still that type — because a confirmation
+  opening on top of an unsaved form asks you to agree to something while
+  another window is still holding edits. Which types are *offered* the control
+  is still decided by the card; whether the removal may *happen* is still
+  decided by the journal.
+
+- **A per-index column word is set in that window now, not in a hidden menu.**
+  The **⋯** on each group's head is removed, with its module; the window's rows
+  hold the same two answers — what this note calls each column, and what it
+  rates that type on — and each box is placeheld with the word a cleared box
+  would show, so going back is visible rather than promised.
+
+### Fixed
+
+- The card's foot no longer spends a section's worth of blank space under the
+  last table when there is nothing in it. It holds nothing at rest now, which
+  an empty flex row would otherwise have paid for on every index note.
+
 ## [1.0.68] - 2026-10-13
 
 ### Changed

@@ -23,7 +23,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { addKindToJournal } from "../src/journals/kind-create";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import type ChronoAnvilPlugin from "../src/main";
-import { cssRule, fnBody, readSrc } from "./sources";
+import { fnBody, readCode, readSrc } from "./sources";
 
 const PROJECTS: JournalConfig = {
   id: "projects",
@@ -215,13 +215,25 @@ describe("adding a kind from the card", () => {
     );
   });
 
-  it("is handed the note by the control that drew itself on it", async () => {
-    // `buildAddKindRow` already resolved the host to decide whether to draw the
-    // control at all, so the scope is the same answer used twice rather than a
-    // second lookup that could disagree with the first.
-    expect(readSrc("tables")).toContain(
-      "void promptAddKind(plugin.app, plugin, type.id, file);"
+  it("is handed the note the window was opened from, resolved at the write", async () => {
+    // THE HOST IS AN ARGUMENT, NEVER A LOOKUP INSIDE. `addKindToJournal` writes
+    // one card — the page has to say so with `listKindOnPage` before the
+    // planner is asked — and the only thing that knows which card is the
+    // surface the door was pressed on.
+    //
+    // RE-RESOLVED AT SAVE AS OF 1.0.69, which the dashed row it replaces did not
+    // have to do: a row was pressed and acted at once, and a window can sit open
+    // while the note under it is renamed or moved. So the path is what the window
+    // holds and the `TFile` is fetched in `commit`.
+    const win = readSrc("ui/note-types-window");
+    const body = win.slice(win.indexOf("protected async commit()"));
+    expect(body).toContain("const file = getFile(this.app, this.path);");
+    expect(body).toContain("await addKindToJournal(this.plugin, cfg, label, file);");
+    expect(body.indexOf("getFile(this.app, this.path)")).toBeLessThan(
+      body.indexOf("addKindToJournal(")
     );
+    // And the old call site is gone rather than left beside it.
+    expect(readCode("tables")).not.toContain("promptAddKind");
   });
 
   it("asks nothing before writing that one note, and says why", async () => {
@@ -252,56 +264,24 @@ describe("adding a kind from the card", () => {
   });
 });
 
-describe("where the row is drawn", () => {
+// ── WHERE THE ADD CONTROL WENT (1.0.69) ──────────────────────────────────
+//
+// A `describe("where the row is drawn")` of seven tests stood here, pinning a
+// dashed `+ Add note type` row that `buildAddKindRow` appended under the last
+// group of a *What's below* card: the gate it rode, the reveal claim that keeps
+// it under the banner's chevron, its `.ca-jld-add` vocabulary, its gap, and the
+// fold it had to not fire.
+//
+// The row is a text field in the Note types window now, behind a cog on the
+// card's own title bar — the reader's call, and the reason for it: *"the add
+// note type and edit buttons would better fit the sections header … but the
+// cleanest and cohesive solution would be just a cog wheel."* Its claims are in
+// `test/note-types-window.test.ts`, which is also where the door's gate and the
+// fold it must not fire now live. The foot's own reveal claim stayed with the
+// foot, in `test/below-edit.test.ts`.
+
+describe("where the control that reaches it is drawn", () => {
   const widgets = () => readSrc("widgets");
-
-  it("goes on any card that lists a journal's kinds", () => {
-    // `kind-table:<id>` IS the What's below card, whether it holds one group or
-    // four — a one-kind journal composes the same line under its own name.
-    expect(widgets()).toContain(
-      'const hasKindTable = lines.some((l) => keywordOf(l) === "kind-table");'
-    );
-    expect(widgets()).toMatch(
-      /if \(hasKindTable\) \{[\s\S]{0,200}container\.appendChild\(belowFoot\)/
-    );
-  });
-
-  it("goes away with the section, under the banner's chevron (1.0.12)", () => {
-    // *"the add note type should only appear when 'whats under this note' is
-    // expanded."*
-    //
-    // WHY IT DID NOT. A reveal hides the children a part's lines DREW, found by
-    // the stamp each one carries; this row is drawn by the renderer after the
-    // loop and carries none, which is the same fact the test above it asserts
-    // from the other side. So the chevron closed the card down to its last row
-    // and left the dashed slot behind, under a head that had gone.
-    //
-    // BY THE LINE IT WAS BUILT FOR, not by position. The row is appended last
-    // in the block, so a section that happens to be the fence's last part would
-    // have been fixed by a range that reached the end and every other one would
-    // not — and a banner welding the index above the grid is a fence the reader
-    // can arrange today.
-    const src = widgets();
-    expect(src).toContain("const kindTableAt = rawLines.findIndex(");
-    // `rawLines`, WHICH IS THE NUMBERING A PART SPEAKS. `lines` has had the
-    // modifiers filtered out of it, so a range read in the wrong one lands a
-    // line or two early on any fence carrying a `stack` or a `frame:`.
-    expect(src).not.toContain("const kindTableAt = lines.findIndex(");
-    // AND IT CLAIMS THE FOOT, WHICH IS WHAT THE ROW IS INSIDE NOW (1.0.14).
-    // 1.0.14 wrapped this row and an **Edit** toggle in one
-    // `div.ca-journal-below-foot`, for exactly this reason: two loose children
-    // would mean naming two nodes in both of the two places one is named here,
-    // and a third of each the next time the foot grows a control — which is this
-    // defect re-armed structurally. One wrapper keeps both claims at one name.
-    expect(src).toContain(
-      "belowFoot && kindTableAt >= part.from && kindTableAt < part.to"
-    );
-    // And the 5.28 spelling, where the whole fence is one part and the span is
-    // a range of children rather than of lines.
-    expect(src).toContain(
-      "if (belowFoot && !within.includes(belowFoot)) within.push(belowFoot);"
-    );
-  });
 
   it("is drawn by the renderer, so no note needs migrating to gain it", () => {
     // The counter-design is a directive the catalogue composes, which would
@@ -310,55 +290,43 @@ describe("where the row is drawn", () => {
     const catalogue = readSrc("journals/journal-sections");
     expect(catalogue).not.toContain("kind-add");
     expect(readSrc("journals/journal-plan")).not.toContain("kind-add");
+    // AND THE SAME IS TRUE OF THE COG (1.0.69): it is appended to the frame the
+    // `header:` line drew, not composed by a new keyword, so no fence changes
+    // and no goldens move.
+    expect(catalogue).not.toContain("note-types");
+    expect(readSrc("journals/journal-plan")).not.toContain("note-types");
+  });
+
+  it("goes on the head of the card that lists a journal's kinds, and no other", () => {
+    // `headerOwning` answers which `header:` line a keyword sits under, and the
+    // cog is drawn on THAT head rather than on every head in the fence. A
+    // dashboard carrying a `kind-table:` under its third heading would otherwise
+    // wear a cog on the first.
+    const src = widgets();
+    expect(src).toContain('const belowHeader = headerOwning("kind-table");');
+    expect(src).toContain(
+      "if (title && belowType && belowHeader === headerIndex - 1) {"
+    );
+    expect(src).toContain("headTools(frame.root).appendChild(");
+    expect(src).toContain("buildNoteTypesCog(");
+    expect(src).toContain("() => belowFoot");
   });
 
   it("declines where the path resolves to no journal", () => {
     // An index TEMPLATE carries `kind-table:` lines and lives outside the
     // journals root, where "add a kind to whatever journal this belongs to" is
     // not a question the surface can answer.
-    const body = fnBody("buildAddKindRow", "tables");
-    expect(body).toContain("if (!type) return null;");
-    expect(body).toContain("hostType(plugin, file.path)");
-  });
-
-  it("wears the vocabulary the vault already uses for an empty slot", () => {
-    // `.ca-jld-add` is how a tracker is added to an entry and how a journal is
-    // added to the Journals section: dashed edge, no ground, muted ink.
-    const body = fnBody("buildAddKindRow", "tables");
-    expect(body).toContain('cls: "ca-jld-add ca-journal-kind-add"');
-    expect(body).toContain('setIcon(btn.createSpan({ cls: "ca-jld-add-icon" }), "plus")');
-  });
-
-  it("takes its gap from the groups, and its edge from the vocabulary", () => {
-    // The slot sits where the next group head would, so the spacing is the
-    // groups' own token rather than a number picked for this row.
     //
-    // THE STRIP PAYS THE GAP AS OF 1.0.14, because the strip is what has a top
-    // edge — the row is inside it now and a second `margin-top` in there would
-    // be the gap charged twice. The decision did not change; the element that
-    // carries it did.
-    const strip = cssRule(".ca-journal-widget-block > .ca-journal-below-foot");
-    expect(strip).toContain("margin-top: var(--ca-sec-gap)");
-    // AND `width: 100%` BECAME `flex`, for the same reason: the row was the
-    // block's only child and took the whole of it; it is now the wide half of a
-    // two-control strip, so it grows into whatever the toggle leaves rather than
-    // insisting on a width that would push the toggle off the end.
-    const rule = cssRule(".ca-journal-below-foot > .ca-journal-kind-add");
-    expect(rule).toContain("flex: 1 1 auto");
-    expect(rule).not.toContain("width: 100%");
-    expect(rule).not.toContain("margin-top");
-    // AND IT DOES NOT RESTATE THE DASH. `.ca-jld-add` owns the dashed edge, the
-    // absent ground and the hover — three `!important` declarations that exist
-    // because a theme's `button` rule outranks a single class. A copy here would
-    // be a second place to tune one look, and the reason that matters is on
-    // record: the vocabulary silently did not draw at all for a release.
-    expect(rule).not.toContain("border-style");
-    expect(rule).not.toContain("background");
-  });
-
-  it("does not fire the fold it sits inside", () => {
-    // The card's head folds on click and its rows open notes. Every other
-    // control inside a section makes the same separation.
-    expect(fnBody("buildAddKindRow", "tables")).toContain("evt.stopPropagation()");
+    // ONE QUESTION, ASKED ONCE (1.0.69). `buildAddKindRow` asked `hostType` and
+    // the foot asked `journalTypeAtPath`, which is two answers to one question;
+    // the dispatcher now resolves it once and both the cog and the foot refuse
+    // on that same answer.
+    const src = widgets();
+    expect(src).toContain(
+      "const belowType = journalTypeAtPath(this.plugin, ctx.sourcePath);"
+    );
+    expect(fnBody("buildBelowFoot", "ui/widgets/below-edit")).toContain(
+      "if (!type) return null;"
+    );
   });
 });

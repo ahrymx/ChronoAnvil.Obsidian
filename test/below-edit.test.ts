@@ -44,7 +44,7 @@ import type { JournalType } from "../src/journals/journal";
 import type { JournalConfig } from "../src/journals/custom-journal";
 import type ChronoAnvilPlugin from "../src/main";
 import { TFolder } from "obsidian";
-import { cssRule, readCode, readCss, readSrc } from "./sources";
+import { cssRule, fnBody, readCode, readCss, readSrc } from "./sources";
 
 // The reader's own journal, which is where the ask came from: `type: project`,
 // two kinds, two `kind-table:` groups on the card.
@@ -467,13 +467,36 @@ describe("how the mode reaches the rows", () => {
     // `LiveWidget` that draws its rows in its own `onload` — so at the moment the
     // foot is BUILT every table is empty. The gate asked there would have hidden
     // the Edit button on every card in the vault. Asked here it is asked after
-    // each render, which is also how a card that gains its first note gains the
-    // button with no reload.
+    // each render, which is also how a card that gains its first note becomes
+    // editable with no reload.
     const text = src();
     expect(text).toContain("private syncAvailable(): void {");
-    expect(text).toContain("hide(this.toggle, !any);");
     const load = text.indexOf("onload(): void {");
     expect(text.indexOf("this.syncAvailable();", load)).toBeGreaterThan(load);
+  });
+
+  it("asks the same question at the door and on a redraw (1.0.69)", () => {
+    // ONE PREDICATE, TWO MOMENTS, and this is the whole of what `syncAvailable`
+    // does now that there is no `Edit` toggle to show or hide. A window drew its
+    // *Select notes…* from a count taken when it opened; by the time it is
+    // pressed the card is a render or two older, so the press asks again rather
+    // than trusting the draw — `promptRemoveKind`'s two-question shape, applied
+    // to a door instead of a write.
+    const text = src();
+    expect(text).toContain("startPicking(): void {");
+    expect(text).toContain(
+      "if (this.pathsOnScreen().length === 0) {\n      notify.info("
+    );
+    // AND THE REDRAW CLOSES WHAT IS OPEN rather than hiding a control, which is
+    // the mutant worth measuring: a `syncAvailable` that forgot `setPicking`
+    // would leave a Move…/Remove… bar standing over a card whose last note was
+    // filed somewhere else.
+    expect(text).toContain(
+      "if (this.pathsOnScreen().length === 0 && this.picking) this.setPicking(false);"
+    );
+    // Nothing named a toggle survives — the `aria-pressed` pair went with it.
+    expect(text).not.toContain("this.toggle");
+    expect(text).not.toContain("aria-pressed");
   });
 
   it("puts the tick in the lead slot, not beside the ⋯", () => {
@@ -801,38 +824,48 @@ describe("what the delete says before it deletes", () => {
 
 // ── the foot, and what the chevron folds ─────────────────────────────────
 
-describe("the foot the Edit button sits in", () => {
+describe("the foot, now that it holds nothing at rest", () => {
   it("is one wrapper, so the reveal claims one name", () => {
     // 1.0.12 fixed a defect where the add row stayed visible under a folded
     // head, by claiming it BY NAME in two places — it carries no `data-ca-line`
     // stamp because no directive drew it. Two loose siblings would mean two names
     // in both of those places and a third of each the next time the foot grows a
     // control, which is that defect re-armed structurally.
+    //
+    // AND THE WRAPPER SURVIVED THE EMPTYING (1.0.69), which is why the builder
+    // returns a record rather than the element: the reveal needs the element and
+    // the window's door needs the handle that turns the mode on, and both come
+    // off the one object so a caller cannot hold one and look up the other.
     const src = readSrc("widgets");
-    expect(src).toContain("buildBelowFoot(this.plugin, ctx, kindHosts)");
-    expect(src).toContain("if (belowFoot) container.appendChild(belowFoot);");
+    expect(src).toContain("belowFoot = buildBelowFoot(this.plugin, ctx, kindHosts)");
+    expect(src).toContain("if (belowFoot) container.appendChild(belowFoot.el);");
     expect(src).toContain(
       "belowFoot && kindTableAt >= part.from && kindTableAt < part.to"
     );
     expect(src).toContain(
-      "if (belowFoot && !within.includes(belowFoot)) within.push(belowFoot);"
+      "if (belowFoot && !within.includes(belowFoot.el)) within.push(belowFoot.el);"
+    );
+    expect(readSrc("ui/widgets/below-edit")).toContain(
+      "return { el: foot, pick: () => child.startPicking() };"
     );
   });
 
-  it("appears exactly where + Add note type appears, and nowhere new", () => {
-    // The Edit button rides the existing gate rather than widening it. Widening
-    // it would put `+ Add note type` on a `level-index` card too — a change to a
-    // control nobody asked about, made as a side effect of adding a second one.
+  it("appears exactly where kind-table appears, and nowhere new", () => {
+    // The foot rides the existing gate rather than widening it. Widening it
+    // would reach a `level-index` card too — a change to a surface nobody asked
+    // about, made as a side effect.
     const src = readSrc("widgets");
     expect(src).toContain(
       'const hasKindTable = lines.some((l) => keywordOf(l) === "kind-table");'
     );
-    // And the foot refuses for the add row's own reason where the path resolves
-    // to no journal: an index TEMPLATE carries `kind-table:` lines and lives
-    // outside the journals root.
+    // And it refuses where the path resolves to no journal, which is the add
+    // row's own old refusal: an index TEMPLATE carries `kind-table:` lines and
+    // lives outside the journals root, where *move these notes to another index
+    // note* is not a question the surface can answer. ONE REFUSAL NOW, not two —
+    // the pair `if (!add) return null;` guarded went into the window.
     const foot = readCode("ui/widgets/below-edit");
-    expect(foot).toContain("if (!add) return null;");
     expect(foot).toContain("if (!type) return null;");
+    expect(foot).not.toContain("if (!add) return null;");
   });
 
   it("collects the live hosts at the append, while both halves are in hand", () => {
@@ -851,27 +884,24 @@ describe("the foot the Edit button sits in", () => {
     expect(src).toContain("head: headerGroup,");
   });
 
-  it("wears a glyph none of the other vocabularies had claimed", () => {
-    // `settings` acts on the page, `more-horizontal` is more about a row, `zap`
-    // is page actions, `pencil` is rename. Selecting rows is none of those.
+  it("draws no control of its own any more (1.0.69)", () => {
+    // WHAT WENT, AND THE SHAPE THAT WENT WITH IT. The `Edit` toggle and the
+    // dashed `+ Add note type` were the foot's two children, and the machinery
+    // that showed and hid them — `hide()`, the `is-hidden` class, the
+    // `aria-pressed` pair — existed only for them. The window is the door now,
+    // so none of it has a subject: a `hide` left behind would be a hiding of
+    // nothing, which the next hand would wire to something.
     const foot = readCode("ui/widgets/below-edit");
-    expect(foot).toContain('"list-checks"');
-    // AND THE SENTENCE NAMES BOTH ACTS SINCE 1.0.24. The removal on an empty
-    // group's head exists only inside this mode, so a door describing only the
-    // ticks would leave it undiscoverable.
-    expect(foot).toContain(
-      'const hint = "Select notes to move or remove, or remove an empty note type";'
-    );
-    // BOTH, per `addHeadButton`'s rule: `title` is the hover and `aria-label` is
-    // the only name a screen reader has for an icon.
-    expect(foot).toContain('edit.setAttr("aria-label", hint)');
-    expect(foot).toContain('edit.setAttr("title", hint)');
-  });
-
-  it("keeps aria-pressed in step with the mode", () => {
-    expect(readCode("ui/widgets/below-edit")).toContain(
-      'this.toggle.setAttr("aria-pressed", on ? "true" : "false");'
-    );
+    expect(foot).not.toContain("buildAddKindRow");
+    expect(foot).not.toContain('cls: "ca-journal-below-edit"');
+    expect(foot).not.toContain("this.addRow");
+    expect(foot).not.toContain("function hide(");
+    expect(foot).not.toContain("is-hidden");
+    // The foot really is built empty — one `createDiv` and no `append` before
+    // the controller is handed it.
+    const build = fnBody("buildBelowFoot", "ui/widgets/below-edit");
+    expect(build).toContain('createDiv({ cls: "ca-journal-below-foot" })');
+    expect(build).not.toContain("appendChild");
   });
 
   it("does not fire the fold it sits inside", () => {
@@ -884,15 +914,26 @@ describe("the foot the Edit button sits in", () => {
 // ── the styles ───────────────────────────────────────────────────────────
 
 describe("how the foot is drawn", () => {
-  it("pays the groups' gap once, on the strip", () => {
-    // The gap was the add row's and is the strip's now: the strip is what has a
-    // top edge, and a second `margin-top` inside it would charge the gap twice.
+  it("pays the groups' gap once, on the strip, and only when it has a strip", () => {
+    // The gap was the add row's and is the foot's: the foot is what has a top
+    // edge, and a second `margin-top` inside it would charge the gap twice.
     const strip = cssRule(".ca-journal-widget-block > .ca-journal-below-foot");
     expect(strip).toContain("display: flex");
     expect(strip).toContain("margin-top: var(--ca-sec-gap)");
-    const add = cssRule(".ca-journal-below-foot > .ca-journal-kind-add");
-    expect(add).toContain("flex: 1 1 auto");
-    expect(add).not.toContain("margin-top");
+    // AND `:empty` IS WHAT STOPS IT SPENDING THAT GAP AT REST (1.0.69). The
+    // wrapper now holds nothing until the mode turns on, so without this every
+    // index note in the vault would carry a group's worth of blank under its
+    // last table. A `display: none` rather than a zeroed margin, because the
+    // margin is the foot's own statement of where the next group would start
+    // and an empty flex row is still a row.
+    expect(cssRule(".ca-journal-widget-block > .ca-journal-below-foot:empty")).toContain(
+      "display: none"
+    );
+    // The gap is stated once and overridden nowhere — a second `margin-top`
+    // reaching this element is the drift this guards.
+    expect(
+      readCss().match(/\.ca-journal-below-foot[^{]*\{[^}]*margin-top/g)
+    ).toHaveLength(1);
   });
 
   it("names the parent, the element AND the class on every button", () => {
@@ -900,13 +941,19 @@ describe("how the foot is drawn", () => {
     // theme needs only `.markdown-rendered button` to reach (0,1,1) and take
     // every property the rule left at a default — the reveal pills shipped a
     // release sitting on a `#333333` ground their own rule called transparent.
+    //
+    // ONE BUTTON LEFT TO SAY IT ABOUT. The `Edit` toggle's rule went with the
+    // toggle; *Done* is the foot's own child and the two acts are named through
+    // their strip below.
     const css = readCss();
-    expect(css).toContain(".ca-journal-below-foot > button.ca-journal-below-edit");
     expect(css).toContain(".ca-journal-below-pick > button.ca-journal-below-done");
+    expect(css).not.toContain(".ca-journal-below-edit");
   });
 
   it("states ground, edge and shadow rather than trusting them to be nothing", () => {
-    const rule = cssRule(".ca-journal-below-foot > button.ca-journal-below-edit");
+    const rule = cssRule(
+      ".ca-journal-below-pick > .ca-journal-below-acts > button:not(.mod-warning)"
+    );
     expect(rule).toContain("background: transparent");
     expect(rule).toContain("box-shadow: none");
     expect(rule).toContain("border: var(--ca-rule-hair) solid");
@@ -936,31 +983,6 @@ describe("how the foot is drawn", () => {
     );
     expect(cssRule(".ca-list.is-editing .ca-list-lead")).toContain(
       "var(--ca-row-tick-w)"
-    );
-  });
-
-  it("swaps the two arrangements with a class, not the hidden attribute", () => {
-    // THE DEFECT 1.0.14 SHIPPED, AND WHY IT IS NOT A SPECIFICITY PROBLEM.
-    // `setPicking` set `el.hidden` on the add row and `syncAvailable` set it on
-    // the toggle, and neither element went away: `[hidden] { display: none }` is
-    // a USER-AGENT rule, and the cascade compares ORIGINS before selectors — so
-    // `.ca-jld-add { display: flex }`, an author rule of one class, beats it
-    // outright. The reader's screenshot is a dashed `+ Add note type` sitting
-    // beside a live *Delete…*, which is the pairing the mode's own comment says
-    // it exists to prevent. There is no selector to strengthen; the property is
-    // unreachable once anything in `styles/` gives the element a `display`.
-    const text = readCode("ui/widgets/below-edit");
-    expect(text).toContain("hide(this.addRow, true);");
-    expect(text).toContain("hide(this.addRow, false);");
-    expect(text).toContain("hide(this.toggle, !any);");
-    // The class does the hiding and the attribute stays for the screen reader,
-    // which a class alone says nothing to.
-    expect(text).toContain('el.toggleClass("is-hidden", away);');
-    expect(text).toContain("el.hidden = away;");
-    // And the sheet honours it, through the foot and — for the button — through
-    // its element, so a theme cannot out-rank the rule that hides it either.
-    expect(readCss()).toContain(
-      ".ca-journal-below-foot > .ca-journal-kind-add.is-hidden,\n.ca-journal-below-foot > button.ca-journal-below-edit.is-hidden"
     );
   });
 
@@ -1031,9 +1053,15 @@ describe("which groups are offered a removal", () => {
     // it cannot be the thing that decides a removal is safe — it decides only
     // that a control is worth drawing. The refusal below is the other half, and
     // the pair is asserted together so neither can quietly grow into the other.
-    const src = readCode("ui/widgets/below-edit");
-    expect(src).not.toContain("getMarkdownFiles");
-    expect(src).toContain("promptRemoveKind(");
+    expect(readCode("ui/widgets/below-edit")).not.toContain("getMarkdownFiles");
+    // IT STAYED HERE WHEN ITS CONTROL LEFT (1.0.69). The ✕ is a row in the Note
+    // types window now and `promptRemoveKind` is called from there, but the rule
+    // is still this module's: `removableKinds` is the one answer to "may this
+    // group be offered a removal", exported rather than re-derived, so the
+    // window and 1.0.24's gate cannot drift apart.
+    expect(readSrc("ui/widgets/below-edit")).toContain("export function removableKinds(");
+    expect(readCode("ui/note-types-window")).toContain("removableKinds(counted)");
+    expect(readCode("ui/note-types-window")).toContain("promptRemoveKind(");
   });
 });
 
@@ -1143,79 +1171,24 @@ describe("what the removal does once it is agreed", () => {
   });
 });
 
-describe("where the removal control lives", () => {
-  const src = () => readCode("ui/widgets/below-edit");
-
-  it("appears only inside the mode, and is taken back off with it", () => {
-    // A permanent `×` beside every empty group would put a journal-altering act
-    // one slip from a reader browsing their notes. `Edit` is the door.
-    const text = src();
-    expect(text).toContain("this.syncRemovals();");
-    expect(text).toContain("this.clearRemovals();");
-    const apply = text.indexOf("private apply()");
-    const release = text.indexOf("private release()");
-    expect(text.slice(apply, release)).toContain("this.syncRemovals();");
-    expect(text.slice(release)).toContain("this.clearRemovals();");
-  });
-
-  it("is re-decided on every redraw, not written once", () => {
-    // These tables are live-scoped: the first note filed under a type arrives
-    // without a repaint of the block, and a button written once would stay
-    // offering to remove a type that now has a note in it. `liftEmptyHead` is a
-    // sync on the same heads for the same reason.
-    const text = src();
-    const at = text.indexOf("private syncRemovals()");
-    const body = text.slice(at, text.indexOf("private clearRemovals()"));
-    // Both directions: put one on a group that may have one, take one off a
-    // group that may not.
-    expect(body).toContain("existing?.remove();");
-    expect(body).toContain("head.appendChild(this.buildRemove(kindId));");
-  });
-
-  it("hangs on the group's head, beside the title it is about", () => {
-    // `attachKindRowMenu`'s argument one scope down: the object being
-    // configured and the control that configures it are the same object. The
-    // picking bar's two buttons act on what is TICKED, and a note type is not a
-    // note.
-    const text = src();
-    expect(text).toContain("head.querySelector");
-    const at = text.indexOf("private buildBar()");
-    expect(text.slice(at)).not.toContain("buildRemove");
-  });
-
-  it("wears a hosted button's shape rather than a third one", () => {
-    // Same wrapper, same button classes, same icon slot as the create button it
-    // sits beside — so it sits at that height and needs no rule of its own.
-    //
-    // IT USED TO CITE THE CATEGORIES CONTROL AS THE OTHER HOSTED BUTTON, and
-    // that comparand is gone: 1.0.49 §3 moved that door onto the bar's TITLE
-    // row as a chevron-sized cog, because a labelled pill in `frame.actions` is
-    // a full-width row for one control. This button is still a labelled pill
-    // and still belongs in the strip — it names an act on what is TICKED,
-    // which is not chrome and has no fold to sit beside.
-    const text = src();
-    expect(text).toContain('cls: "ca-journal-btn ca-journal-btn-subtle"');
-    expect(text).toContain("ca-journal-widget ca-journal-button");
-    expect(readCode("ui/widgets/attachment-widgets")).not.toContain(
-      'cls: "ca-journal-btn ca-journal-btn-subtle"'
-    );
-  });
-
-  it("closes the mode once a type has gone", () => {
-    // Removing a type repaints every open note, which rebuilds this card from
-    // its fence — so ticks, the bar and these buttons are all about to be
-    // replaced, and a mode left on would be marks on elements nothing listens
-    // to.
-    expect(src()).toContain("if (ok) this.setPicking(false);");
-  });
-
-  it("stops the click reaching the head, which folds the group", () => {
-    const text = src();
-    const at = text.indexOf("private buildRemove(");
-    const body = text.slice(at, text.indexOf("private kindLabel("));
-    expect(body).toContain("evt.stopPropagation();");
-  });
-});
+// ── WHERE THE REMOVAL CONTROL WENT (1.0.69) ──────────────────────────────
+//
+// A `describe("where the removal control lives")` of six tests stood here. It
+// pinned a `×` that `BelowEdit` hung on each empty group's head from inside the
+// picking mode, synced on every redraw and taken off again on release —
+// `syncRemovals`, `clearRemovals`, `buildRemove`, `kindLabel`, `removeKind`.
+//
+// All five are deleted and the control is a row in the Note types window, which
+// is the reader's call: *"the cleanest and cohesive solution would be just a
+// cog wheel … which opens a window where a type can be added and the table can
+// be edited, all in one interface."* Its claims moved with it, to
+// `test/note-types-window.test.ts` — the gate, the two-question split, the
+// close-before-confirm order and the glyph are all asserted there, against the
+// window.
+//
+// WHAT STAYED IN THIS FILE is the half that is still this module's:
+// `removableKinds` (above) and `kindRemovalRefusal` (below). The control moved;
+// the rule did not.
 
 describe("no note needs migrating to gain any of this", () => {
   it("is renderer-drawn, so the catalogue says nothing about it", () => {

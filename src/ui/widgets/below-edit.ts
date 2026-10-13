@@ -91,16 +91,14 @@ import {
   MarkdownRenderChild,
   TAbstractFile,
   TFile,
-  setIcon,
 } from "obsidian";
 import type ChronoAnvilPlugin from "../../main";
-import { ROW_NOTE_ATTR, buildAddKindRow } from "../tables";
+import { ROW_NOTE_ATTR } from "../tables";
 import { LIVE_REDRAW_EVENT } from "../livewidget";
 import { getFile } from "../../core/util";
 import { notify } from "../../core/notify";
 import { trashClause, trashDestination, trashSeveral } from "../../core/trash";
 import { confirmAction, promptDetailedSuggester } from "../modals";
-import { buildKindOptions } from "./kind-options-menu";
 import type { DetailedChoice } from "../modals";
 import { isPromotedPath } from "../../journals/page-default";
 import {
@@ -111,7 +109,6 @@ import {
 } from "../../journals/journal";
 import type { JournalKind, JournalType } from "../../journals/journal";
 import { kindPlural } from "../../journals/journal-sections";
-import { promptRemoveKind } from "../../journals/kind-create";
 
 // One `kind-table:` on the card: the element it drew, the note type it drew it
 // for, and the head of the group it sits under.
@@ -153,50 +150,38 @@ export type MoveTarget =
 
 // ── the foot ─────────────────────────────────────────────────────────────
 
+/** The foot, and the handle that turns the selection mode on from elsewhere. */
+export interface BelowFoot {
+  el: HTMLElement;
+  pick: () => void;
+}
+
 // Build the card's foot, or nothing where there is nothing to put in it.
 //
-// NULL WHERE THE ADD ROW IS NULL, which is `buildAddKindRow`'s own refusal: an
-// index TEMPLATE carries `kind-table:` lines and lives outside the journals root,
-// where neither *add a kind to whatever journal this belongs to* nor *move these
-// notes to another index note* is a question the surface can answer. One refusal
-// rather than two, so the two controls cannot disagree about whether this note is
-// a journal's.
+// NULL OUTSIDE A JOURNAL, which is the refusal `buildAddKindRow` used to make
+// for the pair of them: an index TEMPLATE carries `kind-table:` lines and lives
+// outside the journals root, where *move these notes to another index note* is
+// not a question the surface can answer. The cog that opens the Note types
+// window asks `journalTypeAtPath` the same question and declines on the same
+// answer, so the two cannot disagree about whether this note is a journal's.
+//
+// ── THE FOOT IS EMPTY AT REST AS OF 1.0.69 ───────────────────────────────
+//
+// It held `+ Add note type` and the `Edit` toggle; both are in the window now.
+// What is left is the picking bar, which exists only while the mode is on — so
+// this returns a wrapper with nothing in it, and `:empty` is what stops it
+// drawing a gap under every card in the vault. The wrapper stays because the
+// reveal claims it BY NAME (1.0.12's defect) and because `BelowEdit` is
+// anchored on it, which is what makes Obsidian's own unload the teardown.
 export function buildBelowFoot(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   hosts: readonly KindHost[]
-): HTMLElement | null {
-  const add = buildAddKindRow(plugin, ctx);
-  if (!add) return null;
+): BelowFoot | null {
   const type = journalTypeAtPath(plugin, ctx.sourcePath);
   if (!type) return null;
 
   const foot = createDiv({ cls: "ca-journal-below-foot" });
-  foot.appendChild(add);
-
-  const edit = foot.createEl("button", {
-    cls: "ca-journal-below-edit",
-    attr: { type: "button" },
-  });
-  // `list-checks` — the glyph vocabulary is fixed and argued in
-  // `actions-menu.ts`: `settings` acts on the page, `more-horizontal` is more
-  // about a row, `zap` is page actions, `pencil` renames, `x` removes. Selecting
-  // rows is none of those. It is used once already as an empty-callout icon in
-  // the tasks table, which is a picture rather than a control, so it is free
-  // where it counts.
-  setIcon(edit.createSpan({ cls: "ca-journal-below-edit-icon" }), "list-checks");
-  edit.createSpan({ cls: "ca-journal-below-edit-label", text: "Edit" });
-  // BOTH STRINGS, THE SAME SENTENCE, which is `addHeadButton`'s rule: the label
-  // is the gesture and the tooltip is the consequence, and a reader on a screen
-  // reader gets only one of the two.
-  // AND IT NAMES THE SECOND THING THE MODE DOES, AS OF 1.0.24. The removal on
-  // an empty group's head appears only inside this mode, so a door that still
-  // described only the ticks would leave the one act a reader cannot discover
-  // by pressing rows undescribed.
-  const hint = "Select notes to move or remove, or remove an empty note type";
-  edit.setAttr("aria-label", hint);
-  edit.setAttr("title", hint);
-  edit.setAttr("aria-pressed", "false");
 
   // THE FOLDER THESE NOTES ARE IN IS THE HOST NOTE'S OWN. An index note is a
   // folder note — `Projects/Website/Website.md` — and everything its
@@ -206,15 +191,14 @@ export function buildBelowFoot(
   const at = ctx.sourcePath.lastIndexOf("/");
   const here = at < 0 ? "" : ctx.sourcePath.slice(0, at);
 
-  ctx.addChild(
-    new BelowEdit(foot, add, edit, hosts, {
-      plugin,
-      type,
-      here,
-      path: ctx.sourcePath,
-    })
-  );
-  return foot;
+  const child = new BelowEdit(foot, hosts, {
+    plugin,
+    type,
+    here,
+    path: ctx.sourcePath,
+  });
+  ctx.addChild(child);
+  return { el: foot, pick: () => child.startPicking() };
 }
 
 // ── the pure half ────────────────────────────────────────────────────────
@@ -421,36 +405,6 @@ export function moveReport(
   return `Moved ${done} of ${done + skipped.length} to ${where} — these did not: ${skipped.join(", ")}`;
 }
 
-// The removal's own class, named once. It is read by `syncRemovals` to find a
-// button it has already drawn, which is what makes that a sync rather than a
-// one-shot, and a second spelling of it would draw a second button per repaint.
-const REMOVE_CLS = "ca-journal-kind-remove";
-
-// And the options `⋯`'s, for the reason directly above: `syncOptions` finds the
-// one it has already drawn by this name, which is what makes it a sync.
-const OPTIONS_CLS = "ca-journal-kind-options";
-
-// A CLASS, NOT THE `hidden` PROPERTY, AND THIS SHIPPED WRONG IN 1.0.14. Both
-// halves of the foot set `el.hidden` and neither of them disappeared: the reader
-// saw the dashed `+ Add note type` slot sitting beside a live *Delete…*, which is
-// the exact arrangement the mode's own comment says it exists to prevent.
-//
-// `[hidden] { display: none }` is a USER-AGENT rule, and an author rule of any
-// specificity beats every user-agent rule outright — the cascade compares origins
-// before it compares selectors. `.ca-jld-add` declares `display: flex` and
-// `.ca-journal-below-edit` declares `display: inline-flex`, so both elements went
-// on being laid out with the attribute set. There is no specificity to add here;
-// the property is simply unreachable once anything in `styles/` states a `display`
-// for the element, which is why the plugin hides things with `is-hidden`
-// everywhere else (`.ca-journal-task-at-wrap`, `.ca-settings .is-hidden`).
-//
-// The `hidden` attribute stays alongside it, because it is what a screen reader
-// reads and a class is not.
-function hide(el: HTMLElement, away: boolean): void {
-  el.toggleClass("is-hidden", away);
-  el.hidden = away;
-}
-
 // ── the controller ───────────────────────────────────────────────────────
 
 interface BelowEditDeps {
@@ -472,8 +426,6 @@ export class BelowEdit extends MarkdownRenderChild {
 
   constructor(
     private foot: HTMLElement,
-    private addRow: HTMLElement,
-    private toggle: HTMLElement,
     private hosts: readonly KindHost[],
     private deps: BelowEditDeps
   ) {
@@ -484,15 +436,26 @@ export class BelowEdit extends MarkdownRenderChild {
     super(foot);
   }
 
-  onload(): void {
-    this.registerDomEvent(this.toggle, "click", (evt) => {
-      evt.preventDefault();
-      // The card's head folds on click and its rows open notes. Neither should
-      // fire because a reader asked to select something.
-      evt.stopPropagation();
-      this.setPicking(!this.picking);
-    });
+  // THE DOOR THIS MODE IS OPENED BY, and it is somebody else's. The window on
+  // the card's title bar calls it after its own Save; nothing in this file
+  // draws a control that reaches it.
+  //
+  // IT ASKS WHETHER THERE IS ANYTHING TO TICK, because the window's button is
+  // drawn from a count taken when the window opened and the card is live — a
+  // note can be filed, or the last one removed, while a reader reads a form.
+  // Saying so is better than a mode that turns on over an empty card: *a menu
+  // that opens and then explains it cannot help is worse than no menu*, which
+  // is `discoverability.test.ts`' rule for the control that is not drawn and
+  // this notice's for the one that was.
+  startPicking(): void {
+    if (this.pathsOnScreen().length === 0) {
+      notify.info("There are no notes on this card to select yet.");
+      return;
+    }
+    this.setPicking(true);
+  }
 
+  onload(): void {
     // ONE LISTENER PER HOST, BECAUSE THE EVENT DOES NOT BUBBLE. `LiveWidget`
     // dispatches a bare `new CustomEvent(LIVE_REDRAW_EVENT)` on its own element,
     // so a single listener on the block would never fire — this is the mistake
@@ -514,23 +477,27 @@ export class BelowEdit extends MarkdownRenderChild {
     this.syncAvailable();
   }
 
-  // NO EDIT CONTROL WHERE THERE IS NOTHING TO EDIT, and it comes and goes with the
-  // rows. A card whose tables are all empty has nothing to tick, and a button that
-  // opens a mode in which nothing can be selected is `discoverability.test.ts`'
-  // rule broken: *a menu that opens and then explains it cannot help is worse than
+  // NO MODE WHERE THERE IS NOTHING TO EDIT, and it goes with the rows. A card
+  // whose tables have all emptied has nothing left to tick, and a bar offering
+  // *Move…* and *Remove…* over no rows is `discoverability.test.ts`' rule
+  // broken: *a menu that opens and then explains it cannot help is worse than
   // no menu.*
+  //
+  // THIS USED TO HIDE THE `Edit` TOGGLE AND NOW ONLY LEAVES THE MODE (1.0.69).
+  // The toggle is gone — the window's *Select notes…* is the door — so there is
+  // no control here to show or hide, and `startPicking` asks the same question
+  // at the press. One predicate, two moments: asked at the door it declines to
+  // open, asked on a redraw it closes what is open.
   //
   // WHY THIS IS THE CONTROLLER'S JOB AND NOT THE BUILDER'S. `ctx.addChild` loads a
   // child when the rendered markdown is attached, and every table here is a
   // `LiveWidget` that draws its rows in its own `onload` — so at the moment the
-  // foot is BUILT the tables are empty, and a gate asked there would hide the
-  // button on every card in the vault. Asked here it is asked after each render,
-  // which is also how a card that gains its first note gains the button without a
-  // reload.
+  // foot is BUILT the tables are empty, and a gate asked there would have hidden
+  // the button on every card in the vault. Asked here it is asked after each
+  // render, which is also how a card that gains its first note becomes editable
+  // without a reload.
   private syncAvailable(): void {
-    const any = this.pathsOnScreen().length > 0;
-    hide(this.toggle, !any);
-    if (!any && this.picking) this.setPicking(false);
+    if (this.pathsOnScreen().length === 0 && this.picking) this.setPicking(false);
   }
 
   onunload(): void {
@@ -544,25 +511,21 @@ export class BelowEdit extends MarkdownRenderChild {
 
   private setPicking(on: boolean): void {
     this.picking = on;
-    this.toggle.setAttr("aria-pressed", on ? "true" : "false");
-    this.toggle.toggleClass("is-on", on);
     if (!on) {
       // LEAVING CLEARS THE SELECTION. Ticks are not a draft — the acts have
       // already happened when they happened — so there is nothing to keep, and
-      // keeping it would mean a reader who pressed Edit again found somebody
+      // keeping it would mean a reader who opened the mode again found somebody
       // else's half-made choice waiting.
       this.chosen.clear();
       this.release();
-      hide(this.addRow, false);
       return;
     }
-    // THE BAR REPLACES THE ADD ROW RATHER THAN JOINING IT. `+ Add note type`
-    // alters the CARD — it adds a kind to the journal — and the picking bar acts
-    // on NOTES. Leaving a live dashed slot offering a card-altering act while the
-    // reader's attention is on a destructive one is what 4.37 deleted a
-    // row-shaped slot from a card for. One strip, two arrangements, chosen by
-    // mode, which is `actionsRow`'s own idiom.
-    hide(this.addRow, true);
+    // AND THE FOOT IS EMPTY UNTIL THIS MOMENT (1.0.69). The bar used to replace
+    // `+ Add note type` in the same strip, because a live dashed slot offering a
+    // card-altering act beside a destructive one is what 4.37 deleted a
+    // row-shaped slot from a card for. The add row is in the window now, so
+    // there is nothing left to swap with: the bar is the foot's only child and
+    // the foot draws nothing without it.
     this.bar = this.buildBar();
     this.apply();
   }
@@ -585,11 +548,6 @@ export class BelowEdit extends MarkdownRenderChild {
         this.tickIn(row);
       }
     }
-    // BEFORE THE REMOVAL, so a group offered both reads options-then-remove: the
-    // destructive one is last, which is `promptAction`'s ordering rule applied to
-    // a strip rather than to a dialogue.
-    this.syncOptions();
-    this.syncRemovals();
     this.refresh();
   }
 
@@ -653,8 +611,6 @@ export class BelowEdit extends MarkdownRenderChild {
 
   // Take every mark back off.
   private release(): void {
-    this.clearRemovals();
-    this.clearOptions();
     for (const { host } of this.hosts) {
       for (const list of Array.from(host.querySelectorAll(".ca-list"))) {
         list.classList.remove("is-editing");
@@ -673,170 +629,25 @@ export class BelowEdit extends MarkdownRenderChild {
     this.deleteBtn = null;
   }
 
-  // ── the removal on an empty group's head (1.0.24) ─────────────────────
+  // ── WHAT USED TO SIT HERE, AND WHERE IT WENT (1.0.69) ─────────────────
   //
-  // THE READER'S ASK, in their words: *"allow kinds (the titled sections for
-  // pages) to be removed in edit-mode of 'what's below', but only if it has no
-  // entries."* A note type could be ADDED from this card since 1.1 and only
-  // taken off it four steps away in Settings, and the group it leaves behind —
-  // a head, a create button and an empty table — is the most visible thing on
-  // the page.
+  // Three things. 1.0.24's `✕` on an empty group's head, 1.0.33's `⋯` beside
+  // it, and the `+ Add note type` row at the foot — all of them reachable only
+  // from inside this mode, which a reader had to know to turn on first.
   //
-  // IN THE MODE, NOT ON THE CARD. The head carries no control at rest, and that
-  // is the same call the tick made: a permanent `×` beside every empty group
-  // would put a journal-altering act one slip from a reader browsing their
-  // notes. `Edit` is the door, and it already says what it opens — the tooltip
-  // grew the second clause with this.
+  // They are one window now, opened by the cog on the card's own title bar, and
+  // the reader asked for it in those terms: *"the cleanest and cohesive
+  // solution would be just a cog wheel (matching those other sections), which
+  // opens a window where a type can be added and the table can be edited, all
+  // in one interface."* `note-types-window.ts` holds all three.
   //
-  // ON THE HEAD RATHER THAN IN THE PICKING BAR. The bar's two buttons act on
-  // what is TICKED, and a note type is not a note — a third button beside them
-  // would read as a third thing to do to a selection. `attachKindRowMenu` made
-  // this call one scope down: the object being configured and the control that
-  // configures it are the same object, and the group's title is what a reader
-  // points at when they mean "this type".
-
-  // Put a removal on every group that may have one, and take back the ones that
-  // may not.
-  //
-  // A SYNC RATHER THAN A ONE-SHOT, for `liftEmptyHead`'s reason on the same
-  // heads: these tables are live-scoped, so the first note filed under a type
-  // arrives without a repaint of the block, and a button written once would
-  // stay offering to remove a type that now has a note in it. It is re-run from
-  // `apply`, which every redraw calls.
-  private syncRemovals(): void {
-    const offered = new Set(
-      removableKinds(
-        this.hosts.map((h) => ({
-          kindId: h.kindId,
-          rows: h.host.querySelectorAll(`[${ROW_NOTE_ATTR}]`).length,
-          titled: h.head !== null,
-        }))
-      )
-    );
-    for (const { kindId, head } of this.hosts) {
-      if (!head) continue;
-      const existing = head.querySelector<HTMLElement>(`.${REMOVE_CLS}`);
-      if (!offered.has(kindId)) {
-        existing?.remove();
-        continue;
-      }
-      if (existing) continue;
-      head.appendChild(this.buildRemove(kindId));
-    }
-  }
-
-  private clearRemovals(): void {
-    for (const { head } of this.hosts) {
-      head?.querySelector(`.${REMOVE_CLS}`)?.remove();
-    }
-  }
-
-  // ── the options on every group's head (1.0.33) ────────────────────────
-  //
-  // THE READER'S ASK PUT IT HERE, in their words: *"I think there should be
-  // note-kind options settings in the edit-mode of what's below … maybe as a
-  // hamburger menu beside the New note button and collapse chevron."* The mode
-  // is the door 1.0.24 already opened onto this head, and the second control on
-  // it needs no second door.
-  //
-  // ON EVERY GROUP, NOT ONLY THE EMPTY ONES. The removal is offered where the
-  // table has no rows, because removing a type with notes in it is not a thing
-  // this card may do; what a page calls its columns and what it scores them on
-  // is a question a group with forty notes in it asks louder, not quieter.
-  //
-  // A SYNC RATHER THAN A ONE-SHOT, for `syncRemovals`' reason on the same heads:
-  // `apply` runs on every live redraw, and a button written once would be
-  // written again beside itself the first time a note was filed.
-  //
-  // A GROUP NAMING A TYPE THE JOURNAL NO LONGER HAS GETS NOTHING. That fence
-  // draws a red *"Unknown … note type"* where its table would be — 1.0.23's
-  // `prune` is the repair — and there is no kind to carry the answers, so a `⋯`
-  // there would open onto a menu with nothing in it.
-  private syncOptions(): void {
-    const { plugin, type, path } = this.deps;
-    for (const { kindId, head } of this.hosts) {
-      if (!head) continue;
-      const kind = type.kinds.find((k) => k.id === kindId);
-      if (!kind) continue;
-      if (head.querySelector(`.${OPTIONS_CLS}`)) continue;
-      buildKindOptions({ plugin, type, path }, head, kind);
-    }
-  }
-
-  private clearOptions(): void {
-    for (const { head } of this.hosts) {
-      head?.querySelector(`.${OPTIONS_CLS}`)?.remove();
-    }
-  }
-
-  // `buildAddCategoryButton`'s SHAPE EXACTLY, and that is the whole of the
-  // styling. That control is the other hosted button in a `header:` bar on this
-  // surface — a `span.ca-journal-widget.ca-journal-button` holding a
-  // `.ca-journal-btn.ca-journal-btn-subtle` with an icon and a label — so this
-  // needs no rule of its own, sits at the same height as the create button
-  // beside it, and cannot drift into being a third size of control. The one
-  // added class is the handle `syncRemovals` finds it by.
-  private buildRemove(kindId: string): HTMLElement {
-    const label = this.kindLabel(kindId);
-    const wrap = createSpan({
-      cls: `ca-journal-widget ca-journal-button ${REMOVE_CLS}`,
-    });
-    const btn = wrap.createEl("button", {
-      cls: "ca-journal-btn ca-journal-btn-subtle",
-      attr: { type: "button" },
-    });
-    // `x` — `actions-menu.ts` fixes the glyph vocabulary and `x` is its word
-    // for a removal, which is what the tracker cell's own remove already wears.
-    setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), "x");
-    btn.createSpan({ cls: "ca-journal-btn-label", text: "Remove" });
-    // BOTH STRINGS, THE SAME SENTENCE — the foot's own rule, and here the
-    // tooltip is the half that names the type, because the label cannot: four
-    // groups would otherwise carry four buttons reading "Remove".
-    const hint = `Remove the ${label} note type from ${this.deps.type.name}`;
-    btn.setAttr("aria-label", hint);
-    btn.setAttr("title", hint);
-    this.registerDomEvent(btn, "click", (evt) => {
-      evt.preventDefault();
-      // The head folds the group on click. It must not, because a reader asked
-      // to remove the type — the separation every hosted control in a section
-      // makes.
-      evt.stopPropagation();
-      void this.removeKind(kindId);
-    });
-    return wrap;
-  }
-
-  // What to call the type in the tooltip and in the notice.
-  //
-  // THE JOURNAL'S OWN LABEL, falling back to the id. A `kind-table:` naming a
-  // type the journal no longer has still draws a group — that is the state
-  // 1.0.23's `prune` exists to mend — and it has no label to read, so the id is
-  // what the reader is shown rather than the word "undefined".
-  private kindLabel(kindId: string): string {
-    return (
-      this.deps.type.kinds.find((k) => k.id === kindId)?.label ?? kindId
-    );
-  }
-
-  private async removeKind(kindId: string): Promise<void> {
-    const { plugin, type, path } = this.deps;
-    // THE MODE CLOSES FIRST. Removing a type repaints every open note, which
-    // rebuilds this card from its fence — so ticks, the bar and these buttons
-    // are all about to be replaced, and a mode left on would be a set of marks
-    // on elements nothing is listening to. `onunload`'s own argument.
-    // THE CARD'S OWN NOTE GOES WITH IT, because a page-added type listed on two
-    // cards leaves one card at a time — and which card is the one this control
-    // was drawn on. The same answer `buildKindOptions` is handed, resolved at
-    // the press for the same reason: a note can be renamed between the two.
-    const ok = await promptRemoveKind(
-      plugin.app,
-      plugin,
-      type.id,
-      kindId,
-      getFile(plugin.app, path)
-    );
-    if (ok) this.setPicking(false);
-  }
+  // WHAT STAYED IS WHAT COULD NOT MOVE. This mode puts a tick in every row of
+  // every table on the card; what it acts on is the rows a reader is looking
+  // at, so a window offering it would have to draw those tables again and the
+  // reader would be ticking a copy. The window ENTERS it instead — `pick()`
+  // below is the handle it is given — and *Done* on the bar leaves it, which is
+  // also why the `Edit` toggle could go: there is nothing left for it to toggle
+  // that the window does not already own.
 
   // ── the bar ───────────────────────────────────────────────────────────
 

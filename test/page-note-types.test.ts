@@ -423,9 +423,18 @@ describe("a page-added type on two cards leaves one at a time", () => {
     expect(off).toContain("leaves ${cfg.name} altogether");
   });
 
-  it("hangs on the card the control was drawn on", () => {
-    const src = fnBody("removeKind", "ui/widgets/below-edit");
-    expect(src).toContain("getFile(plugin.app, path)");
+  it("hangs on the card the window was opened from", () => {
+    // THE HOST IS THE PATH, RE-RESOLVED AT THE PRESS (1.0.69). The `×` used to
+    // sit on the group's own head inside the picking mode, where the card was
+    // the element the control was drawn on; it is a row in the Note types
+    // window now, which can sit open while the note under it moves — so the
+    // window holds the path and fetches the file when the ✕ is pressed.
+    const win = readSrc("ui/note-types-window");
+    const src = win.slice(win.indexOf("private async removeKind("));
+    expect(src).toContain("const file = getFile(this.app, this.path);");
+    expect(src).toContain(
+      "await promptRemoveKind(this.app, this.plugin, this.type.id, kindId, file);"
+    );
   });
 });
 

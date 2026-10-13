@@ -80,46 +80,8 @@ import { kindPlural } from "./journal-sections";
 import { normaliseKinds } from "../core/settings-editors";
 import { catchUpIndexNote, offerDashboardCatchup } from "./dashboard-catchup";
 import { pageTypesOf } from "./kind-tables";
-import { confirmAction, promptText } from "../ui/modals";
+import { confirmAction } from "../ui/modals";
 import { repaintOpenNotes } from "../ui/livewidget";
-
-// Ask for the name, then add it. Resolves to the kind that was added, or null
-// if the reader cancelled or the name could not be used.
-//
-// THE NAME IS THE WHOLE QUESTION, and it is asked with `promptText` rather than
-// with a form for the reason above. `description` is what a one-line prompt
-// cannot say in its title: what a kind IS, and where the rest of its settings
-// live — so a reader who wants the emoji changed knows there is somewhere to go
-// rather than assuming this was the only chance to say.
-export async function promptAddKind(
-  app: App,
-  plugin: ChronoAnvilPlugin,
-  typeId: string,
-  // The index note the control was pressed from — the ONLY page that gains a
-  // group for the new type. See `addKindToJournal`, where the reader's ask is
-  // quoted and the two scopes are told apart.
-  host: TFile | null = null
-): Promise<JournalKindConfig | null> {
-  const cfg = (plugin.settings.customJournals ?? []).find((j) => j.id === typeId);
-  if (!cfg) return null;
-
-  const name = await promptText(
-    app,
-    `Add a note type to “${cfg.name}”`,
-    "e.g. Decision",
-    "",
-    {
-      description:
-        "Singular, as one note would be called. It gets its own template, its " +
-        "own create button and its own group on this card — and on this card " +
-        "only. Its emoji, its rating, whether it can be split into pages, and " +
-        "which index notes list it are in Settings → ChronoAnvil → Journals.",
-    }
-  );
-  const label = name?.trim();
-  if (!label) return null;
-  return addKindToJournal(plugin, cfg, label, host);
-}
 
 // Add a named kind to a stored journal, and carry out everything that follows.
 //

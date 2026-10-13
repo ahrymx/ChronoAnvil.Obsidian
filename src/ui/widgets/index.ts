@@ -116,7 +116,9 @@ import {
 // list of. It is not a region — nothing wraps it, nothing scopes it, it has no
 // directive — so routing it through `directive-regions.ts` would be a
 // pass-through added only to keep an import in a tidier place.
-import { buildBelowFoot } from "./below-edit";
+import { buildBelowFoot, type BelowFoot } from "./below-edit";
+import { journalTypeAtPath } from "../../journals/journal";
+import { buildNoteTypesCog } from "../note-types-window";
 import type { KindHost } from "./below-edit";
 import {
   liveScopedWidget,
@@ -1271,6 +1273,13 @@ export class Widgets implements
       // stayed. Removing the scope button left the helper with one caller,
       // which is this one.
       const shelfHeader = headerOwning("attach");
+      // AND THE BAR THE KIND TABLES HANG UNDER (1.0.69), by the same walk. This
+      // is the bar a reader points at when they say *What's below*, so it is the
+      // one that carries the cog onto the whole card's note types. A fence with
+      // no titled header before its first `kind-table:` line gets none — there
+      // is nowhere to put it, and the card is then a bare run of groups.
+      const belowHeader = headerOwning("kind-table");
+      const belowType = journalTypeAtPath(this.plugin, ctx.sourcePath);
       // The fence's first `attach:` line, verbatim, or null for a fence with
       // none. Compared by line rather than counted with a mutable flag because
       // the loop `continue`s past several kinds of line before reaching a
@@ -1396,6 +1405,13 @@ export class Widgets implements
       // there is no title to hang a removal off and no way to tell the reader
       // which type it would remove.
       const kindHosts: KindHost[] = [];
+      // DECLARED HERE AND FILLED FAR BELOW, because the cog on the title bar is
+      // built while the headers are walked and the foot is built after every
+      // widget is. The cog reaches it through a getter for that reason, and the
+      // getter is also what keeps the window honest about a card whose foot was
+      // refused — a `kind-table:` fence on a TEMPLATE has no journal at its
+      // path, so there is no mode to enter and `pick()` is never called.
+      let belowFoot: BelowFoot | null = null;
 
       // AND A TRACKER GRID IS ONE OF THEM (5.15). Three paths build the grid —
       // a habit chip, an ordinary `tracker:`/`sleep` cell, and an empty marked
@@ -1606,6 +1622,33 @@ export class Widgets implements
             // goes in front of it.
             headTools(frame.root).appendChild(
               buildCategoriesGlyph(this, ctx, title)
+            );
+          }
+          // ── AND THE NOTE TYPES COG, ON THE BAR THE TABLES HANG UNDER ────
+          //
+          // The reader's ask, in their words: *"the cleanest and cohesive
+          // solution would be just a cog wheel (matching those other sections),
+          // which opens a window where a type can be added and the table can be
+          // edited, all in one interface."* "Those other sections" is the line
+          // directly above — same slot, same glyph, same kind of window.
+          //
+          // IT REPLACES FOUR CONTROLS, three of which were inside a mode: the
+          // foot's `+ Add note type` and `Edit`, and the `⋯` and `✕` that
+          // `below-edit.ts` used to sync onto every group's head.
+          //
+          // AND NOT OUTSIDE A JOURNAL. `belowType` is null on an index TEMPLATE
+          // — a file carrying `kind-table:` lines from outside the journals root
+          // — where *which journal does this add a type to* has no answer. The
+          // same question `buildBelowFoot` declines on, asked once.
+          if (title && belowType && belowHeader === headerIndex - 1) {
+            headTools(frame.root).appendChild(
+              buildNoteTypesCog(
+                this.plugin,
+                ctx.sourcePath,
+                belowType,
+                kindHosts,
+                () => belowFoot
+              )
             );
           }
           // A SECOND HOSTED CONTROL SAT HERE AND IS GONE (5.21) — the task
@@ -2017,10 +2060,9 @@ export class Widgets implements
       // claimed, a second direct-child CSS rule, and a third of each the next time
       // the foot grows a control — which is 1.0.12's defect re-armed structurally.
       // The wrapper makes the reveal code below shorter, not longer.
-      let belowFoot: HTMLElement | null = null;
       if (hasKindTable) {
         belowFoot = buildBelowFoot(this.plugin, ctx, kindHosts);
-        if (belowFoot) container.appendChild(belowFoot);
+        if (belowFoot) container.appendChild(belowFoot.el);
       }
 
 
@@ -2461,7 +2503,7 @@ export class Widgets implements
           const own = stampedWithin(container, part.from, part.to);
           const adds =
             belowFoot && kindTableAt >= part.from && kindTableAt < part.to
-              ? [belowFoot]
+              ? [belowFoot.el]
               : [];
           if (own.length || adds.length) return [...own, ...adds];
           return part.id === "tracker" && trackerBar ? [trackerBar] : [];
@@ -2539,7 +2581,7 @@ export class Widgets implements
           const from = drawn[span.from]?.at ?? 0;
           const to = drawn[span.to]?.at ?? kids.length;
           const within = kids.slice(from, to);
-          if (belowFoot && !within.includes(belowFoot)) within.push(belowFoot);
+          if (belowFoot && !within.includes(belowFoot.el)) within.push(belowFoot.el);
           for (const el of within) {
             revealAnchors.push(el);
             welded.add("below");

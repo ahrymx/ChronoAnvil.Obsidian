@@ -696,7 +696,7 @@ describe("the gesture around it", () => {
   // `drawn` records `container.childElementCount` at the top of each iteration,
   // so its entries are positions in the child list THE LOOP BUILT. Four things
   // no directive drew are put into that list afterwards — the empty grid, the
-  // add-kind row, a diary entry's page-context strip and a journal note's facts
+  // card's foot, a diary entry's page-context strip and a journal note's facts
   // row — and two of them go in at the front. `stampLines` ran below all four,
   // so on an entry's tracker block the strip took index 0 and was handed the
   // tracker directive's line.
@@ -718,7 +718,7 @@ describe("the gesture around it", () => {
     // above the call is the same bug and this list is where it gets noticed.
     for (const insert of [
       "container.createDiv({\n          cls: \"ca-journal-widget-bar ca-journal-tracker-bar\",",
-      "if (belowFoot) container.appendChild(belowFoot);",
+      "if (belowFoot) container.appendChild(belowFoot.el);",
       "container.prepend(strip);",
       "container.prepend(facts);",
     ]) {
