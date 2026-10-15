@@ -37,7 +37,6 @@ import {
   pageKind,
   storedKindTables,
   withCols,
-  withHeading,
   withKindTable,
   withRated,
 } from "../src/journals/kind-tables";
@@ -255,31 +254,17 @@ describe("the sentinel for `nothing`", () => {
 });
 
 describe("writing one answer at a time", () => {
-  it("stores a heading that departs from what the page would say", () => {
-    expect(withHeading({}, "rating", "Score", "Confidence")).toEqual({
-      headings: { rating: "Score" },
-    });
-  });
-
-  it("stores nothing for a heading that agrees with the inherited word", () => {
-    // `packHeadings`' rule one scope down: storing the word as it stands today
-    // would pin it, so renaming the note type later would move it everywhere
-    // EXCEPT the page the reader had visited.
-    expect(withHeading({}, "rating", "Confidence", "Confidence")).toEqual({});
-    expect(withHeading({}, "rating", "  Confidence  ", "Confidence")).toEqual({});
-  });
-
-  it("takes a heading back out when the box is emptied", () => {
-    const over = { headings: { rating: "Score", name: "Exercise" } };
-    expect(withHeading(over, "rating", "", "Confidence")).toEqual({
-      headings: { name: "Exercise" },
-    });
-  });
-
-  it("keeps the rating while a heading changes, and the headings while it does", () => {
+  // ── AND NOT A HEADING, SINCE 1.0.72 ──────────────────────────────────
+  //
+  // *"Remove the pencil to edit the titles, I don't think it is necessary."*
+  // `withHeading` went with the control it was written for; what the four tests
+  // that lived here asserted about the WRITE is gone with the writer, and what
+  // the field still has to do is one question down — a word already in a
+  // reader's note goes on being read. See *a word a page already carries*.
+  it("keeps a word the note already carries while another answer changes", () => {
     const over = { rated: "accuracy", headings: { name: "Exercise" } };
-    expect(withHeading(over, "status", "State", "Status").rated).toBe("accuracy");
     expect(withRated(over, RATED_NONE).headings).toEqual({ name: "Exercise" });
+    expect(withCols(over, ["status"]).headings).toEqual({ name: "Exercise" });
   });
 
   it("drops the rating entirely when the note type's own is chosen", () => {
@@ -292,6 +277,47 @@ describe("writing one answer at a time", () => {
     expect(isBlankOverride({})).toBe(true);
     expect(isBlankOverride({ rated: RATED_NONE })).toBe(false);
     expect(isBlankOverride({ headings: { name: "Exercise" } })).toBe(false);
+  });
+});
+
+// ── A WORD A PAGE ALREADY CARRIES (1.0.72) ──────────────────────────────
+//
+// The pencil is gone and so is its writer, and the field is still READ. That is
+// a deliberate asymmetry rather than a leftover: dropping the read would
+// silently re-word the tables of every page that used the control while it
+// existed, which is a worse thing to do to a reader's vault than leaving an
+// answer only Settings can now change. `remove-not-delete`'s question — what
+// does the reader lose — answers itself here: nothing they can see.
+describe("a word a page already carries", () => {
+  it("is still read off the note", () => {
+    const fm = fmWith({ lesson: { headings: { rating: "Score" } } });
+    expect(kindTableOverride(fm, "lesson")).toEqual({
+      headings: { rating: "Score" },
+    });
+  });
+
+  it("still names that page's column", () => {
+    expect(said(columns({ headings: { rating: "Score" } }))).toEqual([
+      "Lesson",
+      "Score",
+      "Status",
+    ]);
+  });
+
+  it("still keeps the entry in the note, so Save does not quietly drop it", () => {
+    // `isBlankOverride` decides whether the whole entry is REMOVED on Save, and
+    // the window writes every row it finds changed. A blank check that had
+    // stopped counting headings would delete the word on the first Save after
+    // the update — the reader pressing Save on an unrelated answer and losing
+    // this one.
+    expect(isBlankOverride({ headings: { rating: "Score" } })).toBe(false);
+  });
+
+  it("has one way out, and it is the one the window still draws", () => {
+    // *Use the note type's own settings* sets the whole override to `{}`, which
+    // `withKindTable` reads as "take the entry away".
+    expect(withKindTable(fmWith({ lesson: { headings: { rating: "Score" } } }), "lesson", {}))
+      .toBeUndefined();
   });
 });
 
@@ -550,13 +576,6 @@ describe("one field changing does not drop another", () => {
     cols: ["status", "created"],
     headings: { status: "State" },
   };
-
-  it("keeps the list through a rename", () => {
-    expect(withHeading(full, "status", "Phase", "Status").cols).toEqual([
-      "status",
-      "created",
-    ]);
-  });
 
   it("keeps the list through a re-rating", () => {
     expect(withRated(full, "confidence").cols).toEqual(["status", "created"]);

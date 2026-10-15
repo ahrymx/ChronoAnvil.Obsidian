@@ -1522,6 +1522,11 @@ export const CHILDREN_BAR = "🗂️ What's below";
 // kind of the host's journal; `:<id>` means one of them (see `kindTable`).
 const CHILDREN_TABLE = "kind-table";
 
+// The section those tables sit in, by id. Spelled once for `CHILDREN_TABLE`'s
+// own reason: the reorder in `kind-order.ts` asks the catalogue for this row
+// and a second spelling would be a section that could not be found.
+export const CHILDREN_SECTION_ID = "children";
+
 // ── THE STATE ROW IS GONE, AND THE GRID IS WHY (5.28) ───────────────────
 //
 // WHAT IT WAS. 5.18 paired the tracker grid with the stats band on a leaf index
@@ -1847,7 +1852,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   },
 
   {
-    id: "children",
+    id: CHILDREN_SECTION_ID,
     icon: "🗂️",
     category: "journals",
     label: "What's below this note",

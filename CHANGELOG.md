@@ -5,6 +5,26 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.72] - 2026-10-15
+
+### Added
+
+- **Up and down arrows order the note types on an index page.** A *What's
+  below* card lists its groups in the order the note's own block names them, so
+  the arrows in the **Note types** window write that order into the note: one
+  press moves a type past its neighbour, and Save lands it. A single type gets
+  no arrows — there is nothing to order, and a card with one type draws no group
+  heads either. The journal's own order (which type is primary, and what a newly
+  created index note starts with) is in Settings and is left alone.
+
+### Removed
+
+- **The pencil that renamed a column on one page.** *"I don't think it is
+  necessary."* A column's word is the note type's answer, in Settings, where
+  every table of that type reads it from. A page that already carries a word of
+  its own still draws it — nothing in anybody's vault is re-worded — and **Use
+  the note type's own settings** is still the way back out of one.
+
 ## [1.0.71] - 2026-10-15
 
 ### Added

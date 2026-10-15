@@ -52,7 +52,7 @@
 // closes this window and opens that one, which is one destructive act behind
 // one door, exactly where it was before.
 
-import { App, setIcon } from "obsidian";
+import { App, TFile, setIcon } from "obsidian";
 import { EditorModal, type ValidationProblem } from "./editor-modal";
 import type ChronoAnvilPlugin from "../main";
 import { getFile, plural } from "../core/util";
@@ -69,13 +69,13 @@ import {
   type KindColumn,
 } from "../journals/kind-columns";
 import { getTracker } from "../trackers/trackers";
+import { planKindOrder } from "../journals/kind-order";
 import {
   RATED_NONE,
   isBlankOverride,
   kindTableOverrideOf,
   pageKind,
   withCols,
-  withHeading,
   withRated,
   type KindTableOverride,
 } from "../journals/kind-tables";
@@ -149,10 +149,9 @@ export class NoteTypesWindow extends EditorModal {
   // window's rule: two open editors over one list is a merge conflict a reader
   // cannot see. Here it is also what keeps the window the height of a list.
   private open_: string | null = null;
-  // Which column's rename box is open, by role, or null. ONE AT A TIME for the
-  // same reason the detail is — and here it also keeps the Columns row a row of
-  // dropdowns, which is what the reader asked it to be.
-  private naming: string | null = null;
+  // The order the note listed these types in when the window opened, so Save
+  // can tell a reader who moved one from a reader who only looked.
+  private readonly wasOrder: string[];
 
   constructor(
     app: App,
@@ -182,6 +181,7 @@ export class NoteTypesWindow extends EditorModal {
         was: JSON.stringify(over),
       };
     });
+    this.wasOrder = this.rows.map((r) => r.kind.id);
   }
 
   protected renderBody(): void {
@@ -233,6 +233,8 @@ export class NoteTypesWindow extends EditorModal {
       head.createSpan({ cls: "ca-note-type-said", text: "changed here" });
     }
 
+    this.renderMoves(head, row);
+
     const open = this.open_ === row.kind.id;
     const edit = head.createEl("button", {
       cls: "ca-journal-btn-ghost ca-note-type-open",
@@ -272,6 +274,56 @@ export class NoteTypesWindow extends EditorModal {
         void this.removeKind(row.kind.id);
       });
     }
+  }
+
+  // ── THE ORDER THE CARD DRAWS THEM IN (1.0.72) ──────────────────────────
+  //
+  // *"implement up/down buttons to re-order note types within the edit
+  // window"*. The fence's order is the render order, so this is an answer about
+  // the note — see `kind-order.ts`, which also records why the journal's own
+  // `kinds` order is a different question and is left alone.
+  //
+  // ARROWS RATHER THAN DRAG, the categories window's answer to the same ask:
+  // a list of this length is three presses at most, a drag needs a pointer, and
+  // a disabled arrow says *"this one is already at the end"* where a dead drop
+  // zone says nothing.
+  //
+  // NOTHING AT ALL FOR A SINGLE TYPE, where both arrows could only ever be
+  // disabled — and where the card draws no group heads either, so there is not
+  // even a visible order to argue about. `discoverability`'s rule.
+  private renderMoves(host: HTMLElement, row: Row): void {
+    if (this.rows.length < 2) return;
+    const at = this.rows.indexOf(row);
+    const move = (delta: number, icon: string, word: string): void => {
+      const btn = host.createEl("button", {
+        cls: "ca-journal-btn-ghost ca-note-type-move",
+        attr: { type: "button" },
+      });
+      setIcon(btn.createSpan({ cls: "ca-journal-btn-icon" }), icon);
+      const to = at + delta;
+      const can = to >= 0 && to < this.rows.length;
+      btn.disabled = !can;
+      btn.toggleClass("is-static", !can);
+      const name = plural(row.kind.label);
+      const why = can
+        ? `Move ${name} ${word}`
+        : `${name} is already ${delta < 0 ? "first" : "last"}`;
+      btn.setAttr("aria-label", why);
+      btn.setAttr("title", why);
+      btn.addEventListener("click", () => {
+        if (!can) return;
+        // THE LIST IS THE ANSWER. The rows are re-ordered here and `commit`
+        // hands the ids back as they are showing; nothing records that a move
+        // happened, so a move undone before Save costs nothing at all.
+        const next = this.rows.slice();
+        next.splice(to, 0, ...next.splice(at, 1));
+        this.rows = next;
+        this.clearError();
+        this.renderBody();
+      });
+    };
+    move(-1, "chevron-up", "up");
+    move(1, "chevron-down", "down");
   }
 
   // ── one type's own answers ─────────────────────────────────────────────
@@ -339,8 +391,9 @@ export class NoteTypesWindow extends EditorModal {
   // until now and nothing asked for it to go; what it stops being is the only
   // thing on offer. One box at a time, opened by the row it belongs to.
   private renderColumns(host: HTMLElement, row: Row): void {
-    const { shown, inherited } = this.columnWords(row);
-    const offer = offerableColumns(this.plugin, pageKind(row.kind, row.over));
+    const page = pageKind(row.kind, row.over);
+    const shown = kindColumns(this.plugin, page);
+    const offer = offerableColumns(this.plugin, page);
     const field = host.createDiv({ cls: "ca-note-type-field ca-note-type-cols" });
     field.createSpan({ cls: "ca-note-type-label", text: "Columns" });
     const boxes = field.createDiv({ cls: "ca-note-type-boxes" });
@@ -349,35 +402,41 @@ export class NoteTypesWindow extends EditorModal {
     // Practice whose column a reader wants headed "Exercise" is 1.0.32's
     // original ask.
     const lead = shown[0];
-    if (lead) {
-      this.renderColumnSlot(boxes, row, lead, inherited[0]?.heading ?? lead.fallback, null, offer);
-    }
+    if (lead) this.renderColumnSlot(boxes, row, lead, null, offer);
 
     const picked = shown.slice(1).map((c) => c.key);
     shown.slice(1).forEach((col, i) => {
-      const base = inherited[i + 1]?.heading ?? col.fallback;
-      this.renderColumnSlot(boxes, row, col, base, { picked, at: i }, offer);
+      this.renderColumnSlot(boxes, row, col, { picked, at: i }, offer);
     });
     // THE SLOT THAT ADDS ONE, drawn only while something is left to add. An
     // *Add a column…* offering an empty menu is the control
     // `discoverability.test.ts` refuses: *a menu that opens and then explains
     // it cannot help is worse than no menu*.
     if (offer.some((c) => !picked.includes(c.key))) {
-      this.renderColumnSlot(boxes, row, null, "", { picked, at: picked.length }, offer);
+      this.renderColumnSlot(boxes, row, null, { picked, at: picked.length }, offer);
     }
   }
 
-  // One slot: the dropdown that says which column sits here, and the pencil
-  // that renames it.
+  // One slot: the dropdown that says which column sits here.
   //
-  // `slot` IS NULL FOR THE TITLE, which has no dropdown, and `col` is null for
-  // the trailing *Add a column…*, which has nothing to rename yet. The two
-  // nulls are what make this one function rather than three that would drift.
+  // `slot` IS NULL FOR THE TITLE, which has no dropdown because it is the row
+  // rather than a column of it, and `col` is null for the trailing *Add a
+  // column…*. The two nulls are what make this one function rather than three
+  // that would drift.
+  //
+  // ── AND THERE IS NO PENCIL ON IT ANY MORE (1.0.72) ────────────────────
+  //
+  // *"Remove the pencil to edit the titles, I don't think it is necessary."*
+  // A column's word is named on the NOTE TYPE, in Settings — 1.0.32, which is
+  // where every table of that type reads it from — and that is the control that
+  // stays. What went is the per-page override's writer; a page that already
+  // carries one still draws it, because `pageKind` still lays `headings` over
+  // the type's words and a reader's note is not quietly re-worded by an update.
+  // *Use the note type's own settings* is the way back out of one.
   private renderColumnSlot(
     host: HTMLElement,
     row: Row,
     col: KindColumn | null,
-    base: string,
     slot: { picked: string[]; at: number } | null,
     offer: readonly KindColumn[]
   ): void {
@@ -386,59 +445,37 @@ export class NoteTypesWindow extends EditorModal {
     if (!slot) {
       box.createDiv({
         cls: "ca-note-type-fixed",
-        text: col?.heading || base,
+        text: col ? col.heading || col.fallback : "",
       });
-    } else {
-      const pick = box.createEl("select", { cls: "dropdown ca-note-type-pick" });
-      if (!col) {
-        pick.createEl("option", { value: "", text: "Add a column…" });
-      }
-      for (const one of offer) {
-        // A ROLE ANOTHER SLOT HOLDS IS STILL OFFERED, because picking it is how
-        // the two are swapped. It is only withheld from the ADD slot, where
-        // there is no slot to swap it with and choosing it would silently move
-        // a column instead of adding one.
-        if (!col && slot.picked.includes(one.key)) continue;
-        pick.createEl("option", { value: one.key, text: one.heading || one.fallback });
-      }
-      if (col) {
-        pick.createEl("option", { value: COL_REMOVE, text: "Remove this column" });
-        pick.value = col.key;
-      } else {
-        pick.value = "";
-      }
-      pick.addEventListener("change", () => {
-        this.moveColumn(row, slot, pick.value);
-      });
+      return;
     }
 
-    // THE PENCIL, AND NOTHING WHERE THERE IS NOTHING YET TO NAME.
-    if (!col) return;
-    const pencil = box.createEl("button", {
-      cls: "ca-journal-btn-ghost ca-note-type-rename",
-      attr: { type: "button", "aria-expanded": this.naming === col.key ? "true" : "false" },
+    const pick = box.createEl("select", { cls: "dropdown ca-note-type-pick" });
+    if (!col) {
+      pick.createEl("option", { value: "", text: "Add a column…" });
+    }
+    for (const one of offer) {
+      // A ROLE ANOTHER SLOT HOLDS IS STILL OFFERED, because picking it is how
+      // the two are swapped. It is only withheld from the ADD slot, where there
+      // is no slot to swap it with and choosing it would silently move a column
+      // instead of adding one.
+      if (!col && slot.picked.includes(one.key)) continue;
+      pick.createEl("option", { value: one.key, text: one.heading || one.fallback });
+    }
+    if (col) {
+      pick.createEl("option", { value: COL_REMOVE, text: "Remove this column" });
+      pick.value = col.key;
+    } else {
+      pick.value = "";
+    }
+    const why = col
+      ? `Which column sits here, or whether it is removed`
+      : "Add a column to this note's table";
+    pick.setAttr("aria-label", why);
+    pick.setAttr("title", why);
+    pick.addEventListener("change", () => {
+      this.moveColumn(row, slot, pick.value);
     });
-    setIcon(pencil.createSpan({ cls: "ca-journal-btn-icon" }), "pencil");
-    const why = `What this note calls the “${base}” column`;
-    pencil.setAttr("aria-label", why);
-    pencil.setAttr("title", why);
-    pencil.addEventListener("click", () => {
-      this.naming = this.naming === col.key ? null : col.key;
-      this.clearError();
-      this.renderBody();
-    });
-    if (this.naming !== col.key) return;
-
-    const input = box.createEl("input", {
-      cls: "ca-note-type-word",
-      attr: { type: "text", placeholder: base, "aria-label": why },
-    });
-    input.value = row.over.headings?.[col.key] ?? "";
-    const commit = (): void => {
-      row.over = withHeading(row.over, col.key, input.value, base);
-    };
-    input.addEventListener("change", commit);
-    input.addEventListener("blur", commit);
   }
 
   // What a slot's dropdown did, applied to the page's list.
@@ -475,27 +512,13 @@ export class NoteTypesWindow extends EditorModal {
     });
   }
 
-  // The two readings of one set of columns: what this page shows, and what it
-  // would show with every word cleared.
+  // ── REMOVED IN 1.0.72, AND WORTH A LINE ABOUT WHAT IT WAS ─────────────
   //
-  // PAIRED BY POSITION, WHICH IS ONLY SAFE BECAUSE `base` IS THE OVERRIDE
-  // MINUS ITS WORDS. Two things decide which columns exist and in what order —
-  // the rating and `cols` — and both are carried across; only `headings` is
-  // dropped, which is the one field that changes a word without changing a
-  // list. Building `base` from the rating alone was right until 1.0.71 and
-  // would now pair this page's chosen order against the journal's derived one,
-  // putting the wrong placeholder under every box after the first difference.
-  private columnWords(row: Row): { shown: KindColumn[]; inherited: KindColumn[] } {
-    const page = pageKind(row.kind, row.over);
-    const wordless: KindTableOverride = {
-      ...(row.over.rated !== undefined ? { rated: row.over.rated } : {}),
-      ...(row.over.cols ? { cols: [...row.over.cols] } : {}),
-    };
-    return {
-      shown: kindColumns(this.plugin, page),
-      inherited: kindColumns(this.plugin, pageKind(row.kind, wordless)),
-    };
-  }
+  // `columnWords` derived a SECOND list — the columns this page would show with
+  // every word cleared — so each rename box could be placeheld with the word it
+  // would fall back to. With the pencil gone nothing needs the second list, and
+  // the whole pairing-by-position hazard it carried goes with it: the dropdowns
+  // read their labels off the columns they are drawn from.
 
   // ── adding one ─────────────────────────────────────────────────────────
 
@@ -573,6 +596,16 @@ export class NoteTypesWindow extends EditorModal {
       notify.info("That note has moved — reopen it to change its tables.");
       return;
     }
+    // ── THE ORDER FIRST, AND THE FRONTMATTER AFTER ──────────────────────
+    //
+    // Two writes to one file, and this is the safe order. `processFrontMatter`
+    // re-reads the note and rewrites its property block alone, so it cannot
+    // lose a body change that has already landed; a `vault.process` running
+    // after it would read whatever the cache had and could write the old
+    // frontmatter back over the new. That lag is the defect 1.0.34 chased
+    // through three symptoms before naming it.
+    await this.writeOrder(file);
+
     for (const row of this.rows) {
       // ONLY WHAT MOVED. `setKindTable` returns early on a no-op of its own, and
       // this is the second half of the same rule: a window that wrote every row
@@ -588,6 +621,25 @@ export class NoteTypesWindow extends EditorModal {
       );
       if (cfg) await addKindToJournal(this.plugin, cfg, label, file);
     }
+  }
+
+  // The note's own order for its groups, where a reader moved one.
+  //
+  // THE LIST IS THE ANSWER (see `kind-order.ts`), so what is handed over is the
+  // ids as the rows are showing and `planKindOrder` works out the difference
+  // against the file. It returns null for every refusal — nothing moved, no
+  // groups to move, groups spread over two fences — and null means no write,
+  // which is why there is no second guard here.
+  //
+  // THE CONTEXT IS RESOLVED AT THE WRITE, like the file: a note that has been
+  // moved out of its journal while the window sat open is no longer an index of
+  // anything, and `contextFor` answering null is the honest end of the matter.
+  private async writeOrder(file: TFile): Promise<void> {
+    const ids = this.rows.map((r) => r.kind.id);
+    if (ids.join("\u0000") === this.wasOrder.join("\u0000")) return;
+    const ctx = this.plugin.sections.contextFor(this.path);
+    if (!ctx) return;
+    await this.app.vault.process(file, (text) => planKindOrder(text, ctx, ids) ?? text);
   }
 
   // Save, and then do something that leaves. Shared by the footer's second

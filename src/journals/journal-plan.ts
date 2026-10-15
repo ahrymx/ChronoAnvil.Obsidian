@@ -1153,11 +1153,26 @@ export interface StrayPart {
   to: number;
 }
 
-export function strayParts(
+// ── EVERY GROUP, KNOWN OR STRAY, WITH ITS EXACT SPAN (1.0.72) ────────────
+//
+// `strayParts` IS THIS FILTERED, and that is the whole of the extraction. The
+// walk was written to answer *"where are the groups the section no longer
+// has"*; reordering the groups a section DOES have needs the same spans for the
+// other half of the same list, and a second walk beside this one would be two
+// ideas of what a group is made of — the shape `regionSpans` was merged to end.
+//
+// A group not named by the reorder is left exactly where it is, which is why
+// the probe comes back with the span: it is the only thing that tells the two
+// halves apart.
+export interface PartGroup extends StrayPart {
+  probe: string;
+}
+
+export function partGroups(
   lines: string[],
   section: JournalSection,
   ctx: SectionContext
-): StrayPart[] {
+): PartGroup[] {
   if (ctx.noteKind === "leaf" || ctx.noteKind === "page") return [];
   const parts = section.parts?.(ctx, sectionOverrides(ctx, section.id)) ?? [];
   if (!parts.length) return [];
@@ -1167,18 +1182,17 @@ export function strayParts(
     return at === -1 ? line : line.slice(0, at);
   };
   const probeKeys = new Set(parts.map((p) => keyOf(p.probe.trim())));
-  const known = new Set(parts.map((p) => p.probe.trim()));
   // Any real part answers for the SHAPE — they are composed by one `map`, so
   // they differ only in the id and the label.
   const shape = parts[0];
   const siblings = shape.lines.slice(0, -1).map((l) => l.trim());
 
-  const out: StrayPart[] = [];
+  const out: PartGroup[] = [];
   const taken = new Set<number>();
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     const key = keyOf(line);
-    if (!probeKeys.has(key) || known.has(line) || taken.has(i)) continue;
+    if (!probeKeys.has(key) || taken.has(i)) continue;
     const id = line.slice(key.length + 1);
     if (!id) continue;
 
@@ -1194,9 +1208,21 @@ export function strayParts(
       from--;
     }
     for (let j = from; j <= i; j++) taken.add(j);
-    out.push({ id, from, to: i });
+    out.push({ id, from, to: i, probe: line });
   }
   return out;
+}
+
+export function strayParts(
+  lines: string[],
+  section: JournalSection,
+  ctx: SectionContext
+): StrayPart[] {
+  const parts = section.parts?.(ctx, sectionOverrides(ctx, section.id)) ?? [];
+  const known = new Set(parts.map((p) => p.probe.trim()));
+  return partGroups(lines, section, ctx)
+    .filter((g) => !known.has(g.probe))
+    .map(({ id, from, to }) => ({ id, from, to }));
 }
 
 // ── A CELL ALREADY ON DISK WITH NO TITLE OVER IT (5.9) ───────────────────

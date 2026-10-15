@@ -1793,9 +1793,13 @@ body.is-mobile .ca-list.is-editing {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* `obsidian-button-height`: a chip-shaped `<button>` is 30px until it is reset,
-   and beside a dropdown that is the one thing that would make the row ragged. */
-.ca-note-type-rename {
+/* THE ARROWS THAT ORDER THE TYPES (1.0.72), the categories window's control
+   under the categories window's rules: ghost buttons on the row, and
+   `obsidian-button-height`'s reset, because a chip-shaped `<button>` is 30px
+   until you take it off and that is what makes a row of them ragged.
+   `is-static` is the one at the end of the list — Obsidian's `:disabled` leaves
+   a button looking pressable, so the state is said in the ink as well. */
+.ca-note-type-move {
   flex: 0 0 auto;
   min-height: 0;
   padding: var(--ca-space-1);
@@ -1804,19 +1808,13 @@ body.is-mobile .ca-list.is-editing {
   box-shadow: none;
   color: var(--text-faint);
 }
-.ca-note-type-rename:hover {
+.ca-note-type-move:hover:not(.is-static) {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-.ca-note-type-rename[aria-expanded="true"] {
-  color: var(--text-accent);
-}
-/* THE WORD BOX TAKES THE WHOLE SLOT, on the line under the dropdown that opened
-   it — `100%` of a wrapping flex row is a new line, which is the whole of how
-   it gets one. */
-.ca-note-type-word {
-  flex: 1 0 100%;
-  min-width: 0;
+.ca-note-type-move.is-static {
+  opacity: 0.35;
+  cursor: default;
 }
 .ca-note-type-reset {
   align-self: flex-start;

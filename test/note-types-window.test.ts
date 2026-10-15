@@ -216,37 +216,19 @@ describe("the per-page answers the ⋯ used to hold", () => {
     expect(readSrc("widgets")).not.toContain("kind-options-menu");
   });
 
-  it("placeholds each box with the word a cleared box would show", () => {
-    // WHICH IS WHAT MAKES "CLEAR IT TO GO BACK" VISIBLE rather than promised in
-    // a sentence. The placeholder is this page's INHERITED word — the type's
-    // own, under this page's rating and this page's chosen columns — so a
-    // reader who re-rated the type here sees the words that rating brings
-    // rather than the ones it replaced.
-    const c = code();
-    expect(c).toContain("const base = inherited[i + 1]?.heading ?? col.fallback;");
-    expect(c).toContain("placeholder: base");
-    expect(c).toContain('input.value = row.over.headings?.[col.key] ?? "";');
-    expect(c).toContain("withHeading(row.over, col.key, input.value, base)");
-  });
-
-  it("strips only the WORDS to derive what a cleared box would show", () => {
-    // `shown` and `inherited` are paired BY POSITION, and that is only safe
-    // while the two lists are the same list. Two things decide which columns
-    // exist and in what order — the rating and `cols` — so `base` carries both
-    // and drops `headings` alone.
-    //
-    // THE DEFECT THIS IS THE FIX FOR, caught before it shipped: building `base`
-    // from `withRated({}, …)` was right until a page could choose its columns,
-    // and would then pair this page's chosen ORDER against the journal's
-    // derived one — putting the wrong placeholder under every box after the
-    // first difference, and so renaming the wrong column.
+  it("reads every slot off one list, which is what this page draws", () => {
+    // ONE DERIVATION, NOT TWO PAIRED BY POSITION. Until 1.0.72 a second list
+    // was derived — the words a cleared rename box would fall back to — and
+    // paired against this one by index, which is only safe while the two are
+    // the same list. The pencil is gone and so is the second list, and with it
+    // the whole hazard: every dropdown's label comes off the column it is drawn
+    // from.
     const c = code();
     expect(c).toContain("const page = pageKind(row.kind, row.over);");
-    expect(c).toContain("...(row.over.rated !== undefined ? { rated: row.over.rated } : {})");
-    expect(c).toContain("...(row.over.cols ? { cols: [...row.over.cols] } : {})");
-    expect(c).toContain("shown: kindColumns(this.plugin, page)");
-    expect(c).toContain("inherited: kindColumns(this.plugin, pageKind(row.kind, wordless))");
-    expect(c).not.toContain("withRated({}, row.over.rated ?? null)");
+    expect(c).toContain("const shown = kindColumns(this.plugin, page);");
+    expect(c).toContain("const offer = offerableColumns(this.plugin, page);");
+    expect(c).not.toContain("inherited");
+    expect(c).not.toContain("wordless");
   });
 
   it("re-draws the boxes when the rating moves, because they are a different list", () => {
@@ -326,9 +308,7 @@ describe("a slot's dropdown, as arithmetic", () => {
 describe("the row of dropdowns", () => {
   it("offers what the table could draw, asked rather than listed again", () => {
     const c = code();
-    expect(c).toContain(
-      "const offer = offerableColumns(this.plugin, pageKind(row.kind, row.over));"
-    );
+    expect(c).toContain("const offer = offerableColumns(this.plugin, page);");
     expect(c).toContain('pick.createEl("option", { value: one.key, text: one.heading || one.fallback })');
   });
 
@@ -388,211 +368,118 @@ describe("the row of dropdowns", () => {
   });
 });
 
-describe("the word for a column, now behind a pencil", () => {
-  it("is still per-page, because 1.0.33 shipped that and nobody asked for it back", () => {
-    // The dropdowns answered a different question. A box that was the only way
-    // to rename a column on one page cannot be replaced by a control that
-    // cannot rename anything.
+// ── and the pencil is gone again, 1.0.72 ────────────────────────────────
+
+describe("what renaming a column is now", () => {
+  // *"Remove the pencil to edit the titles, I don't think it is necessary."*
+  //
+  // The control shipped in 1.0.71 and lasted one release. A column's word is
+  // named on the NOTE TYPE, in Settings, which is where every table of that
+  // type reads it from — 1.0.32 — and that is the one that stays.
+  it("has no pencil, no box and nothing listening for a word", () => {
     const c = code();
-    expect(c).toContain("withHeading(row.over, col.key, input.value, base)");
-    expect(c).toContain('cls: "ca-note-type-word"');
+    expect(c).not.toContain("ca-note-type-rename");
+    expect(c).not.toContain("ca-note-type-word");
+    expect(c).not.toContain("withHeading");
+    expect(c).not.toContain("this.naming");
   });
 
-  it("names the column it renames, in both names a button has", () => {
-    const c = code();
-    expect(c).toContain("const why = `What this note calls the “${base}” column`;");
-    expect(c).toContain('pencil.setAttr("aria-label", why);');
-    expect(c).toContain('pencil.setAttr("title", why);');
+  it("left no writer behind in the record either", () => {
+    // `test/dead-code.test.ts`' subject: the field's only writer was this
+    // control, so it goes with the control rather than sitting in the module
+    // unreachable for the next hand to re-wire by symmetry.
+    expect(readCode("journals/kind-tables")).not.toContain(
+      "export function withHeading"
+    );
   });
 
-  it("opens one at a time, and says which is open", () => {
-    // `aria-expanded` is the only thing a screen reader has to tell a toggled
-    // pencil from an idle one, and `this.naming` holding a single key is what
-    // keeps the row from becoming a wall of text boxes.
-    const c = code();
-    expect(c).toContain('"aria-expanded": this.naming === col.key ? "true" : "false"');
-    expect(c).toContain("this.naming = this.naming === col.key ? null : col.key;");
-    expect(c).toContain("if (this.naming !== col.key) return;");
+  it("still READS a word a page already carries", () => {
+    // Which is the asymmetry worth stating: removing the read would re-word the
+    // tables of every page that used the control while it existed. `pageKind`
+    // lays the stored words over the type's, and that line is untouched.
+    expect(readCode("journals/kind-tables")).toContain(
+      "const headings = { ...(kind.headings ?? {}), ...(over.headings ?? {}) };"
+    );
+    // And the way out of one is the button that was already there.
+    expect(code()).toContain("row.over = {};");
   });
 
-  it("offers no pencil on the slot that has nothing to name yet", () => {
-    const c = code();
-    expect(c).toContain("if (!col) return;");
-  });
-
-  it("commits a word on leaving the box, never on a keystroke", () => {
-    // 1.0.33's rule and 1.0.49's scar both: a per-keystroke write re-reads the
-    // note mid-type and loses the rest of the word.
-    const c = code();
-    const at = c.indexOf("private renderColumnSlot(");
-    const body = c.slice(at, c.indexOf("private moveColumn("));
-    expect(body).toContain('input.addEventListener("change", commit);');
-    expect(body).toContain('input.addEventListener("blur", commit);');
-    expect(body).not.toContain('input.addEventListener("input"');
+  it("leaves no stylesheet rule for the pencil or its box", () => {
+    const css = readCss();
+    for (const dead of [".ca-note-type-rename", ".ca-note-type-word"]) {
+      expect(css, dead).not.toContain(dead);
+    }
   });
 });
 
-// ── the add field ────────────────────────────────────────────────────────
+// ── the order the card draws them in, 1.0.72 ────────────────────────────
 
-describe("adding a note type, where the dashed row was", () => {
-  it("keeps the sentence the dashed row's prompt carried, whole", () => {
-    // It is the only place either scope is stated — the type joins the JOURNAL,
-    // its group joins THIS CARD — and 1.0.33 shipped a patch for a reader
-    // surprised by exactly that. A field with no sentence is that patch undone.
+describe("the arrows that order the note types", () => {
+  it("are arrows, and they are the categories window's arrows", () => {
+    // *"implement up/down buttons to re-order note types within the edit
+    // window"*. The same control the reader asked for on the Attachments list
+    // in 1.0.49, so it is the same gesture, the same glyphs and the same
+    // disabled-at-the-end behaviour rather than a second idea of reordering.
     const c = code();
-    expect(c).toContain("Singular, as one note would be called.");
-    expect(c).toContain("and on this card only.");
-    expect(c).toContain("Settings → ChronoAnvil → Journals.");
+    expect(c).toContain('move(-1, "chevron-up", "up")');
+    expect(c).toContain('move(1, "chevron-down", "down")');
+    expect(readCode("ui/attach-categories-editor")).toContain(
+      'move(-1, "chevron-up", "up")'
+    );
   });
 
-  it("refuses a name the journal already has, and says which journal", () => {
+  it("re-orders the rows and nothing else, so a move undone costs nothing", () => {
+    // THE LIST IS THE ANSWER, NOT A SEQUENCE OF MOVES. Nothing records that a
+    // move happened; `commit` hands back the ids as the rows are showing.
     const c = code();
+    expect(c).toContain("const next = this.rows.slice();");
+    expect(c).toContain("next.splice(to, 0, ...next.splice(at, 1));");
+    expect(c).toContain("const ids = this.rows.map((r) => r.kind.id);");
+  });
+
+  it("says which end a row is already at, rather than going quiet", () => {
+    const c = code();
+    expect(c).toContain("const can = to >= 0 && to < this.rows.length;");
+    expect(c).toContain("btn.disabled = !can;");
     expect(c).toContain(
-      "(k) => k.label.trim().toLowerCase() === label.toLowerCase()"
+      "`${name} is already ${delta < 0 ? \"first\" : \"last\"}`"
     );
+  });
+
+  it("draws nothing at all where there is one type", () => {
+    // Both arrows could only ever be disabled, and a card with one note type
+    // composes no group heads either — there is not even a visible order.
+    expect(code()).toContain("if (this.rows.length < 2) return;");
+  });
+
+  it("writes the order into the note, because the fence order is the draw order", () => {
+    const c = code();
+    expect(c).toContain("await this.writeOrder(file);");
+    expect(c).toContain("const ctx = this.plugin.sections.contextFor(this.path);");
     expect(c).toContain(
-      "return `“${label}” is already a note type in ${this.type.name}.`"
+      "await this.app.vault.process(file, (text) => planKindOrder(text, ctx, ids) ?? text);"
     );
   });
 
-  it("treats an empty field as nothing asked for, not as an error", () => {
-    // The field is one part of a window a reader may have opened to change a
-    // column word. Validating it as required would make Save impossible for
-    // everything else the window does.
+  it("writes nothing when the rows are showing in the order they arrived", () => {
     const c = code();
-    expect(c).toContain("if (!label) return null;");
-    expect(c).toContain("if (label) {");
-  });
-});
-
-// ── what Save writes, and what does not wait for it ──────────────────────
-
-describe("the writes", () => {
-  it("writes only the rows that moved", () => {
-    // THE NO-OP-WRITE RULE, which this window could break more widely than
-    // anything that came before it: it holds every type on the card at once, so
-    // a loop that wrote them all would touch the frontmatter of a note whose
-    // tables nobody changed — moving its modified time, which is a lie about
-    // the reader's vault that sync then propagates.
-    const c = code();
-    expect(c).toContain("was: JSON.stringify(over)");
-    expect(c).toContain("if (JSON.stringify(row.over) === row.was) continue;");
+    expect(c).toContain("private readonly wasOrder: string[];");
+    expect(c).toContain("this.wasOrder = this.rows.map((r) => r.kind.id);");
     expect(c).toContain(
-      "await this.plugin.journals.setKindTable(file, row.kind.id, row.over);"
+      'if (ids.join("\\u0000") === this.wasOrder.join("\\u0000")) return;'
     );
   });
 
-  it("does not write a keystroke at a time", () => {
-    // The column words are text fields. A field that wrote on every keystroke
-    // would put a frontmatter write between two letters of a heading.
+  it("writes the body BEFORE the frontmatter, which is the safe order", () => {
+    // `processFrontMatter` re-reads the note and rewrites its property block
+    // alone, so it cannot lose a body change that has landed; a `vault.process`
+    // running after it could read a stale text and write the old frontmatter
+    // back. 1.0.34's cache lag, which bit three ways before it was named.
     const c = code();
-    const slot = c.slice(
-      c.indexOf("private renderColumnSlot("),
-      c.indexOf("private moveColumn(")
-    );
-    expect(slot).toContain('input.addEventListener("change", commit)');
-    expect(slot).toContain('input.addEventListener("blur", commit)');
-    expect(slot).not.toContain('addEventListener("input"');
-    // The add field's `input` listener is NOT this and is correct: it moves a
-    // string into `this.pending`, which is memory. Nothing reaches a note until
-    // Save either way, and scoping the sweep is what keeps that distinction
-    // visible rather than forbidding the event everywhere.
-    expect(c).toContain("this.pending = input.value;");
-  });
-
-  it("lets the removal out of the batch, deliberately", () => {
-    // `templates-one-word-1-0-46`'s rule: *a repair window must never be the
-    // write behind a confirmed gesture*. `promptRemoveKind` asks its own
-    // question and performs its own act — it deletes a template and may take
-    // the type out of the journal — so this window CLOSES and that one opens.
-    // A confirmation on top of an unsaved form asks a reader to agree to
-    // something while another window holds edits they have not committed.
-    const c = code();
-    const at = c.indexOf("gone.addEventListener");
-    expect(at).toBeGreaterThan(-1);
-    const body = c.slice(at, at + 300);
-    expect(body).toContain("this.close();");
-    expect(body).toContain("void this.removeKind(row.kind.id);");
-    expect(body.indexOf("this.close()")).toBeLessThan(body.indexOf("this.removeKind"));
-    // And it is NOT in the batch — `commit` says nothing about a removal.
-    const commit = c.slice(
-      c.indexOf("protected async commit()"),
-      c.indexOf("private async submitThen(")
-    );
-    expect(commit).not.toContain("removeKind");
-  });
-
-  it("draws the ✕ from the rule, not from the count again", () => {
-    // 1.0.24's TWO-QUESTION GATE, unchanged by the move. Whether a group may be
-    // OFFERED a removal is about this card — `removableKinds`, which also
-    // refuses an untitled group and a type the fence names but the journal has
-    // lost. Whether it may HAPPEN is about the whole journal and is
-    // `kindRemovalRefusal`, at the press. A `rows === 0` read again in this
-    // window would be a third answer to the first question.
-    const c = code();
-    expect(c).toContain("const removable = new Set(removableKinds(counted));");
-    expect(c).toContain("removable: removable.has(row.kindId)");
-    expect(c).toContain("if (row.removable) {");
-    // The row's own count is NOT what the control is drawn from.
-    expect(c).not.toContain("if (row.rows === 0) {");
-  });
-});
-
-// ── the one thing that stayed a mode ─────────────────────────────────────
-
-describe("the door into the selection mode", () => {
-  it("sits in the footer, because it ends the sitting", () => {
-    // It leaves the window — so it belongs beside Cancel and Save rather than
-    // in a body a reader is still editing.
-    const c = code();
-    expect(c).toContain("protected renderFooter(footer: HTMLElement): void {");
-    expect(c).toContain('pick.createSpan({ text: "Select notes…" })');
-    expect(c).toContain("super.renderFooter(footer);");
-  });
-
-  it("saves before it leaves, so the mode cannot open over uncommitted edits", () => {
-    const c = code();
-    expect(c).toContain("pick.addEventListener(\"click\", () => void this.submitThen(this.onPick));");
-    const then = c.slice(c.indexOf("private async submitThen("));
-    expect(then).toContain("const problem = this.validate();");
-    expect(then).toContain("await this.commit();");
-    expect(then).toContain("this.close();");
-    expect(then).toContain("run();");
-    expect(then.indexOf("this.commit()")).toBeLessThan(then.indexOf("this.close()"));
-  });
-
-  it("is absent where there is nothing to tick, not disabled", () => {
-    // The rule the `Edit` toggle it replaces already followed: it came and went
-    // with the rows. Disabled means *momentarily inapplicable*; absent means
-    // *there is nothing here*, and a card whose tables are all empty is the
-    // second.
-    const c = code();
-    expect(c).toContain("if (this.rows.every((r) => r.rows === 0)) {");
-    const at = c.indexOf("if (this.rows.every((r) => r.rows === 0)) {");
-    expect(c.slice(at, at + 200)).toContain("super.renderFooter(footer);");
-    expect(c.slice(at, at + 200)).toContain("return;");
-  });
-
-  it("asks the card again at the press, because the count is older than the window", () => {
-    // THE WINDOW'S COUNT IS A SNAPSHOT. A note can be filed, or the last one
-    // moved away, while a reader reads a form — so the handle `below-edit.ts`
-    // exposes asks the live card rather than turning the mode on over nothing.
-    // One predicate, two moments: the same `pathsOnScreen().length === 0` that
-    // closes the mode on a redraw declines to open it here.
-    const b = readCode("ui/widgets/below-edit");
-    expect(b).toContain("startPicking(): void {");
-    expect(b).toContain("notify.info(\"There are no notes on this card to select yet.\")");
-    expect(win()).toContain("private readonly onPick: () => void");
-  });
-
-  it("reaches the mode through the foot it was handed, never by looking for it", () => {
-    // The mode belongs to one render of one block. A window that went looking
-    // for it would find whichever card the query hit first, which on a note
-    // with two *What's below* cards is a coin toss.
-    expect(code()).toContain("foot()?.pick()");
-    expect(readSrc("ui/widgets/below-edit")).toContain(
-      "return { el: foot, pick: () => child.startPicking() };"
-    );
+    const order = c.indexOf("await this.writeOrder(file);");
+    const fm = c.indexOf("await this.plugin.journals.setKindTable(");
+    expect(order).toBeGreaterThan(-1);
+    expect(fm).toBeGreaterThan(order);
   });
 });
 
@@ -606,22 +493,16 @@ describe("how a slot is laid out", () => {
     expect(rule).toContain("flex-wrap: wrap");
   });
 
-  it("gives the word box its own line, which is what the wrap is for", () => {
-    // `100%` of a wrapping flex row IS a new line. Without it the box would
-    // squeeze the dropdown that opened it down to nothing.
-    expect(cssRule(".ca-note-type-word")).toContain("flex: 1 0 100%");
+  it("resets the arrows' height, because a chip-shaped button is 30px", () => {
+    // `obsidian-button-height`, and on a row of them that is the one thing that
+    // would make it ragged — a failure whose signature is looking fine.
+    expect(cssRule(".ca-note-type-move")).toContain("min-height: 0");
   });
 
-  it("resets the pencil's height, because a chip-shaped button is 30px", () => {
-    // `obsidian-button-height`, and beside a dropdown it is the one thing that
-    // would make the row ragged — a failure whose signature is looking fine.
-    expect(cssRule(".ca-note-type-rename")).toContain("min-height: 0");
-  });
-
-  it("says which pencil is open in ink as well as in ARIA", () => {
-    expect(cssRule('.ca-note-type-rename[aria-expanded="true"]')).toContain(
-      "color: var(--text-accent)"
-    );
+  it("says a spent arrow in ink, not only in `disabled`", () => {
+    // Obsidian leaves a `:disabled` button looking pressable, so the row would
+    // read as four live controls with two that do nothing.
+    expect(cssRule(".ca-note-type-move.is-static")).toContain("opacity: 0.35");
   });
 
   it("draws the title slot as a value, on the dropdowns' line", () => {

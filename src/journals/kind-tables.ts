@@ -87,11 +87,7 @@
 
 import type { App, TFile } from "obsidian";
 import { frontmatterOf } from "../core/util";
-import {
-  KIND_COLUMN_KEYS,
-  type KindColumnKey,
-  type KindColumnSource,
-} from "./kind-columns";
+import { KIND_COLUMN_KEYS, type KindColumnSource } from "./kind-columns";
 
 // The one property, spelled once.
 //
@@ -386,18 +382,19 @@ export function pageKind(
 // what this page would fall back to. Typing the word that is already there
 // stores nothing, so a heading a reader did not really change still follows the
 // note type when the note type is renamed.
-export function withHeading(
-  over: KindTableOverride,
-  key: KindColumnKey,
-  value: string,
-  inherited: string
-): KindTableOverride {
-  const text = value.trim();
-  const headings = { ...(over.headings ?? {}) };
-  if (!text || text === inherited.trim()) delete headings[key];
-  else headings[key] = text;
-  return compactOverride({ ...over, headings });
-}
+// ── AND THERE IS NO `withHeading` ANY MORE (1.0.72) ────────────────────
+//
+// *"Remove the pencil to edit the titles, I don't think it is necessary."* The
+// window's per-slot rename was this field's only writer, so the writer goes
+// with the control rather than sitting here unreachable — `test/dead-code.ts`'
+// own subject, and 1.0.69 deleted 324 lines for the same reason.
+//
+// THE FIELD IS STILL READ, and that is not an oversight. `cleanOverride` takes
+// it, `pageKind` lays it over the type's words and `isBlankOverride` counts it,
+// so an index page that already carries a word from 1.0.33 keeps drawing it.
+// Removing the read would re-word a reader's table on an update, which is a
+// worse thing to do to a vault than leaving an answer only Settings can change.
+// *Use the note type's own settings* is still the way out of one.
 
 // The same for the rating, where `null` means *stop saying anything*.
 export function withRated(
