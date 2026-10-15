@@ -29,18 +29,24 @@ import { describe, expect, it } from "vitest";
 import {
   KIND_TABLES_KEY,
   RATED_NONE,
+  cleanCols,
   cleanOverride,
   isBlankOverride,
   kindTableOverride,
   kindTablesIn,
   pageKind,
   storedKindTables,
+  withCols,
   withHeading,
   withKindTable,
   withRated,
 } from "../src/journals/kind-tables";
 import type { KindTableOverride } from "../src/journals/kind-tables";
-import { KIND_DATE_KEYS, kindColumns } from "../src/journals/kind-columns";
+import {
+  KIND_DATE_KEYS,
+  kindColumns,
+  offerableColumns,
+} from "../src/journals/kind-columns";
 import { slugify } from "../src/core/util";
 import type ChronoAnvilPlugin from "../src/main";
 import { readSrc } from "./sources";
@@ -374,3 +380,244 @@ describe("where it is read and written", () => {
 // `pageKind`, `withHeading`, `withRated`, `cleanOverride` and the two-levels-deep
 // storage shape. The writer moved; what it writes did not.
 
+
+// ── which columns one page draws, and in what order (1.0.71) ─────────────
+//
+// *"make columns drop-down menus instead of free-text"*, and what they choose
+// is this. The reader picked it over two other readings of the same sentence.
+//
+// THE REASON THIS COULD NOT BE DONE IN 1.0.67 was storage, and the plan said so
+// in as many words: *"a presence answer there would have to be a list whose
+// EMPTY value means 'none on this page' while its ABSENCE means 'inherit' — a
+// distinction Obsidian's own property editor does not reliably preserve."*
+// That is still true, which is why there is a sentinel and why every assertion
+// below about the empty case is about the sentinel instead.
+
+describe("a page that picks its own columns", () => {
+  const keys = (over: KindTableOverride): string[] =>
+    columns(over).map((c) => c.key);
+
+  it("draws them in the order it picked, not the derivation's", () => {
+    // THE HALF A SET COULD NOT CARRY. `kindColumns` draws the rating, then the
+    // status, then the date columns — a page saying "status first" has to be
+    // able to say where, not only whether.
+    expect(keys({ cols: ["status", "rating"] })).toEqual([
+      "name",
+      "status",
+      "rating",
+    ]);
+    expect(keys({ cols: ["rating", "status"] })).toEqual([
+      "name",
+      "rating",
+      "status",
+    ]);
+  });
+
+  it("keeps the title first, whatever the list says", () => {
+    // `cols[0]` is what `recordList` draws as the row's LINK, so it is the row
+    // rather than a column of it. A page that could drop it would be a page of
+    // rows nobody can open.
+    expect(keys({ cols: ["status"] })[0]).toBe("name");
+    // And naming it does not draw it twice beside itself.
+    expect(keys({ cols: ["name", "status"] })).toEqual(["name", "status"]);
+  });
+
+  it("can ask for a date column the note type never ticked on", () => {
+    // WHICH IS THE WHOLE POINT OF THE SCOPE. `KIND_DATE_DEFAULTS` is what every
+    // Lesson table in the vault draws; this is what one topic's draws, and the
+    // two disagreeing is the state the reader asked to be able to reach.
+    expect(keys({ cols: ["created", "statusdate"] })).toEqual([
+      "name",
+      "created",
+      "statusdate",
+    ]);
+    // The derivation would have drawn Modified and neither of those.
+    expect(keys({})).toContain("modified");
+    expect(keys({})).not.toContain("created");
+  });
+
+  it("replaces the derivation rather than filtering it", () => {
+    // Which is also what makes order expressible: `dates` is not consulted
+    // while `cols` is present, so a page asking for the status alone gets the
+    // status alone and not the status plus whatever the journal ticks.
+    expect(keys({ cols: ["status"] })).toEqual(["name", "status"]);
+  });
+
+  it("draws no rating column on a type that is rated on nothing", () => {
+    // A page may name the role — the dropdown offers what the page can draw,
+    // and a re-rating can happen after the list was written. The honest answer
+    // is no column rather than a heading over an empty gauge.
+    expect(keys({ cols: ["rating", "status"], rated: RATED_NONE })).toEqual([
+      "name",
+      "status",
+    ]);
+  });
+
+  it("ignores a role this build has not got", () => {
+    // The other half of `cleanCols` keeping an unknown entry: a list written by
+    // a later build survives a Save here and draws nothing here.
+    expect(keys({ cols: ["status", "sparkline"] })).toEqual(["name", "status"]);
+  });
+
+  it("keeps a page's own word for a column it moved", () => {
+    // 1.0.32's rule, which is the reason a column is keyed by its ROLE: the
+    // word follows the column rather than the position.
+    const over: KindTableOverride = {
+      cols: ["status", "rating"],
+      headings: { rating: "Score" },
+    };
+    expect(said(columns(over))).toEqual(["Lesson", "Status", "Score"]);
+  });
+});
+
+describe("the list that means the title alone", () => {
+  it("is a sentinel, because an empty list is not a value that survives", () => {
+    // `RATED_NONE` one field over, doing the same job for the same reason. One
+    // spelling per state — `setPageTemplate`'s scar.
+    expect(withCols({}, []).cols).toEqual([RATED_NONE]);
+    expect(columns({ cols: [RATED_NONE] }).map((c) => c.key)).toEqual(["name"]);
+  });
+
+  it("is never written as an empty list by anything", () => {
+    expect(withCols({}, ["status"]).cols).toEqual(["status"]);
+    expect(cleanCols([])).toBeNull();
+    expect(cleanOverride({ cols: [] })).toBeNull();
+  });
+
+  it("is an answer, so the entry stays in the note", () => {
+    // `isBlankOverride` decides whether the whole entry is REMOVED on Save. A
+    // page saying "title alone" is saying something, and a blank check that
+    // read only the other two fields would delete it on the way out — the
+    // answer would survive one Save and be gone after the next.
+    expect(isBlankOverride({ cols: [RATED_NONE] })).toBe(false);
+    expect(isBlankOverride({ cols: ["status"] })).toBe(false);
+    expect(
+      withKindTable(fmWith({}), "lesson", { cols: ["status"] })?.lesson
+    ).toEqual({ cols: ["status"] });
+  });
+
+  it("says nothing again when the page stops saying anything", () => {
+    expect(withCols({ cols: ["status"] }, null).cols).toBeUndefined();
+    expect(isBlankOverride(withCols({ cols: ["status"] }, null))).toBe(true);
+  });
+});
+
+describe("what a stored column list is read as", () => {
+  it("takes a scalar, which is what one chip comes back as", () => {
+    // `pageTypesIn`'s tolerance, one property over: a reader who went through
+    // Obsidian's property editor has a string where this expects a list.
+    expect(cleanCols("status")).toEqual(["status"]);
+  });
+
+  it("drops a repeat rather than drawing the column twice", () => {
+    expect(cleanCols(["status", "rating", "status"])).toEqual([
+      "status",
+      "rating",
+    ]);
+  });
+
+  it("keeps a role it does not understand", () => {
+    // `cleanHeadings`' reason: pruning here means opening an old vault in a new
+    // build silently deletes what a later one wrote.
+    expect(cleanCols(["status", "sparkline"])).toEqual(["status", "sparkline"]);
+  });
+
+  it("reads anything else as nothing said", () => {
+    expect(cleanCols(undefined)).toBeNull();
+    expect(cleanCols([1, 2])).toBeNull();
+    expect(cleanCols({})).toBeNull();
+  });
+
+  it("round-trips through the note as a list", () => {
+    // A LIST, WHICH IS WHAT OBSIDIAN RENDERS BEST — the argument `notetypes`
+    // makes one property over, and the reason the sentinel exists at all.
+    const over: KindTableOverride = { cols: ["status", "created"], rated: "accuracy" };
+    const fm = fmWith({ lesson: over });
+    expect((fm[KIND_TABLES_KEY] as Record<string, Record<string, unknown>>).lesson.cols)
+      .toEqual(["status", "created"]);
+    expect(kindTableOverride(fm, "lesson")).toEqual(over);
+  });
+});
+
+describe("one field changing does not drop another", () => {
+  // THE DEFECT THE SHARED BUILDER EXISTS TO STOP. Each `with*` used to carry
+  // the other fields across by restating them, which is correct for exactly as
+  // long as the number of fields does not change — and `cols` arriving made two
+  // of them silently drop it. A field surviving a rename and vanishing on the
+  // next re-rating is a defect a reader sees once and cannot explain.
+  const full: KindTableOverride = {
+    rated: "accuracy",
+    cols: ["status", "created"],
+    headings: { status: "State" },
+  };
+
+  it("keeps the list through a rename", () => {
+    expect(withHeading(full, "status", "Phase", "Status").cols).toEqual([
+      "status",
+      "created",
+    ]);
+  });
+
+  it("keeps the list through a re-rating", () => {
+    expect(withRated(full, "confidence").cols).toEqual(["status", "created"]);
+    expect(withRated(full, null).cols).toEqual(["status", "created"]);
+  });
+
+  it("keeps the words and the rating through a column change", () => {
+    const next = withCols(full, ["rating"]);
+    expect(next.rated).toBe("accuracy");
+    expect(next.headings).toEqual({ status: "State" });
+  });
+
+  it("still leaves the note when the last field goes", () => {
+    const one: KindTableOverride = { cols: ["status"] };
+    expect(isBlankOverride(withCols(one, null))).toBe(true);
+    expect(withKindTable(fmWith({ lesson: one }), "lesson", withCols(one, null)))
+      .toBeUndefined();
+  });
+});
+
+describe("what the window is allowed to offer", () => {
+  it("is derived from what the table can draw, not listed again", () => {
+    // A role that cannot be drawn must not be offered, and `kindColumns` is
+    // where that is decided — so the offer asks it rather than keeping a second
+    // list that could disagree.
+    expect(offerableColumns(plugin(), LESSON).map((c) => c.key)).toEqual([
+      "rating",
+      "status",
+      "created",
+      "modified",
+      "statusdate",
+    ]);
+  });
+
+  it("never offers the title, because it is the row", () => {
+    expect(offerableColumns(plugin(), LESSON).map((c) => c.key)).not.toContain(
+      "name"
+    );
+  });
+
+  it("withholds the rating where the page rates them on nothing", () => {
+    const page = pageKind(LESSON, { rated: RATED_NONE });
+    expect(offerableColumns(plugin(), page).map((c) => c.key)).not.toContain(
+      "rating"
+    );
+  });
+
+  it("offers every date column, not only the ticked ones", () => {
+    // The ticks are the JOURNAL's answer. A page is being asked a different
+    // question, and a menu that offered only what was already on could never
+    // add one.
+    const keys = offerableColumns(plugin(), LESSON).map((c) => c.key);
+    for (const d of KIND_DATE_KEYS) expect(keys).toContain(d);
+  });
+
+  it("offers each one under the word it would be drawn with", () => {
+    const over: KindTableOverride = { headings: { statusdate: "Moved on" } };
+    const words = offerableColumns(plugin(), pageKind(LESSON, over));
+    expect(words.find((c) => c.key === "statusdate")?.heading).toBe("Moved on");
+    // And the status column's word follows the STATUS TRACKER, which is why
+    // this fixture renames it: the built-in is `state`, labelled "📌 Status".
+    expect(words.find((c) => c.key === "status")?.heading).toBe("Status");
+  });
+});

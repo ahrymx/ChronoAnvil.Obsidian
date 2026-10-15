@@ -1749,9 +1749,15 @@ body.is-mobile .ca-list.is-editing {
 }
 .ca-note-type-rated { flex: 1 1 auto; min-width: 0; }
 
-/* ONE BOX PER COLUMN, WRAPPING. A type with a rating and all three date columns
-   draws six, which is more than a dialogue is wide — so they flow, and each one
-   keeps a width it can show a word in rather than being squeezed to a share. */
+/* ONE SLOT PER COLUMN, WRAPPING. A type with a rating and all three date
+   columns draws six, which is more than a dialogue is wide — so they flow, and
+   each one keeps a width it can show a word in rather than being squeezed to a
+   share.
+
+   A SLOT IS A DROPDOWN AND A PENCIL SINCE 1.0.71, and it was a text box before
+   that: *"make columns drop-down menus instead of free-text"*. The box is still
+   here — it is what the pencil opens — and it drops onto a second line of the
+   slot, which is why the slot is a column and the row inside it is not. */
 .ca-note-type-boxes {
   flex: 1 1 auto;
   min-width: 0;
@@ -1760,7 +1766,56 @@ body.is-mobile .ca-list.is-editing {
   gap: var(--ca-space-2);
 }
 .ca-note-type-col {
-  flex: 1 1 8em;
+  flex: 1 1 10em;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ca-space-1);
+}
+/* THE DROPDOWN TAKES THE SLOT AND THE PENCIL TAKES WHAT IS LEFT, so a column
+   whose word is long does not push the pencil onto a line of its own. */
+.ca-note-type-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* THE TITLE, WHICH IS SAID RATHER THAN CHOSEN. It reads as a value and not as a
+   control: no edge, no ground, the muted ink every label in this window has.
+   The height matches a `dropdown` so the first slot sits on the same line as
+   the rest rather than riding half a step high. */
+.ca-note-type-fixed {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--ca-space-2) 0;
+  font-size: var(--ca-text-sm);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* `obsidian-button-height`: a chip-shaped `<button>` is 30px until it is reset,
+   and beside a dropdown that is the one thing that would make the row ragged. */
+.ca-note-type-rename {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: var(--ca-space-1);
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: var(--text-faint);
+}
+.ca-note-type-rename:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-note-type-rename[aria-expanded="true"] {
+  color: var(--text-accent);
+}
+/* THE WORD BOX TAKES THE WHOLE SLOT, on the line under the dropdown that opened
+   it — `100%` of a wrapping flex row is a new line, which is the whole of how
+   it gets one. */
+.ca-note-type-word {
+  flex: 1 0 100%;
   min-width: 0;
 }
 .ca-note-type-reset {

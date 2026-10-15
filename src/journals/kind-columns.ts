@@ -75,6 +75,24 @@
 // difference is only that their default is not "off" for all three — see
 // `KIND_DATE_DEFAULTS`.
 //
+// ── AND ONE PAGE MAY PICK ITS OWN, IN ITS OWN ORDER (1.0.71) ────────────
+//
+// *"make columns drop-down menus instead of free-text"* — and what the
+// dropdowns in the Note types window choose is which columns that one index
+// note draws. `KindColumnSource.cols` is the field; `kind-tables.ts` is where
+// it is stored and why the list is never empty.
+//
+// IT REPLACES THE DERIVATION RATHER THAN FILTERING IT, which is what makes
+// ORDER expressible at all: a set could say the rating is drawn and could not
+// say it is drawn last. `dates` is therefore not consulted while `cols` is
+// present — a page that has named its columns has named all of them, and a
+// page naming a date column its note type never ticked on gets it.
+//
+// THE NAME IS STILL NOT A COLUMN. It is `cols[0]` and it is the row's title —
+// `recordList` draws it as the link — so it leads every list and is not in the
+// record. `offerableColumns` is what the window offers, and it is the name's
+// absence that makes that list exactly the choosable ones.
+//
 // ── WHY IT IS ITS OWN MODULE ────────────────────────────────────────────
 //
 // Two callers need the same answer and neither may import the other. The table
@@ -186,6 +204,20 @@ export interface KindColumnSource {
   // Which of the three date columns this kind draws, as DEPARTURES from
   // `KIND_DATE_DEFAULTS`. Absent means the defaults whole. See `packDates`.
   dates?: Record<string, boolean>;
+  // The columns AFTER THE NAME, in draw order, where one page has chosen them
+  // for itself. 1.0.71.
+  //
+  // ABSENT IS THE DERIVATION, which is every kind in every journal: the rating
+  // where there is one, then the status, then whichever date columns `dates`
+  // ticks on. Present, it replaces all three of those answers at once — a page
+  // that names its columns has named them, and `dates` is not consulted.
+  //
+  // IT IS NOT A SECOND WAY TO SET A JOURNAL'S DEFAULTS. Nothing in Settings
+  // writes this; `pageKind` is the only thing that fills it in, from the one
+  // index note's own frontmatter. The two live at different scopes on purpose
+  // — `dates` is what every Lesson table in the vault draws, this is what one
+  // topic's does.
+  cols?: readonly string[];
 }
 
 // A kind's table columns, in order, each with the word it shows and the word it
@@ -205,55 +237,115 @@ export function kindColumns(
   const ratingId = kind.rating ?? null;
   const ratingDef = ratingId ? getTracker(plugin, ratingId) ?? null : null;
 
-  const out: KindColumn[] = [
-    { key: "name", property: "", fallback: kind.label, heading: "" },
-  ];
-  if (ratingId) {
-    out.push({
-      key: "rating",
-      property: ratingId,
-      fallback: ratingNoun(ratingDef, ratingId),
-      heading: "",
-    });
-  }
-  out.push({
-    key: "status",
-    property: statusId,
-    fallback: ratingNoun(statusDef, "Status"),
-    heading: "",
-  });
-
-  // ── AND THE DATE COLUMNS THIS KIND HAS TICKED ON (1.0.67) ──────────────
+  // ONE DESCRIPTOR PER ROLE, BUILT IN ONE PLACE (1.0.71). The derivation below
+  // and a page's own list both need the same answer for the same role, and two
+  // constructions of it are two chances to give a column a different property
+  // in one of them — which draws the right heading over the wrong cell.
   //
-  // In `KIND_DATE_KEYS` order rather than the record's, so two kinds with the
-  // same three ticks draw them the same way round.
-  const ticks = datesOf(kind);
-  for (const key of KIND_DATE_KEYS) {
-    if (!ticks[key]) continue;
-    out.push({
-      key,
-      // `modified` READS NO PROPERTY, and the empty string already means that
-      // here — it is what `name` carries, which reads the note's filename. The
-      // cell goes to `file.stat.mtime`; there is no `modified:` key in a vault
-      // and this round deliberately does not create one.
-      property:
-        key === "created" ? "created" : key === "statusdate" ? STATUS_DATE_KEY : "",
-      // "Status changed", OFF THE STATUS TRACKER'S OWN WORD. A reader who
-      // renames Status to State gets "State changed" — which is 1.0.32's rule
-      // and the whole reason a column is keyed by its role. A literal here
-      // would be the fourth place the word lived.
-      fallback:
-        key === "created"
-          ? "Created"
-          : key === "modified"
-            ? "Modified"
-            : `${ratingNoun(statusDef, "Status")} changed`,
-      heading: "",
-    });
+  // NULL WHERE THE KIND CANNOT DRAW IT, which is only the rating: a page may
+  // name a `rating` column on a type that is rated on nothing, and the honest
+  // answer is no column rather than a heading over an empty gauge.
+  const describe = (key: string): KindColumn | null => {
+    switch (key) {
+      case "name":
+        return { key: "name", property: "", fallback: kind.label, heading: "" };
+      case "rating":
+        return ratingId
+          ? {
+              key: "rating",
+              property: ratingId,
+              fallback: ratingNoun(ratingDef, ratingId),
+              heading: "",
+            }
+          : null;
+      case "status":
+        return {
+          key: "status",
+          property: statusId,
+          fallback: ratingNoun(statusDef, "Status"),
+          heading: "",
+        };
+      case "created":
+        return { key: "created", property: "created", fallback: "Created", heading: "" };
+      case "modified":
+        // `modified` READS NO PROPERTY, and the empty string already means that
+        // here — it is what `name` carries, which reads the note's filename. The
+        // cell goes to `file.stat.mtime`; there is no `modified:` key in a vault
+        // and 1.0.67 deliberately did not create one.
+        return { key: "modified", property: "", fallback: "Modified", heading: "" };
+      case "statusdate":
+        return {
+          key: "statusdate",
+          property: STATUS_DATE_KEY,
+          // "Status changed", OFF THE STATUS TRACKER'S OWN WORD. A reader who
+          // renames Status to State gets "State changed" — which is 1.0.32's
+          // rule and the whole reason a column is keyed by its role. A literal
+          // here would be the fourth place the word lived.
+          fallback: `${ratingNoun(statusDef, "Status")} changed`,
+          heading: "",
+        };
+      // A ROLE THIS BUILD HAS NOT GOT draws nothing. `cleanCols` keeps an
+      // unknown entry so a list written by a later build survives a Save here;
+      // this is the other half of that, and it is the same silence a date
+      // column nobody ticked gets.
+      default:
+        return null;
+    }
+  };
+
+  // THE NAME IS NOT A CHOICE AND NEVER IN THE LIST. `cols[0]` is what
+  // `recordList` draws as the row's TITLE — the link a reader presses to open
+  // the note — so it is the row rather than a column of it, and a page that
+  // could drop it would be a page of rows nobody can open.
+  const out: KindColumn[] = [describe("name") as KindColumn];
+
+  if (kind.cols) {
+    // ── WHAT THIS ONE PAGE PICKED (1.0.71) ──────────────────────────────
+    //
+    // In the ORDER IT PICKED, which is the half of the answer a set could not
+    // carry, and `dates` is not consulted: a page naming its columns has named
+    // all of them. `RATED_NONE` is the list that means *the title alone* — see
+    // `kind-tables.ts` for why that state has a spelling rather than an empty
+    // list — and it describes nothing, so it falls out here with every other
+    // unknown role.
+    for (const key of kind.cols) {
+      const col = describe(key);
+      // Never the name twice: it is already the title, and a page that named
+      // it would draw the note's own filename in a second cell beside itself.
+      if (col && key !== "name") out.push(col);
+    }
+  } else {
+    if (ratingId) out.push(describe("rating") as KindColumn);
+    out.push(describe("status") as KindColumn);
+    // ── AND THE DATE COLUMNS THIS KIND HAS TICKED ON (1.0.67) ────────────
+    //
+    // In `KIND_DATE_KEYS` order rather than the record's, so two kinds with the
+    // same three ticks draw them the same way round.
+    const ticks = datesOf(kind);
+    for (const key of KIND_DATE_KEYS) {
+      if (ticks[key]) out.push(describe(key) as KindColumn);
+    }
   }
 
   for (const col of out) col.heading = headingOf(kind, col.key, col.fallback);
   return out;
+}
+
+// Every role a kind's table could draw after its name, in the order the
+// derivation would draw them. 1.0.71.
+//
+// WHAT THE WINDOW'S DROPDOWNS OFFER, and it is derived from `kindColumns`
+// rather than listed again: a role that cannot be drawn must not be offered,
+// and `describe` is where that is decided. Asking with `cols` cleared is how
+// this gets the WHOLE set rather than the page's chosen subset — the
+// derivation's own ticks are ignored too, because a page may add a date column
+// its note type has not ticked on.
+export function offerableColumns(
+  plugin: ChronoAnvilPlugin,
+  kind: KindColumnSource
+): KindColumn[] {
+  const all = { ...kind, cols: KIND_COLUMN_KEYS as readonly string[] };
+  return kindColumns(plugin, all).filter((c) => c.key !== "name");
 }
 
 // Which date columns a kind draws: the defaults with its own answers over them.

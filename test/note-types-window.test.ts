@@ -36,6 +36,7 @@
 
 import { describe, expect, it } from "vitest";
 import { cssRule, readCode, readCss, readSrc } from "./sources";
+import { COL_REMOVE, movedCols } from "../src/ui/note-types-window";
 
 const win = () => readSrc("ui/note-types-window");
 const code = () => readCode("ui/note-types-window");
@@ -218,27 +219,34 @@ describe("the per-page answers the ⋯ used to hold", () => {
   it("placeholds each box with the word a cleared box would show", () => {
     // WHICH IS WHAT MAKES "CLEAR IT TO GO BACK" VISIBLE rather than promised in
     // a sentence. The placeholder is this page's INHERITED word — the type's
-    // own, under this page's rating — so a reader who re-rated the type here
-    // sees the words that rating brings rather than the ones it replaced.
+    // own, under this page's rating and this page's chosen columns — so a
+    // reader who re-rated the type here sees the words that rating brings
+    // rather than the ones it replaced.
     const c = code();
-    expect(c).toContain("const base = inherited[i]?.heading ?? col.fallback;");
+    expect(c).toContain("const base = inherited[i + 1]?.heading ?? col.fallback;");
     expect(c).toContain("placeholder: base");
-    expect(c).toContain('box.value = row.over.headings?.[col.key] ?? "";');
-    expect(c).toContain("withHeading(row.over, col.key, box.value, base)");
+    expect(c).toContain('input.value = row.over.headings?.[col.key] ?? "";');
+    expect(c).toContain("withHeading(row.over, col.key, input.value, base)");
   });
 
-  it("derives the two column lists from one rating, so they can be paired by position", () => {
-    // `shown` and `inherited` differ only in their WORDS: the rating is this
-    // page's in both, and the rating is the only thing that decides which
-    // columns exist. Pairing by index would be wrong the moment that stopped
-    // being true, so it is stated rather than assumed.
+  it("strips only the WORDS to derive what a cleared box would show", () => {
+    // `shown` and `inherited` are paired BY POSITION, and that is only safe
+    // while the two lists are the same list. Two things decide which columns
+    // exist and in what order — the rating and `cols` — so `base` carries both
+    // and drops `headings` alone.
+    //
+    // THE DEFECT THIS IS THE FIX FOR, caught before it shipped: building `base`
+    // from `withRated({}, …)` was right until a page could choose its columns,
+    // and would then pair this page's chosen ORDER against the journal's
+    // derived one — putting the wrong placeholder under every box after the
+    // first difference, and so renaming the wrong column.
     const c = code();
     expect(c).toContain("const page = pageKind(row.kind, row.over);");
-    expect(c).toContain(
-      "const base = pageKind(row.kind, withRated({}, row.over.rated ?? null));"
-    );
+    expect(c).toContain("...(row.over.rated !== undefined ? { rated: row.over.rated } : {})");
+    expect(c).toContain("...(row.over.cols ? { cols: [...row.over.cols] } : {})");
     expect(c).toContain("shown: kindColumns(this.plugin, page)");
-    expect(c).toContain("inherited: kindColumns(this.plugin, base)");
+    expect(c).toContain("inherited: kindColumns(this.plugin, pageKind(row.kind, wordless))");
+    expect(c).not.toContain("withRated({}, row.over.rated ?? null)");
   });
 
   it("re-draws the boxes when the rating moves, because they are a different list", () => {
@@ -253,6 +261,174 @@ describe("the per-page answers the ⋯ used to hold", () => {
     expect(c).toContain("if (isBlankOverride(row.over)) return;");
     expect(c).toContain('text: "Use the note type\'s own settings"');
     expect(c).toContain("row.over = {};");
+  });
+});
+
+// ── the columns, 1.0.71 ──────────────────────────────────────────────────
+//
+// *"make columns drop-down menus instead of free-text"* — and of the three
+// readings that sentence has, the reader chose the one that is new capability:
+// WHICH columns this page shows, and in what order. Renaming, which is what the
+// boxes used to be, keeps its place behind a pencil on each slot.
+
+describe("a slot's dropdown, as arithmetic", () => {
+  // The pure half of `renderColumnSlot`, pulled out because it is the only part
+  // that can be wrong without LOOKING wrong: every other line is on screen the
+  // moment it draws, while a swap that drops a column instead of trading places
+  // draws a perfectly ordinary row of dropdowns.
+  it("replaces the role in the slot the reader used", () => {
+    expect(movedCols(["rating", "status"], 1, "created")).toEqual([
+      "rating",
+      "created",
+    ]);
+  });
+
+  it("swaps when the chosen role is already in another slot", () => {
+    // WHICH IS WHAT MAKES A ROW OF DROPDOWNS A REORDERING. Without this, moving
+    // Status to the front would draw Status twice and lose whatever was there —
+    // or, with the role withheld, would make reordering inexpressible.
+    expect(movedCols(["rating", "status"], 0, "status")).toEqual([
+      "status",
+      "rating",
+    ]);
+    expect(movedCols(["rating", "status", "created"], 2, "rating")).toEqual([
+      "created",
+      "status",
+      "rating",
+    ]);
+  });
+
+  it("appends from the slot past the end, which is the add row", () => {
+    expect(movedCols(["rating"], 1, "status")).toEqual(["rating", "status"]);
+    expect(movedCols([], 0, "status")).toEqual(["status"]);
+  });
+
+  it("takes the column out, which is how a page shows fewer", () => {
+    expect(movedCols(["rating", "status"], 0, COL_REMOVE)).toEqual(["status"]);
+    expect(movedCols(["status"], 0, COL_REMOVE)).toEqual([]);
+  });
+
+  it("is nothing at all when the add slot is left on its placeholder", () => {
+    // A `change` can fire back to the empty option, and freezing the list
+    // because the reader opened a menu and closed it is a write nobody asked
+    // for — the no-op-write rule, one level up from the file.
+    expect(movedCols(["rating"], 1, "")).toBeNull();
+  });
+
+  it("never edits the list it was handed", () => {
+    const picked = ["rating", "status"];
+    movedCols(picked, 0, "status");
+    movedCols(picked, 0, COL_REMOVE);
+    expect(picked).toEqual(["rating", "status"]);
+  });
+});
+
+describe("the row of dropdowns", () => {
+  it("offers what the table could draw, asked rather than listed again", () => {
+    const c = code();
+    expect(c).toContain(
+      "const offer = offerableColumns(this.plugin, pageKind(row.kind, row.over));"
+    );
+    expect(c).toContain('pick.createEl("option", { value: one.key, text: one.heading || one.fallback })');
+  });
+
+  it("draws the title as a word, because it is the row and not a column", () => {
+    // `recordList` draws `cols[0]` as the LINK. A page that could drop it or
+    // move it would be a page of rows nobody can open, so the first slot says
+    // what it is and carries no dropdown at all.
+    const c = code();
+    expect(c).toContain("if (!slot) {");
+    expect(c).toContain('cls: "ca-note-type-fixed"');
+    const at = c.indexOf("const lead = shown[0];");
+    expect(at).toBeGreaterThan(-1);
+    expect(c.slice(at, at + 260)).toContain("null, offer)");
+    expect(c).toContain("const picked = shown.slice(1).map((c) => c.key);");
+  });
+
+  it("keeps a role another slot holds, because picking it is the swap", () => {
+    // The ADD slot is the exception: there is no slot to trade with, so a role
+    // already shown would silently MOVE a column under a control that says it
+    // adds one.
+    expect(code()).toContain("if (!col && slot.picked.includes(one.key)) continue;");
+  });
+
+  it("stops offering to add one when there is nothing left to add", () => {
+    // `discoverability`'s rule: a menu that opens and then explains it cannot
+    // help is worse than no menu.
+    expect(code()).toContain("if (offer.some((c) => !picked.includes(c.key))) {");
+  });
+
+  it("offers removal in the slot's own menu, not as a second button", () => {
+    // ONE CONTROL PER SLOT. A ✕ beside each dropdown would be a second way to
+    // say the same thing, and `remove-not-delete` would then want the word
+    // twice over.
+    const c = code();
+    expect(c).toContain('pick.createEl("option", { value: COL_REMOVE, text: "Remove this column" })');
+    expect(c).not.toContain('"Add a column…", text');
+    expect(c).toContain('pick.createEl("option", { value: "", text: "Add a column…" })');
+  });
+
+  it("re-draws the whole list after a pick, because the slots moved", () => {
+    const c = code();
+    const at = c.indexOf("private moveColumn(");
+    expect(at).toBeGreaterThan(-1);
+    const body = c.slice(at, c.indexOf("private renderReset("));
+    expect(body).toContain("row.over = withCols(row.over, next);");
+    expect(body).toContain("this.renderBody();");
+  });
+
+  it("writes nothing to the note until Save, as every other answer here does", () => {
+    // `row.over` is the draft. The window's one write is `commit`, which is
+    // what makes Cancel mean cancel.
+    const c = code();
+    const at = c.indexOf("private moveColumn(");
+    const body = c.slice(at, c.indexOf("private renderReset("));
+    expect(body).not.toContain("processFrontMatter");
+    expect(body).not.toContain("withKindTable");
+  });
+});
+
+describe("the word for a column, now behind a pencil", () => {
+  it("is still per-page, because 1.0.33 shipped that and nobody asked for it back", () => {
+    // The dropdowns answered a different question. A box that was the only way
+    // to rename a column on one page cannot be replaced by a control that
+    // cannot rename anything.
+    const c = code();
+    expect(c).toContain("withHeading(row.over, col.key, input.value, base)");
+    expect(c).toContain('cls: "ca-note-type-word"');
+  });
+
+  it("names the column it renames, in both names a button has", () => {
+    const c = code();
+    expect(c).toContain("const why = `What this note calls the “${base}” column`;");
+    expect(c).toContain('pencil.setAttr("aria-label", why);');
+    expect(c).toContain('pencil.setAttr("title", why);');
+  });
+
+  it("opens one at a time, and says which is open", () => {
+    // `aria-expanded` is the only thing a screen reader has to tell a toggled
+    // pencil from an idle one, and `this.naming` holding a single key is what
+    // keeps the row from becoming a wall of text boxes.
+    const c = code();
+    expect(c).toContain('"aria-expanded": this.naming === col.key ? "true" : "false"');
+    expect(c).toContain("this.naming = this.naming === col.key ? null : col.key;");
+    expect(c).toContain("if (this.naming !== col.key) return;");
+  });
+
+  it("offers no pencil on the slot that has nothing to name yet", () => {
+    const c = code();
+    expect(c).toContain("if (!col) return;");
+  });
+
+  it("commits a word on leaving the box, never on a keystroke", () => {
+    // 1.0.33's rule and 1.0.49's scar both: a per-keystroke write re-reads the
+    // note mid-type and loses the rest of the word.
+    const c = code();
+    const at = c.indexOf("private renderColumnSlot(");
+    const body = c.slice(at, c.indexOf("private moveColumn("));
+    expect(body).toContain('input.addEventListener("change", commit);');
+    expect(body).toContain('input.addEventListener("blur", commit);');
+    expect(body).not.toContain('input.addEventListener("input"');
   });
 });
 
@@ -310,9 +486,18 @@ describe("the writes", () => {
     // The column words are text fields. A field that wrote on every keystroke
     // would put a frontmatter write between two letters of a heading.
     const c = code();
-    expect(c).toContain('box.addEventListener("change", commit)');
-    expect(c).toContain('box.addEventListener("blur", commit)');
-    expect(c).not.toContain('box.addEventListener("input"');
+    const slot = c.slice(
+      c.indexOf("private renderColumnSlot("),
+      c.indexOf("private moveColumn(")
+    );
+    expect(slot).toContain('input.addEventListener("change", commit)');
+    expect(slot).toContain('input.addEventListener("blur", commit)');
+    expect(slot).not.toContain('addEventListener("input"');
+    // The add field's `input` listener is NOT this and is correct: it moves a
+    // string into `this.pending`, which is memory. Nothing reaches a note until
+    // Save either way, and scoping the sweep is what keeps that distinction
+    // visible rather than forbidding the event everywhere.
+    expect(c).toContain("this.pending = input.value;");
   });
 
   it("lets the removal out of the batch, deliberately", () => {
@@ -408,6 +593,41 @@ describe("the door into the selection mode", () => {
     expect(readSrc("ui/widgets/below-edit")).toContain(
       "return { el: foot, pick: () => child.startPicking() };"
     );
+  });
+});
+
+describe("how a slot is laid out", () => {
+  it("wraps the slots rather than scrolling one long row", () => {
+    // Up to six slots on a window that is also a phone's width. `10em` is the
+    // basis rather than a fixed width, so three fit on a desktop and one fits
+    // on a phone without a breakpoint deciding it.
+    const rule = cssRule(".ca-note-type-col");
+    expect(rule).toContain("flex: 1 1 10em");
+    expect(rule).toContain("flex-wrap: wrap");
+  });
+
+  it("gives the word box its own line, which is what the wrap is for", () => {
+    // `100%` of a wrapping flex row IS a new line. Without it the box would
+    // squeeze the dropdown that opened it down to nothing.
+    expect(cssRule(".ca-note-type-word")).toContain("flex: 1 0 100%");
+  });
+
+  it("resets the pencil's height, because a chip-shaped button is 30px", () => {
+    // `obsidian-button-height`, and beside a dropdown it is the one thing that
+    // would make the row ragged — a failure whose signature is looking fine.
+    expect(cssRule(".ca-note-type-rename")).toContain("min-height: 0");
+  });
+
+  it("says which pencil is open in ink as well as in ARIA", () => {
+    expect(cssRule('.ca-note-type-rename[aria-expanded="true"]')).toContain(
+      "color: var(--text-accent)"
+    );
+  });
+
+  it("draws the title slot as a value, on the dropdowns' line", () => {
+    const rule = cssRule(".ca-note-type-fixed");
+    expect(rule).toContain("color: var(--text-muted)");
+    expect(rule).toContain("text-overflow: ellipsis");
   });
 });
 

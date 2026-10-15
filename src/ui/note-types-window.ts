@@ -62,17 +62,57 @@ import { removableKinds, type BelowFoot, type KindHost } from "./widgets/below-e
 import { notify } from "../core/notify";
 import { ratingChoices } from "../core/settings-editors";
 import type { JournalKind, JournalType } from "../journals/journal";
-import { kindColumns, ratingNoun, type KindColumn } from "../journals/kind-columns";
+import {
+  kindColumns,
+  offerableColumns,
+  ratingNoun,
+  type KindColumn,
+} from "../journals/kind-columns";
 import { getTracker } from "../trackers/trackers";
 import {
   RATED_NONE,
   isBlankOverride,
   kindTableOverrideOf,
   pageKind,
+  withCols,
   withHeading,
   withRated,
   type KindTableOverride,
 } from "../journals/kind-tables";
+
+// What the dropdown's last option is worth. NOT a role, and it cannot become
+// one: every role is a `KIND_COLUMN_KEYS` entry, all of which are bare
+// lowercase words.
+export const COL_REMOVE = "--remove";
+
+// One slot's dropdown, as arithmetic on the list it was drawn from.
+//
+// A PURE FUNCTION BECAUSE IT IS THE ONLY PART OF THE SLOT THAT CAN BE WRONG
+// WITHOUT LOOKING WRONG. Everything else in `renderColumnSlot` is visible on
+// screen the moment it is drawn; a swap that drops a column instead of trading
+// places with it draws a perfectly ordinary row of dropdowns. `null` is "the
+// reader chose the placeholder", which is not a change.
+export function movedCols(
+  picked: readonly string[],
+  at: number,
+  value: string
+): string[] | null {
+  if (value === "") return null;
+  const next = [...picked];
+  if (value === COL_REMOVE) {
+    next.splice(at, 1);
+  } else if (at >= next.length) {
+    next.push(value);
+  } else {
+    // THE SWAP, WHICH IS WHAT MAKES THE SLOTS A REORDERING. Where the chosen
+    // role is already somewhere else in the list, the two change places; where
+    // it is not, it simply replaces what was here.
+    const held = next.indexOf(value);
+    if (held >= 0) next[held] = next[at];
+    next[at] = value;
+  }
+  return next;
+}
 
 // One note type as this window is handed it: the kind itself, and the one fact
 // about the CARD that decides whether its row can be removed.
@@ -109,6 +149,10 @@ export class NoteTypesWindow extends EditorModal {
   // window's rule: two open editors over one list is a merge conflict a reader
   // cannot see. Here it is also what keeps the window the height of a list.
   private open_: string | null = null;
+  // Which column's rename box is open, by role, or null. ONE AT A TIME for the
+  // same reason the detail is — and here it also keeps the Columns row a row of
+  // dropdowns, which is what the reader asked it to be.
+  private naming: string | null = null;
 
   constructor(
     app: App,
@@ -274,28 +318,146 @@ export class NoteTypesWindow extends EditorModal {
     });
   }
 
-  // ONE BOX PER COLUMN THIS PAGE DRAWS, each opening on the override and
-  // placeheld with what the type calls it — which is the state that makes
-  // "clear it to go back" something a reader can see rather than something a
-  // sentence has to promise.
+  // ── ONE DROPDOWN PER COLUMN, AND THE TITLE IS NOT ONE (1.0.71) ────────
+  //
+  // *"make columns drop-down menus instead of free-text"*, and what they choose
+  // is WHICH columns this page draws. Four text boxes said only what each
+  // column was called and said nothing about what was available — a reader
+  // could rename Modified and had no way to ask for Created beside it.
+  //
+  // THE SLOT IS THE ORDER. Picking a role a later slot already holds SWAPS the
+  // two rather than drawing it twice, which is what makes a plain list of
+  // dropdowns a reordering control and saves this row a pair of arrows per
+  // line. Picking *Remove this column* takes the slot out; the trailing slot
+  // adds one.
+  //
+  // THE NAME COLUMN LEADS AND IS NOT OFFERED. It is the row's title — the link
+  // a reader presses — so it is drawn here as a label rather than as a dropdown
+  // with one option, which would read as a control that does not work.
+  //
+  // AND RENAMING SURVIVES, behind the pencil. It was this row's whole purpose
+  // until now and nothing asked for it to go; what it stops being is the only
+  // thing on offer. One box at a time, opened by the row it belongs to.
   private renderColumns(host: HTMLElement, row: Row): void {
     const { shown, inherited } = this.columnWords(row);
+    const offer = offerableColumns(this.plugin, pageKind(row.kind, row.over));
     const field = host.createDiv({ cls: "ca-note-type-field ca-note-type-cols" });
     field.createSpan({ cls: "ca-note-type-label", text: "Columns" });
     const boxes = field.createDiv({ cls: "ca-note-type-boxes" });
-    shown.forEach((col, i) => {
-      const base = inherited[i]?.heading ?? col.fallback;
-      const box = boxes.createEl("input", {
-        cls: "ca-note-type-col",
-        attr: { type: "text", placeholder: base, "aria-label": `What this note calls the “${base}” column` },
-      });
-      box.value = row.over.headings?.[col.key] ?? "";
-      const commit = (): void => {
-        row.over = withHeading(row.over, col.key, box.value, base);
-      };
-      box.addEventListener("change", commit);
-      box.addEventListener("blur", commit);
+
+    // THE TITLE, SAID RATHER THAN CHOSEN, and still renameable: a type called
+    // Practice whose column a reader wants headed "Exercise" is 1.0.32's
+    // original ask.
+    const lead = shown[0];
+    if (lead) {
+      this.renderColumnSlot(boxes, row, lead, inherited[0]?.heading ?? lead.fallback, null, offer);
+    }
+
+    const picked = shown.slice(1).map((c) => c.key);
+    shown.slice(1).forEach((col, i) => {
+      const base = inherited[i + 1]?.heading ?? col.fallback;
+      this.renderColumnSlot(boxes, row, col, base, { picked, at: i }, offer);
     });
+    // THE SLOT THAT ADDS ONE, drawn only while something is left to add. An
+    // *Add a column…* offering an empty menu is the control
+    // `discoverability.test.ts` refuses: *a menu that opens and then explains
+    // it cannot help is worse than no menu*.
+    if (offer.some((c) => !picked.includes(c.key))) {
+      this.renderColumnSlot(boxes, row, null, "", { picked, at: picked.length }, offer);
+    }
+  }
+
+  // One slot: the dropdown that says which column sits here, and the pencil
+  // that renames it.
+  //
+  // `slot` IS NULL FOR THE TITLE, which has no dropdown, and `col` is null for
+  // the trailing *Add a column…*, which has nothing to rename yet. The two
+  // nulls are what make this one function rather than three that would drift.
+  private renderColumnSlot(
+    host: HTMLElement,
+    row: Row,
+    col: KindColumn | null,
+    base: string,
+    slot: { picked: string[]; at: number } | null,
+    offer: readonly KindColumn[]
+  ): void {
+    const box = host.createDiv({ cls: "ca-note-type-col" });
+
+    if (!slot) {
+      box.createDiv({
+        cls: "ca-note-type-fixed",
+        text: col?.heading || base,
+      });
+    } else {
+      const pick = box.createEl("select", { cls: "dropdown ca-note-type-pick" });
+      if (!col) {
+        pick.createEl("option", { value: "", text: "Add a column…" });
+      }
+      for (const one of offer) {
+        // A ROLE ANOTHER SLOT HOLDS IS STILL OFFERED, because picking it is how
+        // the two are swapped. It is only withheld from the ADD slot, where
+        // there is no slot to swap it with and choosing it would silently move
+        // a column instead of adding one.
+        if (!col && slot.picked.includes(one.key)) continue;
+        pick.createEl("option", { value: one.key, text: one.heading || one.fallback });
+      }
+      if (col) {
+        pick.createEl("option", { value: COL_REMOVE, text: "Remove this column" });
+        pick.value = col.key;
+      } else {
+        pick.value = "";
+      }
+      pick.addEventListener("change", () => {
+        this.moveColumn(row, slot, pick.value);
+      });
+    }
+
+    // THE PENCIL, AND NOTHING WHERE THERE IS NOTHING YET TO NAME.
+    if (!col) return;
+    const pencil = box.createEl("button", {
+      cls: "ca-journal-btn-ghost ca-note-type-rename",
+      attr: { type: "button", "aria-expanded": this.naming === col.key ? "true" : "false" },
+    });
+    setIcon(pencil.createSpan({ cls: "ca-journal-btn-icon" }), "pencil");
+    const why = `What this note calls the “${base}” column`;
+    pencil.setAttr("aria-label", why);
+    pencil.setAttr("title", why);
+    pencil.addEventListener("click", () => {
+      this.naming = this.naming === col.key ? null : col.key;
+      this.clearError();
+      this.renderBody();
+    });
+    if (this.naming !== col.key) return;
+
+    const input = box.createEl("input", {
+      cls: "ca-note-type-word",
+      attr: { type: "text", placeholder: base, "aria-label": why },
+    });
+    input.value = row.over.headings?.[col.key] ?? "";
+    const commit = (): void => {
+      row.over = withHeading(row.over, col.key, input.value, base);
+    };
+    input.addEventListener("change", commit);
+    input.addEventListener("blur", commit);
+  }
+
+  // What a slot's dropdown did, applied to the page's list.
+  //
+  // READ OUT OF WHAT IS DRAWN, NOT OUT OF THE RECORD, because the record is
+  // absent until the first change: a page inheriting its journal's columns has
+  // no `cols` to edit, and `slot.picked` is that derivation written down. The
+  // first pick is therefore what FREEZES the list — which is the right moment,
+  // and is the same thing `withHeading` does to a word.
+  private moveColumn(
+    row: Row,
+    slot: { picked: string[]; at: number },
+    value: string
+  ): void {
+    const next = movedCols(slot.picked, slot.at, value);
+    if (!next) return;
+    row.over = withCols(row.over, next);
+    this.clearError();
+    this.renderBody();
   }
 
   private renderReset(host: HTMLElement, row: Row): void {
@@ -314,16 +476,24 @@ export class NoteTypesWindow extends EditorModal {
   }
 
   // The two readings of one set of columns: what this page shows, and what it
-  // would show with every box cleared. Paired by position, which is safe
-  // because the rating is the same in both — it is the only thing that decides
-  // which columns exist, and `base` carries this page's rating with the type's
-  // own WORDS.
+  // would show with every word cleared.
+  //
+  // PAIRED BY POSITION, WHICH IS ONLY SAFE BECAUSE `base` IS THE OVERRIDE
+  // MINUS ITS WORDS. Two things decide which columns exist and in what order —
+  // the rating and `cols` — and both are carried across; only `headings` is
+  // dropped, which is the one field that changes a word without changing a
+  // list. Building `base` from the rating alone was right until 1.0.71 and
+  // would now pair this page's chosen order against the journal's derived one,
+  // putting the wrong placeholder under every box after the first difference.
   private columnWords(row: Row): { shown: KindColumn[]; inherited: KindColumn[] } {
     const page = pageKind(row.kind, row.over);
-    const base = pageKind(row.kind, withRated({}, row.over.rated ?? null));
+    const wordless: KindTableOverride = {
+      ...(row.over.rated !== undefined ? { rated: row.over.rated } : {}),
+      ...(row.over.cols ? { cols: [...row.over.cols] } : {}),
+    };
     return {
       shown: kindColumns(this.plugin, page),
-      inherited: kindColumns(this.plugin, base),
+      inherited: kindColumns(this.plugin, pageKind(row.kind, wordless)),
     };
   }
 

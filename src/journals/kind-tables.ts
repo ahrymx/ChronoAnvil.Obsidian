@@ -45,14 +45,39 @@
 //     kindtables:
 //       lesson:
 //         rated: accuracy
+//         cols: [status, modified]
 //         name: Exercise
 //         rating: Score
 //
-// `rated` sits beside the headings rather than under a nested `headings:` map
-// because it cannot collide with one: the heading keys are `KIND_COLUMN_KEYS` —
-// `name`, `date`, `rating`, `status` — and `rated` is none of them. A third
-// level of YAML buys nothing and costs a reader looking at their own note two
-// more indents to read past.
+// `rated` and `cols` sit beside the headings rather than under a nested
+// `headings:` map because neither can collide with one: the heading keys are
+// `KIND_COLUMN_KEYS` — `name`, `rating`, `status`, `created`, `modified`,
+// `statusdate` — and neither of these is among them. A third level of YAML buys
+// nothing and costs a reader looking at their own note two more indents to read
+// past.
+//
+// ── AND `cols` IS WHICH COLUMNS, IN ORDER (1.0.71) ──────────────────────
+//
+// The reader's ask was about the window rather than the record: *"make columns
+// drop-down menus instead of free-text"*, and what the dropdowns choose is
+// which columns this page draws. 1.0.67 refused this answer and named the
+// reason, which was STORAGE rather than scope:
+//
+//   *"a presence answer there would have to be a list whose EMPTY value means
+//   'none on this page' while its ABSENCE means 'inherit' — a distinction
+//   Obsidian's own property editor does not reliably preserve."*
+//
+// That is still true of a plain list and is why this one is never empty.
+// `RATED_NONE` is the same `-` sentinel one field over, doing the same job: a
+// page that wants the title alone stores `cols: ["-"]`, which is present and
+// says so. Absent is the journal's own answer, as it is for every other field
+// here. One spelling per state — `setPageTemplate`'s scar, which this file
+// already cites for `rated`.
+//
+// THE NAME COLUMN IS NOT IN THE LIST, and cannot be. `cols[0]` is the row's
+// TITLE — `recordList` draws it as the link a reader presses to open the note
+// — so it is not a column a page can move or drop, it is the row. The list is
+// everything AFTER it, which is also the only part the window offers.
 //
 // ── ROLES AGAIN, NOT TRACKER IDS (1.0.32'S RULE, UNCHANGED) ──────────────
 //
@@ -182,6 +207,12 @@ export const RATED_NONE = "-";
 export interface KindTableOverride {
   /** A tracker id, `RATED_NONE`, or absent for the journal's own answer. */
   rated?: string;
+  /**
+   * The column roles after the name, in draw order; `[RATED_NONE]` for the
+   * title alone; absent for the journal's own answer. Never empty — see the
+   * sentinel's note at the top of this file.
+   */
+  cols?: string[];
   /** Column role → the word this page calls it. */
   headings?: Record<string, string>;
 }
@@ -235,6 +266,15 @@ export function cleanOverride(raw: unknown): KindTableOverride | null {
   const out: KindTableOverride = {};
   const headings: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    // `cols` IS THE ONE LIST-VALUED FIELD, so it is read before the string
+    // guard below rather than after it. A reader who typed one value into
+    // Obsidian's property editor has a scalar where this expects a list, which
+    // is the same tolerance `pageTypesIn` states one property over.
+    if (key === "cols") {
+      const list = cleanCols(value);
+      if (list) out.cols = list;
+      continue;
+    }
     if (typeof value !== "string") continue;
     const text = value.trim();
     if (!text) continue;
@@ -245,9 +285,66 @@ export function cleanOverride(raw: unknown): KindTableOverride | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+// One stored `cols` value as a list of roles, or null for *nothing said*.
+//
+// EVERY REJECTION IS THE SAME ANSWER AS SAYING NOTHING, which is this file's
+// rule for the whole property: an entry a build does not understand reads as
+// absent, and absent is the state every vault is already in. An empty list is
+// among those rejections — it is the value the sentinel exists to replace, and
+// a page that really means the title alone says `["-"]`.
+//
+// UNKNOWN ROLES ARE KEPT, for `cleanHeadings`' reason: a list written by a
+// later build naming a column this one has not got must survive a Save here,
+// or opening an old vault in a new one silently prunes it. `kindColumns` is
+// where an unknown role draws nothing.
+export function cleanCols(raw: unknown): string[] | null {
+  const many = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
+  const out: string[] = [];
+  for (const one of many) {
+    if (typeof one !== "string") continue;
+    const text = one.trim();
+    // DE-DUPLICATED, because the window swaps a role between two slots and a
+    // record holding it twice would draw the column twice.
+    if (!text || out.includes(text)) continue;
+    out.push(text);
+  }
+  return out.length > 0 ? out : null;
+}
+
 /** True where the note says nothing at all about this kind. */
 export function isBlankOverride(over: KindTableOverride): boolean {
-  return over.rated === undefined && over.headings === undefined;
+  return (
+    over.rated === undefined &&
+    over.cols === undefined &&
+    over.headings === undefined
+  );
+}
+
+// One entry rebuilt from its parts, with every empty field left out.
+//
+// ── WHY THE `with*` FUNCTIONS GO THROUGH THIS (1.0.71) ──────────────────
+//
+// Each of them changes ONE field and has to carry the others across, and each
+// used to spell that carrying out: `withHeading` restated `rated`, `withRated`
+// restated `headings`. That shape is correct for exactly as long as the number
+// of fields does not change, and the moment `cols` arrived it was two places
+// that would silently drop it — the field would survive a rename and vanish on
+// the next re-rating, which is a defect a reader sees once and cannot explain.
+//
+// One builder, three callers: a fourth field is added here and the carrying
+// follows. The omit-when-empty rule is the same one `withKindTable` relies on
+// — `isBlankOverride` is what decides the entry leaves the note altogether.
+function compactOverride(parts: {
+  rated?: string;
+  cols?: string[];
+  headings?: Record<string, string>;
+}): KindTableOverride {
+  const headings = parts.headings ?? {};
+  return {
+    ...(parts.rated !== undefined ? { rated: parts.rated } : {}),
+    ...(parts.cols && parts.cols.length > 0 ? { cols: [...parts.cols] } : {}),
+    ...(Object.keys(headings).length > 0 ? { headings: { ...headings } } : {}),
+  };
 }
 
 // The kind as THIS PAGE draws it: the journal's answer with the note's over it.
@@ -270,6 +367,12 @@ export function pageKind(
   return {
     label: kind.label,
     ...(rating ? { rating } : {}),
+    // THE LIST REPLACES, IT DOES NOT MERGE (1.0.71). A page that names its
+    // columns has named all of them — the order is half the answer, and an
+    // order merged with another order is not an order. `dates` stays the
+    // journal's and is simply not consulted while `cols` is present, which is
+    // `kindColumns`' branch rather than a second rule here.
+    ...(over.cols ? { cols: [...over.cols] } : kind.dates ? { dates: kind.dates } : {}),
     ...(Object.keys(headings).length > 0 ? { headings } : {}),
   };
 }
@@ -293,11 +396,7 @@ export function withHeading(
   const headings = { ...(over.headings ?? {}) };
   if (!text || text === inherited.trim()) delete headings[key];
   else headings[key] = text;
-  const out: KindTableOverride = {
-    ...(over.rated !== undefined ? { rated: over.rated } : {}),
-    ...(Object.keys(headings).length > 0 ? { headings } : {}),
-  };
-  return out;
+  return compactOverride({ ...over, headings });
 }
 
 // The same for the rating, where `null` means *stop saying anything*.
@@ -305,10 +404,27 @@ export function withRated(
   over: KindTableOverride,
   rated: string | null
 ): KindTableOverride {
-  return {
-    ...(rated !== null ? { rated } : {}),
-    ...(over.headings ? { headings: { ...over.headings } } : {}),
-  };
+  return compactOverride({
+    ...over,
+    ...(rated !== null ? { rated } : { rated: undefined }),
+  });
+}
+
+// The same for the column list, where `null` means *stop saying anything* and
+// an empty list means *the title alone*.
+//
+// THE SENTINEL IS WRITTEN HERE AND NOWHERE ELSE, so no caller has to know it.
+// A window hands this what the reader picked — which is a list that can be
+// empty, because a reader can take every column off — and the one value that
+// cannot be stored is turned into the one that can.
+export function withCols(
+  over: KindTableOverride,
+  cols: readonly string[] | null
+): KindTableOverride {
+  return compactOverride({
+    ...over,
+    cols: cols === null ? undefined : cols.length > 0 ? [...cols] : [RATED_NONE],
+  });
 }
 
 // The whole property, with one kind's entry replaced — or removed where the
@@ -339,11 +455,15 @@ export function withKindTable(
 // does the flattening so the writer cannot invent a third shape.
 export function storedKindTables(
   all: Record<string, KindTableOverride>
-): Record<string, Record<string, string>> {
-  const out: Record<string, Record<string, string>> = {};
+): Record<string, Record<string, string | string[]>> {
+  const out: Record<string, Record<string, string | string[]>> = {};
   for (const [kindId, over] of Object.entries(all)) {
-    const entry: Record<string, string> = {};
+    const entry: Record<string, string | string[]> = {};
     if (over.rated !== undefined) entry["rated"] = over.rated;
+    // A LIST, WHICH IS WHAT OBSIDIAN RENDERS BEST — the same argument
+    // `PAGE_TYPES_KEY` makes one property over. It is never empty, so the
+    // property editor has chips to draw rather than a blank it may not keep.
+    if (over.cols !== undefined) entry["cols"] = [...over.cols];
     for (const [key, value] of Object.entries(over.headings ?? {})) {
       entry[key] = value;
     }

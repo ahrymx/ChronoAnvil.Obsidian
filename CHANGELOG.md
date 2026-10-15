@@ -5,6 +5,31 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.71] - 2026-10-15
+
+### Added
+
+- **An index page picks which columns its tables show, and in what order.** The
+  **Columns** row of the Note types window was five text boxes, each of which
+  could only rename a column that was already there. It is now one dropdown per
+  column: the first says the note's title, which cannot move or be dropped — it
+  is the link the note opens by — and each one after it offers every column that
+  type can draw, plus **Remove this column**. Picking a column another slot
+  already holds swaps the two, which is how they are reordered, and a trailing
+  **Add a column…** shows while there is anything left to add. So one topic can
+  show **Created** where its journal shows **Modified**, put Status first, or
+  draw the title alone.
+- **Renaming a column on one page moved behind a pencil**, one per dropdown. It
+  does what the boxes did — the field is still placeheld with the word you would
+  get by clearing it — and only one is open at a time.
+
+### Changed
+
+- **A page's chosen columns replace the note type's, rather than filtering
+  them.** Which is what makes an order expressible: a page asking for Status
+  alone gets Status alone, and not Status plus whatever date columns the type
+  ticks. Say nothing and the type decides, exactly as before.
+
 ## [1.0.70] - 2026-10-15
 
 ### Fixed
