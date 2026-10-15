@@ -303,13 +303,55 @@ describe("where the control that reaches it is drawn", () => {
     // dashboard carrying a `kind-table:` under its third heading would otherwise
     // wear a cog on the first.
     const src = widgets();
-    expect(src).toContain('const belowHeader = headerOwning("kind-table");');
     expect(src).toContain(
       "if (title && belowType && belowHeader === headerIndex - 1) {"
     );
     expect(src).toContain("headTools(frame.root).appendChild(");
     expect(src).toContain("buildNoteTypesCog(");
     expect(src).toContain("() => belowFoot");
+  });
+
+  it("asks for the CARD's bar, not the group head above the first table", () => {
+    // THE DEFECT 1.0.69 SHIPPED, and the reader's report is the statement of
+    // it: *"the cog is below the sections header when it should be next to the
+    // left of the chevron opposite to 'What's Below', as it is with the
+    // attachments section."*
+    //
+    // THE TWO FENCES ARE NOT THE SAME SHAPE, which is why one filter is needed
+    // and the other is not. `attach:` lines hang directly under the section's
+    // bar — a shelf is a region and draws its own head below it — so the last
+    // titled header before the first one IS the card's. `childrenParts` writes
+    // a `header:2:` per note type where a journal has several, so the last
+    // titled header before the first `kind-table:` is the FIRST GROUP'S, and
+    // the cog landed beside 📖 Lessons' chevron looking like it was about
+    // Lessons.
+    const src = widgets();
+    expect(src).toContain('const shelfHeader = headerOwning("attach");');
+    expect(src).toContain('const belowHeader = headerOwning("kind-table", 1);');
+    // LEVEL AS THE RENDERER READS IT, not as the line writes it: a bare second
+    // `header:` draws as a group, and reading its written level here would call
+    // it a card bar when the page is drawing it as something inside one.
+    expect(src).toContain(
+      "if (atLevel === undefined || headerLevel(rest, seen === 0) === atLevel) {"
+    );
+    // The unfiltered walk is unchanged for the caller that wants it — `owner`
+    // follows `seen` on every titled head when no level is asked for.
+    expect(src).toContain("let owner = -1;");
+    expect(src).toContain("if (kw === keyword) return owner;");
+  });
+
+  it("is the level the composer actually writes, in both of its shapes", () => {
+    // ASSERTED FROM THE COMPOSER rather than from the renderer, because the
+    // filter is only right if `childrenBar` really is level 1 in both shapes it
+    // emits. It is: several note types get `🗂️ What's below` over `header:2:`
+    // group heads, and one note type gets that type's own name on the section
+    // bar with no group head under it at all.
+    const cat = readSrc("journals/journal-sections");
+    expect(cat).toContain("...(grouped ? [`header:2:${heading}`] : []),");
+    // And the section's own bar is written by `childrenBar`, which names no
+    // level — so it is the fence's first titled head and renders at 1.
+    expect(cat).toContain("export function childrenBar(");
+    expect(cat).not.toContain("header:2:What's below");
   });
 
   it("declines where the path resolves to no journal", () => {

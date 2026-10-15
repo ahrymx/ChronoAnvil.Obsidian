@@ -1255,14 +1255,46 @@ export class Widgets implements
       // with none. Computed in one pass up front rather than discovered during
       // the loop, because the button has to be placed when its header is drawn
       // and the `attach:` line proving it is a Resources bar comes later.
-      const headerOwning = (keyword: string): number => {
+      //
+      // ── AND WHICH LEVEL, WHERE THE NEAREST HEAD IS THE WRONG ONE (1.0.69) ──
+      //
+      // `atLevel` narrows the answer to the heads that render at that level,
+      // and a caller passing it gets the last one of those rather than the last
+      // head of any kind. The two callers want different things and the
+      // difference is in their fences:
+      //
+      //   `attach:` lines hang DIRECTLY under the section's bar — the shelves
+      //   are regions, not sections, and draw their own heads below it. The
+      //   nearest titled head IS the section's.
+      //
+      //   `kind-table:` lines do not. `childrenParts` composes `header:2:` per
+      //   note type where a journal has several, so the nearest titled head is
+      //   the FIRST GROUP'S — 📖 Lessons — and a cog placed there sits inside
+      //   the card, beside one type's chevron, looking like it is about that
+      //   type. It is about all of them.
+      //
+      // Level 1 is the card's own bar in both shapes the composer writes: `🗂️
+      // What's below` over the groups, or — where the journal has one note type
+      // and `grouped` is false — that type's own name on the section bar with
+      // no group head under it at all. A fence whose tables hang under no
+      // level-1 head gets -1, and no cog: there is no bar a reader would point
+      // at and call the card.
+      const headerOwning = (keyword: string, atLevel?: number): number => {
         let seen = -1;
+        let owner = -1;
         for (const line of lines) {
           const kw = line.split("|")[0].split(":")[0].trim();
-          if (kw === keyword) return seen;
+          if (kw === keyword) return owner;
           if (kw !== "header") continue;
-          if (parseHeaderDirective(line.slice(line.indexOf(":") + 1).trim()).title) {
-            seen++;
+          const rest = line.slice(line.indexOf(":") + 1).trim();
+          if (!parseHeaderDirective(rest).title) continue;
+          seen++;
+          // THE SAME DEMOTION RULE THE RENDERER USES, through the same helper —
+          // a bare second `header:` draws as a group, so reading its WRITTEN
+          // level here would call it a card bar when the page does not.
+          // `firstInFence` is asked of the titled heads only, which `seen` is.
+          if (atLevel === undefined || headerLevel(rest, seen === 0) === atLevel) {
+            owner = seen;
           }
         }
         return -1;
@@ -1273,12 +1305,13 @@ export class Widgets implements
       // stayed. Removing the scope button left the helper with one caller,
       // which is this one.
       const shelfHeader = headerOwning("attach");
-      // AND THE BAR THE KIND TABLES HANG UNDER (1.0.69), by the same walk. This
-      // is the bar a reader points at when they say *What's below*, so it is the
-      // one that carries the cog onto the whole card's note types. A fence with
-      // no titled header before its first `kind-table:` line gets none — there
-      // is nowhere to put it, and the card is then a bare run of groups.
-      const belowHeader = headerOwning("kind-table");
+      // AND THE BAR THE KIND TABLES HANG UNDER (1.0.69), by the same walk at
+      // LEVEL 1. This is the bar a reader points at when they say *What's
+      // below*, so it is the one that carries the cog onto the whole card's note
+      // types — never the group head directly above the first table, which is
+      // what the unfiltered walk returns and what 1.0.69 shipped: the cog sat
+      // inside the card beside 📖 Lessons' chevron, reading as that type's.
+      const belowHeader = headerOwning("kind-table", 1);
       const belowType = journalTypeAtPath(this.plugin, ctx.sourcePath);
       // The fence's first `attach:` line, verbatim, or null for a fence with
       // none. Compared by line rather than counted with a mutable flag because
@@ -1624,7 +1657,7 @@ export class Widgets implements
               buildCategoriesGlyph(this, ctx, title)
             );
           }
-          // ── AND THE NOTE TYPES COG, ON THE BAR THE TABLES HANG UNDER ────
+          // ── AND THE NOTE TYPES COG, ON THE CARD'S OWN BAR ──────────────
           //
           // The reader's ask, in their words: *"the cleanest and cohesive
           // solution would be just a cog wheel (matching those other sections),
@@ -1640,6 +1673,17 @@ export class Widgets implements
           // — a file carrying `kind-table:` lines from outside the journals root
           // — where *which journal does this add a type to* has no answer. The
           // same question `buildBelowFoot` declines on, asked once.
+          //
+          // AND NOT ON A GROUP HEAD, WHICH IS WHAT 1.0.69 SHIPPED. `belowHeader`
+          // asks for level 1 because `childrenParts` writes a `header:2:` per
+          // note type: the nearest titled head before the first `kind-table:` is
+          // 📖 Lessons, not 🗂️ What's below, so the cog landed inside the card
+          // beside one type's chevron. The reader's report is the test: *"the
+          // cog is below the sections header when it should be next to the left
+          // of the chevron opposite to What's Below, as it is with the
+          // attachments section."* The Attachments door needs no such filter —
+          // its shelves are regions under the section's own bar, so the nearest
+          // head already IS the card's.
           if (title && belowType && belowHeader === headerIndex - 1) {
             headTools(frame.root).appendChild(
               buildNoteTypesCog(

@@ -5,6 +5,22 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.70] - 2026-10-15
+
+### Fixed
+
+- **The Note types cog sat inside the card instead of on its bar.** It landed
+  beside the first note type's chevron — *Lessons* — rather than opposite
+  **What's below**, which read as a control over that one type.
+
+  The placement asks which `header:` line the tables hang under, and that walk
+  returned the nearest one. It is the right answer for an Attachments section,
+  whose shelves are regions drawn under the section's own bar, and the wrong one
+  here: a card listing several note types writes a second-level head per type,
+  so the nearest head is the first group's. The walk now asks for the card's own
+  bar — the level the composer writes for `What's below`, and for a journal with
+  a single note type the bar carrying that type's name.
+
 ## [1.0.69] - 2026-10-13
 
 ### Changed
