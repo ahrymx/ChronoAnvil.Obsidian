@@ -62,6 +62,15 @@
 // — `.ca-journal-head-tools + .ca-journal-header-toggle` is that order, written
 // down in the stylesheet since 4.13.
 //
+// AND THE FIRST CUT SHIPPED IT BROKEN IN THE EDITOR (1.0.79 §2): *"clicking the
+// chevron in edit mode completely hides the prose section."* The bar was a
+// widget anchored one position INSIDE the range that hid the run, and
+// CodeMirror skips every decoration strictly inside a replacement — so the only
+// control a folded block has was folded away with it. The fix is structural:
+// the bar is now the replacement rather than a widget beside one, which makes
+// the thing that cannot be hidden the thing doing the hiding.
+// `prose-surface.ts::foldedRange` carries the arithmetic and the reasoning.
+//
 // WHY THE DOM LIVES HERE AND NOT IN `prose-surface.ts`. That module is the
 // painter — two passes that put classes where the FILE says — and 1.0.75's test
 // swept it for `createDiv`/`createEl` to hold the head to an attribute. The

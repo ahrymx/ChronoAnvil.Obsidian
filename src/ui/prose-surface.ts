@@ -503,40 +503,69 @@ class ProseBarWidget extends WidgetType {
 // What a folded block hides, as one range, and why that range starts where it
 // does.
 //
-// IT TAKES THE BREAK BEFORE THE RUN, NOT THE BREAK AFTER IT, and that is
-// `marker-lines.ts::hiddenRanges`' own asymmetry rather than a taste. A range
-// over `[firstLine.from, lastLine.to]` leaves both breaks standing, so the fold
-// would collapse the writing and leave one empty row where it was. Taking the
-// leading break instead merges the whole run upward into the opener's row —
-// which is itself already merged into the line above it, because the markers'
-// own range took ITS leading break for the same reason.
+// ── IT COVERS WHOLE LINES, AND IT RUNS TO THE CLOSING MARKER (1.0.79 §2) ─
 //
-// AND THE TWO RANGES TOUCH RATHER THAN OVERLAP. The markers' range ends at the
-// opener line's `.to`; this one begins there. Two replace ranges from two state
-// fields sharing one endpoint is composition, which CodeMirror does; two that
-// overlapped would be a conflict neither field could see.
+// 1.0.79 SHIPPED THIS WRONG AND THE REPORT WAS *"clicking the chevron in edit
+// mode completely hides the prose section"*. The first cut took the break
+// BEFORE the run — `[openerLine.to, lastLine.to]` — on `marker-lines.ts`'
+// argument that a leading break merges the hidden rows upward and leaves no
+// empty row. That half was right. What it missed is that the BAR was a separate
+// widget anchored at the first row's start, which is one position INSIDE that
+// range: `SpanCursor.next` advances the cursor past a point's `to` the moment it
+// emits it, so every decoration strictly inside a replace range is skipped, and
+// the fold swallowed the control that was supposed to bring it back.
+//
+// SO THE BAR IS THE REPLACEMENT NOW, not a widget beside one — see `proseIn`.
+// A folded block is `Decoration.replace({ widget, block: true })` over the whole
+// block, which makes the thing that cannot be hidden the thing doing the hiding.
+// A point AT a range's `from` is still emitted, so anchoring the old widget one
+// character earlier would also have drawn it; it would not have fixed the row
+// under it, and that is the rest of this comment.
+//
+// FROM A LINE START TO A LINE END, which is what a block replacement has to
+// cover. Both ends of the old range sat mid-line.
+//
+// AND IT RUNS PAST THE WRITING TO THE CLOSING MARKER, which is the half that
+// takes the blank row out. Hidden text needs a line box to live on, and
+// `ContentBuilder.point` opens a fresh one for any replacement that arrives with
+// no line open — a block widget closes the line before it, so the closing
+// marker's own hidden range, which begins exactly where the writing ends, would
+// get an empty `.cm-line` of its own directly under the folded card. Reaching to
+// the marker's last character absorbs it instead: `SpanCursor.next` drops *"any
+// non-empty points that end precisely at the end of the prev point"*, so one
+// range ends where both would have, and `Decoration.replace({ block: true })` is
+// inclusive at both ends by default (`getInclusive` defaults to `block`), which
+// is what stops a line being opened after it either.
+//
+// THE OPENER IS LEFT TO `marker-lines.ts`, deliberately. It merges upward into
+// the row above it, so the line that holds it has visible content and needs
+// nothing from us. Only the end of the block is ours to close.
 //
 // `span.from > 0` IS ALWAYS TRUE and is asserted anyway: a prose surface is the
-// writing INSIDE two markers, so there is always an opener above it. A run that
-// started the document would have no leading break to take and would need the
-// trailing one, which is the shape `hiddenRanges` keeps a branch for.
+// writing INSIDE two markers, so there is always an opener above it.
 //
-// AND IT TAKES A `{ from, to }` RATHER THAN A `ProseSurface`, which is the only
-// reason `foldedSet` can call it. The decoration that HIDES a run and the atomic
-// range that stops a cursor reaching into it have to be the same two offsets, and
-// a second copy of this expression is how they would come apart — a narrower
-// atomic range leaves a position inside hidden text that an arrow key still
-// reaches, which is invisible until a reader types there.
+// AND IT TAKES A SHAPE RATHER THAN A `ProseSurface`, so the one caller that is
+// not `proseIn` can hand it three numbers. The decoration that HIDES a run and
+// the atomic range that stops a cursor reaching into it have to be the same two
+// offsets; `proseIn` computes them once and `ProsePaint` carries them, so there
+// is no second copy of this expression to come apart from the first.
 function foldedRange(
   doc: Text,
-  span: { from: number; to: number }
+  span: { from: number; to: number; close: number }
 ): { from: number; to: number } | null {
-  if (span.from <= 0 || span.from > span.to || span.to + 1 > doc.lines) return null;
-  return { from: doc.line(span.from).to, to: doc.line(span.to + 1).to };
+  if (span.from <= 0 || span.from > span.to || span.to >= span.close) return null;
+  if (span.close + 1 > doc.lines) return null;
+  return { from: doc.line(span.from + 1).from, to: doc.line(span.close + 1).to };
 }
 
 interface ProsePaint {
   deco: DecorationSet;
+  // The folded blocks as OFFSETS, computed once by the loop below and handed
+  // to `atomicRanges` unchanged. Recomputing them there would be the second
+  // copy of `foldedRange`'s arithmetic that 1.0.79's twelfth mutant was: a
+  // narrower atomic range leaves a position inside hidden text that an arrow
+  // key still reaches, and nothing on screen says so.
+  hidden: { from: number; to: number }[];
   // The folded runs as whole LINES, which is what both guards are given. Line
   // numbers rather than offsets because `protectLines` takes a `LineSpan` and
   // `atomicRanges` is built from the same two lines one call later — one list,
@@ -548,37 +577,47 @@ interface ProsePaint {
 function proseIn(doc: Text, plugin: ChronoAnvilPlugin, path: string | null): ProsePaint {
   const out: Range<Decoration>[] = [];
   const shut: LineSpan[] = [];
+  const hidden: { from: number; to: number }[] = [];
   for (const span of livePreviewSpans(doc.toString().split("\n"))) {
     // A BLOCK WITH NO HEAD HAS NO CHEVRON AND THEREFORE NO FOLD (1.0.79). The
     // control lives on the title row, so a `#bare` block cannot be folded and
     // a note written before the markers existed has no block to fold at all.
     // Reaching the record anyway would let a fold survive the head being
     // turned off, with nothing on screen to turn it back.
-    const folded =
-      span.head !== null && proseFolded(plugin, path, span) && foldedRange(doc, span) !== null;
-    if (folded) {
-      const range = foldedRange(doc, span);
-      if (range) {
-        shut.push({ from: span.from, to: span.to });
-        out.push(HIDE_RUN.range(range.from, range.to));
-      }
-    } else {
-      for (let n = span.from; n <= span.to && n < doc.lines; n++) {
-        const cls = [PROSE_BLOCK_CLASS];
-        // THE TOP EDGE IS THE BAR'S WHERE THERE IS A BAR (1.0.78). Two elements
-        // carrying `is-prose-first` would be two rounded tops and two paddings,
-        // one of them in the middle of the card — so the line gets it only on a
-        // block that draws no head, which is `#bare` and every block written
-        // before 1.0.75.
-        if (n === span.from && span.head === null) cls.push(PROSE_FIRST_CLASS);
-        if (n === span.to) cls.push(PROSE_LAST_CLASS);
-        out.push(Decoration.line({ class: cls.join(" ") }).range(doc.line(n + 1).from));
-      }
+    const head = span.head;
+    const range =
+      head !== null && proseFolded(plugin, path, span) ? foldedRange(doc, span) : null;
+    if (range && head !== null) {
+      shut.push({ from: span.from, to: span.to });
+      hidden.push(range);
+      // THE BAR IS WHAT REPLACES THE BLOCK (1.0.79 §2), rather than a widget
+      // drawn beside a range that hid it — which is the bug the first cut
+      // shipped. One decoration draws the only control a folded block has and
+      // takes out every row it folds, so the two cannot disagree about which
+      // rows those are and the control cannot land inside them.
+      out.push(
+        Decoration.replace({
+          widget: new ProseBarWidget(head, span.nth, span.title, true, plugin),
+          block: true,
+        }).range(range.from, range.to)
+      );
+      continue;
     }
-    if (span.head === null || span.from >= doc.lines) continue;
+    for (let n = span.from; n <= span.to && n < doc.lines; n++) {
+      const cls = [PROSE_BLOCK_CLASS];
+      // THE TOP EDGE IS THE BAR'S WHERE THERE IS A BAR (1.0.78). Two elements
+      // carrying `is-prose-first` would be two rounded tops and two paddings,
+      // one of them in the middle of the card — so the line gets it only on a
+      // block that draws no head, which is `#bare` and every block written
+      // before 1.0.75.
+      if (n === span.from && head === null) cls.push(PROSE_FIRST_CLASS);
+      if (n === span.to) cls.push(PROSE_LAST_CLASS);
+      out.push(Decoration.line({ class: cls.join(" ") }).range(doc.line(n + 1).from));
+    }
+    if (head === null || span.from >= doc.lines) continue;
     out.push(
       Decoration.widget({
-        widget: new ProseBarWidget(span.head, span.nth, span.title, folded, plugin),
+        widget: new ProseBarWidget(head, span.nth, span.title, false, plugin),
         // ABOVE THE ROW, NOT BESIDE IT. `block` makes the widget a row of its
         // own between two lines, and a negative `side` puts it before the line
         // it is anchored to — the two halves of "draw this above the writing".
@@ -589,18 +628,15 @@ function proseIn(doc: Text, plugin: ChronoAnvilPlugin, path: string | null): Pro
   }
   // SORTED, because a widget and the line decoration beside it are pushed in
   // the order the loop meets them and `Decoration.set` is handed both.
-  return { deco: out.length ? Decoration.set(out, true) : Decoration.none, shut };
+  return { deco: out.length ? Decoration.set(out, true) : Decoration.none, shut, hidden };
 }
 
-// The folded writing renders as nothing at all, the way reading mode renders a
-// hidden block — no widget, no class, and `marker-lines.ts`' own `HIDE` one
-// file over is the same decoration for the same reason.
-//
-// NOT `block: true`. A block replace would take the rows out of the layout as a
-// unit and is the obvious reading of "fold these lines"; the inline form is the
-// one this plugin has shipped since 5.31 and the one the markers are drawn with,
-// and it composes with them at the shared endpoint. The proven shape wins over
-// the tidy one on a range that is hiding the reader's own writing.
+// WHAT THE ATOMIC RANGE IS MADE OF, and nothing else as of 1.0.79 §2. The
+// HIDING is the bar's own block replacement, built in `proseIn`; `atomicRanges`
+// takes a `DecorationSet` and cares only about where the ranges are, so the
+// cheapest honest value to put in one is an empty replacement over the same two
+// offsets — `marker-lines.ts`' own `HIDE` one file over is the same decoration
+// in the same role.
 const HIDE_RUN = Decoration.replace({});
 
 interface Painted {
@@ -608,9 +644,16 @@ interface Painted {
   deco: DecorationSet;
   /** The folded runs, as whole lines. Empty in source mode, where nothing folds. */
   shut: readonly LineSpan[];
+  /** The same folded blocks as offsets, for the atomic ranges. */
+  hidden: readonly { from: number; to: number }[];
 }
 
-const NOTHING_PAINTED: Painted = { live: false, deco: Decoration.none, shut: [] };
+const NOTHING_PAINTED: Painted = {
+  live: false,
+  deco: Decoration.none,
+  shut: [],
+  hidden: [],
+};
 
 function stateOf(state: EditorState, plugin: ChronoAnvilPlugin): Painted {
   // SOURCE MODE PAINTS NOTHING, which is `marker-lines.ts`' gate and the same
@@ -625,8 +668,8 @@ function stateOf(state: EditorState, plugin: ChronoAnvilPlugin): Painted {
   const live = state.field(editorLivePreviewField, false) === true;
   if (!live) return NOTHING_PAINTED;
   const path = state.field(editorInfoField, false)?.file?.path ?? null;
-  const { deco, shut } = proseIn(state.doc, plugin, path);
-  return { live, deco, shut };
+  const { deco, shut, hidden } = proseIn(state.doc, plugin, path);
+  return { live, deco, shut, hidden };
 }
 
 // A FIELD BUILT PER PLUGIN INSTANCE RATHER THAN A MODULE CONSTANT, which is the
@@ -684,24 +727,23 @@ export function proseSurface(plugin: ChronoAnvilPlugin): Extension {
   ];
 }
 
-// The folded runs as the range set `atomicRanges` takes.
+// The folded blocks as the range set `atomicRanges` takes.
 //
-// BUILT FROM THE SAME LIST THE CHANGE FILTER READS AND THROUGH THE SAME
-// ARITHMETIC THE DECORATION USES. Three things have to agree about a folded run
-// — what is hidden, what a cursor steps over, and what a keystroke is refused on
-// — and they agree by construction: one list (`Painted.shut`) through one
-// function (`foldedRange`). A measured mutant narrowed a second copy of that
-// expression and nothing noticed, which is why there is no longer a second copy.
+// IT RE-RANGES WHAT THE PAINT ALREADY DECIDED AND COMPUTES NOTHING. Three things
+// have to agree about a folded block — what is hidden, what a cursor steps over,
+// and what a keystroke is refused on — and they agree by construction: the
+// offsets are `proseIn`'s, carried on the field, and the lines are the same
+// loop's. A measured mutant narrowed a second copy of the arithmetic and nothing
+// noticed, which is why this function no longer holds one: there is no
+// `state.doc.line(` below, and a sweep asserts there is not.
 function foldedSet(
   state: EditorState,
   field: StateField<Painted>
 ): DecorationSet {
-  const shut = state.field(field, false)?.shut ?? [];
-  if (!shut.length) return Decoration.none;
-  const out: Range<Decoration>[] = [];
-  for (const span of shut) {
-    const range = foldedRange(state.doc, span);
-    if (range) out.push(HIDE_RUN.range(range.from, range.to));
-  }
-  return out.length ? Decoration.set(out, true) : Decoration.none;
+  const hidden = state.field(field, false)?.hidden ?? [];
+  if (!hidden.length) return Decoration.none;
+  return Decoration.set(
+    hidden.map((range) => HIDE_RUN.range(range.from, range.to)),
+    true
+  );
 }

@@ -634,8 +634,22 @@
   text-transform: none;
   /* The bar's own division, down to the token. */
   border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
-  padding-bottom: var(--ca-sec-pad);
-  margin-bottom: 10px;
+  /* FULL BLEED, BY CANCELLING THE BLOCK'S INSET (1.0.79 §2). *"the hairline
+     should extend to both edges (as it does on tasks)."* It did not, and the
+     reason is that this bar is the only one in the plugin drawn INSIDE the
+     surface it heads: every other head is `.ca-journal-sec-l1` on its own block,
+     and the rule two hundred lines up gives that one `padding: 8px
+     var(--ca-sec-pad-x) 6px` with a matching negative margin for exactly this.
+     A rule that stops 20px short of the card's edges reads as an underline on
+     the title; one that meets them reads as the edge of a header — which is the
+     argument that rule already makes, now made in both places.
+
+     THE SAME VARIABLE IN BOTH HALVES, never a literal. The block's inset is
+     20px here, 14px below the phone breakpoint, and 0 where a field zeroes it;
+     a bleed written as a number would hang past the edge at one width and stop
+     short at another. */
+  padding: 0 var(--ca-sec-pad-x) var(--ca-sec-pad);
+  margin: 0 calc(-1 * var(--ca-sec-pad-x)) 10px;
 }
 /* A LONG NAME ELLIPSISES RATHER THAN WRAPPING, which is the rule the bar's
    title already follows: two lines of head would push the writing down by a row

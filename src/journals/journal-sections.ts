@@ -933,6 +933,22 @@ export interface ProseSurface {
   // without putting an id on the marker that nothing else would read.
   /** The title on the marker, or null where the reader has not named the block. */
   title: string | null;
+  // ── AND THE LINE THE BLOCK CLOSES ON (1.0.79 §2) ──────────────────────
+  //
+  // `from`/`to` are the WRITING, trimmed inward past blank rows; this is the
+  // closing marker itself. It is here because a folded block in Live Preview is
+  // replaced by one block widget — its bar — and that replacement has to reach
+  // the end of the block, not the end of the writing. A range that stops at
+  // `to` leaves the closing marker's own hidden range needing a line of its own
+  // to live on, and an empty `.cm-line` under a folded card is exactly the
+  // blank row the break-before arithmetic was chosen to avoid.
+  //
+  // THE OPENER IS DELIBERATELY NOT HERE. It merges UPWARD into the row above
+  // it — `marker-lines.ts` has taken the break before a marker run since 5.31 —
+  // so the line holding it has visible content and needs nothing from us. Only
+  // the end of the block is ours to close.
+  /** The closing marker's line, 0-based. */
+  close: number;
 }
 
 export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
@@ -956,6 +972,7 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
         head: span.bare ? null : proseHeadLabel(span.title, i + 1),
         nth: i + 1,
         title: span.title,
+        close: span.close,
       });
     }
   });

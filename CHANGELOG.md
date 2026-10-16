@@ -5,6 +5,33 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.80] - 2026-10-16
+
+### Fixed
+
+- **Folding a prose block in Live Preview hid the block's own bar.** *"clicking
+  the chevron in edit mode completely hides the prose section."* 1.0.79's fold
+  took the line break before the run so the collapsed rows would merge upward
+  and leave no blank row — which was right — and then anchored the bar one
+  position inside that range. CodeMirror skips every decoration strictly inside
+  a replacement, so the one control a folded block has was folded away with it
+  and there was no way back short of switching modes.
+  - **The bar is now the replacement, not a widget beside one.** A folded block
+    is a single block decoration that both draws the bar and takes out every row
+    it folds, so the control cannot land inside what it hides and the two cannot
+    disagree about which rows those are.
+  - The replacement runs from the first line of the writing to the closing
+    marker. Hidden text needs a row to live on and a block widget closes the row
+    before it, so stopping at the writing left the closing marker opening an
+    empty line directly under the folded card.
+- **The hairline under a prose block's title now reaches both edges**, the way
+  every other section's does. *"the hairline should extend to both edges (as it
+  does on tasks)."* It stopped 20px short of each because this is the only head
+  in the plugin drawn inside the surface it heads; it now cancels the block's
+  inset with a negative margin, which is the move the section bar's rule has
+  made since 2.56.0 — a rule that stops short of a card's edges reads as an
+  underline on the title, one that meets them reads as the edge of a header.
+
 ## [1.0.79] - 2026-10-16
 
 ### Added
