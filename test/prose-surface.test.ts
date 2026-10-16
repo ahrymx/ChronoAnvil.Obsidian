@@ -42,11 +42,31 @@ describe("what a prose surface covers", () => {
     ]);
   });
 
-  it("gives an empty block no surface at all", () => {
-    // A prose block a reader has emptied is a legitimate state — see
-    // `proseTitlesIn` on why an empty array is not null — and a band of colour
-    // with nothing in it is chrome saying "something could go here".
-    expect(proseSurfaceSpans([OPEN, "", SHUT])).toEqual([]);
+  it("keeps an emptied block's head, and gives a bare one nothing (1.0.82)", () => {
+    // *"backspacing all the text removes the prose block — it disappears
+    // entirely."* 1.0.36 dropped the surface on the argument that an empty block
+    // is a band of colour with nothing in it, which is chrome saying "something
+    // could go here". Three rounds then put the block's NAME on that band, and a
+    // cog, and a chevron — so what goes with the last character is the block's
+    // only visible identity and its only control, and a section vanishing under
+    // the backspace key reads as having been deleted.
+    expect(proseSurfaceSpans([OPEN, "", SHUT])).toEqual([
+      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2 },
+    ]);
+    // THE BLANK ROW THE READER IS SITTING ON IS THE WRITING, so the card has
+    // somewhere to type — which is where `marker-lines.ts`' landings were
+    // already sending the cursor, and is why typing a line below brought the
+    // block back rather than making a new one.
+    expect(proseSurfaceSpans([OPEN, "", "", SHUT])).toEqual([
+      { from: 1, to: 2, head: "Prose 1", nth: 1, title: null, close: 3 },
+    ]);
+    // AND 1.0.36'S ARGUMENT IS KEPT EXACTLY WHERE IT WAS RIGHT. A `#bare` block
+    // has no name, no cog and no chevron on it, so an empty one really is a band
+    // of colour with nothing in it.
+    expect(proseSurfaceSpans(["<!--chronoanvil-prose#bare-->", "", SHUT])).toEqual([]);
+    // AND A BLOCK WITH NO ROW AT ALL BETWEEN ITS MARKERS gets nothing either:
+    // there is no line to paint and nothing to type into. `protectedRanges` is
+    // what stops a reader reaching that state with the backspace key.
     expect(proseSurfaceSpans([OPEN, SHUT])).toEqual([]);
   });
 
@@ -830,13 +850,21 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
   });
 
   it("numbers off the block and not off the surfaces it produced", () => {
-    // AN EMPTIED BLOCK HAS NO SURFACE — see `proseSurfaceSpans`, which skips it
-    // — so numbering off the output array would call the reader's SECOND block
-    // *Prose* the moment they emptied the first. The reader can see both
-    // blocks in the file; the number has to count what is there.
-    const lines = [OPEN, "", SHUT, "", OPEN, "Words.", SHUT];
+    // A BLOCK CAN STILL PRODUCE NO SURFACE — a `#bare` one the reader has
+    // emptied, which is the one case 1.0.82 left alone — so numbering off the
+    // output array would call the reader's SECOND block *Prose 1*. The reader
+    // can see both blocks in the file; the number has to count what is there.
+    const lines = ["<!--chronoanvil-prose#bare-->", "", SHUT, "", OPEN, "Words.", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
       { from: 5, to: 5, head: "Prose 2", nth: 2, title: null, close: 6 },
+    ]);
+    // AND AN EMPTIED BLOCK THAT KEPT ITS HEAD KEEPS ITS NUMBER TOO, which is
+    // the same rule read the other way: emptying block one must not renumber
+    // block two, and filling it again must not renumber it back.
+    const headed = [OPEN, "", SHUT, "", OPEN, "Words.", SHUT];
+    expect(proseSurfaceSpans(headed).map((s) => [s.nth, s.head])).toEqual([
+      [1, "Prose 1"],
+      [2, "Prose 2"],
     ]);
   });
 

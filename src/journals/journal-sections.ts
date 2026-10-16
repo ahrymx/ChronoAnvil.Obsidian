@@ -976,26 +976,54 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
   const out: ProseSurface[] = [];
   // ── THE ORDINAL IS THE SPAN'S, NOT THE SURFACE'S (1.0.75) ────────────
   //
-  // An emptied block has no surface and is skipped three lines down, so
-  // numbering off `out.length` would call the second block *Prose* the moment
+  // A block with no head and no writing has no surface and is skipped below, so
+  // numbering off `out.length` would call the second block *Prose 1* the moment
   // the first was emptied — and call it *Prose 2* again when a word was typed
   // back into it. The block's position in the FILE is its identity everywhere
   // else (`proseIdFor`, `proseSpanIn`, the editor's rows), so it is here too.
   proseSpansIn(lines).forEach((span, i) => {
+    const head = span.bare ? null : proseHeadLabel(span.title, i + 1);
     let from = span.open + 1;
     let to = span.close - 1;
     while (from <= to && lines[from].trim() === "") from++;
     while (to >= from && lines[to].trim() === "") to--;
-    if (from <= to) {
-      out.push({
-        from,
-        to,
-        head: span.bare ? null : proseHeadLabel(span.title, i + 1),
-        nth: i + 1,
-        title: span.title,
-        close: span.close,
-      });
+    // ── AN EMPTIED BLOCK KEEPS ITS HEAD (1.0.82) ───────────────────────
+    //
+    // *"backspacing all the text removes the prose block — it disappears
+    // entirely — but if I type anything with the cursor down 1 line it will pop
+    // back in."*
+    //
+    // 1.0.36 DROPPED THE SURFACE ON PURPOSE and the argument was good at the
+    // time: an empty block was a band of colour with nothing in it, which is
+    // chrome saying *something could go here*. Three rounds have since put the
+    // block's NAME on that band, then a cog, then a chevron. So what vanishes
+    // when the last character goes is no longer decoration — it is the block's
+    // only visible identity and its only control, and a section disappearing
+    // under the backspace key reads as having been deleted.
+    //
+    // SO THE TRIM FALLS BACK TO THE UNTRIMMED INTERIOR rather than to nothing.
+    // The blank row the reader is sitting on becomes the writing: the card
+    // stays, the head stays, and there is a row inside it to type into — which
+    // is where `marker-lines.ts`' landings were already sending the cursor
+    // (1.0.39), and is why typing a line below brought the block back.
+    //
+    // AND `#bare` IS STILL SKIPPED, which is 1.0.36's argument kept exactly
+    // where it was right. A block whose head the reader turned off has no name,
+    // no cog and no chevron on it, so an empty one really is a band of colour
+    // with nothing in it, and still gets nothing.
+    if (from > to) {
+      if (head === null || span.close <= span.open + 1) return;
+      from = span.open + 1;
+      to = span.close - 1;
     }
+    out.push({
+      from,
+      to,
+      head,
+      nth: i + 1,
+      title: span.title,
+      close: span.close,
+    });
   });
   return out;
 }

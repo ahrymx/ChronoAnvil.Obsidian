@@ -5,6 +5,34 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.82] - 2026-10-16
+
+### Fixed
+
+- **Emptying a prose block made the whole block disappear.** *"backspacing all
+  the text removes the prose block — it disappears entirely — but if I type
+  anything with the cursor down 1 line it will pop back in with the text so long
+  as there is any text."* The surface was deliberately dropped when a block's
+  interior trimmed to nothing — 1.0.36's reasoning, that an empty card is a band
+  of colour saying *something could go here*. Three rounds have since put the
+  block's name on that band (1.0.75), then a cog (1.0.78), then a fold chevron
+  (1.0.79), so what vanished with the last character was no longer decoration: it
+  was the block's only visible identity and its only control, and a section
+  going out from under the backspace key reads as having been deleted. The trim
+  now falls back to the untrimmed interior, so the card, the head, the cog and
+  the chevron stay, with the blank row the cursor is already sitting on as the
+  writing — which is the row 1.0.39's landings were sending the cursor to, and
+  the reason typing a line below brought the block back.
+  - **A block whose title row is turned off still gets nothing**, which is
+    1.0.36's argument kept where it was right: `#bare` has no name, no cog and
+    no chevron on it, so an empty one really is a band of colour with nothing in
+    it. Two markers with no line between them get nothing either — there is no
+    row to be inside the card.
+  - Reading mode is unchanged on this point and cannot be otherwise: the
+    post-processor paints the blocks the renderer hands it, and an emptied block
+    renders none, so there is no element to put the bar on. The report was about
+    Live Preview, which is where the backspace happens.
+
 ## [1.0.81] - 2026-10-16
 
 ### Changed
