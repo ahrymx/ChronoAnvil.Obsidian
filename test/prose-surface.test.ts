@@ -27,7 +27,7 @@ describe("what a prose surface covers", () => {
     // An opener renders as nothing in reading mode and is hidden in Live
     // Preview, so a surface that included its row would open with a blank band.
     const lines = [OPEN, "## Overview", "", "Some words.", SHUT];
-    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 3, head: "Prose" }]);
+    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 }]);
   });
 
   it("trims the blank lines the composer leaves at each end", () => {
@@ -35,7 +35,7 @@ describe("what a prose surface covers", () => {
     // reader who presses Enter twice under their last paragraph leaves more.
     // Blank rows are not rows of prose.
     const lines = [OPEN, "", "", "Words.", "", "", SHUT];
-    expect(proseSurfaceSpans(lines)).toEqual([{ from: 3, to: 3, head: "Prose" }]);
+    expect(proseSurfaceSpans(lines)).toEqual([{ from: 3, to: 3, head: "Prose", nth: 1 }]);
   });
 
   it("gives an empty block no surface at all", () => {
@@ -57,8 +57,8 @@ describe("what a prose surface covers", () => {
       OPEN, "Second.", SHUT,
     ];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 1, to: 1, head: "Prose" },
-      { from: 7, to: 7, head: "Prose 2" },
+      { from: 1, to: 1, head: "Prose", nth: 1 },
+      { from: 7, to: 7, head: "Prose 2", nth: 2 },
     ]);
   });
 
@@ -67,7 +67,7 @@ describe("what a prose surface covers", () => {
     // 1.0.36 carries, and `proseSpansIn` reads both spellings — so this inherits
     // that contract rather than restating it.
     const lines = ["<!--chronoanvil-skeleton-->", "Words.", "<!--/chronoanvil-skeleton-->"];
-    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 1, head: "Prose" }]);
+    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 1, head: "Prose", nth: 1 }]);
   });
 
   it("paints nothing on a note with no markers", () => {
@@ -102,16 +102,16 @@ describe("where a rendered block stands in the prose", () => {
   const mark = (from: number, to: number) => proseMarkFor(TEXT, from, to);
 
   it("carries the first end on the block the writing starts in", () => {
-    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose" });
+    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose", nth: 1 });
   });
 
   it("carries the last end on the block it ends in", () => {
-    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null });
+    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null, nth: 1 });
   });
 
   it("carries neither in the middle", () => {
-    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null });
-    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null });
+    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 });
+    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 });
   });
 
   it("carries both when one block is the whole of it", () => {
@@ -122,6 +122,7 @@ describe("where a rendered block stands in the prose", () => {
       first: true,
       last: true,
       head: "Prose",
+      nth: 1,
     });
   });
 
@@ -142,12 +143,14 @@ describe("where a rendered block stands in the prose", () => {
       first: true,
       last: false,
       head: "Prose",
+      nth: 1,
     });
     expect(proseMarkFor(TEXT, 12, 15)).toEqual({
       member: true,
       first: false,
       last: true,
       head: null,
+      nth: 1,
     });
   });
 });
@@ -166,19 +169,26 @@ describe("the surface is paint and never a write", () => {
       "vault.create",
       "processFrontMatter",
       "Decoration.replace",
-      "Decoration.widget",
       "```",
     ]) {
       expect(src()).not.toContain(write);
     }
+    // `Decoration.widget` LEFT THIS LIST IN 1.0.78 and the promise did not
+    // change with it. The bar is chrome drawn beside the writing, the same as
+    // the background and the hairline; what the list is about is the file, and
+    // the three vault calls above are still absent. The cog's window is the
+    // only thing here that writes, it lives in another module, and it writes
+    // on a reader's Save.
+    expect(src()).toContain("Decoration.widget({");
   });
 
-  it("paints only the rows, which is what a line decoration is", () => {
-    // A mark decoration wraps the text and would paint the words; a widget puts
-    // something on screen that is not in the file. `Decoration.line` puts a
-    // class on the element CodeMirror already draws for that row.
+  it("paints the rows with a line decoration and nothing else", () => {
+    // A mark decoration wraps the text and would paint the words. A line
+    // decoration puts a class on the element CodeMirror already draws for that
+    // row, which is why the reader's own markdown keeps rendering inside it.
     expect(src()).toContain("Decoration.line({");
-    expect(src()).toContain("class: cls.join(\" \"),");
+    expect(src()).toContain('Decoration.line({ class: cls.join(" ") })');
+    expect(src()).not.toContain("Decoration.mark");
   });
 
   it("stands down in source mode, the way the markers do", () => {
@@ -354,9 +364,9 @@ describe("the prose surface is the section surface, not a copy of it", () => {
 
   it("is registered for both modes, from one rule", () => {
     const main = readCode("main.ts");
-    expect(main).toContain("this.registerEditorExtension(proseSurface());");
+    expect(main).toContain("this.registerEditorExtension(proseSurface(this));");
     expect(main).toContain(
-      "this.registerMarkdownPostProcessor((el, ctx) => paintProse(el, ctx));"
+      "this.registerMarkdownPostProcessor((el, ctx) => paintProse(el, ctx, this));"
     );
     // And the one rule both painters read is the pure one, so the two cannot
     // disagree about where a block begins.
@@ -567,16 +577,16 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose" }]);
+    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose", nth: 1 }]);
     // Writing at the ends keeps the trimmed span it always had.
     const written = [...lines];
     written.splice(2, 0, "Intro.");
     written.splice(6, 0, "Outro.");
-    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 6, head: "Prose" }]);
+    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 6, head: "Prose", nth: 1 }]);
     // No blank to take: the span is left alone rather than stepping onto the
     // bracket.
     const tight = lines.filter((l) => l !== "");
-    expect(livePreviewSpans(tight)).toEqual([{ from: 1, to: 3, head: "Prose" }]);
+    expect(livePreviewSpans(tight)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 }]);
     // And the painter reads it.
     expect(readCode("ui/prose-surface.ts")).toContain(
       "for (const span of livePreviewSpans(doc.toString().split(\"\\n\")))"
@@ -648,7 +658,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose" }]);
+    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose", nth: 1 }]);
 
     // A one-line `$$ x $$` is the same row: Obsidian mounts that one too, and
     // where it does not the run merely ends on the blank line below it — the
@@ -660,14 +670,14 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(oneLine)).toEqual([{ from: 1, to: 3, head: "Prose" }]);
+    expect(livePreviewSpans(oneLine)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 }]);
 
     // Writing at the ends keeps the trimmed span it always had — an equation
     // in the MIDDLE of the writing is reached by the stylesheet, not by this.
     const written = [...lines];
     written.splice(2, 0, "Simplify by the HCF:");
     written.splice(7, 0, "Which is in its lowest terms.");
-    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 7, head: "Prose" }]);
+    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 7, head: "Prose", nth: 1 }]);
 
     // AND `$$` MID-LINE IS NOT A BLOCK. Obsidian draws it inside the row, the
     // row is a `.cm-line`, and the decoration lands on it as it always did.
@@ -678,7 +688,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(inline)).toEqual([{ from: 2, to: 2, head: "Prose" }]);
+    expect(livePreviewSpans(inline)).toEqual([{ from: 2, to: 2, head: "Prose", nth: 1 }]);
   });
 
   it("leaves a `$$` a reader printed inside a code fence alone (1.0.41)", () => {
@@ -697,7 +707,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([{ from: 2, to: 6, head: "Prose" }]);
+    expect(livePreviewSpans(lines)).toEqual([{ from: 2, to: 6, head: "Prose", nth: 1 }]);
   });
 
   it("ends a section run rather than being taken into one", () => {
@@ -714,28 +724,71 @@ describe("the surface survives Live Preview, where a block is a line", () => {
   });
 });
 
-// ── THE HEAD, WHICH TRAVELS AS DATA (1.0.75) ─────────────────────────────
+// ── THE HEAD, AND THE COG THAT RIDES IT (1.0.75, 1.0.78) ─────────────────
 //
-// *"can we give the prose blocks a header like other sections?"*
+// *"can we give the prose blocks a header like other sections?"* — and then
+// *"I think prose blocks could definetely benefit from the cog."*
 //
 // A SECTION'S HEAD IS AN ELEMENT A RENDERER BUILT; prose has no renderer. In
 // reading mode it is the note's own blocks and in Live Preview it is the
-// `.cm-line`s CodeMirror measures, so there is nowhere to put a bar — and a
-// block widget in the editor would be a new atomic range at the top of the
-// reader's writing. So the painter puts the NAME on the row that already
-// carries `is-prose-first` and the stylesheet draws it: one attribute, one
-// declaration, identical in both modes because it is the same rule over the
-// same class.
-describe("the head, which travels as data (1.0.75)", () => {
+// `.cm-line`s CodeMirror measures, so 1.0.75 put the NAME on the row that
+// already carried `is-prose-first` in a `data-ca-prose-head` attribute and let
+// the stylesheet draw it with `content: attr(…)`. One declaration, both modes,
+// no node.
+//
+// THAT IS SPENT, BECAUSE A COG IS A `<button>` AND A PSEUDO-ELEMENT HOLDS NO
+// CHILDREN. The row is an element now — `ui/prose-bar.ts` builds it, out of a
+// title and one `settings` button — and the two painters host it differently:
+// reading mode prepends it into the block that carries `is-prose-first`,
+// exactly where the `::before` drew, and Live Preview mounts a BLOCK WIDGET
+// above the writing which takes that class off the line and wears it itself.
+//
+// AND THE ONE THING 1.0.75 SAID THAT WAS SIMPLY WRONG: *"a block widget in the
+// editor would be a new atomic range at the top of the reader's writing."* It
+// is not. `Decoration.widget({ block: true })` is a zero-length point that
+// adds no document position, and CodeMirror already moves a cursor out of one
+// — *"If a position is in/near a block widget, move it to a nearby text line"*
+// (`@codemirror/view`). `marker-lines.ts` was left untouched for this round.
+//
+// THE CHEVRON IS STILL REFUSED. It was asked for in the same breath as the cog
+// and the answer has not changed: `headerbar.ts` never hides a source line in
+// Live Preview — *"A SOURCE LINE IS NEVER HIDDEN, only painted"* — so a fold
+// arrow here would work in reading mode and sit dead in the editor, which is
+// 1.0.73's omission-with-extra-pixels.
+describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
   const src = () => readCode("prose-surface");
+  const bar = () => readCode("ui/prose-bar.ts");
 
-  it("is an attribute and not an element", () => {
-    // The two things that would be an element, and both are refused above: a
-    // widget decoration in the editor, and a node the post-processor inserts.
-    expect(src()).toContain('export const PROSE_HEAD_ATTR = "data-ca-prose-head";');
-    for (const built of ["createDiv", "createEl", "createSpan", "Decoration.widget"]) {
-      expect(src()).not.toContain(built);
+  it("is an element, and the attribute it replaced is gone from both halves", () => {
+    // AN INVARIANT SPENT IS REWRITTEN, NEVER QUIETLY BROKEN. 1.0.75's rule was
+    // "an attribute and not an element"; the cog is what overturned it, so the
+    // attribute must be gone from the painter AND from the stylesheet — a
+    // selector left asking for it would draw a second hairline over the bar.
+    expect(src()).not.toContain("PROSE_HEAD_ATTR");
+    expect(src()).not.toContain("data-ca-prose-head");
+    for (const sheet of styleSheets()) {
+      expect(sheet, "data-ca-prose-head").not.toContain("data-ca-prose-head");
     }
+    expect(cssRules(".ca-prose-block.is-prose-first[data-ca-prose-head]::before")).toHaveLength(0);
+    expect(cssRules(".ca-prose-block.is-prose-first::before")).toHaveLength(0);
+  });
+
+  it("is built in one place and hosted in two", () => {
+    // THE DOM IS THE BAR MODULE'S, which is what keeps the two modes agreeing
+    // about what a prose head looks like. A painter decides WHERE the row goes;
+    // neither decides what is in it.
+    expect(bar()).toContain('export const PROSE_BAR_CLASS = "ca-prose-bar";');
+    expect(bar()).toContain('export const PROSE_BAR_TITLE_CLASS = "ca-prose-bar-title";');
+    expect(bar()).toContain('export const PROSE_BAR_COG_CLASS = "ca-prose-bar-cog";');
+    expect(bar()).toContain('export const PROSE_BAR_HOST_CLASS = "ca-prose-bar-host";');
+    for (const named of ["buildProseBar", "clearProseBar", "PROSE_BAR_HOST_CLASS"]) {
+      expect(src(), named).toContain(named);
+    }
+    expect(src()).toContain('} from "./prose-bar";');
+    // And the bar module builds no decoration and reads no document: it is
+    // handed a title, a number and a thunk.
+    expect(bar()).not.toContain("Decoration");
+    expect(bar()).not.toContain("getSectionInfo");
   });
 
   it("names the default block, numbered, and the reader's own block by its name", () => {
@@ -756,45 +809,160 @@ describe("the head, which travels as data (1.0.75)", () => {
     // blocks in the file; the number has to count what is there.
     const lines = [OPEN, "", SHUT, "", OPEN, "Words.", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 5, to: 5, head: "Prose 2" },
+      { from: 5, to: 5, head: "Prose 2", nth: 2 },
     ]);
   });
 
+  it("carries the ordinal to the cog, so the window opens on one block", () => {
+    // THE NUMBER IS THE BLOCK'S ADDRESS and not a label: `proseIdFor(nth)` is
+    // what the window looks the section view up by. It had to travel because
+    // the head was already computing it for the name, and because a bar on the
+    // second block of a note must not open a window onto the first.
+    const two = [OPEN, "One.", SHUT, "", "<!--chronoanvil-prose#bare-->", "Two.", SHUT];
+    expect(proseSurfaceSpans(two).map((s) => s.nth)).toEqual([1, 2]);
+    // AND IT REACHES READING MODE'S MARK, which is the half a reader meets
+    // first: `paintProse` builds the bar off `mark.nth`, so a mark that always
+    // said 1 would put a cog on every block that opened the FIRST block's
+    // window — the defect nobody sees until they rename the wrong one.
+    const text = note(OPEN, "One.", SHUT, "", OPEN, "Two.", SHUT);
+    expect(proseMarkFor(text, 1, 1).nth).toBe(1);
+    expect(proseMarkFor(text, 5, 5).nth).toBe(2);
+    // A ROW IN NO BLOCK IS ZERO, which is the one value `proseIdFor` is never
+    // asked for — a mark with no head builds no bar.
+    expect(proseMarkFor(note("Nothing here."), 0, 0)).toEqual({
+      member: false,
+      first: false,
+      last: false,
+      head: null,
+      nth: 0,
+    });
+  });
+
   it("rides the first row only, which is what makes it one head", () => {
-    // The declaration is on `.is-prose-first`, so an attribute on every row
-    // would be a name waiting for one stylesheet change to print on all of
-    // them.
+    // The bar lands on `.is-prose-first`, so a head on every row would be a
+    // title repeated down the whole of the writing.
     const text = note(OPEN, "", "## Overview", "", "A paragraph.", "", SHUT);
     expect(proseMarkFor(text, 2, 2).head).toBe("Prose");
     expect(proseMarkFor(text, 4, 4).head).toBeNull();
   });
 
   it("is taken off a row that has stopped being the top of the block", () => {
-    // `toggleClass`'s reason, on the attribute: a post-processor runs again over
-    // a block Obsidian re-renders in place, and a name that is only ever SET is
+    // `toggleClass`'s reason, on the element: a post-processor runs again over a
+    // block Obsidian re-renders in place, and a bar that is only ever BUILT is
     // a head stranded in the middle of the writing.
     const body = fnBody("paintProse", "prose-surface");
-    expect(body).toContain("el.setAttr(PROSE_HEAD_ATTR, mark.head)");
-    expect(body).toContain("el.removeAttribute(PROSE_HEAD_ATTR)");
+    expect(body).toContain("if (mark.head === null) {");
+    expect(body).toContain("clearProseBar(el);");
+    expect(body).toContain("buildProseBar(");
+    expect(body).toContain("{ title: mark.head, nth: mark.nth, path: () => ctx.sourcePath },");
   });
 
-  it("is drawn by the stylesheet, from the attribute it reads", () => {
-    const rule = cssRule(".ca-prose-block.is-prose-first[data-ca-prose-head]::before");
-    expect(rule).toContain("content: attr(data-ca-prose-head)");
-    expect(rule).toContain("display: block");
+  it("rebuilds without emptying the host, because the host is the reader's block", () => {
+    // `host.empty()` WOULD TAKE THE PARAGRAPH WITH IT. In reading mode the host
+    // IS the first rendered block of the writing — a `## ` heading, a
+    // paragraph — so the sweep names the bar's own class and removes only that.
+    const clear = fnBody("clearProseBar", "ui/prose-bar.ts");
+    expect(clear).toContain("old.hasClass(PROSE_BAR_CLASS)");
+    expect(clear).toContain("old.remove()");
+    expect(bar()).not.toContain("host.empty()");
+    // AND BUILDING IS CLEARING FIRST, so a second pass leaves one bar rather
+    // than two, and `prepend` keeps it above the markdown rather than under it.
+    const build = fnBody("buildProseBar", "ui/prose-bar.ts");
+    expect(build).toContain("clearProseBar(host);");
+    expect(build).toContain("host.prepend(bar);");
   });
 
-  it("asks for the attribute in the selector, not only in the content", () => {
-    // `content: attr(…)` ON AN ELEMENT WITHOUT THE ATTRIBUTE IS AN EMPTY
-    // STRING, which still draws the hairline and the padding — a blank band
-    // above the writing on every row the painter has not named. The selector is
-    // what makes an unnamed row draw nothing at all.
-    expect(cssRules(".ca-prose-block.is-prose-first::before")).toHaveLength(0);
-    for (const selector of [
-      ".ca-prose-block.is-prose-first[data-ca-prose-head]::before",
+  it("wears `settings`, the same glyph the other two cogs wear", () => {
+    // *"I'm trying to remove '...' for some sections, so far this has been done
+    // for attachments and what's below. I think prose blocks could definetely
+    // benefit from the cog."* Three sections, one glyph, one word for it.
+    expect(bar()).toContain('setIcon(btn, "settings");');
+    for (const other of [
+      "ui/note-types-window.ts",
+      "ui/widgets/attachment-widgets.ts",
     ]) {
-      expect(cssRule(selector)).toContain("border-bottom");
+      expect(readCode(other), other).toContain('setIcon(btn, "settings");');
     }
+    // A BUTTON, SO IT IS TABBABLE AND ANNOUNCES ITSELF, and it says what it
+    // opens rather than naming its own shape.
+    expect(bar()).toContain('createEl("button"');
+    expect(bar()).toContain('"aria-label": COG_LABEL');
+    expect(bar()).toContain('type: "button"');
+  });
+
+  it("keeps the press off the row under it", () => {
+    // The cog sits on top of the reader's own markdown in reading mode and on
+    // top of a CodeMirror widget in the editor. A press that bubbled would
+    // place a cursor, follow a link, or toggle a checkbox in the first line of
+    // the writing.
+    const press = fnBody("buildProseCog", "ui/prose-bar.ts");
+    expect(press).toContain("evt.preventDefault();");
+    expect(press).toContain("evt.stopPropagation();");
+  });
+
+  it("reads the note's path at the press and not before", () => {
+    // A `path: string` CAPTURED AT BUILD TIME IS A STALE ANSWER. A reading-mode
+    // bar outlives a rename, and a Live Preview widget outlives the file in its
+    // pane being swapped — CodeMirror reuses a widget whose `eq` says it is the
+    // same one. So the spec carries a thunk, and the editor's thunk asks the
+    // view which file it is showing at the moment the reader clicks.
+    expect(bar()).toContain("path: () => string | null;");
+    expect(fnBody("buildProseCog", "ui/prose-bar.ts")).toContain("const path = spec.path();");
+    expect(src()).toContain(
+      "path: () => view.state.field(editorInfoField, false)?.file?.path ?? null,"
+    );
+    expect(fnBody("paintProse", "prose-surface")).toContain("path: () => ctx.sourcePath");
+  });
+
+  it("mounts the editor's bar as a block widget above the writing", () => {
+    // `side: -1` PUTS IT BEFORE THE LINE at the same position, which is what
+    // makes it the top of the card rather than a row inside it. `block: true`
+    // is legal here and nowhere else in this file's neighbourhood: CodeMirror
+    // refuses block decorations from a plugin-provided facet and accepts them
+    // from a `StateField`, which is what this already was.
+    const body = fnBody("proseIn", "prose-surface");
+    expect(body).toContain("block: true,");
+    expect(body).toContain("side: -1,");
+    expect(body).toContain("new ProseBarWidget(span.head, span.nth, plugin)");
+    // AND NO WIDGET WHERE THERE IS NO HEAD, which is 1.0.77's tick reaching the
+    // editor: a `#bare` block gets rows and no bar at all.
+    expect(body).toContain("if (span.head === null || span.from >= doc.lines) continue;");
+  });
+
+  it("moves the card's top edge onto the widget, because that is where it is", () => {
+    // `is-prose-first` ZEROES THE TOP MARGIN AND ROUNDS THE TOP CORNERS. With a
+    // bar above it the first `.cm-line` is no longer the top of anything, so
+    // the class rides the widget and the line keeps the interior rule — leave
+    // it on both and the card draws two top edges one gap apart.
+    const body = fnBody("proseIn", "prose-surface");
+    expect(body).toContain("if (n === span.from && span.head === null) cls.push(PROSE_FIRST_CLASS);");
+    expect(src()).toContain(
+      'cls: [PROSE_BLOCK_CLASS, PROSE_FIRST_CLASS, PROSE_BAR_HOST_CLASS].join(" "),'
+    );
+  });
+
+  it("tells CodeMirror when two widgets are the same bar", () => {
+    // A WIDGET WITHOUT `eq` IS REBUILT ON EVERY TRANSACTION, which costs the
+    // cog its focus and the row a repaint on every keystroke. The two fields
+    // the DOM depends on are the title and the ordinal; the plugin is the same
+    // object for the life of the field, and the path is read at the press.
+    expect(src()).toContain("eq(other: ProseBarWidget): boolean {");
+    expect(src()).toContain(
+      "return other.title === this.title && other.nth === this.nth;"
+    );
+    // AND IT HANDLES ITS OWN EVENTS. `ignoreEvent` returning true keeps
+    // CodeMirror from reading a press on the cog as a press on the document.
+    expect(src()).toContain("ignoreEvent(): boolean {");
+  });
+
+  it("gives the editor's host no vertical margin, and that is a height and not a look", () => {
+    // CodeMirror measures a block widget's height from its box and adds the
+    // result to the height map. A margin is outside that box, so the editor
+    // would believe every prose card starts a gap higher than it does and the
+    // scroll would drift by one gap per block.
+    const host = cssRule(".markdown-source-view.mod-cm6 .cm-content > .ca-prose-bar-host");
+    expect(host).toContain("margin-top: 0");
+    expect(host).toContain("margin-bottom: 0");
   });
 
   it("wears the section bar's own type, token for token", () => {
@@ -802,8 +970,8 @@ describe("the head, which travels as data (1.0.75)", () => {
     // paragraph, a list — so nothing may be inherited. Everything a title
     // settles is settled here, off the tokens the bar's own title reads, so a
     // retune of the bar reaches this head with it.
-    const head = cssRule(".ca-prose-block.is-prose-first[data-ca-prose-head]::before");
-    const bar = cssRule(".ca-journal-header-title");
+    const head = cssRule(".ca-prose-bar");
+    const barRule = cssRule(".ca-journal-header-title");
     for (const declaration of [
       "font-size: var(--ca-sec-title-size)",
       "font-weight: 600",
@@ -811,16 +979,26 @@ describe("the head, which travels as data (1.0.75)", () => {
       "color: var(--ca-sec-title-ink)",
       "letter-spacing: normal",
       "text-transform: none",
-      // A long name ellipsises rather than wrapping, which is the bar's rule
-      // too: two lines of head push the writing down by a row whose cause the
-      // reader cannot see.
+    ]) {
+      expect(head, declaration).toContain(declaration);
+      expect(barRule, declaration).toContain(declaration);
+    }
+    // A long name ellipsises rather than wrapping, which is the bar's rule too:
+    // two lines of head push the writing down by a row whose cause the reader
+    // cannot see. ON A FLEX ROW IT TAKES `min-width: 0` AS WELL — a flex item's
+    // floor is its content, so without it the title grows and the COG is what
+    // leaves the line.
+    const title = cssRule(".ca-prose-bar-title");
+    for (const declaration of [
       "overflow: hidden",
       "text-overflow: ellipsis",
       "white-space: nowrap",
     ]) {
-      expect(head, declaration).toContain(declaration);
-      expect(bar, declaration).toContain(declaration);
+      expect(title, declaration).toContain(declaration);
+      expect(barRule, declaration).toContain(declaration);
     }
+    expect(title).toContain("min-width: 0");
+    expect(head).toContain("display: flex");
     // And the division under it is the bar's, down to the token.
     expect(head).toContain(
       "border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border)"
@@ -830,15 +1008,43 @@ describe("the head, which travels as data (1.0.75)", () => {
     );
   });
 
+  it("is the same cog as the other two, from one rule rather than three blocks", () => {
+    // 1.0.69 WROTE THIS RULE DOWN AND THEN WROTE A SECOND BLOCK ANYWAY. The
+    // third cog is where it costs something: a second place for the 30px reset
+    // to be forgotten in is how `obsidian-button-height` announces itself on a
+    // `<button>` in a ~20px head.
+    const cog = cssRule(".ca-prose-bar-cog");
+    for (const other of [".ca-journal-field-cats", ".ca-journal-note-types-cog"]) {
+      expect(cssRule(other), other).toBe(cog);
+    }
+    expect(cssRule(".ca-prose-bar-cog .svg-icon")).toBe(
+      cssRule(".ca-journal-note-types-cog .svg-icon")
+    );
+    expect(cssRule(".ca-prose-bar-cog:hover")).toBe(
+      cssRule(".ca-journal-note-types-cog:hover")
+    );
+    // THE RESET ITSELF, named rather than left to the shared rule: app.css
+    // gives every button `height: var(--input-height)`, which no amount of
+    // padding, font-size or line-height reaches.
+    expect(cog).toContain("height: 1.4em");
+    expect(cog).toContain("min-height: 0");
+    expect(cog).toContain("cursor: pointer");
+  });
+
   it("draws no chevron, because a fold cannot act in the editor", () => {
-    // 1.0.73'S RULE, MET ON A CONTROL THAT WAS NEVER BUILT. `headerbar.ts` never
+    // ASKED FOR IN THE SAME BREATH AS THE COG AND REFUSED. `headerbar.ts` never
     // hides a source line in Live Preview — *"A SOURCE LINE IS NEVER HIDDEN,
     // only painted"* — so a fold arrow on this head would work in reading mode
     // and sit dead in the editor, which is the omission with extra pixels.
-    // Renaming is in *Edit sections…*, where the other two prose answers are.
-    const head = cssRule(".ca-prose-block.is-prose-first[data-ca-prose-head]::before");
-    expect(head).not.toContain("cursor");
-    expect(src()).not.toContain("addEventListener");
+    for (const glyph of ["chevron", "triangle", "collapse", "fold"]) {
+      expect(bar().toLowerCase(), glyph).not.toContain(glyph);
+    }
+    // ONE CONTROL ON THE ROW, so the title itself is not a press either.
+    expect(cssRule(".ca-prose-bar")).not.toContain("cursor");
+    expect(cssRules(".ca-prose-bar-title").join("\n")).not.toContain("cursor");
+    const build = fnBody("buildProseBar", "ui/prose-bar.ts");
+    expect(build).toContain("bar.appendChild(buildProseCog(spec, plugin));");
+    expect((bar().match(/addEventListener/g) ?? []).length).toBe(1);
   });
 });
 
@@ -856,7 +1062,7 @@ describe("the block that wears no head (1.0.77)", () => {
     // asked for one piece of chrome to go, not for their prose to stop being a
     // prose block — the background, the padding and both edge classes stay.
     expect(proseSurfaceSpans([BARE, "Words.", SHUT])).toEqual([
-      { from: 1, to: 1, head: null },
+      { from: 1, to: 1, head: null, nth: 1 },
     ]);
     const text = note(BARE, "", "## Overview", "", "A paragraph.", "", SHUT);
     const mark = proseMarkFor(text, 2, 2);
@@ -885,29 +1091,36 @@ describe("the block that wears no head (1.0.77)", () => {
     // block in the file.
     const two = [OPEN, "One.", SHUT, "", BARE, "Two.", SHUT];
     expect(proseSurfaceSpans(two)).toEqual([
-      { from: 1, to: 1, head: "Prose" },
-      { from: 5, to: 5, head: null },
+      { from: 1, to: 1, head: "Prose", nth: 1 },
+      { from: 5, to: 5, head: null, nth: 2 },
     ]);
     // AND IN THE OTHER ORDER, which is what says the flag is read off each
     // opener rather than carried between them: a block's answer must not
     // outlive the block it was written on.
     const flip = [BARE, "One.", SHUT, "", OPEN, "Two.", SHUT];
     expect(proseSurfaceSpans(flip)).toEqual([
-      { from: 1, to: 1, head: null },
-      { from: 5, to: 5, head: "Prose 2" },
+      { from: 1, to: 1, head: null, nth: 1 },
+      { from: 5, to: 5, head: "Prose 2", nth: 2 },
     ]);
   });
 
-  it("puts no attribute on the line at all, rather than an empty one", () => {
-    // `data-ca-prose-head=""` WOULD STILL MATCH THE STYLESHEET, whose selector
-    // asks for the attribute — see the 1.0.75 rule above — so the hairline and
-    // the padding would be drawn over nothing at the top of the writing. Both
-    // painters skip it instead: reading mode removes it, and the editor's
-    // decoration never carries it.
+  it("builds no bar at all, rather than an empty one", () => {
+    // AN EMPTY BAR WOULD STILL DRAW, because `.ca-prose-bar` carries the
+    // hairline and the air under it — a blank band above the writing on every
+    // block whose head the reader asked to go. So neither painter builds one:
+    // reading mode takes any existing bar off and returns, and the editor's
+    // widget is never added.
+    const paint = fnBody("paintProse", "prose-surface");
+    expect(paint).toContain("if (mark.head === null) {");
+    expect(paint).toContain("clearProseBar(el);");
     const body = fnBody("proseIn", "prose-surface");
-    expect(body).toContain("n === span.from && span.head !== null");
-    expect(fnBody("paintProse", "prose-surface")).toContain(
-      "if (mark.head) el.setAttr(PROSE_HEAD_ATTR, mark.head);"
+    expect(body).toContain("if (span.head === null || span.from >= doc.lines) continue;");
+    // AND THE CARD'S TOP EDGE STAYS ON THE LINE WHERE THERE IS NO BAR TO TAKE
+    // IT. This is the one place the two 1.0.77/1.0.78 answers meet: a `#bare`
+    // block's first row is still the top of the card, so `is-prose-first` goes
+    // where it always went.
+    expect(body).toContain(
+      "if (n === span.from && span.head === null) cls.push(PROSE_FIRST_CLASS);"
     );
   });
 
@@ -916,10 +1129,14 @@ describe("the block that wears no head (1.0.77)", () => {
     // blank line above a table or a `$$`, so a head declared `string` here
     // would have been a cast at exactly the place the two shapes meet.
     expect(livePreviewSpans([BARE, "Words.", SHUT])).toEqual([
-      { from: 1, to: 1, head: null },
+      { from: 1, to: 1, head: null, nth: 1 },
     ]);
+    // ONE TYPE, NAMED ONCE. `livePreviewSpans` returns the model's own
+    // `ProseSurface`, so a `head` declared `string` would have been a cast at
+    // exactly the place the two shapes meet.
     expect(readCode("prose-surface")).toContain(
-      "{ from: number; to: number; head: string | null }[]"
+      "export function livePreviewSpans(lines: readonly string[]): ProseSurface[] {"
     );
+    expect(readSrc("journal-sections")).toContain("head: string | null;");
   });
 });

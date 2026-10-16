@@ -901,6 +901,22 @@ export interface ProseSurface {
   // for the attribute rather than only reading it.
   /** The head this block wears, or null where it wears none. */
   head: string | null;
+  // ── AND WHICH BLOCK OF THE NOTE THIS IS (1.0.78) ─────────────────────
+  //
+  // THE HEAD CARRIES A COG NOW, and a cog opens a window onto ONE block — so
+  // the surface has to say which. The number was already here and was already
+  // this number: `proseHeadLabel` reads it to write *Prose 2*, and it is the
+  // same ordinal `proseIdFor` turns into `headings#2`, which is what the
+  // window is opened on. Carrying it is what stops the bar deriving a second
+  // one; see `proseSurfaceSpans` on why it is the SPAN's index and not the
+  // surface's.
+  //
+  // ON EVERY SURFACE, HEAD OR NO HEAD. A `#bare` block draws no bar and still
+  // has an identity — the next release that puts a control anywhere else on a
+  // prose block needs the same number, and a field that is null exactly where
+  // the chrome is absent would have to be widened again.
+  /** Which prose block of the note this is, 1-based. */
+  nth: number;
 }
 
 export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
@@ -917,12 +933,14 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
     let to = span.close - 1;
     while (from <= to && lines[from].trim() === "") from++;
     while (to >= from && lines[to].trim() === "") to--;
-    if (from <= to)
+    if (from <= to) {
       out.push({
         from,
         to,
         head: span.bare ? null : proseHeadLabel(span.title, i + 1),
+        nth: i + 1,
       });
+    }
   });
   return out;
 }
@@ -2957,10 +2975,13 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         placeholder: proseHeadLabel(null, 1),
         // THE UNMARKED NOTE'S WORDING, AND NOT `TITLE_SETTLED`. That one says
         // "rename it on the note" because a header bar is a control the reader
-        // can click; a prose head is drawn by the stylesheet off an attribute
-        // and there is nothing on the note to click. What is true of a pre-5.6
-        // block is that it has no edge to carry a name on at all, which is the
-        // same refusal the headings box wears and names the same route out.
+        // can click. A prose head is a control too as of 1.0.78 — the cog on
+        // its title row opens the window this very question is drawn in — and
+        // that is exactly why the sentence must not name it: a block with no
+        // markers gets no bar, so there is no cog on it to point at. What is
+        // true of a pre-5.6 block is that it has no edge to carry a name on at
+        // all, which is the same refusal the headings box wears and names the
+        // same route out.
         settled: {
           text: "this block has no edge to name",
           hint:

@@ -53,7 +53,11 @@
 // last. Two owners, one class, and a race nobody would ever reproduce twice.
 // Distinct names make the two passes unable to touch each other's work.
 
-import { editorLivePreviewField, type MarkdownPostProcessorContext } from "obsidian";
+import {
+  editorInfoField,
+  editorLivePreviewField,
+  type MarkdownPostProcessorContext,
+} from "obsidian";
 import {
   EditorState,
   StateField,
@@ -61,9 +65,20 @@ import {
   type Range,
   type Text,
 } from "@codemirror/state";
-import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
+import {
+  Decoration,
+  EditorView,
+  WidgetType,
+  type DecorationSet,
+} from "@codemirror/view";
 
-import { proseSurfaceSpans } from "../journals/journal-sections";
+import type ChronoAnvilPlugin from "../main";
+import { proseSurfaceSpans, type ProseSurface } from "../journals/journal-sections";
+import {
+  buildProseBar,
+  clearProseBar,
+  PROSE_BAR_HOST_CLASS,
+} from "./prose-bar";
 
 /** The surface's three classes, spelled once. */
 export const PROSE_BLOCK_CLASS = "ca-prose-block";
@@ -93,15 +108,57 @@ export const PROSE_LAST_CLASS = "is-prose-last";
 // LINE IS NEVER HIDDEN, only painted"* — so a chevron here would act in reading
 // mode and sit dead in the editor, which is the control 1.0.73 was about.
 // Renaming is in *Edit sections…*, where every other section's title is.
-export const PROSE_HEAD_ATTR = "data-ca-prose-head";
+//
+// ── AND THAT COST CAME DUE: THE HEAD IS AN ELEMENT NOW (1.0.78) ──────────
+//
+// *"can a collapse chevron and gear cog (for prose section editor/commands
+// window) be added to the new title row on the prose blocks?"* — *"I think
+// prose blocks could definetely benefit from the cog."*
+//
+// A COG IS A BUTTON AND A BUTTON NEEDS A NODE, so the attribute is gone and
+// `ui/prose-bar.ts` builds the row. The chevron stays refused, on the argument
+// above — which is the paragraph this one amends rather than deletes: the
+// prediction was right about what a pseudo-element can hold, and the answer was
+// to stop using one, not to go without the control.
+//
+// THE TWO MODES HOST IT DIFFERENTLY, AND THAT IS THIS FILE'S OWN SHAPE. The
+// painters already put one class on two different kinds of element, for the
+// reason at the top of this file:
+//
+//   READING MODE prepends the bar into the block that carries
+//   `is-prose-first` — the very row the pseudo-element was drawn on, so the
+//   geometry a reader sees is unchanged and the card's top edge is still the
+//   first thing in it.
+//
+//   LIVE PREVIEW cannot: that row is a `.cm-line` whose content CodeMirror
+//   owns, and anything prepended into one is gone on the next keystroke. So
+//   the bar is a BLOCK WIDGET above it, and the widget takes the card's top
+//   edge — `is-prose-first` moves onto the widget and off the line.
+//
+// A BLOCK WIDGET IS NOT A NEW ATOMIC RANGE, which is the one claim above that
+// was simply wrong. `Decoration.widget({ block: true })` is a point: it has no
+// length, adds no document position, and CodeMirror already keeps a cursor out
+// of one ("if a position is in/near a block widget, move it to a nearby text
+// line"). What it is instead is a row of chrome with no line under it, which is
+// what a title row is.
+//
+// AND THE MARKER'S OWN LINE IS STILL NOT THE HOST, which was the other candidate
+// and reads better than it works. In reading mode the opener renders as a block
+// that draws nothing and could hold the bar; in Live Preview `marker-lines.ts`
+// replaces that line AND the break before it, so there is no row there at all.
+// Hosting on it would mean one owner in one mode and a second mechanism in the
+// other — against a pseudo-element's single declaration, which the reader has
+// been looking at since 1.0.75 and which this keeps.
 
 /** Whether a run of lines is inside a prose block, and which ends it carries. */
 export interface ProseMark {
   member: boolean;
   first: boolean;
   last: boolean;
-  /** The head, on the first row of the block only. */
+  /** The head this block wears, on the first row of it only. */
   head: string | null;
+  /** Which prose block of the note it is, or 0 for a run that is in none. */
+  nth: number;
 }
 
 const NOT_PROSE: ProseMark = {
@@ -109,6 +166,7 @@ const NOT_PROSE: ProseMark = {
   first: false,
   last: false,
   head: null,
+  nth: 0,
 };
 
 // Where a block of `lineStart..lineEnd` stands in this note's prose.
@@ -138,9 +196,10 @@ export function proseMarkFor(
     first,
     last: lineEnd >= span.to,
     // ONLY THE FIRST ROW CARRIES IT, which is what makes the head one head: the
-    // declaration is on `.is-prose-first`, and an attribute on every row would
-    // be a name waiting for a stylesheet change to print it on all of them.
+    // bar is prepended into the block that draws the card's top edge, and a
+    // head on every row would be one bar per paragraph.
     head: first ? span.head : null,
+    nth: span.nth,
   };
 }
 
@@ -154,7 +213,8 @@ export function proseMarkFor(
 // than gaining a stripe in the middle of a quote.
 export function paintProse(
   el: HTMLElement,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  plugin: ChronoAnvilPlugin
 ): void {
   const info = ctx.getSectionInfo(el);
   if (!info) return;
@@ -166,11 +226,20 @@ export function paintProse(
   el.toggleClass(PROSE_BLOCK_CLASS, mark.member);
   el.toggleClass(PROSE_FIRST_CLASS, mark.first);
   el.toggleClass(PROSE_LAST_CLASS, mark.last);
-  // AND THE HEAD IS REMOVED WHEN IT IS NOT THE FIRST ROW, for the toggles'
-  // reason exactly: a re-render in place that only ever SET this would leave
-  // the name on a row that has stopped being the top of the block.
-  if (mark.head) el.setAttr(PROSE_HEAD_ATTR, mark.head);
-  else el.removeAttribute(PROSE_HEAD_ATTR);
+  // AND THE BAR IS TAKEN OFF A ROW THAT HAS STOPPED BEING THE TOP OF THE BLOCK,
+  // for the toggles' reason exactly: a re-render in place that only ever BUILT
+  // one would leave a title row stranded in the middle of the writing. Built
+  // where there is a head and cleared where there is not — the two halves of
+  // one answer, and `#bare` is the answer that is always the second half.
+  if (mark.head === null) {
+    clearProseBar(el);
+    return;
+  }
+  buildProseBar(
+    el,
+    { title: mark.head, nth: mark.nth, path: () => ctx.sourcePath },
+    plugin
+  );
 }
 
 // ── LIVE PREVIEW ─────────────────────────────────────────────────────────
@@ -265,44 +334,108 @@ function mountedLines(lines: readonly string[]): Set<number> {
   return out;
 }
 
-export function livePreviewSpans(
-  lines: readonly string[]
-): { from: number; to: number; head: string | null }[] {
+export function livePreviewSpans(lines: readonly string[]): ProseSurface[] {
   const mounted = mountedLines(lines);
-  return proseSurfaceSpans(lines).map(({ from, to, head }) => ({
+  return proseSurfaceSpans(lines).map((span) => ({
+    ...span,
     from:
-      mounted.has(from) && lines[from - 1]?.trim() === "" ? from - 1 : from,
-    to: mounted.has(to) && lines[to + 1]?.trim() === "" ? to + 1 : to,
-    // THE HEAD GOES WITH THE ROW THE RUN NOW STARTS ON, whichever that is. A
-    // block opening on a table or a `$$` has already stepped its start up onto
-    // the blank line above it, because a replaced row draws no line decoration
-    // — and a head on a row that is never drawn is a head nobody sees.
-    head,
+      mounted.has(span.from) && lines[span.from - 1]?.trim() === ""
+        ? span.from - 1
+        : span.from,
+    to:
+      mounted.has(span.to) && lines[span.to + 1]?.trim() === ""
+        ? span.to + 1
+        : span.to,
+    // THE HEAD AND THE ORDINAL RIDE THROUGH UNCHANGED, which is what `...span`
+    // says: this function moves the ENDS of a run and nothing else. The bar
+    // goes above whichever row the run now starts on — a block opening on a
+    // table or a `$$` has already stepped its start up onto the blank line
+    // above it, because a replaced row draws no line decoration, and a bar
+    // anchored to a row that is never drawn is a bar nobody sees.
   }));
 }
 
-function proseIn(doc: Text): DecorationSet {
+// The bar, as a row of the editor that is not a row of the file.
+//
+// `eq` COMPARES WHAT IS DRAWN, which is the whole of why this is cheap: the
+// field recomputes on every document change, and a widget that claimed to be
+// different every time would rebuild the DOM — and drop the focus ring off a
+// cog mid-keystroke — on each one. Title and ordinal are everything the bar
+// shows, and the FILE is deliberately not among them: it is read at the press.
+//
+// `ignoreEvent` RETURNS TRUE, which is what makes the cog pressable. Without
+// it CodeMirror treats a click inside the widget as a click on the position the
+// widget sits at, so the button would open the window AND put the cursor on the
+// first row of the writing — the same one-gesture-one-meaning rule the cog's
+// own `stopPropagation` states from the other side.
+class ProseBarWidget extends WidgetType {
+  constructor(
+    private readonly title: string,
+    private readonly nth: number,
+    private readonly plugin: ChronoAnvilPlugin
+  ) {
+    super();
+  }
+
+  eq(other: ProseBarWidget): boolean {
+    return other.title === this.title && other.nth === this.nth;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const host = createDiv({
+      cls: [PROSE_BLOCK_CLASS, PROSE_FIRST_CLASS, PROSE_BAR_HOST_CLASS].join(" "),
+    });
+    buildProseBar(
+      host,
+      {
+        title: this.title,
+        nth: this.nth,
+        // THE FILE THE EDITOR IS SHOWING, ASKED WHEN THE COG IS PRESSED.
+        // `editorInfoField` is how a CM6 extension learns its note — the view
+        // is the only thing that knows, a widget outlives the state it was
+        // built from, and an embed or a hover preview has no file at all, which
+        // is the null the cog declines on.
+        path: () => view.state.field(editorInfoField, false)?.file?.path ?? null,
+      },
+      this.plugin
+    );
+    return host;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+function proseIn(doc: Text, plugin: ChronoAnvilPlugin): DecorationSet {
   const out: Range<Decoration>[] = [];
   for (const span of livePreviewSpans(doc.toString().split("\n"))) {
     for (let n = span.from; n <= span.to && n < doc.lines; n++) {
       const cls = [PROSE_BLOCK_CLASS];
-      if (n === span.from) cls.push(PROSE_FIRST_CLASS);
+      // THE TOP EDGE IS THE BAR'S WHERE THERE IS A BAR (1.0.78). Two elements
+      // carrying `is-prose-first` would be two rounded tops and two paddings,
+      // one of them in the middle of the card — so the line gets it only on a
+      // block that draws no head, which is `#bare` and every block written
+      // before 1.0.75.
+      if (n === span.from && span.head === null) cls.push(PROSE_FIRST_CLASS);
       if (n === span.to) cls.push(PROSE_LAST_CLASS);
-      out.push(
-        Decoration.line({
-          class: cls.join(" "),
-          // AND NULL PUTS NO ATTRIBUTE ON THE LINE AT ALL (1.0.77), rather
-          // than an empty one: the stylesheet's selector asks for the
-          // attribute, so `data-ca-prose-head=""` would still draw the
-          // hairline and the padding above a block that asked for neither.
-          ...(n === span.from && span.head !== null
-            ? { attributes: { [PROSE_HEAD_ATTR]: span.head } }
-            : {}),
-        }).range(doc.line(n + 1).from)
-      );
+      out.push(Decoration.line({ class: cls.join(" ") }).range(doc.line(n + 1).from));
     }
+    if (span.head === null || span.from >= doc.lines) continue;
+    out.push(
+      Decoration.widget({
+        widget: new ProseBarWidget(span.head, span.nth, plugin),
+        // ABOVE THE ROW, NOT BESIDE IT. `block` makes the widget a row of its
+        // own between two lines, and a negative `side` puts it before the line
+        // it is anchored to — the two halves of "draw this above the writing".
+        block: true,
+        side: -1,
+      }).range(doc.line(span.from + 1).from)
+    );
   }
-  return out.length ? Decoration.set(out) : Decoration.none;
+  // SORTED, because a widget and the line decoration beside it are pushed in
+  // the order the loop meets them and `Decoration.set` is handed both.
+  return out.length ? Decoration.set(out, true) : Decoration.none;
 }
 
 interface Painted {
@@ -310,27 +443,36 @@ interface Painted {
   deco: DecorationSet;
 }
 
-function stateOf(state: EditorState): Painted {
+function stateOf(state: EditorState, plugin: ChronoAnvilPlugin): Painted {
   // SOURCE MODE PAINTS NOTHING, which is `marker-lines.ts`' gate and the same
   // bargain: source mode is where a reader goes to see the file as it is, and a
   // surface drawn around markers that are themselves visible there would be the
   // editor disagreeing with itself about what is chrome.
   const live = state.field(editorLivePreviewField, false) === true;
   return live
-    ? { live, deco: proseIn(state.doc) }
+    ? { live, deco: proseIn(state.doc, plugin) }
     : { live, deco: Decoration.none };
 }
 
-const prose = StateField.define<Painted>({
-  create: stateOf,
-  update: (value, tr) =>
-    tr.docChanged ||
-    (tr.state.field(editorLivePreviewField, false) === true) !== value.live
-      ? stateOf(tr.state)
-      : value,
-  provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
-});
-
-export function proseSurface(): Extension {
-  return prose;
+// A FIELD BUILT PER PLUGIN INSTANCE RATHER THAN A MODULE CONSTANT, which is the
+// one thing the bar changed here. The decorations now carry a widget that has
+// to be able to open a window, and a `StateField` defined at module load has
+// nothing to close over. `registerEditorExtension` is called once, from
+// `main.ts`, so there is exactly one of these.
+//
+// AND IT IS STILL A STATE FIELD RATHER THAN A VIEW PLUGIN, for the reason the
+// original comment gives AND for a second one now: CodeMirror refuses a block
+// decoration from a plugin-provided facet — *"Block decorations may not be
+// specified via plugins"* — which is the same refusal `marker-lines.ts` met
+// from the other direction when it had to replace a line break.
+export function proseSurface(plugin: ChronoAnvilPlugin): Extension {
+  return StateField.define<Painted>({
+    create: (state) => stateOf(state, plugin),
+    update: (value, tr) =>
+      tr.docChanged ||
+      (tr.state.field(editorLivePreviewField, false) === true) !== value.live
+        ? stateOf(tr.state, plugin)
+        : value,
+    provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
+  });
 }

@@ -567,25 +567,23 @@
  *
  * *"can we give the prose blocks a header like other sections?"*
  *
- * IT IS A PSEUDO-ELEMENT AND THAT IS THE WHOLE TRICK. Every other section's
- * head is built by a renderer into a fence's widget; prose has no widget — in
- * reading mode it is the note's own blocks and in Live Preview it is the
- * `.cm-line`s CodeMirror measures. `ui/prose-surface.ts` puts the NAME on the
- * row that already carries `is-prose-first` and this draws it, so one
- * declaration serves both modes exactly as the surface above it does.
+ * IT WAS A PSEUDO-ELEMENT UNTIL 1.0.78, and that was the whole trick. Every
+ * other section's head is built by a renderer into a fence's widget; prose has
+ * no widget — in reading mode it is the note's own blocks and in Live Preview
+ * it is the `.cm-line`s CodeMirror measures — so the painter put the NAME on
+ * the row that already carried `is-prose-first` in a `data-ca-prose-head`
+ * attribute and `content: attr(…)` drew it. One declaration served both modes
+ * exactly as the surface above it does, and the attribute was in the SELECTOR
+ * as well as the content, because `attr()` on an element without it is an empty
+ * string that still draws the hairline and the padding.
  *
- * `[data-ca-prose-head]` IS PART OF THE SELECTOR, not just the source of the
- * text: `content: attr(…)` on an element without the attribute is an empty
- * string, which would still draw the hairline and the padding — a blank band
- * above the writing on any row the painter has not named yet.
- *
- * AND THAT IS WHAT 1.0.77's TICK TURNS OFF. *"add a hide title row button"* —
- * a block whose marker carries `#bare` is painted with no attribute at all, so
- * this rule does not match it and NOTHING here needs a second state. The
- * stylesheet has one head and one way not to have one; the decision is the
- * painters', which is where the reader's answer is read. See
- * `journal-sections.ts::proseSurfaceSpans`, whose `head` is null for such a
- * block, and the question on the prose row that writes it.
+ * AND 1.0.77's TICK IS WHAT TURNS THE HEAD OFF. *"add a hide title row
+ * button"* — a block whose marker carries `#bare` gets no bar built for it at
+ * all, so NOTHING here needs a second state. The stylesheet has one head and
+ * one way not to have one; the decision is the painters', which is where the
+ * reader's answer is read. See `journal-sections.ts::proseSurfaceSpans`, whose
+ * `head` is null for such a block, and the question on the prose row that
+ * writes it.
  *
  * THE TYPE IS THE BAR'S, RESTATED RATHER THAN INHERITED, because the row this
  * sits on is the reader's own markdown: a `## ` heading, a paragraph, a list.
@@ -593,6 +591,22 @@
  * different size on every block depending on what the reader opened it with.
  * The three tokens are the ones `.ca-journal-sec` and `.ca-journal-header-title`
  * read, so a retune of the bar reaches this head with it.
+ *
+ * ── AND IT IS AN ELEMENT AS OF 1.0.78 ─────────────────────────────────
+ *
+ * *"I think prose blocks could definetely benefit from the cog."* A cog is a
+ * `<button>` and a pseudo-element can hold no children, so the trick above is
+ * spent: `ui/prose-bar.ts` builds the row and this draws it. Every declaration
+ * below is the one that was on the `::before`, moved — the type is still
+ * restated rather than inherited, the division is still the bar's own token,
+ * and a long name still ellipsises rather than wrapping. What is new is the
+ * flex that puts the cog on the end of the line.
+ *
+ * TWO RULES BECAUSE THE ROW HAS TWO JOBS. The bar is the line: its type, its
+ * hairline and the air under it. The TITLE is the half that must give way —
+ * `min-width: 0` and the ellipsis, so a long name shortens instead of pushing
+ * the cog off the end, which is what a flex item does by default when its
+ * content is wider than its box.
  *
  * THERE IS NO GLYPH, AND THAT IS A RULE RATHER THAN AN OMISSION (1.0.76).
  * 1.0.75 drew `📝 Prose` here on the argument that a bar keeps its glyph in a
@@ -603,9 +617,12 @@
  * can type is words alone, and a default with an emoji in it invites them to
  * keep one in a box that has no slot to put it in. The 📝 lives on the row in
  * *Edit sections…*, in that window's own icon slot, like every other section's. */
-.ca-prose-block.is-prose-first[data-ca-prose-head]::before {
-  content: attr(data-ca-prose-head);
-  display: block;
+.ca-prose-bar {
+  display: flex;
+  align-items: center;
+  /* The section bar's own column gap, so a cog sits the same distance from a
+     title here as it does on the Attachments bar two cards up. */
+  gap: 10px;
   font-size: var(--ca-sec-title-size);
   font-weight: 600;
   line-height: 1.35;
@@ -619,12 +636,37 @@
   border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
   padding-bottom: var(--ca-sec-pad);
   margin-bottom: 10px;
-  /* A LONG NAME ELLIPSISES RATHER THAN WRAPPING, which is the rule the bar's
-     title already follows: two lines of head would push the writing down by a
-     row the reader cannot see the cause of. */
+}
+/* A LONG NAME ELLIPSISES RATHER THAN WRAPPING, which is the rule the bar's
+   title already follows: two lines of head would push the writing down by a row
+   the reader cannot see the cause of. On a flex row it takes `min-width: 0`
+   as well — a flex item's floor is its content, so without it the box grows
+   and the cog is what leaves the line. */
+.ca-prose-bar-title {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* ── THE HOST THE EDITOR DRAWS IT IN, AND ITS ONE DECLARATION ───────────
+ *
+ * In Live Preview the bar cannot be prepended into the row that carries
+ * `is-prose-first`: that row is a `.cm-line` whose content CodeMirror owns and
+ * rebuilds. So the bar is a BLOCK WIDGET above the writing and the widget takes
+ * the card's top edge — see `ui/prose-surface.ts`, which moves `is-prose-first`
+ * onto it and off the line.
+ *
+ * NO VERTICAL MARGIN, AND THAT IS CODEMIRROR'S RULE RATHER THAN A LOOK. It
+ * measures a block widget's height from its box and adds the result to the
+ * height map; a margin is outside that box, so the editor would believe every
+ * prose card starts `--ca-widget-gap` higher than it does and the scroll would
+ * drift by one gap per block. The long selector beside this one zeroes the same
+ * two margins on a `.cm-line` for a different reason — Obsidian's own line
+ * spacing — and cannot reach a div. */
+.markdown-source-view.mod-cm6 .cm-content > .ca-prose-bar-host {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 

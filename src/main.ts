@@ -189,8 +189,13 @@ export default class ChronoAnvilPlugin extends Plugin {
     // NOTHING IS WRITTEN TO A NOTE BY EITHER. That is the whole of the reader's
     // second sentence: *"it is important that prose is not put into a code
     // block so that standard markdown syntax still works."*
-    this.registerEditorExtension(proseSurface());
-    this.registerMarkdownPostProcessor((el, ctx) => paintProse(el, ctx));
+    //
+    // AND BOTH TAKE THE PLUGIN AS OF 1.0.78, because a prose block's title row
+    // carries a cog and a cog opens a window — the one thing either painter
+    // needs that a line of text did not. Nothing else about them moved: the
+    // bar is built from the same spans, on the same rows, in both modes.
+    this.registerEditorExtension(proseSurface(this));
+    this.registerMarkdownPostProcessor((el, ctx) => paintProse(el, ctx, this));
 
     // A CHRONOANVIL PAGE OPENS IN READING MODE. 4.6, and the plugin's first
     // `file-open` hook.

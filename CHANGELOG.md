@@ -5,6 +5,46 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.78] - 2026-10-16
+
+### Added
+
+- **A cog on a prose block's title row.** *"can a collapse chevron and gear cog
+  (for prose section editor/commands window be added to the new title row on
+  the prose blocks?"* — and, on the glyph: *"I'm trying to remove '...' for
+  some sections, so far this has been done for attachments and what's below. I
+  think prose blocks could definetely benefit from the cog."* Attachments got
+  one in 1.0.49 and **What's below** in 1.0.69; a prose block is the third, same
+  glyph, same place on the title row.
+  - **It opens a Prose block window onto that block and no other.** The
+    block's **Title**, whether it shows its title row, whether it opens with
+    default headings and which ones, and a tick to **Remove this block** — the
+    four answers that were reachable only through **Note: edit sections…**, a
+    window that lists every section of the note so you could rename your third
+    prose block. They are all still there; the cog is the short way to the
+    block you are standing on.
+  - **Nothing is written until Save, the removal included**, so a window you
+    close with Cancel leaves the note untouched. The window re-reads the note
+    before it writes and declines rather than overwrite a note you have typed
+    in since opening it — on a block of your own writing, that is the one thing
+    a stale write would cost.
+  - **No chevron, and that is the same refusal 1.0.75 made.** A fold arrow on
+    this head would work while reading and sit dead in Live Preview, where
+    ChronoAnvil never hides a line of your own file. One control on the row.
+  - A block whose title row you have hidden has no cog either, and a block on a
+    note written before ChronoAnvil marked where prose begins and ends has no
+    title row to put one on. Both are still reachable from **Note: edit
+    sections…**.
+
+### Changed
+
+- **The prose head is an element now rather than a drawn attribute.** 1.0.75
+  put the name on the row and let the stylesheet print it, which was the whole
+  trick and cost nothing — until a cog, which is a button and needs somewhere
+  to live. Reading mode builds the row into the first block of the writing,
+  exactly where the printed one was; Live Preview draws it above the writing as
+  a row of its own. Identical type, identical hairline, identical spacing.
+
 ## [1.0.77] - 2026-10-16
 
 ### Added

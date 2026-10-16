@@ -419,7 +419,9 @@
    or line-height reaches. A 30px control in a ~20px head inflates the row and
    looks like a spacing bug anywhere else. Fourth time in this release; see the
    habit chip, the overflow count and the mood face. */
-.ca-journal-field-cats {
+.ca-journal-field-cats,
+.ca-journal-note-types-cog,
+.ca-prose-bar-cog {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -436,50 +438,37 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.ca-journal-field-cats .svg-icon {
+.ca-journal-field-cats .svg-icon,
+.ca-journal-note-types-cog .svg-icon,
+.ca-prose-bar-cog .svg-icon {
   width: 1.1em;
   height: 1.1em;
 }
-.ca-journal-field-cats:hover {
+.ca-journal-field-cats:hover,
+.ca-journal-note-types-cog:hover,
+.ca-prose-bar-cog:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-/* ── THE NOTE TYPES COG (1.0.69) ─────────────────────────────────────────
+/* ── THE SAME COG, ON THREE SECTIONS (1.0.69, 1.0.78) ────────────────────
  *
- * The Attachments cog's twin, and sharing its rules rather than copying them.
- * Both sit in `headTools` on a section's title row, both wear `settings`, both
- * open a window onto a list the section owns — the reader asked for this one in
- * exactly those terms: *"just a cog wheel (matching those other sections)"*.
+ * Attachments got it first, What's below second — *"just a cog wheel (matching
+ * those other sections)"* — and a prose block third: *"I'm trying to remove
+ * '...' for some sections, so far this has been done for attachments and what's
+ * below. I think prose blocks could definetely benefit from the cog."* All
+ * three sit on a section's title row, wear `settings`, and open a window onto
+ * something that section owns.
  *
- * SO IT IS A SELECTOR ON THE RULES ABOVE, NOT A BLOCK BELOW THEM. A second
- * block of the same twelve declarations is two places for the 30px reset to be
- * forgotten in — and `obsidian-button-height` is how that trap announces itself
- * on a `<button>` in a ~20px head. */
-.ca-journal-note-types-cog {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  font-size: var(--ca-bar-glyph);
-  width: 1.4em;
-  height: 1.4em;
-  min-height: 0;
-  padding: 0;
-  border: none;
-  border-radius: var(--ca-radius-sm);
-  background: none;
-  box-shadow: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.ca-journal-note-types-cog .svg-icon {
-  width: 1.1em;
-  height: 1.1em;
-}
-.ca-journal-note-types-cog:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
+ * SO THEY ARE SELECTORS ON ONE RULE AND NOT THREE BLOCKS OF IT. 1.0.69 said
+ * exactly this and then wrote the second block anyway; the third is where it
+ * costs something, because a second place for the 30px reset to be forgotten
+ * in is how `obsidian-button-height` announces itself on a `<button>` in a
+ * ~20px head. One list, twelve declarations, three cogs.
+ *
+ * AND THE PROSE COG IS NOT IN `headTools`, which is the one thing it does not
+ * share. A prose block has no fence and therefore no `sectionFrame` — its bar
+ * is built by `ui/prose-bar.ts` out of a title and this button — so what the
+ * three have in common is the control and its size, not the slot. */
 /* THE STRIP'S SCALE, WHICH IS LEVEL 2'S AND IS NOW BOTH LEVELS'. 50-entry-
    header.css sized a nested bar's buttons down to `--ca-text-2xs` and argued it as
    a fact about level 2; the argument turns out to be about a PLACE — chrome under

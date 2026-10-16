@@ -661,22 +661,34 @@ chosen, like everything else.
 **And it wears a head, like every other section.** A prose block is titled
 **Prose** — **Prose 2** for the second one on the note, and so on down — drawn
 in the same type, over the same hairline, as the header bar on any section above
-it. Give it your own name in **Note: edit sections…**: the Prose row's **Title**
-box is its head, and the box shows the default so you can see what you are
-replacing. Empty the box and the default comes back. The name is kept on the
-block's own invisible marker rather than in a fence, so renaming a block moves
-one character of markup and nothing about your writing; the head has no fold
-arrow, because folding a prose block would hide lines of your own file and
-ChronoAnvil never does that in Live Preview.
+it. The name is kept on the block's own invisible marker rather than in a fence,
+so renaming a block moves one character of markup and nothing about your
+writing; the head has no fold arrow, because folding a prose block would hide
+lines of your own file and ChronoAnvil never does that in Live Preview.
 
-**And you can turn the head off.** The Prose row's **Show the title** tick is
-the same choice every other section makes with **Show as widget**: untick it and
-that block keeps its card and loses the title row above it. It is per block, so
-one block on a note can wear a head while the next does not, and it keeps
-whatever name you gave it — tick it back and your own word is still there.
-Blocks show their head unless you say otherwise, so nothing on any note you
-already have changes. A block on a note written before those markers existed has
-no edge to draw one on, and the row says so instead of offering the tick.
+**And the head carries a cog, like Attachments and What's below.** It sits at
+the right-hand end of the title row and opens a **Prose block** window for that
+block and no other — the block's **Title**, whether it shows the title row at
+all, whether it opens with default headings and which ones, and a tick to remove
+the block. Nothing is written until you press Save, the removal included, so a
+window you close with Cancel leaves the note exactly as it was. Every one of
+those answers is still on the Prose row in **Note: edit sections…** as well; the
+cog is the short way to the block you are standing on, which is the whole of
+what it adds. A block on a note written before ChronoAnvil marked where prose
+begins and ends has no title row, so it has no cog either — reach it through
+**Note: edit sections…**, or **Apply to this note** to get the markers.
+
+**And you can turn the head off.** The **Show the title** tick — on the cog's
+window, or on the Prose row in **Note: edit sections…** — is the same choice
+every other section makes with **Show as widget**: untick it and that block
+keeps its card and loses the title row above it. It is per block, so one block
+on a note can wear a head while the next does not, and it keeps whatever name
+you gave it — tick it back and your own word is still there. Blocks show their
+head unless you say otherwise, so nothing on any note you already have changes.
+A block on a note written before those markers existed has no edge to draw one
+on, and the row says so instead of offering the tick. (Unticking the head takes
+the cog with it: the control lives on the row it is drawn in. Everything behind
+it stays in **Note: edit sections…**.)
 
 Nothing is put inside a fence to do it. Your writing is still ordinary markdown
 in the file: headings, links, tasks, callouts, tables and code blocks behave
@@ -686,9 +698,9 @@ source mode shows the file as it is, markers and all, which is what source mode
 is for. A block you have emptied is not drawn at all, because a card with
 nothing in it is not telling you anything.
 
-You can also write the list without leaving the change window.
-**Note: edit sections…** gives the Prose row a box holding the note's
-headings, one per line: reorder them, rename one, add one, take one out. The
+You can also write the list without leaving the change window. The cog on the
+block's own head and the Prose row in **Note: edit sections…** both give you a
+box holding that block's headings, one per line: reorder them, rename one, add one, take one out. The
 list is applied to the headings the note already has rather than composed
 fresh, so a heading carries everything written under it while it moves — and a
 heading you take out but have written under is not removed, it simply moves to
