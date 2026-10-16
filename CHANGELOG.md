@@ -5,6 +5,22 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.74] - 2026-10-16
+
+### Fixed
+
+- **A lone attachment category draws its own name again.** Reported as *"Files
+  title is missing on the attachments section despite it existing"*: a Study
+  topic drew 📎 Attachments, two buttons and a drop zone, while the Categories
+  window beside it listed one category called **Files** whose name the section
+  never said. The dispatcher withholds a field's own head wherever the fence's
+  bar can be read as naming that one field — right for a section whose single
+  `tasks:` field *is* the section, wrong for a shelf ever since 1.0.49 §4 made a
+  section's name a constant rather than its first category's. A bar over shelves
+  names the section, so no shelf is titled from the fence any more: one category
+  is drawn exactly as two are, with its name, its fold and its own *Add file* /
+  *Add link* on its title row. Nothing in any note changed.
+
 ## [1.0.73] - 2026-10-16
 
 ### Changed

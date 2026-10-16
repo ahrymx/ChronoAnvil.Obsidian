@@ -1049,13 +1049,36 @@ function attachIntake(zone: HTMLElement, io: AttachIntake): void {
 // `ATTACH_SECTION_TITLE` is the one word, and it is the same word the journal's
 // `header:` default now carries (`journal-sections.ts`), because they are the
 // same section.
+//
+// ── AND IT TAKES NO `titled` AND NO `barActions` (1.0.74) ───────────────
+//
+// *"Files title is missing on the attachments section despite it existing"* —
+// a Study topic's Attachments drawn as 📎 Attachments, two buttons and a drop
+// zone, with the Categories window beside it listing one category called Files
+// that the section never said the name of.
+//
+// `fenceTitled && soleField` is what took it: the dispatcher withholds a
+// field's own head where the fence's bar can be read as naming THAT field, and
+// with one `attach:` line under `header:📎 Attachments` it could. For every
+// other field kind that reading is right — a `checklist` section's bar and its
+// one `tasks:` field are the same thing said twice. FOR A SHELF IT IS NOT, and
+// 1.0.49 §4 is where that stopped being true: a section's name became a
+// CONSTANT rather than its first category's, precisely so renaming the category
+// would not rename the section. A bar over shelves names the SECTION, and a
+// section is not its first category — so there is no count of shelves at which
+// the bar starts naming one of them.
+//
+// WHAT THE OLD READING COST was a name that came and went with an unrelated
+// number: one category drew no head, and adding a second gave BOTH of them one.
+// The journal's own composer says which way that should fall —
+// *"THE DEFAULT CATEGORY IS NOT THE SECTION'S NAME … so `Files` names the
+// category and nothing is said twice"* (`journal-sections.ts`) — and the diary
+// half has drawn section head plus shelf head since §4 with one category in it.
 export function buildAttachments(
   deps: PluginNoteRegionHost,
   rest: string,
   ctx: MarkdownPostProcessorContext,
   label: string | null,
-  titled = false,
-  barActions: HTMLElement | null = null,
   ownsCategories = false,
   nestInto: HTMLElement | null = null
 ): HTMLElement {
@@ -1106,20 +1129,22 @@ export function buildAttachments(
   }
   const wrap = shelves ? shelves.createDiv({ cls: shelfCls }) : root;
 
-  const nested = nestInto != null || shelves != null;
+  // A SHELF NEVER BORROWS A BAR. It was `nested ? false : titled` until 1.0.74
+  // — true for the nested shelves of a barless fence, and left the bar-owned
+  // ones reading their section's bar as their own name whenever there was
+  // exactly one of them. Both arguments are simply not passed now: there is no
+  // shape in which a bar names a category, so there is nothing for the branch
+  // that WITHHOLDS a head to be right about, and a shelf with no head of its
+  // own is the one thing this section cannot be drawn without.
+  //
+  // `label` STILL DECIDES, which is why this is not a head drawn unasked:
+  // `fieldHead`'s other refusal is a field with no name, and an `attach:` line
+  // written without a `|` has none. What a reader sees follows what the line
+  // says, rather than how many other lines are beside it.
   const chrome = fieldHead({
     wrap,
     key,
     label,
-    // A SHELF NEVER BORROWS A BAR, and both of these say so. `titled` means
-    // *the bar over this fence names this field*, and a shelf is nested only
-    // where no bar owns the shelves at all (`shelfHeader === -1`) — so passing
-    // either through would route it into the branch that WITHHOLDS its head,
-    // and a shelf with no head of its own is the one thing the nesting cannot
-    // be drawn without. True for the first shelf too as of §4: it is inside the
-    // section's own head now, so it is nested like every other one.
-    titled: nested ? false : titled,
-    barActions: nested ? null : barActions,
     store,
   });
   // WHERE A FOLLOWING SHELF NESTS. `index.ts` groups a barless run of `attach:`

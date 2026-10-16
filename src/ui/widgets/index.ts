@@ -3334,16 +3334,17 @@ export class Widgets implements
         // link/file chips, over the same `<!--chronoanvil:<key>-->` body region the
         // other body-backed widgets use. Accepts dropped/pasted files, pasted
         // URLs, and links dragged in from the vault itself.
-        widget = buildAttachments(
-          this,
-          rest,
-          ctx,
-          label,
-          fenceTitled,
-          barActions,
-          ownsCategories,
-          nestInto
-        );
+        //
+        // AND IT IS HANDED NEITHER `fenceTitled` NOR `barActions` (1.0.74).
+        // Every other field kind takes both: a bar that names the fence names
+        // the one field under it, so that field withholds its head and puts its
+        // controls on the bar instead. A shelf is the exception, and the reason
+        // is in the catalogue rather than here — a bar over shelves names the
+        // SECTION, and since 1.0.49 §4 a section's name is a constant rather
+        // than its first category's. Passing them made the name of a lone
+        // category disappear into the section's own, and reappear the moment a
+        // second category was added. `buildAttachments` says the rest.
+        widget = buildAttachments(this, rest, ctx, label, ownsCategories, nestInto);
         break;
       case "tracker":
         widget = buildTracker(this, rest, ctx);

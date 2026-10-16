@@ -367,16 +367,20 @@ describe("where a second category goes when no bar owns the shelves", () => {
     expect(src).not.toContain("function shelfHead");
     expect(src).toContain("const chrome = fieldHead({");
     expect((src.match(/fieldHead\(\{/g) ?? []).length).toBe(1);
-    // AND THE FIRST SHELF IS NESTED TOO, AS OF §4 — it sits inside the
-    // section's own head rather than being it, so `nested` is the question
-    // both arguments ask rather than `nestInto` alone.
-    expect(src).toContain("const nested = nestInto != null || shelves != null;");
-    // A NESTED SHELF NEVER BORROWS A BAR, and both arguments say so. `nestInto`
-    // is set only where no bar owns the shelves at all, so passing either
-    // through would route it into the branch that WITHHOLDS the head — and a
-    // nested shelf with no head of its own cannot be drawn.
-    expect(src).toContain("titled: nested ? false : titled,");
-    expect(src).toContain("barActions: nested ? null : barActions,");
+    // AND NO SHELF BORROWS A BAR, which was `nested ? false : titled` until
+    // 1.0.74 and is now not asked at all — see "the name of a lone category"
+    // below. The branch of `fieldHead` that WITHHOLDS a head is unreachable
+    // from here, and a shelf with no head of its own cannot be drawn.
+    //
+    // READ OFF THE CALL AND NOT OFF THE FILE. `not.toContain("barActions")` on
+    // the whole module passes nothing and fails on `AttachToolbarActions`,
+    // which ends in those letters — the prefix trap this codebase keeps
+    // meeting, met here on a suffix.
+    const call = src.slice(src.indexOf("const chrome = fieldHead({"));
+    const args = call.slice(0, call.indexOf("});"));
+    expect(args).not.toContain("titled");
+    expect(args).not.toContain("barActions");
+    expect(args.match(/\n\s*\w+,/g)).toEqual(["\n    wrap,", "\n    key,", "\n    label,", "\n    store,"]);
     // A FOLD OF ITS OWN COMES WITH THE HEAD, keyed per category off the store
     // that was already threaded through here — and off the SAME store the
     // section's own fold uses, since both are this note's fields.
@@ -635,6 +639,84 @@ describe("the name both halves go by (§4)", () => {
   });
 });
 
+// ── THE NAME OF A LONE CATEGORY (1.0.74) ───────────────────────────────────
+//
+// *"Files title is missing on the attachments section despite it existing"*,
+// with two screenshots of a Study topic: 📎 Attachments, two buttons, a drop
+// zone — and the Categories window open beside it listing one category called
+// Files that the section never says the name of.
+//
+// THE CAUSE WAS `fenceTitled && soleField`, the dispatcher's rule for every
+// field kind: a bar that names the fence names the one field under it, so that
+// field withholds its own head and puts its controls on the bar. Right for a
+// `checklist` section's single `tasks:` — the bar and the field are the same
+// thing said twice. Wrong for a shelf, and §4 is where it stopped being right:
+// a section's name became a CONSTANT rather than its first category's, so a bar
+// over shelves names the SECTION and there is no count of shelves at which it
+// starts naming one of them.
+//
+// WHAT IT COST, said as a shape worth recognising: a NAME that appeared and
+// disappeared with an unrelated COUNT. One category drew no head; adding a
+// second gave both of them one. Same family as 1.0.73's missing ✕ — a control
+// or a label that goes missing rather than explaining itself — and the same
+// answer: draw it, and let what the line says decide what it reads.
+describe("the name of a lone category (1.0.74)", () => {
+  const resources = (): JournalSection => {
+    const found = JOURNAL_SECTIONS.find((s) => s.id === "resources");
+    if (!found) throw new Error("the resources section is gone");
+    return found;
+  };
+
+  it("ships one named category under a differently named bar", () => {
+    // THE FIXTURE IS THE DEFECT'S OWN SHAPE: one `attach:` line, a `header:`
+    // bar over it, and two different words. The section drew the bar's and
+    // never the line's.
+    const fence = resources().render({} as never).find((b) => b.kind === "fence");
+    const lines = (fence as { lines: string[] }).lines;
+    const shelves = lines.filter((l) => l.startsWith("attach:"));
+    expect(shelves).toEqual(["attach:resources|Files"]);
+    expect(lines.filter((l) => l.startsWith("header:"))).toHaveLength(1);
+    expect(lines[0]).toContain("Attachments");
+    expect(lines[0]).not.toContain("Files");
+  });
+
+  it("takes neither of the arguments that could take that name away", () => {
+    // READ OFF THE SIGNATURE, because a default parameter is how the coupling
+    // would come back: a caller that stops passing `titled` leaves the
+    // parameter sitting there for the next one to pass again.
+    const src = attach();
+    const at = src.indexOf("export function buildAttachments(");
+    expect(at).toBeGreaterThan(-1);
+    const sig = src.slice(at, src.indexOf("): HTMLElement {", at));
+    expect(sig).toContain("label: string | null,");
+    expect(sig).toContain("ownsCategories = false,");
+    expect(sig).toContain("nestInto: HTMLElement | null = null");
+    expect(sig).not.toContain("titled");
+    expect(sig).not.toContain("barActions");
+  });
+
+  it("is the one field kind the dispatcher does not title from the fence", () => {
+    // AND THE CONTRAST IS THE POINT. The rule is not withdrawn — six kinds
+    // still take both arguments, and `section-frame.test.ts` holds the sweep
+    // that keeps them honest. Only the shelf opts out, because only the shelf
+    // sits under a bar that names something else.
+    const src = widgets();
+    const arm = src.slice(src.indexOf('case "attach":'));
+    const call = arm.slice(0, arm.indexOf("break;"));
+    expect(call).toContain("buildAttachments(this, rest, ctx, label, ownsCategories, nestInto)");
+    expect(call).not.toContain("fenceTitled");
+    expect(call).not.toContain("barActions");
+    expect(src).toContain("buildTasks(this, rest, ctx, label, fenceTitled, barActions)");
+  });
+
+  it("still draws nothing for a line that names nothing", () => {
+    // THE OTHER HALF OF `fieldHead`'S FIRST BRANCH, and it is the half that
+    // keeps this from being a head drawn unasked: `attach:scratch` with no `|`
+    // has no name, and a bar ruled across a card for no reason is what that
+    // refusal is for. So the answer follows the LINE, not the count of lines.
+    expect(readCode("note-field")).toContain("if (opts.titled || !label) {");
+  });
+});
 
 // ── THE THREE SHAPES A SHELF CAN DRAW (1.0.49 §6) ──────────────────────────
 //
