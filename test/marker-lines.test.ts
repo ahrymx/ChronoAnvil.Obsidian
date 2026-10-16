@@ -172,6 +172,27 @@ describe("which lines are this plugin's", () => {
     ]);
   });
 
+  it("takes a named bracket's edges too (1.0.75)", () => {
+    // A PROSE BLOCK WEARS ITS NAME ON THE OPENER, and a pattern that missed a
+    // titled one would leave the marker VISIBLE in Live Preview on exactly the
+    // notes a reader has named — the one place the name is meant to appear as a
+    // head rather than as markup.
+    const note = [
+      "<!--chronoanvil-prose:Chapter one-->",
+      "## Heading",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(markerLinesIn(note)).toEqual([
+      { from: 0, to: 0, keepLine: false, opensRegion: false },
+      { from: 2, to: 2, keepLine: false, opensRegion: false },
+    ]);
+    // AND IT IS STILL NOT A REGION, which is the property the hyphen buys: a
+    // colon inside the NAME must not promote the marker to the form whose
+    // contents are taken whole. The reader's heading is between these two
+    // edges and it stays.
+    expect(markerLinesIn(note)[0].opensRegion).toBe(false);
+  });
+
   it("takes the graph block's links line with its head", () => {
     const note = ["prose", "%% chronoanvil-graph %%", "%% [[Weekly|​]] %%"];
     expect(markerLinesIn(note)).toEqual([

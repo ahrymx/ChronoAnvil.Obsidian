@@ -586,9 +586,43 @@ export function isProseId(id: string): boolean {
   return proseOrdinalOf(id) !== null;
 }
 
+// What a prose row is called, where a note carries more than one block.
+//
+// THE ORDINAL IS THE LABEL'S, TOO (1.0.36). The reader asked for "copy prose
+// block #" and "move prose block #", and a window listing three rows all
+// reading **Prose** answers neither — the number is the only thing telling
+// them apart, since every block holds different words and the same everything
+// else. The first keeps the bare label, exactly as its id keeps the bare
+// `headings`: one block is the ordinary case and numbering it would imply a
+// second that may not exist.
+export function proseLabelOf(section: JournalSection, id: string): string {
+  const n = isProseId(id) ? (proseOrdinalOf(id) ?? 1) : 1;
+  return n > 1 ? `${section.label} ${n}` : section.label;
+}
+
+// What a prose block's HEAD reads (1.0.75): what the reader called it, or the
+// row's own label with the same ordinal rule.
+//
+// ONE DERIVATION FOR TWO SURFACES. The head is drawn over the writing and the
+// row is drawn in *Edit sections…*, and a block whose head says *Prose 2* while
+// its row says *Prose 3* is two answers to "which block is this" — which is the
+// only question either of them exists to answer. So the fallback goes through
+// `proseLabelOf` rather than composing a second string, and the icon comes off
+// the same catalogue row the window draws.
+export function proseHeadLabel(title: string | null, nth: number): string {
+  if (title) return title;
+  const row = JOURNAL_SECTIONS.find((s) => s.id === PROSE_SECTION_ID);
+  if (!row) return "Prose";
+  return `${row.icon} ${proseLabelOf(row, proseIdFor(nth))}`;
+}
+
 // A bracketed prose span: visible markdown, invisible edges.
-function bracketed(key: string, lines: string[]): SectionBlock {
-  return { kind: "bracketed", key, lines };
+function bracketed(
+  key: string,
+  lines: string[],
+  title: string | null = null
+): SectionBlock {
+  return { kind: "bracketed", key, lines, title };
 }
 
 // The two markers, and the one place either is spelled.
@@ -599,11 +633,95 @@ function bracketed(key: string, lines: string[]): SectionBlock {
 // for the reason `renderSection` gives about spacing: two spellings of one
 // marker is a schematic and a file that disagree, and the disagreement is
 // silent until somebody's headings survive a removal.
-export function bracketOpen(key: string): string {
-  return `<!--chronoanvil-${key}-->`;
+//
+// ── AND THE OPENER MAY CARRY A TITLE (1.0.75) ────────────────────────────
+//
+// *"can we give the prose blocks a header like other sections?"* Every other
+// section's name is the argument of a `header:` line in a fence, and this one
+// cannot have that: *"directive blocks break markdown syntax"* is the reader's
+// own reason, and it is 5.6's reason for the bracket in the first place —
+// visible markdown, invisible edges. A comment is already invisible in both
+// modes, so the name goes where the edges are.
+//
+// `<!--chronoanvil-prose:What I think-->`, and the colon is the separator for
+// the same reason `|` is one on a directive: it cannot appear in a key, whose
+// alphabet is `[A-Za-z0-9_-]`. The CLOSER never carries one — a pair of markers
+// is one block, the title belongs to the block, and a second place to write it
+// is a second place for it to disagree.
+//
+// ABSENT IS NOT EMPTY. A block with no title is what every note in every vault
+// carries today and what the composer still writes; the head falls back to the
+// row's own label (`proseLabelOf` — *Prose*, *Prose 2*, …), so nothing has to
+// be migrated for a head to appear.
+export function bracketOpen(key: string, title: string | null = null): string {
+  const clean = title === null ? null : normaliseProseTitle(title);
+  return clean
+    ? `<!--chronoanvil-${key}${BRACKET_TITLE_SEP}${clean}-->`
+    : `<!--chronoanvil-${key}-->`;
 }
 export function bracketClose(key: string): string {
   return `<!--/chronoanvil-${key}-->`;
+}
+
+export const BRACKET_TITLE_SEP = ":";
+
+// A title the opener can hold, or null where there is nothing usable in it.
+//
+// THE MARKER IS ONE LINE AND IT ENDS AT `-->`, so those are the two things a
+// title cannot contain: a line break would split the comment and `-->` would
+// close it early, leaving the rest of the reader's title as text at the top of
+// their own prose. Dropped rather than escaped, which is
+// `normaliseCategoryLabel`'s call on the same question — there is no escape in
+// this format, inventing one would have to reach every reader of it, and a
+// reader typing `-->` into a title has not asked for anything.
+//
+// `<` AND `>` GO WITH THEM for the comment either could open, and a run of
+// whitespace collapses because a marker is not where leading spaces are kept.
+//
+// THE LINE BREAK IS HANDLED BY THE WHITESPACE FOLD AND NOT BY A CLASS OF ITS
+// OWN. It was listed with `<` and `>` for one turn, which read as a stronger
+// guarantee than it was: `\s+` already matches `\r` and `\n`, so naming them
+// twice measured as an equivalent mutant — a rule a test cannot tell the
+// presence of from the absence of. One pass, stated where it happens.
+export function normaliseProseTitle(raw: string): string | null {
+  const clean = raw
+    .replace(/-->/g, " ")
+    .replace(/[<>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean || null;
+}
+
+/** An opener's key and the title it carries, or null where it is not one. */
+export interface BracketOpener {
+  key: string;
+  title: string | null;
+}
+
+// Whether this line opens one of `keys`' brackets, and what it is called.
+//
+// ONE READ FOR BOTH SPELLINGS AND BOTH SHAPES. It was a `Map` of exact strings
+// — `opener.get(line)` — which is what a titled opener breaks: every reader of
+// a marker that compares the whole line answers "not a marker" the moment a
+// title is on it, and a block whose edges have stopped being findable is a
+// block that cannot be removed, surfaced or planned.
+export function bracketOpenerOf(
+  line: string,
+  keys: readonly string[]
+): BracketOpener | null {
+  const t = line.trim();
+  if (!t.startsWith("<!--chronoanvil-") || !t.endsWith("-->")) return null;
+  const inner = t.slice("<!--chronoanvil-".length, -"-->".length);
+  for (const key of keys) {
+    if (inner === key) return { key, title: null };
+    if (inner.startsWith(key + BRACKET_TITLE_SEP)) {
+      return {
+        key,
+        title: normaliseProseTitle(inner.slice(key.length + BRACKET_TITLE_SEP.length)),
+      };
+    }
+  }
+  return null;
 }
 
 /** One prose block's extent, and which spelling of the marker delimits it. */
@@ -611,6 +729,8 @@ export interface ProseSpan {
   open: number;
   close: number;
   key: string;
+  /** What the reader called this block, or null where the opener is bare. */
+  title: string | null;
 }
 
 // Every prose span in these lines, in file order.
@@ -642,25 +762,24 @@ export interface ProseSpan {
 //
 // BOTH SPELLINGS, MERGED IN FILE ORDER. See `LEGACY_PROSE_KEY`.
 export function proseSpansIn(lines: readonly string[]): ProseSpan[] {
-  const opener = new Map<string, string>();
-  for (const key of [PROSE_KEY, LEGACY_PROSE_KEY]) {
-    opener.set(bracketOpen(key), key);
-  }
   const out: ProseSpan[] = [];
   let open = -1;
   let key = "";
+  let title: string | null = null;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    const starts = opener.get(line);
-    if (starts !== undefined) {
+    const starts = bracketOpenerOf(line, [PROSE_KEY, LEGACY_PROSE_KEY]);
+    if (starts) {
       open = i;
-      key = starts;
+      key = starts.key;
+      title = starts.title;
       continue;
     }
     if (open !== -1 && line === bracketClose(key)) {
-      out.push({ open, close: i, key });
+      out.push({ open, close: i, key, title });
       open = -1;
       key = "";
+      title = null;
     }
   }
   return out;
@@ -700,17 +819,27 @@ export interface ProseSurface {
   from: number;
   /** Last line of the writing, 0-based and inside the markers. */
   to: number;
+  /** The head this block wears — see `proseHeadLabel`. */
+  head: string;
 }
 
 export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
   const out: ProseSurface[] = [];
-  for (const span of proseSpansIn(lines)) {
+  // ── THE ORDINAL IS THE SPAN'S, NOT THE SURFACE'S (1.0.75) ────────────
+  //
+  // An emptied block has no surface and is skipped three lines down, so
+  // numbering off `out.length` would call the second block *Prose* the moment
+  // the first was emptied — and call it *Prose 2* again when a word was typed
+  // back into it. The block's position in the FILE is its identity everywhere
+  // else (`proseIdFor`, `proseSpanIn`, the editor's rows), so it is here too.
+  proseSpansIn(lines).forEach((span, i) => {
     let from = span.open + 1;
     let to = span.close - 1;
     while (from <= to && lines[from].trim() === "") from++;
     while (to >= from && lines[to].trim() === "") to--;
-    if (from <= to) out.push({ from, to });
-  }
+    if (from <= to)
+      out.push({ from, to, head: proseHeadLabel(span.title, i + 1) });
+  });
   return out;
 }
 
@@ -740,6 +869,23 @@ export function proseCountIn(text: string): number {
 // OFF `looseLines`, so a `## ` inside a fence or inside a region is not one.
 // The same walk the reload check uses, which is what keeps "what the page says"
 // and "what a rewrite would destroy" reading the same page.
+// The name the reader has given this note's nth prose block, or null where
+// there is no such block to name.
+//
+// THE SHAPE IS `proseTitlesIn`'s DELIBERATELY, down to the null. Both are the
+// planner's read of one bracketed block, both run over `looseLines` so a marker
+// a reader printed inside a code fence is not one, and both answer null for the
+// pre-5.6 note that has no markers — which is the answer that leaves the
+// editor's box undrawn and its refusal in its place.
+//
+// AND THE EMPTY STRING IS NOT THAT ANSWER. A marked block nobody has named has
+// a name to give and nowhere yet to show it, which is every block composed
+// before 1.0.75; `answeredIn` leans on the distinction and says why.
+export function proseHeadIn(text: string, n = 1): string | null {
+  const span = proseSpanIn(looseLines(text), n);
+  return span ? (span.title ?? "") : null;
+}
+
 export function proseTitlesIn(text: string, n = 1): string[] | null {
   const lines = looseLines(text);
   const span = proseSpanIn(lines, n);
@@ -810,7 +956,7 @@ export function renderBlock(block: SectionBlock): string {
     // Lesson's `📄 Pages` fold would run past `## Overview` into the prose. One
     // blank line makes every block model agree, and costs a line nobody sees.
     return [
-      bracketOpen(block.key),
+      bracketOpen(block.key, block.title ?? null),
       "",
       ...block.lines,
       "",
@@ -2670,6 +2816,51 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // reason: an affordance without the capability behind it is worse than a
     // sentence naming the route that works.
     questions: (ctx) => [
+      // ── THE BLOCK'S OWN HEAD (1.0.75) ────────────────────────────────
+      //
+      // *"can we give the prose blocks a header like other sections?"*
+      //
+      // NO `directive`, WHICH MAKES THIS THE SECOND QUESTION IN THE PLUGIN
+      // WHOSE ANSWER IS NOT A DIRECTIVE'S ARGUMENT AND THE FIRST `title` ONE.
+      // The other three `title` questions name `header` — the keyword their
+      // answer is spliced into — and prose composes no fence to hold one. The
+      // reader said why it never will: *"directive blocks breaking markdown
+      // syntax"*, which is 5.6's own argument for the bracket, restated by the
+      // person the bracket was built for. So the answer rides the OPENING
+      // MARKER (`bracketOpen`'s second argument) and the journal planner owns
+      // both halves, exactly as it owns the headings below.
+      //
+      // `label`, LIKE EVERY OTHER TITLE QUESTION, because the key is the
+      // override's field name and `SectionOverrides.label` is "this section's
+      // head, replacing the default". `render` reads it, so a layout that names
+      // a prose block composes the name rather than storing an answer nothing
+      // draws.
+      //
+      // THE PLACEHOLDER IS THE DEFAULT HEAD, DERIVED AND NOT SPELLED. The head
+      // the reader is looking at comes from `proseHeadLabel`; a literal
+      // `"📝 Prose"` here would be a second spelling of it, and the first
+      // release to change the icon would have the box promising the old one.
+      // `rowFor` NUMBERS IT per block — the second block's head reads
+      // *📝 Prose 2* and so must the box under it.
+      {
+        kind: "title",
+        key: "label",
+        label: "this block's head",
+        placeholder: proseHeadLabel(null, 1),
+        // THE UNMARKED NOTE'S WORDING, AND NOT `TITLE_SETTLED`. That one says
+        // "rename it on the note" because a header bar is a control the reader
+        // can click; a prose head is drawn by the stylesheet off an attribute
+        // and there is nothing on the note to click. What is true of a pre-5.6
+        // block is that it has no edge to carry a name on at all, which is the
+        // same refusal the headings box wears and names the same route out.
+        settled: {
+          text: "this block has no edge to name",
+          hint:
+            "This note's prose was written before ChronoAnvil marked where a " +
+            "prose block starts and ends, so there is nowhere to keep a head " +
+            "for it. Use Reload this note to get the markers, and the box.",
+        },
+      },
       // ── THE TICK, AND THEN WHICH (1.0.36) ────────────────────────────
       //
       // *"The skeleton part should remain as a toggle 'Add Default Headings'."*
@@ -2731,7 +2922,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // than dropping the section out of the window and reporting the reader's
     // own writing as blocks that aren't the catalogue's.
     locate: (t) => {
-      const at = t.search(/^<!--\/?chronoanvil-(?:prose|skeleton)-->$/m);
+      // THE TITLE IS OPTIONAL AND THE CLOSER NEVER HAS ONE (1.0.75), which is
+      // what `(?::[^\n]*)?` after the key says. A `locate` that missed a titled
+      // opener would fall through to the `##` probe and report the reader's own
+      // first heading as where this section starts.
+      const at = t.search(/^<!--\/?chronoanvil-(?:prose|skeleton)(?::[^\n]*)?-->$/m);
       return at >= 0 ? at : probe(t, /^##\s+\S/m);
     },
     render: (ctx, opts) => {
@@ -2759,7 +2954,12 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         if (i > 0) lines.push("");
         lines.push(`## ${h.title}`, "", ...(h.body ?? [""]));
       });
-      return [bracketed(PROSE_KEY, lines)];
+      // AND THE HEAD, WHERE THE LAYOUT DECLARED ONE (1.0.75). `label` is the
+      // override every other section's title question writes, and this one
+      // writes it too — so a preset that names a prose block composes a named
+      // marker rather than holding an answer nothing reads. Absent is the
+      // ordinary case and composes the marker this always wrote.
+      return [bracketed(PROSE_KEY, lines, opts?.label ?? null)];
     },
   },
 ];

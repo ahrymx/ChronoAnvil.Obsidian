@@ -96,7 +96,7 @@ import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import {
   LEGACY_PROSE_KEY,
   PROSE_KEY,
-  bracketOpen,
+  bracketOpenerOf,
   proseSpansIn,
 } from "../journals/journal-sections";
 import {
@@ -147,7 +147,12 @@ const REGION_OPEN = /^<!--(?:chronoanvil|almanac):[A-Za-z0-9_-]+(?:\s*-->)?$/;
 //
 // NO `almanac-` HERE, unlike the region above, because there is no such marker
 // to hide: brackets arrived in 5.6, five releases after the rename.
-const BRACKET = /^<!--\/?chronoanvil-[A-Za-z0-9_-]+-->$/;
+//
+// THE OPENER'S TITLE IS OPTIONAL AND THE CLOSER HAS NONE (1.0.75). A pattern
+// that missed a titled opener would leave the marker VISIBLE in Live Preview
+// on exactly the notes a reader has named — the one place the name is supposed
+// to appear as a head rather than as markup.
+const BRACKET = /^<!--\/?chronoanvil-[A-Za-z0-9_-]+(?::[^\n]*?)?-->$/;
 
 // The graph block's first line. Its second is the links, matched loosely
 // (`%% … %%`) because what is between them is a wikilink list this file has no
@@ -174,9 +179,16 @@ function fenceCloseAt(lines: readonly string[], i: number): number | null {
   return -1;
 }
 
-// The two spellings of a prose block's opener — the second is 5.6's skeleton,
-// which `proseSpansIn` still reads.
-const PROSE_OPENERS = new Set([bracketOpen(PROSE_KEY), bracketOpen(LEGACY_PROSE_KEY)]);
+// Whether this line opens a prose block — either spelling, titled or bare.
+//
+// IT WAS A `Set` OF TWO EXACT STRINGS until 1.0.75, and a titled opener is the
+// shape that breaks every whole-line comparison of a marker: this one decides
+// whether the blank line below belongs to the reader's block, so a miss put the
+// row back in the join and gave an emptied, NAMED block the 1.0.39 defect back.
+// `bracketOpenerOf` is the one read, in the module that writes them.
+function isProseOpener(line: string): boolean {
+  return bracketOpenerOf(line, [PROSE_KEY, LEGACY_PROSE_KEY]) !== null;
+}
 
 // Which lines of this note are markers.
 //
@@ -255,7 +267,7 @@ export function markerLinesIn(lines: readonly string[]): MarkerSpan[] {
 // the inside of a prose block.
 function joins(last: MarkerSpan, span: MarkerSpan, lines: readonly string[]): boolean {
   if (last.to + 1 === span.from) return true;
-  if (PROSE_OPENERS.has(lines[last.to].trim())) return false;
+  if (isProseOpener(lines[last.to])) return false;
   return last.to + 2 === span.from && lines[last.to + 1].trim() === "";
 }
 
@@ -312,7 +324,7 @@ function merged(spans: MarkerSpan[], lines: readonly string[]): MarkerSpan[] {
       continue;
     }
     const row = last && last.to + 2 === span.from && lines[last.to + 1].trim() === "";
-    if (row && PROSE_OPENERS.has(lines[last.to].trim())) out.push({ ...span, apart: true });
+    if (row && isProseOpener(lines[last.to])) out.push({ ...span, apart: true });
     else out.push({ ...span });
   }
   return out;

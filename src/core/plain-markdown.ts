@@ -301,7 +301,13 @@ export function stripPluginMarkup(raw: string): string {
       // the reader's own document and only the markers go. Two lines, not a
       // span, and that difference is the whole reason the two are told apart by
       // a `-` where a region has a `:`.
-      .replace(/<!--\/?chronoanvil-[A-Za-z0-9_-]+-->/g, "")
+      //
+      // AND AN OPENER MAY CARRY A TITLE SINCE 1.0.75 — `<!--chronoanvil-prose:
+      // What I think-->`. It is the plugin's marker whichever shape it is in,
+      // so it goes the same way: an export that left a titled opener behind
+      // would put an HTML comment at the top of the reader's own writing on
+      // every note that has been given a head.
+      .replace(/<!--\/?chronoanvil-[A-Za-z0-9_-]+(?::[^\n]*?)?-->/g, "")
       .split("\n")
       .filter((l) => l.trim() !== "`chronoanvil:spacer`")
       .join("\n")

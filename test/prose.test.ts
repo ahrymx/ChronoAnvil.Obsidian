@@ -14,19 +14,29 @@ import {
   PROSE_SECTION_ID,
   bracketClose,
   bracketOpen,
+  bracketOpenerOf,
   findSection,
   isProseId,
+  normaliseProseTitle,
   proseCountIn,
+  proseHeadIn,
+  proseHeadLabel,
   proseIdFor,
   proseOrdinalOf,
   proseSpanIn,
   proseSpansIn,
   proseTitlesIn,
+  renderSection,
   sectionContext,
   sectionOverrides,
   sectionRemovable,
 } from "../src/journals/journal-sections";
-import { FLAG_OFF, FLAG_ON, describeAnswers } from "../src/core/section-model";
+import {
+  FLAG_OFF,
+  FLAG_ON,
+  answerInText,
+  describeAnswers,
+} from "../src/core/section-model";
 import {
   applySections,
   journalSectionModel,
@@ -36,7 +46,7 @@ import {
 import { wantFromJournalNote } from "../src/journals/journal-template";
 import { toPlainMarkdown } from "../src/core/plain-markdown";
 import { readNoteRegion } from "../src/core/notestore";
-import { readSrc } from "./sources";
+import { readCode, readSrc } from "./sources";
 
 // ── PROSE, AND WHY IT IS A SECTION AT ALL (1.0.36) ───────────────────────
 //
@@ -805,9 +815,16 @@ describe("the tick and the list", () => {
   const relist = (text: string, titles: string[]): string =>
     applySections(text, lessonCtx, wantWith(text, { headings: titles.join("\n") }))!;
 
-  it("asks the tick first and the list second", () => {
+  it("asks the head first, then the tick, then the list", () => {
+    // THE ORDER IS THE SIZE OF THE DECISION (1.0.75). The head names the whole
+    // block, the tick says whether it opens with prompts, the box says which —
+    // so the row reads from the block down into it. The head went on top rather
+    // than under the two because every other section's title question is the
+    // first row of its card, and a reader who has learned where a title lives
+    // should not have to look for this one.
     const qs = findSection(PROSE_SECTION_ID)!.questions!(lessonCtx);
-    expect(qs.map((q) => q.kind)).toEqual(["flag", "lines"]);
+    expect(qs.map((q) => q.kind)).toEqual(["title", "flag", "lines"]);
+    expect(question("title").key).toBe("label");
     expect(question("flag").key).toBe("defaults");
     expect(question("lines").key).toBe("headings");
   });
@@ -1100,5 +1117,342 @@ describe("the tick and the list", () => {
     expect(
       permutations.filter((p) => welded(p).join() !== p.join()).length
     ).toBe(3);
+  });
+});
+
+// ── THE HEAD A PROSE BLOCK WEARS (1.0.75) ───────────────────────────────
+//
+// *"can we give the prose blocks a header like other sections?"* — and the
+// reader's own reason the head cannot be composed the way every other section's
+// is: *"I think this is the only viable choice due to directive blocks breaking
+// markdown syntax"*, which is 5.6's argument for the bracket said back by the
+// person it was built for. A `header:` line over a prose block would put a fence
+// in the middle of the reader's markdown.
+//
+// SO THE NAME LIVES ON THE OPENING MARKER, which is the only edge this section
+// has, and the default is the catalogue's own word: *"Prose and if numbered,
+// append the number. Allow editing like some sections already provide."*
+describe("the head a prose block wears (1.0.75)", () => {
+  const named = (title: string): string =>
+    applySections(lesson(), lessonCtx, wantNamed(lesson(), title))!;
+  const wantNamed = (text: string, title: string, id = "headings") =>
+    sectionsPresent(text, lessonCtx).map((x) =>
+      x === id ? { id: x, options: { label: title } } : x
+    );
+
+  describe("the grammar on the marker", () => {
+    it("writes the name after the key and never on the closer", () => {
+      // ONE MARKER CARRIES IT, because the pair is read as a pair: the closer is
+      // found by key, and a title on it would be a second string to keep equal
+      // to the first for no reader-visible gain.
+      expect(bracketOpen(PROSE_KEY, "Chapter one")).toBe(
+        "<!--chronoanvil-prose:Chapter one-->"
+      );
+      expect(bracketClose(PROSE_KEY)).toBe("<!--/chronoanvil-prose-->");
+    });
+
+    it("writes the bare marker for no name, which is what every note has", () => {
+      // The ordinary case, and the one the whole suite above was written over.
+      expect(bracketOpen(PROSE_KEY)).toBe("<!--chronoanvil-prose-->");
+      expect(bracketOpen(PROSE_KEY, null)).toBe("<!--chronoanvil-prose-->");
+      expect(bracketOpen(PROSE_KEY, "   ")).toBe("<!--chronoanvil-prose-->");
+    });
+
+    it("cannot be made to end the comment early", () => {
+      // THE ONE THING A NAME IN AN HTML COMMENT MUST NOT DO. A reader who types
+      // `-->` into the box would otherwise close the marker mid-name, and
+      // everything after it would become visible markdown with no opener — the
+      // section falls off the window and the reader is told to reload a note
+      // nothing is wrong with.
+      expect(normaliseProseTitle("a --> b")).toBe("a b");
+      expect(bracketOpen(PROSE_KEY, "a --> b")).toBe(
+        "<!--chronoanvil-prose:a b-->"
+      );
+      expect(bracketOpen(PROSE_KEY, "a --> b")).not.toContain("--> b");
+    });
+
+    it("keeps a name to one line, and folds the space out of it", () => {
+      // A newline would end the marker's own line and split the comment across
+      // two blocks; `<` and `>` are the other two characters a comment's
+      // grammar reads.
+      expect(normaliseProseTitle("Two  words")).toBe("Two words");
+      expect(normaliseProseTitle("Aim\nMethod")).toBe("Aim Method");
+      expect(normaliseProseTitle("<b>Aim</b>")).toBe("b Aim /b");
+      expect(normaliseProseTitle("  ")).toBeNull();
+      expect(normaliseProseTitle("")).toBeNull();
+    });
+
+    it("reads a name back off either spelling of the marker", () => {
+      const keys = [PROSE_KEY, LEGACY_PROSE_KEY];
+      expect(bracketOpenerOf("<!--chronoanvil-prose-->", keys)).toEqual({
+        key: PROSE_KEY,
+        title: null,
+      });
+      expect(
+        bracketOpenerOf("<!--chronoanvil-prose:Chapter one-->", keys)
+      ).toEqual({ key: PROSE_KEY, title: "Chapter one" });
+      // A NOTE WRITTEN BEFORE THE RENAME CAN BE NAMED TOO, which falls out of
+      // the keys being a list rather than being arranged for.
+      expect(
+        bracketOpenerOf("<!--chronoanvil-skeleton:Old notes-->", keys)
+      ).toEqual({ key: LEGACY_PROSE_KEY, title: "Old notes" });
+    });
+
+    it("declines a closer, another key, and a key this is only a prefix of", () => {
+      // THE PREFIX TRAP, WHICH THIS CODEBASE KEEPS MEETING. `prose` is a prefix
+      // of nothing in the catalogue today and `headings` is, so the separator is
+      // part of the test rather than `startsWith` on its own: a key that merely
+      // begins with another's letters must not be read as that one with a name.
+      const keys = [PROSE_KEY, LEGACY_PROSE_KEY];
+      expect(bracketOpenerOf("<!--/chronoanvil-prose-->", keys)).toBeNull();
+      expect(bracketOpenerOf("<!--chronoanvil-recall-->", keys)).toBeNull();
+      expect(bracketOpenerOf("<!--chronoanvil-prosey-->", keys)).toBeNull();
+      expect(bracketOpenerOf("## Overview", keys)).toBeNull();
+    });
+  });
+
+  describe("what the file says, and what the window shows", () => {
+    const row = (text: string, id = "headings") =>
+      journalSectionModel(lessonCtx)
+        .sections(text)
+        .find((s) => s.id === id)!;
+
+    it("answers the empty string for a block nobody has named", () => {
+      // AND NOT NOTHING, which is the whole control: `readable()` draws the box
+      // exactly where the model supplied a key, so an unset answer would hide
+      // the box on every block in every vault — all of them are unnamed — and
+      // print the refusal over a marker that is right there to write to.
+      expect(row(lesson()).answered?.["label"]).toBe("");
+      expect(proseHeadIn(lesson())).toBe("");
+    });
+
+    it("answers the reader's own word once they have given one", () => {
+      const text = named("Chapter one");
+      expect(proseHeadIn(text)).toBe("Chapter one");
+      expect(row(text).answered?.["label"]).toBe("Chapter one");
+    });
+
+    it("answers nothing at all for a note with no markers", () => {
+      // The pre-5.6 note. There is no edge to keep a name on, so the model
+      // supplies no answer and the question's `settled` wording stands in for
+      // the box — the same refusal the headings list already wears, and for the
+      // same reason.
+      const text = unmarked(lesson());
+      expect(proseHeadIn(text)).toBeNull();
+      expect(row(text).answered?.["label"]).toBeUndefined();
+      const q = findSection(PROSE_SECTION_ID)!
+        .questions!(lessonCtx)
+        .find((x) => x.kind === "title")!;
+      expect(q.settled?.text).toBeTruthy();
+      expect(q.settled?.hint).toContain("Reload this note");
+    });
+
+    it("names no keyword, which is what puts the answer on the bracket", () => {
+      // Every other `title` question in every catalogue names `header` — the
+      // directive its answer is spliced into. This one names none, and that is
+      // the single field `readable()` and `answerInText` both branch on.
+      const q = findSection(PROSE_SECTION_ID)!
+        .questions!(lessonCtx)
+        .find((x) => x.kind === "title")!;
+      expect(q.directive).toBeUndefined();
+      expect(answerInText(named("Chapter one"), q)).toBeNull();
+    });
+
+    it("offers the second block's own default as its placeholder", () => {
+      // A PLACEHOLDER STATES THE DEFAULT, so it has to be the default of THIS
+      // block: the second block's head reads *📝 Prose 2* and a box promising
+      // *📝 Prose* under it would be the control describing another block.
+      const text = twoBlocks();
+      const headOf = (id: string) =>
+        row(text, id).questions.find((q) => q.kind === "title")!;
+      expect(headOf("headings").placeholder).toBe("📝 Prose");
+      expect(headOf(proseIdFor(2)).placeholder).toBe("📝 Prose 2");
+    });
+
+    it("derives that word where the painter derives it", () => {
+      // ONE DERIVATION, TWO READERS — the attribute the stylesheet draws and the
+      // placeholder the box shows. A second spelling of "📝 Prose" is how the
+      // head over a block and the box under it come to promise different words.
+      expect(proseHeadLabel(null, 1)).toBe("📝 Prose");
+      expect(proseHeadLabel(null, 3)).toBe("📝 Prose 3");
+      expect(proseHeadLabel("Chapter one", 2)).toBe("Chapter one");
+    });
+  });
+
+  describe("the write, and everything it does not touch", () => {
+    it("names the block by rewriting one line", () => {
+      const before = lesson();
+      const after = named("Chapter one");
+      const a = before.split("\n");
+      const b = after.split("\n");
+      expect(b).toHaveLength(a.length);
+      const moved = a.flatMap((l, i) => (l === b[i] ? [] : [i]));
+      expect(moved).toHaveLength(1);
+      expect(b[moved[0]]).toBe("<!--chronoanvil-prose:Chapter one-->");
+    });
+
+    it("writes nothing when the answer is the name already there", () => {
+      // The editor sends every answer back on every Save, so a bare write would
+      // rewrite the opener of a block the reader only looked at — and
+      // `applySections` answers null for a file it would not change.
+      const text = named("Chapter one");
+      expect(
+        applySections(text, lessonCtx, wantNamed(text, "Chapter one"))
+      ).toBeNull();
+      expect(applySections(lesson(), lessonCtx, wantNamed(lesson(), ""))).toBeNull();
+    });
+
+    it("leaves the reader's own marker line alone, down to its spacing", () => {
+      // WHAT "WRITES NOTHING" HAS TO MEAN, and the measurement that found it:
+      // with the guard removed the two assertions above still passed, because
+      // rewriting a marker to the same name produces the same bytes. The
+      // difference the guard actually makes is on a line the reader has touched
+      // — trailing spaces after the marker, which `proseSpansIn` trims to match
+      // and this would silently tidy away. `applySections`' promise is that a
+      // section it was not asked about comes out byte for byte, and a line it
+      // WAS asked about and told to leave as it is counts as one.
+      const spaced = lesson().replace(
+        "<!--chronoanvil-prose-->\n",
+        "<!--chronoanvil-prose-->   \n"
+      );
+      expect(spaced).toContain("<!--chronoanvil-prose-->   ");
+      expect(proseHeadIn(spaced)).toBe("");
+      expect(applySections(spaced, lessonCtx, wantNamed(spaced, ""))).toBeNull();
+    });
+
+    it("gives the block its default head back when the box is emptied", () => {
+      // `TitleQuestion`'s own rule: empty means the catalogue's own heading.
+      const text = named("Chapter one");
+      const cleared = applySections(text, lessonCtx, wantNamed(text, "  "))!;
+      expect(cleared).toContain("<!--chronoanvil-prose-->");
+      expect(cleared).not.toContain("Chapter one");
+      expect(proseHeadIn(cleared)).toBe("");
+    });
+
+    it("names the block the reader is on and not the one above it", () => {
+      const text = twoBlocks();
+      const want = sectionsPresent(text, lessonCtx).map((x) =>
+        x === proseIdFor(2) ? { id: x, options: { label: "Scratch" } } : x
+      );
+      const after = applySections(text, lessonCtx, want)!;
+      expect(proseHeadIn(after, 1)).toBe("");
+      expect(proseHeadIn(after, 2)).toBe("Scratch");
+    });
+
+    it("keeps the name through an untick of the default headings", () => {
+      // `pruneBracketedSpan` REWRITES THE OPENER, because the shape has to be
+      // `renderBlock`'s to the blank line — so the title has to be carried
+      // across explicitly. Without that, *Add default headings* would be a
+      // checkbox that also renames the section.
+      // AND THE TICK IS THE ONLY ANSWER SENT, which is what makes this the
+      // prune's own job rather than the head write's. The editor sends back the
+      // keys the reader TOUCHED — see `shownAnswer`, which seeds a control
+      // without dirtying it — so a reader who only clears this checkbox sends
+      // no name at all, and `withProseTitle` has nothing to put back.
+      const text = named("Chapter one");
+      const want = sectionsPresent(text, lessonCtx).map((x) =>
+        x === "headings" ? { id: x, options: { defaults: FLAG_OFF } } : x
+      );
+      const after = applySections(text, lessonCtx, want)!;
+      expect(proseTitlesIn(after)).toEqual([]);
+      expect(proseHeadIn(after)).toBe("Chapter one");
+    });
+
+    it("hands both writes the same block, which is the run's own ordinal", () => {
+      // TWO WRITES LAND ON ONE BLOCK and both are handed the run's lines rather
+      // than the file's — so the number saying WHICH block inside that run has
+      // to be the same number, read once. Each prose block is its own run
+      // today, which makes the two disagreeing invisible until the day one run
+      // holds two blocks; a shape assertion is what can see it now.
+      const src = readCode("journal-plan");
+      const at = src.indexOf("const nth = proseSpanOfRun(run.sectionIds, id);");
+      expect(at).toBeGreaterThan(-1);
+      const site = src.slice(at, src.indexOf("}", src.indexOf("withProseTitle(", at)));
+      expect(site.match(/\n\s+nth,?\n/g) ?? []).toHaveLength(2);
+      expect(site).not.toContain("1\n");
+    });
+
+    it("does not migrate the old spelling as a side effect of a rename", () => {
+      // A rename is a rename. The `skeleton` marker is read and never written
+      // (`test/legacy-tokens.test.ts` is the other half of that contract), and
+      // naming a block is not the release that changes which spelling a note
+      // carries.
+      const old = lesson()
+        .split(bracketOpen(PROSE_KEY))
+        .join(bracketOpen(LEGACY_PROSE_KEY))
+        .split(bracketClose(PROSE_KEY))
+        .join(bracketClose(LEGACY_PROSE_KEY));
+      const after = applySections(old, lessonCtx, wantNamed(old, "Chapter one"))!;
+      expect(after).toContain("<!--chronoanvil-skeleton:Chapter one-->");
+      expect(after).toContain("<!--/chronoanvil-skeleton-->");
+      expect(after).not.toContain("chronoanvil-prose");
+    });
+  });
+
+  describe("a block composed with a name", () => {
+    const prose = findSection(PROSE_SECTION_ID)!;
+
+    it("composes the name a layout declared", () => {
+      // `label` IS THE OVERRIDE'S FIELD NAME AND THE QUESTION'S KEY, which is
+      // the contract `renderOptionsFor` runs on — so a preset that names a
+      // prose block has to COMPOSE that name rather than store an answer
+      // nothing draws. The alternative was a key nothing reads, which is a
+      // control that works and an override that silently does not.
+      const text = renderSection(prose, lessonCtx, { label: "Chapter one" });
+      expect(text.split("\n")[0]).toBe("<!--chronoanvil-prose:Chapter one-->");
+      expect(proseHeadIn(text)).toBe("Chapter one");
+    });
+
+    it("composes the bare marker where no layout named it", () => {
+      // Every template this plugin ships, and the reason the goldens did not
+      // move this release.
+      expect(renderSection(prose, lessonCtx).split("\n")[0]).toBe(
+        "<!--chronoanvil-prose-->"
+      );
+      expect(lesson()).toContain("<!--chronoanvil-prose-->");
+      expect(lesson()).not.toContain("<!--chronoanvil-prose:");
+    });
+
+    it("normalises a layout's name the way the box's is normalised", () => {
+      // ONE NORMALISER, BOTH WRITERS. A preset is written in code and a `-->`
+      // in one would break the marker exactly as a typed one would — and the
+      // code path is the one nobody is watching when it happens.
+      const text = renderSection(prose, lessonCtx, { label: "Aim --> Method" });
+      expect(text.split("\n")[0]).toBe("<!--chronoanvil-prose:Aim Method-->");
+    });
+  });
+
+  describe("a named marker is still a marker", () => {
+    it("is still where the section starts", () => {
+      // `locate` FALLS BACK TO A `##` PROBE, so a regex that missed a titled
+      // opener would not fail loudly — it would report the reader's own first
+      // heading as where the section begins, and the attribution would claim
+      // their prose.
+      const text = named("Chapter one");
+      const at = findSection(PROSE_SECTION_ID)!.locate(text, lessonCtx);
+      expect(text.slice(at)).toMatch(/^<!--chronoanvil-prose:Chapter one-->/);
+      expect(sectionsPresent(text, lessonCtx)).toContain("headings");
+      expect(proseCountIn(text)).toBe(1);
+    });
+
+    it("is still invisible to a reader who copies the note out", () => {
+      // `toPlainMarkdown` is what a note looks like with the plugin gone, and a
+      // marker carrying a name is still a marker.
+      const plain = toPlainMarkdown(
+        named("Chapter one"),
+        journalSectionModel(lessonCtx)
+      );
+      expect(plain).not.toContain("chronoanvil-prose");
+      expect(plain).not.toContain("Chapter one");
+      expect(plain).toContain("## Overview");
+    });
+
+    it("is still a row the editor hides", () => {
+      // `marker-lines.ts` reads the bracket with the same function the spans do,
+      // so a titled opener is hidden in Live Preview exactly as a bare one is.
+      // A regex of its own here is how the two would stop agreeing.
+      expect(readCode("marker-lines")).toContain("bracketOpenerOf(line, [");
+      expect(readCode("marker-lines")).not.toContain("PROSE_OPENERS");
+    });
   });
 });

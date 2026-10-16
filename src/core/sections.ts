@@ -189,6 +189,16 @@ export type SectionBlock =
       // under deadline.
       key: string;
       lines: string[];
+      // THE OPENER'S TITLE, WHERE THE COMPOSER HAS ONE (1.0.75). A prose
+      // block wears a head, and the only edge it has to carry a name on is the
+      // opening marker — see `bracketOpen`, which is where the grammar is.
+      //
+      // ABSENT IS THE ORDINARY CASE AND NOT AN EMPTY NAME: an untitled marker
+      // is what every note composed before this release carries and what a
+      // fresh block is written with, and the head then reads the catalogue's
+      // own word. A `null` here is the same answer said out loud, which is
+      // what a layout that cleared the override hands in.
+      title?: string | null;
     };
 
 // One repeatable piece of a section that a file may be missing. 3.18 §1.3.

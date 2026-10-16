@@ -5,6 +5,29 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.75] - 2026-10-16
+
+### Added
+
+- **A prose block wears a head, like every other section.** Asked for as *"can
+  we give the prose blocks a header like other sections?"* — the one part of a
+  note that is a section on screen and had nothing over it. Each block is now
+  titled **📝 Prose**, numbered from the second one down, drawn in the section
+  bar's own type over the bar's own hairline and identical in reading mode and
+  Live Preview.
+- **And the head is yours to name.** The Prose row in **Note: edit sections…**
+  opens with a box for it; the box shows the default so you can see what you are
+  replacing, and emptying it gives the default back. The name is kept on the
+  block's own invisible marker — not in a fence, because *"directive blocks
+  [break] markdown syntax"* and prose is the one section whose substance is
+  plain markdown — so a rename moves one character of markup and nothing about
+  your writing. The head carries no fold arrow: folding a prose block would hide
+  lines of your own file, which ChronoAnvil does not do in Live Preview, and a
+  control that can only work in one of the two modes is the 1.0.73 rule again.
+- A block you name keeps that name through an untick of **Add default
+  headings**, through a rename of the headings inside it, and through a copy of
+  the note out to plain markdown — where the marker goes, name and all.
+
 ## [1.0.74] - 2026-10-16
 
 ### Fixed

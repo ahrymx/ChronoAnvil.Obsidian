@@ -127,8 +127,12 @@ import {
   isProseId,
   proseIdFor,
   proseOrdinalOf,
+  proseLabelOf,
   proseCountIn,
   proseSpanIn,
+  normaliseProseTitle,
+  proseHeadIn,
+  proseHeadLabel,
   proseSpansIn,
   proseTitlesIn,
   PROSE_KEY,
@@ -163,6 +167,7 @@ import {
   SectionModel,
   SectionOp,
   SectionOpKind,
+  SectionQuestion,
   SectionView,
   SectionWant,
   FLAG_OFF,
@@ -487,19 +492,10 @@ export function sectionOfId(
     : undefined;
 }
 
-// What a prose row is called, where a note carries more than one block.
-//
-// THE ORDINAL IS THE LABEL'S, TOO (1.0.36). The reader asked for "copy prose
-// block #" and "move prose block #", and a window listing three rows all
-// reading **Prose** answers neither — the number is the only thing telling
-// them apart, since every block holds different words and the same everything
-// else. The first keeps the bare label, exactly as its id keeps the bare
-// `headings`: one block is the ordinary case and numbering it would imply a
-// second that may not exist.
-export function proseLabelOf(section: JournalSection, id: string): string {
-  const n = isProseId(id) ? (proseOrdinalOf(id) ?? 1) : 1;
-  return n > 1 ? `${section.label} ${n}` : section.label;
-}
+// `proseLabelOf` MOVED TO `journal-sections.ts` IN 1.0.75, because the head a
+// prose block now draws has to read the same word as the row in *Edit
+// sections…* — and the surface painters cannot import this file. One
+// derivation, in the module that owns the catalogue row it reads.
 
 export function proseSpanOfRun(
   runIds: readonly string[],
@@ -2180,12 +2176,27 @@ export function applySections(
             optionsFor(requested, id)
           );
           if (listedSection) {
+            const nth = proseSpanOfRun(run.sectionIds, id);
             out = withListedHeadings(
               out,
               listedSection,
               ctx,
               optionsFor(requested, id),
-              proseSpanOfRun(run.sectionIds, id)
+              nth
+            );
+            // AND THE HEAD AFTER THE HEADINGS, WHICH IS THE SAFE ORDER OF THE
+            // TWO (1.0.75). Both writes land on the same block and only one of
+            // them touches the opener: `rewriteBracketedSpan` copies that line
+            // through untouched, `pruneBracketedSpan` rewrites it and carries
+            // the title across on purpose. Naming the block last means the
+            // answer the reader typed is the last word either way, rather than
+            // depending on which branch the tick took.
+            out = withProseTitle(
+              out,
+              listedSection,
+              ctx,
+              optionsFor(requested, id),
+              nth
             );
           }
         }
@@ -2874,6 +2885,54 @@ function withListedHeadings(
   return rewriteBracketedSpan(lines, skel, titles, nth)?.lines ?? lines;
 }
 
+// The reader's name for one prose block, written onto the marker that opens it.
+//
+// ── THE ONE EDGE A PROSE BLOCK HAS (1.0.75) ──────────────────────────────
+//
+// *"can we give the prose blocks a header like other sections?"* — and the
+// reader's own reason for why it cannot be a `header:` line: *"directive blocks
+// breaking markdown syntax"*. So this is the whole write: one line, the
+// opener's, replaced by the same opener carrying a title. Nothing inside the
+// bracket is touched, which is what keeps a rename off the reader's prose.
+//
+// `span.key` AND NOT `PROSE_KEY`, so naming a block composed before 1.0.36
+// does not quietly migrate `skeleton` to `prose` as a side effect. A rename is
+// a rename; the spelling a note was written in is the spelling it keeps until
+// something that is about the spelling changes it.
+//
+// AN EMPTIED BOX CLEARS THE NAME, which is `TitleQuestion`'s own rule — empty
+// means the catalogue's own heading — and `normaliseProseTitle` spells it:
+// whitespace and nothing else normalises to null, and a null title composes the
+// bare marker this release found in every vault.
+//
+// AND AN UNCHANGED ANSWER WRITES NOTHING. The editor sends every answer back on
+// every Save, so a bare write here would rewrite the opener of a block the
+// reader only looked at — and `applySections`' promise is that a section it was
+// not asked about comes out byte for byte. Comparing against the span's own
+// title is the cheapest honest form of that: `null === null` on the ordinary
+// block, and the file is returned rather than rebuilt.
+function withProseTitle(
+  lines: string[],
+  section: JournalSection,
+  ctx: SectionContext,
+  options: Record<string, unknown> | undefined,
+  nth = 1
+): string[] {
+  const q = questionsOf(section, ctx).find(
+    (x) => x.kind === "title" && !x.directive
+  );
+  if (!q) return lines;
+  const answer = options?.[q.key];
+  if (typeof answer !== "string") return lines;
+  const span = proseSpanIn(lines, nth);
+  if (!span) return lines;
+  const title = normaliseProseTitle(answer);
+  if (title === span.title) return lines;
+  const out = [...lines];
+  out[span.open] = bracketOpen(span.key, title);
+  return out;
+}
+
 // The options a section is rendered with: the layout's defaults, the reader's
 // answers on top — and a `lines` answer turned back into the shape the
 // catalogue's `render` reads.
@@ -2942,7 +3001,12 @@ function pruneBracketedSpan(
   return {
     lines: [
       ...lines.slice(0, span.open),
-      bracketOpen(PROSE_KEY),
+      // THE HEAD SURVIVES THE UNTICK (1.0.75). This rewrites the opener rather
+      // than keeping the line — the shape has to be `renderBlock`'s to the
+      // blank line — so a marker that carries the reader's own name for this
+      // block has to be written back carrying it. Dropping it would make
+      // *Add default headings* a control that also renames the section.
+      bracketOpen(PROSE_KEY, span.title),
       "",
       ...(body.length ? body : [""]),
       "",
@@ -3515,13 +3579,34 @@ function answeredIn(
   // bracketed section's prose answers a `lines` question; it does not need to
   // know that the journal catalogue happens to call the answer "headings".
   const list = questions.find((q) => q.kind === "lines");
-  if (!list) return out;
+  // AND THE HEAD IS THE SECOND SUCH QUESTION (1.0.75), found the same way: a
+  // `title` question with no keyword to name is one whose answer is on the
+  // bracket. Every other `title` question in every catalogue names `header:`
+  // and is answered two branches up by `answersInText`, so `!q.directive` is
+  // the whole of the test and this file still does not know the key is `label`.
+  const head = questions.find((q) => q.kind === "title" && !q.directive);
+  if (!list && !head) return out;
   if (bracketKeyOf(section, ctx, sectionOverrides(ctx, section.id)) === null)
     return out;
+  const nth = proseOrdinalOf(id) ?? 1;
+  // ── THE NAME ON THIS BLOCK'S OPENER (1.0.75) ────────────────────────
+  //
+  // AN UNTITLED MARKER ANSWERS THE EMPTY STRING AND NOT NOTHING, and the
+  // difference is the whole control. `readable()` draws the box exactly where
+  // the model supplied a key, so a `null` title left unset would hide the box
+  // on every block nobody has named yet — which is all of them — and print the
+  // `settled` refusal over a block whose marker is right there to write to.
+  // Absent stays reserved for the note that has no markers at all, where the
+  // write genuinely cannot land; `proseSpanIn` returning null is that note.
+  if (head) {
+    const named = proseHeadIn(text, nth);
+    if (named !== null) out[head.key] = named;
+  }
+  if (!list) return out;
   // THE NTH BLOCK'S HEADINGS, NOT THE FIRST'S (1.0.36). `id` is which prose
   // block this row is; a reader editing the headings of their second block
   // must not be shown the first block's list and must not write over it.
-  const titles = proseTitlesIn(text, proseOrdinalOf(id) ?? 1);
+  const titles = proseTitlesIn(text, nth);
   if (titles) out[list.key] = titles.join("\n");
   // ── AND THE DERIVED TICK BESIDE IT (1.0.36) ─────────────────────────
   //
@@ -3579,6 +3664,39 @@ function defaultProseTitles(
   return headingTitlesIn(composed.slice(span.open + 1, span.close));
 }
 
+// The questions of one prose block, with the head's placeholder numbered for
+// THAT block.
+//
+// ── A PLACEHOLDER STATES THE DEFAULT, SO IT HAS TO BE THIS BLOCK'S (1.0.75) ─
+//
+// `TitleQuestion.placeholder` exists to say what the head reads when the reader
+// has not named it, and for prose that word is numbered: the second block's
+// head is *📝 Prose 2*. One catalogue row describes every block — it has to, or
+// `locked`, `blurb` and the two other questions would each need a copy per
+// ordinal — so the catalogue supplies the first block's word and this scopes it,
+// which is exactly how `label` and `removable` are already scoped two fields
+// down.
+//
+// OFF `proseHeadLabel`, THE FUNCTION THE PAINTER CALLS, so the box under a
+// block and the head over it cannot word the default differently. That is the
+// whole reason it moved into `journal-sections.ts` this release: the stylesheet
+// draws an attribute, the attribute comes from there, and so does this.
+//
+// EVERY OTHER QUESTION IS PASSED THROUGH BY IDENTITY, and the array is only
+// rebuilt where there is a head to renumber — a row that is not a prose block
+// gets the catalogue's own list back unchanged.
+function proseHeadPlaceholders(
+  questions: readonly SectionQuestion[],
+  id: string
+): SectionQuestion[] {
+  if (!isProseId(id)) return [...questions];
+  return questions.map((q) =>
+    q.kind === "title" && !q.directive
+      ? { ...q, placeholder: proseHeadLabel(null, proseOrdinalOf(id) ?? 1) }
+      : q
+  );
+}
+
 const rowFor = (
   section: JournalSection,
   ctx: SectionContext,
@@ -3589,7 +3707,7 @@ const rowFor = (
   // section that declares nothing can still HAVE a question, which is why this
   // no longer asks whether the catalogue entry has a `questions` field — and
   // why the shared projection takes the list rather than reading the field.
-  const questions = questionsOf(section, ctx);
+  const questions = proseHeadPlaceholders(questionsOf(section, ctx), id);
   // THE SHAPE IS `viewOf`'s, IN `core/sections.ts` (5.22). Both policies
   // this catalogue differs on are handed in:
   //

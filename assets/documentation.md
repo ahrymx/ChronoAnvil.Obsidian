@@ -658,6 +658,17 @@ on a phone — so a note reads as one stack of sections rather than a stack of
 cards followed by loose text. It picks up whichever aesthetic preset you have
 chosen, like everything else.
 
+**And it wears a head, like every other section.** A prose block is titled
+**📝 Prose** — **📝 Prose 2** for the second one on the note, and so on down —
+drawn in the same type, over the same hairline, as the header bar on any section
+above it. Give it your own name in **Note: edit sections…**: the Prose row's
+first box is its head, and the box shows the default so you can see what you are
+replacing. Empty the box and the default comes back. The name is kept on the
+block's own invisible marker rather than in a fence, so renaming a block moves
+one character of markup and nothing about your writing; the head has no fold
+arrow, because folding a prose block would hide lines of your own file and
+ChronoAnvil never does that in Live Preview.
+
 Nothing is put inside a fence to do it. Your writing is still ordinary markdown
 in the file: headings, links, tasks, callouts, tables and code blocks behave
 exactly as they did, the outline still lists your headings, and the card is gone
@@ -667,7 +678,7 @@ is for. A block you have emptied is not drawn at all, because a card with
 nothing in it is not telling you anything.
 
 You can also write the list without leaving the change window.
-**Note: edit sections…** gives the Prose skeleton row a box holding the note's
+**Note: edit sections…** gives the Prose row a box holding the note's
 headings, one per line: reorder them, rename one, add one, take one out. The
 list is applied to the headings the note already has rather than composed
 fresh, so a heading carries everything written under it while it moves — and a

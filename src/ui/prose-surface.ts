@@ -70,14 +70,46 @@ export const PROSE_BLOCK_CLASS = "ca-prose-block";
 export const PROSE_FIRST_CLASS = "is-prose-first";
 export const PROSE_LAST_CLASS = "is-prose-last";
 
+// ── THE HEAD IS AN ATTRIBUTE AND THE STYLESHEET DRAWS IT (1.0.75) ────────
+//
+// *"can we give the prose blocks a header like other sections?"*
+//
+// A section's head is an ELEMENT, built by a renderer into a fence's widget.
+// Prose has no widget to build into: in reading mode it is the note's own
+// blocks, and in Live Preview it is `.cm-line`s CodeMirror owns and measures.
+// The two ways to put an element there are both worse than they look — a block
+// widget in the editor is a new atomic range for the cursor to meet at the top
+// of the reader's writing, and a `::before` is neither.
+//
+// SO THE NAME TRAVELS AS DATA AND THE RULE DRAWS IT. One attribute on the row
+// that already carries `is-prose-first`, `content: attr(…)` in the stylesheet,
+// and the head is identical in both modes because it is the same declaration
+// over the same class — which is the whole architecture of this file applied
+// once more rather than a new one.
+//
+// WHAT IT COSTS, SAID PLAINLY: a head drawn this way holds text and nothing
+// else. No chevron, no tools. A fold would have to hide the reader's own lines,
+// and `headerbar.ts` already refuses to do that in Live Preview — *"A SOURCE
+// LINE IS NEVER HIDDEN, only painted"* — so a chevron here would act in reading
+// mode and sit dead in the editor, which is the control 1.0.73 was about.
+// Renaming is in *Edit sections…*, where every other section's title is.
+export const PROSE_HEAD_ATTR = "data-ca-prose-head";
+
 /** Whether a run of lines is inside a prose block, and which ends it carries. */
 export interface ProseMark {
   member: boolean;
   first: boolean;
   last: boolean;
+  /** The head, on the first row of the block only. */
+  head: string | null;
 }
 
-const NOT_PROSE: ProseMark = { member: false, first: false, last: false };
+const NOT_PROSE: ProseMark = {
+  member: false,
+  first: false,
+  last: false,
+  head: null,
+};
 
 // Where a block of `lineStart..lineEnd` stands in this note's prose.
 //
@@ -100,10 +132,15 @@ export function proseMarkFor(
   const spans = proseSurfaceSpans(text.split("\n"));
   const span = spans.find((s) => lineStart <= s.to && lineEnd >= s.from);
   if (!span) return NOT_PROSE;
+  const first = lineStart <= span.from;
   return {
     member: true,
-    first: lineStart <= span.from,
+    first,
     last: lineEnd >= span.to,
+    // ONLY THE FIRST ROW CARRIES IT, which is what makes the head one head: the
+    // declaration is on `.is-prose-first`, and an attribute on every row would
+    // be a name waiting for a stylesheet change to print it on all of them.
+    head: first ? span.head : null,
   };
 }
 
@@ -129,6 +166,11 @@ export function paintProse(
   el.toggleClass(PROSE_BLOCK_CLASS, mark.member);
   el.toggleClass(PROSE_FIRST_CLASS, mark.first);
   el.toggleClass(PROSE_LAST_CLASS, mark.last);
+  // AND THE HEAD IS REMOVED WHEN IT IS NOT THE FIRST ROW, for the toggles'
+  // reason exactly: a re-render in place that only ever SET this would leave
+  // the name on a row that has stopped being the top of the block.
+  if (mark.head) el.setAttr(PROSE_HEAD_ATTR, mark.head);
+  else el.removeAttribute(PROSE_HEAD_ATTR);
 }
 
 // ── LIVE PREVIEW ─────────────────────────────────────────────────────────
@@ -225,12 +267,17 @@ function mountedLines(lines: readonly string[]): Set<number> {
 
 export function livePreviewSpans(
   lines: readonly string[]
-): { from: number; to: number }[] {
+): { from: number; to: number; head: string }[] {
   const mounted = mountedLines(lines);
-  return proseSurfaceSpans(lines).map(({ from, to }) => ({
+  return proseSurfaceSpans(lines).map(({ from, to, head }) => ({
     from:
       mounted.has(from) && lines[from - 1]?.trim() === "" ? from - 1 : from,
     to: mounted.has(to) && lines[to + 1]?.trim() === "" ? to + 1 : to,
+    // THE HEAD GOES WITH THE ROW THE RUN NOW STARTS ON, whichever that is. A
+    // block opening on a table or a `$$` has already stepped its start up onto
+    // the blank line above it, because a replaced row draws no line decoration
+    // — and a head on a row that is never drawn is a head nobody sees.
+    head,
   }));
 }
 
@@ -242,7 +289,12 @@ function proseIn(doc: Text): DecorationSet {
       if (n === span.from) cls.push(PROSE_FIRST_CLASS);
       if (n === span.to) cls.push(PROSE_LAST_CLASS);
       out.push(
-        Decoration.line({ class: cls.join(" ") }).range(doc.line(n + 1).from)
+        Decoration.line({
+          class: cls.join(" "),
+          ...(n === span.from
+            ? { attributes: { [PROSE_HEAD_ATTR]: span.head } }
+            : {}),
+        }).range(doc.line(n + 1).from)
       );
     }
   }

@@ -563,6 +563,58 @@
   }
 }
 
+/* ── THE HEAD A PROSE BLOCK WEARS (1.0.75) ──────────────────────────────
+ *
+ * *"can we give the prose blocks a header like other sections?"*
+ *
+ * IT IS A PSEUDO-ELEMENT AND THAT IS THE WHOLE TRICK. Every other section's
+ * head is built by a renderer into a fence's widget; prose has no widget — in
+ * reading mode it is the note's own blocks and in Live Preview it is the
+ * `.cm-line`s CodeMirror measures. `ui/prose-surface.ts` puts the NAME on the
+ * row that already carries `is-prose-first` and this draws it, so one
+ * declaration serves both modes exactly as the surface above it does.
+ *
+ * `[data-ca-prose-head]` IS PART OF THE SELECTOR, not just the source of the
+ * text: `content: attr(…)` on an element without the attribute is an empty
+ * string, which would still draw the hairline and the padding — a blank band
+ * above the writing on any row the painter has not named yet.
+ *
+ * THE TYPE IS THE BAR'S, RESTATED RATHER THAN INHERITED, because the row this
+ * sits on is the reader's own markdown: a `## ` heading, a paragraph, a list.
+ * Everything a title has to settle is settled here, or the head would be a
+ * different size on every block depending on what the reader opened it with.
+ * The three tokens are the ones `.ca-journal-sec` and `.ca-journal-header-title`
+ * read, so a retune of the bar reaches this head with it.
+ *
+ * THE GLYPH IS IN THE STRING, unlike a bar's, which keeps it in a fixed slot so
+ * a column of titles aligns. There is no column here — one head per block, and
+ * the blocks are far apart — and a slot would mean a second pseudo-element with
+ * its own width to keep in step. `📝 Prose` is one label, which is also how
+ * `header:📎 Attachments` is written. */
+.ca-prose-block.is-prose-first[data-ca-prose-head]::before {
+  content: attr(data-ca-prose-head);
+  display: block;
+  font-size: var(--ca-sec-title-size);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ca-sec-title-ink);
+  letter-spacing: normal;
+  /* AND THE CASE IS PINNED FOR THE SAME REASON THE SIZE IS. A theme that
+     uppercases `h2` would uppercase this head, because in reading mode the row
+     under it is whatever heading the reader opened the block with. */
+  text-transform: none;
+  /* The bar's own division, down to the token. */
+  border-bottom: var(--ca-rule-hair) solid var(--background-modifier-border);
+  padding-bottom: var(--ca-sec-pad);
+  margin-bottom: 10px;
+  /* A LONG NAME ELLIPSISES RATHER THAN WRAPPING, which is the rule the bar's
+     title already follows: two lines of head would push the writing down by a
+     row the reader cannot see the cause of. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 /* ── LIVE PREVIEW: A RUN OF LINES, NOT A RUN OF BLOCKS (1.0.38) ──────────
  *
