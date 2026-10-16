@@ -917,6 +917,22 @@ export interface ProseSurface {
   // the chrome is absent would have to be widened again.
   /** Which prose block of the note this is, 1-based. */
   nth: number;
+  // ── AND THE NAME AS THE READER WROTE IT, IF THEY WROTE ONE (1.0.79) ───
+  //
+  // THIS IS NOT `head` AND THE DIFFERENCE IS THE WHOLE REASON IT IS HERE. `head`
+  // is what the bar PRINTS — the reader's word, or *Prose 2* derived from the
+  // ordinal, or null where the block wears none. This is what the marker SAYS,
+  // which is null on a block the reader has not named.
+  //
+  // THE FOLD IS KEYED OFF IT. A fold is remembered per note per place, and the
+  // place has to survive the reader editing the note around it. A name they
+  // typed does: *Chapter one* stays *Chapter one* when a block is inserted
+  // above it. An ordinal does not — block 2 becomes block 3 and would inherit
+  // block 2's fold — so an unnamed block is keyed by ordinal and accepts that
+  // drift, which is one chevron press to correct and the only answer available
+  // without putting an id on the marker that nothing else would read.
+  /** The title on the marker, or null where the reader has not named the block. */
+  title: string | null;
 }
 
 export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
@@ -939,6 +955,7 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
         to,
         head: span.bare ? null : proseHeadLabel(span.title, i + 1),
         nth: i + 1,
+        title: span.title,
       });
     }
   });

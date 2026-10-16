@@ -43,23 +43,9 @@
 
 import { MarkdownRenderChild, setIcon } from "obsidian";
 import { OBSIDIAN_DOM } from "../core/constants";
+import { collapsedAt, setCollapsedAt } from "./fold-state";
 import { PROSE_BLOCK_CLASS } from "./prose-surface";
 import type ChronoAnvilPlugin from "../main";
-
-// One shared timer rather than one per bar: folding three sections in a row
-// should be one write, not three. Module-level because the bars are separate
-// MarkdownRenderChild instances with no common owner, and a fold survives the
-// bar that made it being torn down by a re-render.
-let persistTimer: number | null = null;
-const PERSIST_DELAY_MS = 400;
-
-function schedulePersist(plugin: ChronoAnvilPlugin): void {
-  if (persistTimer !== null) window.clearTimeout(persistTimer);
-  persistTimer = window.setTimeout(() => {
-    persistTimer = null;
-    void plugin.saveSettings();
-  }, PERSIST_DELAY_MS);
-}
 
 // One element of the flattened fold walk.
 //
@@ -484,23 +470,14 @@ export class HeaderBar extends MarkdownRenderChild {
   }
 
   private isCollapsed(): boolean {
-    return this.plugin.settings.collapsedNoteSections?.[this.key] === true;
+    return collapsedAt(this.plugin, this.key);
   }
 
-  // Fold state stays in settings, so it syncs with everything else — a section
-  // folded on one device is folded on the next. What it should NOT do is write
-  // data.json on every chevron click: a fold is a glance, people fold and
-  // unfold several in a row, and each one was an await on a disk write plus a
-  // sync event. The in-memory value updates immediately (recompute reads it on
-  // the next line); only the persist is deferred.
+  // The record, the debounce and the absent-means-open rule are all
+  // `fold-state.ts`' as of 1.0.79 — a prose block's head folds now and could
+  // not import this file without closing a ring. See that module's header.
   private setCollapsed(v: boolean): void {
-    if (!this.plugin.settings.collapsedNoteSections) {
-      this.plugin.settings.collapsedNoteSections = {};
-    }
-    const map = this.plugin.settings.collapsedNoteSections;
-    if (v) map[this.key] = true;
-    else delete map[this.key];
-    schedulePersist(this.plugin);
+    setCollapsedAt(this.plugin, this.key, v);
   }
 
   onload(): void {
@@ -1008,7 +985,7 @@ export class HeaderBar extends MarkdownRenderChild {
   private barCollapsed(bar: HTMLElement): boolean {
     const key = bar.dataset.headerKey;
     if (!key) return false;
-    return this.plugin.settings.collapsedNoteSections?.[key] === true;
+    return collapsedAt(this.plugin, key);
   }
 
   // Is this block a rendered markdown heading?

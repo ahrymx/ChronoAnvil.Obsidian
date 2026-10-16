@@ -649,6 +649,53 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* ── AND WHAT THE CHEVRON LEAVES WHEN IT IS PRESSED (1.0.79) ────────────
+ *
+ * *"make the head a real bar with the collapse chevron, so it feels like any
+ * other section."*
+ *
+ * READING MODE IS THE AWKWARD HALF AND IT IS AWKWARD FOR ONE REASON: the bar is
+ * prepended INTO the first rendered block of the writing, so that block cannot
+ * be hidden the way the rest of the run can — it is holding the control that
+ * would bring the run back. So the first block hides its own children and keeps
+ * the bar, and every block after it in the run wears
+ * `.ca-journal-section-hidden`, which is the class a collapsed header bar's
+ * members have worn since 4.x and is already `display: none !important`.
+ *
+ * `> :not(.ca-prose-bar)` RATHER THAN A CLASS ON EACH CHILD. The children are
+ * the reader's own rendered markdown — a heading, a paragraph, a table — and
+ * the painter never touches them. One selector reaching past the bar is the
+ * whole rule.
+ *
+ * AND THE CARD CLOSES, which is what makes a folded block read as a section and
+ * not as a clipped one. A collapsed first block is BOTH ends of the run, so it
+ * takes `is-prose-last`'s border, radius, padding and margin — restated here
+ * rather than added as a class, because the block already carries
+ * `is-prose-first` and the painter would otherwise be writing a second answer
+ * to "where does this card end".
+ *
+ * THE EDITOR NEEDS NONE OF IT. There the rows are replaced out of the document
+ * entirely — `ui/prose-surface.ts::foldedRange` — so the widget IS the card and
+ * takes `is-prose-last` from the painter. Nothing is hidden with CSS, because
+ * there is nothing left to hide. */
+.ca-prose-block.is-prose-shut > :not(.ca-prose-bar) {
+  display: none;
+}
+.ca-prose-block.is-prose-first.is-prose-shut {
+  border-bottom: 1px solid var(--ca-border-subtle);
+  border-radius: var(--ca-radius-md);
+  padding-bottom: 16px;
+  margin-bottom: var(--ca-widget-gap);
+}
+/* NO HAIRLINE UNDER A BAR WITH NOTHING UNDER IT. The division separates the
+   title from the writing; folded, it is a line across the bottom of a card that
+   already has one, two pixels above it. */
+.ca-prose-bar.is-collapsed {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
 /* ── THE HOST THE EDITOR DRAWS IT IN, AND ITS ONE DECLARATION ───────────
  *
  * In Live Preview the bar cannot be prepended into the row that carries

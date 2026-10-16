@@ -27,7 +27,7 @@ describe("what a prose surface covers", () => {
     // An opener renders as nothing in reading mode and is hidden in Live
     // Preview, so a surface that included its row would open with a blank band.
     const lines = [OPEN, "## Overview", "", "Some words.", SHUT];
-    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 }]);
+    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 , title: null }]);
   });
 
   it("trims the blank lines the composer leaves at each end", () => {
@@ -35,7 +35,7 @@ describe("what a prose surface covers", () => {
     // reader who presses Enter twice under their last paragraph leaves more.
     // Blank rows are not rows of prose.
     const lines = [OPEN, "", "", "Words.", "", "", SHUT];
-    expect(proseSurfaceSpans(lines)).toEqual([{ from: 3, to: 3, head: "Prose", nth: 1 }]);
+    expect(proseSurfaceSpans(lines)).toEqual([{ from: 3, to: 3, head: "Prose", nth: 1 , title: null }]);
   });
 
   it("gives an empty block no surface at all", () => {
@@ -57,8 +57,8 @@ describe("what a prose surface covers", () => {
       OPEN, "Second.", SHUT,
     ];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 1, to: 1, head: "Prose", nth: 1 },
-      { from: 7, to: 7, head: "Prose 2", nth: 2 },
+      { from: 1, to: 1, head: "Prose", nth: 1 , title: null },
+      { from: 7, to: 7, head: "Prose 2", nth: 2 , title: null },
     ]);
   });
 
@@ -67,7 +67,7 @@ describe("what a prose surface covers", () => {
     // 1.0.36 carries, and `proseSpansIn` reads both spellings — so this inherits
     // that contract rather than restating it.
     const lines = ["<!--chronoanvil-skeleton-->", "Words.", "<!--/chronoanvil-skeleton-->"];
-    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 1, head: "Prose", nth: 1 }]);
+    expect(proseSurfaceSpans(lines)).toEqual([{ from: 1, to: 1, head: "Prose", nth: 1 , title: null }]);
   });
 
   it("paints nothing on a note with no markers", () => {
@@ -102,16 +102,16 @@ describe("where a rendered block stands in the prose", () => {
   const mark = (from: number, to: number) => proseMarkFor(TEXT, from, to);
 
   it("carries the first end on the block the writing starts in", () => {
-    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose", nth: 1 });
+    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose", nth: 1 , title: null });
   });
 
   it("carries the last end on the block it ends in", () => {
-    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null, nth: 1 });
+    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null, nth: 1 , title: null });
   });
 
   it("carries neither in the middle", () => {
-    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 });
-    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 });
+    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null });
+    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null });
   });
 
   it("carries both when one block is the whole of it", () => {
@@ -123,6 +123,7 @@ describe("where a rendered block stands in the prose", () => {
       last: true,
       head: "Prose",
       nth: 1,
+      title: null,
     });
   });
 
@@ -144,6 +145,7 @@ describe("where a rendered block stands in the prose", () => {
       last: false,
       head: "Prose",
       nth: 1,
+      title: null,
     });
     expect(proseMarkFor(TEXT, 12, 15)).toEqual({
       member: true,
@@ -151,6 +153,7 @@ describe("where a rendered block stands in the prose", () => {
       last: true,
       head: null,
       nth: 1,
+      title: null,
     });
   });
 });
@@ -164,22 +167,24 @@ describe("the surface is paint and never a write", () => {
     // this feature has no write path at all: it adds a class to rows that were
     // already being drawn. A reader who uninstalls the plugin is left with the
     // markdown they typed.
-    for (const write of [
-      "vault.modify",
-      "vault.create",
-      "processFrontMatter",
-      "Decoration.replace",
-      "```",
-    ]) {
+    for (const write of ["vault.modify", "vault.create", "processFrontMatter", "```"]) {
       expect(src()).not.toContain(write);
     }
-    // `Decoration.widget` LEFT THIS LIST IN 1.0.78 and the promise did not
-    // change with it. The bar is chrome drawn beside the writing, the same as
-    // the background and the hairline; what the list is about is the file, and
-    // the three vault calls above are still absent. The cog's window is the
-    // only thing here that writes, it lives in another module, and it writes
-    // on a reader's Save.
+    // TWO DECORATIONS LEFT THIS LIST, ONE PER RELEASE, AND THE PROMISE IS
+    // UNCHANGED — which is the only reason either was allowed to go.
+    //
+    // `Decoration.widget` went in 1.0.78: a bar is chrome drawn beside the
+    // writing, like the background and the hairline.
+    //
+    // `Decoration.replace` went in 1.0.79, and that one is worth being exact
+    // about, because it HIDES THE READER'S OWN LINES — the first range in this
+    // plugin that does. What the list is about is the FILE, and a fold changes
+    // no character of it: unfold and every word is where it was, uninstall and
+    // the markdown was never touched. The fold is a row in `settings`, not a
+    // row in the note. The guards that make hiding it safe are asserted in the
+    // fold's own describe below.
     expect(src()).toContain("Decoration.widget({");
+    expect(src()).toContain("Decoration.replace({})");
   });
 
   it("paints the rows with a line decoration and nothing else", () => {
@@ -577,16 +582,16 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose", nth: 1 , title: null }]);
     // Writing at the ends keeps the trimmed span it always had.
     const written = [...lines];
     written.splice(2, 0, "Intro.");
     written.splice(6, 0, "Outro.");
-    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 6, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 6, head: "Prose", nth: 1 , title: null }]);
     // No blank to take: the span is left alone rather than stepping onto the
     // bracket.
     const tight = lines.filter((l) => l !== "");
-    expect(livePreviewSpans(tight)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(tight)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 , title: null }]);
     // And the painter reads it.
     expect(readCode("ui/prose-surface.ts")).toContain(
       "for (const span of livePreviewSpans(doc.toString().split(\"\\n\")))"
@@ -658,7 +663,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(lines)).toEqual([{ from: 1, to: 5, head: "Prose", nth: 1 , title: null }]);
 
     // A one-line `$$ x $$` is the same row: Obsidian mounts that one too, and
     // where it does not the run merely ends on the blank line below it — the
@@ -670,14 +675,14 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(oneLine)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(oneLine)).toEqual([{ from: 1, to: 3, head: "Prose", nth: 1 , title: null }]);
 
     // Writing at the ends keeps the trimmed span it always had — an equation
     // in the MIDDLE of the writing is reached by the stylesheet, not by this.
     const written = [...lines];
     written.splice(2, 0, "Simplify by the HCF:");
     written.splice(7, 0, "Which is in its lowest terms.");
-    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 7, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(written)).toEqual([{ from: 2, to: 7, head: "Prose", nth: 1 , title: null }]);
 
     // AND `$$` MID-LINE IS NOT A BLOCK. Obsidian draws it inside the row, the
     // row is a `.cm-line`, and the decoration lands on it as it always did.
@@ -688,7 +693,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(inline)).toEqual([{ from: 2, to: 2, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(inline)).toEqual([{ from: 2, to: 2, head: "Prose", nth: 1 , title: null }]);
   });
 
   it("leaves a `$$` a reader printed inside a code fence alone (1.0.41)", () => {
@@ -707,7 +712,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([{ from: 2, to: 6, head: "Prose", nth: 1 }]);
+    expect(livePreviewSpans(lines)).toEqual([{ from: 2, to: 6, head: "Prose", nth: 1 , title: null }]);
   });
 
   it("ends a section run rather than being taken into one", () => {
@@ -809,7 +814,7 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     // blocks in the file; the number has to count what is there.
     const lines = [OPEN, "", SHUT, "", OPEN, "Words.", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 5, to: 5, head: "Prose 2", nth: 2 },
+      { from: 5, to: 5, head: "Prose 2", nth: 2 , title: null },
     ]);
   });
 
@@ -835,6 +840,7 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
       last: false,
       head: null,
       nth: 0,
+      title: null,
     });
   });
 
@@ -854,7 +860,8 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     expect(body).toContain("if (mark.head === null) {");
     expect(body).toContain("clearProseBar(el);");
     expect(body).toContain("buildProseBar(");
-    expect(body).toContain("{ title: mark.head, nth: mark.nth, path: () => ctx.sourcePath },");
+    expect(body).toContain("title: mark.head,");
+    expect(body).toContain("path: () => ctx.sourcePath,");
   });
 
   it("rebuilds without emptying the host, because the host is the reader's block", () => {
@@ -923,7 +930,9 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     const body = fnBody("proseIn", "prose-surface");
     expect(body).toContain("block: true,");
     expect(body).toContain("side: -1,");
-    expect(body).toContain("new ProseBarWidget(span.head, span.nth, plugin)");
+    expect(body).toContain(
+      "new ProseBarWidget(span.head, span.nth, span.title, folded, plugin)"
+    );
     // AND NO WIDGET WHERE THERE IS NO HEAD, which is 1.0.77's tick reaching the
     // editor: a `#bare` block gets rows and no bar at all.
     expect(body).toContain("if (span.head === null || span.from >= doc.lines) continue;");
@@ -947,9 +956,8 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     // the DOM depends on are the title and the ordinal; the plugin is the same
     // object for the life of the field, and the path is read at the press.
     expect(src()).toContain("eq(other: ProseBarWidget): boolean {");
-    expect(src()).toContain(
-      "return other.title === this.title && other.nth === this.nth;"
-    );
+    expect(src()).toContain("other.title === this.title &&");
+    expect(src()).toContain("other.nth === this.nth &&");
     // AND IT HANDLES ITS OWN EVENTS. `ignoreEvent` returning true keeps
     // CodeMirror from reading a press on the cog as a press on the document.
     expect(src()).toContain("ignoreEvent(): boolean {");
@@ -1031,20 +1039,316 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     expect(cog).toContain("cursor: pointer");
   });
 
-  it("draws no chevron, because a fold cannot act in the editor", () => {
-    // ASKED FOR IN THE SAME BREATH AS THE COG AND REFUSED. `headerbar.ts` never
-    // hides a source line in Live Preview — *"A SOURCE LINE IS NEVER HIDDEN,
-    // only painted"* — so a fold arrow on this head would work in reading mode
-    // and sit dead in the editor, which is the omission with extra pixels.
-    for (const glyph of ["chevron", "triangle", "collapse", "fold"]) {
-      expect(bar().toLowerCase(), glyph).not.toContain(glyph);
-    }
-    // ONE CONTROL ON THE ROW, so the title itself is not a press either.
-    expect(cssRule(".ca-prose-bar")).not.toContain("cursor");
-    expect(cssRules(".ca-prose-bar-title").join("\n")).not.toContain("cursor");
+  it("wears the header bar's chevron rather than a second one (1.0.79)", () => {
+    // *"make the head a real bar with the collapse chevron, so it feels like
+    // any other section."* The reader's own call on how far that goes: the same
+    // classes, so the glyph, its box, its hover and the direction it points are
+    // one declaration each. A prose bar with its own chevron would be the
+    // mistake 30-header-bars.css spent 1.0.78 undoing for the cogs.
+    expect(bar()).toContain('export const FOLD_TOGGLE_CLASS = "ca-journal-header-toggle";');
+    expect(bar()).toContain('export const FOLD_SHUT_CLASS = "is-collapsed";');
+    expect(bar()).toContain('setIcon(toggle, "chevron-down");');
+    expect(readCode("ui/headerbar")).toContain('setIcon(toggle, "chevron-down");');
+    // ONE RULE LIST, THREE SELECTORS LONGER — the rotation that says which way
+    // it points is the header bar's, reached by adding the prose bar to it.
+    const turn = cssRule(".ca-prose-bar:not(.is-collapsed) .ca-journal-header-toggle");
+    expect(turn).toContain("transform: rotate(180deg)");
+    expect(cssRule(".ca-journal-header-bar:not(.is-collapsed) .ca-journal-header-toggle")).toBe(
+      turn
+    );
+    // AND IT SITS AFTER THE COG, which is where a fenced section's bar puts it:
+    // `.ca-journal-head-tools + .ca-journal-header-toggle` is that order.
     const build = fnBody("buildProseBar", "ui/prose-bar.ts");
-    expect(build).toContain("bar.appendChild(buildProseCog(spec, plugin));");
-    expect((bar().match(/addEventListener/g) ?? []).length).toBe(1);
+    expect(build.indexOf("buildProseCog")).toBeLessThan(build.indexOf("buildProseFold"));
+  });
+});
+
+// ── THE FOLD, AND THE REFUSAL THAT WAS TOO WIDE (1.0.79) ─────────────────
+//
+// *"make the head a real bar with the collapse chevron, so it feels like any
+// other section. is it doable?"*
+//
+// IT WAS REFUSED TWICE AND THE PREMISE WAS WRONG BOTH TIMES. 1.0.75 and 1.0.78
+// each cited `headerbar.ts` — *"A SOURCE LINE IS NEVER HIDDEN, only painted"* —
+// as a fact about Live Preview. It is a fact about THAT PASS, which toggles a
+// class on sibling elements and explicitly skips `.cm-line`s (`headerbar.ts`
+// does it in one line, asserted below): a header bar's fold in the editor hides
+// the FENCES and leaves the reader's plain rows painted. Prose has no fences, so
+// that mechanism would fold nothing — which is true, and is not the sentence
+// "CodeMirror will not allow it".
+//
+// WHAT CODEMIRROR ACTUALLY FORBIDS is a plugin doing it. `disallowBlockEffectsFor`
+// gates both of its throws, and `prose-surface.ts` has been a `StateField` since
+// 1.0.37 — the right side of that gate. `marker-lines.ts` has shipped exactly
+// this since 5.31 for the plugin's own markers.
+//
+// AND THAT IS THE ONE THING THAT IS NEW HERE: whose text is hidden. Every
+// hidden range until now was markup this plugin wrote. A folded prose block
+// hides the reader's writing, which is why this describe is as long as it is —
+// the fold has to be reversible by one press, survive a reload, change no
+// character of the file, and be impossible to type into or delete blind.
+describe("the fold, and the refusal that was too wide (1.0.79)", () => {
+  const src = () => readCode("prose-surface");
+  const bar = () => readCode("ui/prose-bar");
+
+  it("is why the old refusal was wrong, stated where the refusal was", () => {
+    // THE SENTENCE THE REFUSAL RESTED ON IS STILL TRUE AND STILL THERE. What
+    // changed is the reading of it, so this pins the line that makes the old
+    // claim narrow — a header bar's fold really does skip the editor's rows.
+    const fold = fnBody("recompute", "ui/headerbar");
+    expect(fold).toContain("if (el.classList.contains(OBSIDIAN_DOM.editorLine)) continue;");
+    // AND THE CORRECTION IS WRITTEN DOWN RATHER THAN QUIETLY ACTED ON, which is
+    // this repo's rule for an invariant that gets spent.
+    expect(readSrc("ui/prose-bar")).toContain("REFUSED TWICE AND SHOULD NOT HAVE BEEN");
+  });
+
+  it("hides the lines from the state field, the way the markers are hidden", () => {
+    // ONE DECORATION, SHARED SHAPE. `Decoration.replace({})` with a range that
+    // spans line breaks is what `marker-lines.ts` draws its own hidden runs
+    // with, and the fold is the same thing pointed at the reader's rows.
+    expect(src()).toContain("const HIDE_RUN = Decoration.replace({});");
+    expect(readCode("marker-lines")).toContain("const HIDE = Decoration.replace({});");
+    // AND NOT `block: true`, deliberately: the inline form is the one this
+    // plugin has shipped since 5.31 and the one that composes with the markers
+    // at their shared endpoint.
+    expect(src()).not.toContain("HIDE_RUN = Decoration.replace({ block");
+  });
+
+  it("takes the break BEFORE the run, which is what leaves no empty row", () => {
+    // A RANGE OVER `[first.from, last.to]` LEAVES BOTH BREAKS STANDING, so the
+    // writing would collapse and leave one blank row where it was. Taking the
+    // leading break merges the run upward into the opener's row — which is
+    // `marker-lines.ts::hiddenRanges`' own asymmetry, and is also what makes
+    // the two ranges TOUCH at one endpoint rather than overlap.
+    const body = fnBody("foldedRange", "prose-surface");
+    expect(body).toContain("return { from: doc.line(span.from).to, to: doc.line(span.to + 1).to };");
+    expect(readCode("marker-lines")).toContain("const from = doc.line(span.from).to;");
+    // AND IT REFUSES A RUN IT CANNOT MEASURE rather than returning a bad range.
+    expect(body).toContain("if (span.from <= 0 || span.from > span.to || span.to + 1 > doc.lines) return null;");
+  });
+
+  it("steps the cursor over a folded run and refuses a keystroke into it", () => {
+    // THE TWO GUARDS, AND THE SECOND IS THE ONE THAT MATTERS. `atomicRanges`
+    // moves a cursor; it does not stop a SELECTION, so Ctrl+A and a keystroke —
+    // 5.31.1's own case — would replace the writing the reader folded away.
+    // `protectLines` is a change filter over caller-supplied spans and this is
+    // its second caller.
+    const ext = fnBody("proseSurface", "prose-surface");
+    expect(ext).toContain("EditorView.atomicRanges.of((view) => foldedSet(view.state, field)),");
+    expect(ext).toContain("protectLines((state) => state.field(field, false)?.shut ?? []),");
+    // BOTH READ ONE LIST AND BOTH GO THROUGH ONE ARITHMETIC. Three things have
+    // to agree about a folded run — what is hidden, what a cursor steps over,
+    // and what a keystroke is refused on — and a second copy of the offsets is
+    // how they come apart. A measured mutant narrowed exactly that copy and
+    // nothing noticed; the copy is gone rather than asserted.
+    const set = fnBody("foldedSet", "prose-surface");
+    expect(set).toContain("const shut = state.field(field, false)?.shut ?? [];");
+    expect(set).toContain("const range = foldedRange(state.doc, span);");
+    expect(set).toContain("if (range) out.push(HIDE_RUN.range(range.from, range.to));");
+    expect(set).not.toContain("state.doc.line(");
+    expect(src()).toContain("shut: LineSpan[];");
+    // AND NO `cursorRest` REDIRECT, which the markers need and this does not: a
+    // folded run's two ends are the reader's own rows and `atomicRanges` leaves
+    // exactly those endpoints legal.
+    expect(src()).not.toContain("cursorRest");
+  });
+
+  it("writes no character of the note", () => {
+    // A FOLD IS A WAY OF LOOKING AT A NOTE. It is a row in `settings`, under the
+    // record every other fold in the plugin already uses, so unfolding restores
+    // every word and uninstalling never touched the markdown at all.
+    for (const write of ["vault.modify", "vault.create", "processFrontMatter"]) {
+      expect(bar(), write).not.toContain(write);
+      expect(src(), write).not.toContain(write);
+    }
+    expect(bar()).toContain("setCollapsedAt(plugin,");
+  });
+
+  it("is remembered per note per place, keyed on the name where there is one", () => {
+    // AN ORDINAL DRIFTS AND A NAME DOES NOT. Insert a block above block 2 and it
+    // becomes block 3, inheriting block 2's fold; *Chapter one* stays *Chapter
+    // one*. So a named block is keyed by its name and an unnamed one by its
+    // number, which accepts the drift for the only case that has no better
+    // answer short of putting an id on the marker nothing else would read.
+    const key = fnBody("proseFoldKey", "ui/prose-bar.ts");
+    expect(key).toContain("const where = block.title ? `t:${block.title}` : `n:${block.nth}`;");
+    expect(key).toContain("return `${path}::prose:${where}`;");
+    // THE PREFIX IS NOT DECORATION: without it a reader who names a block `2`
+    // owns the key of whichever block happens to be second.
+    expect(key).toContain("t:");
+    expect(key).toContain("n:");
+    // AND THE RECORD IS THE ONE EVERY OTHER FOLD USES, whose namespacing rule
+    // (`<path>::<ns>:<id>`) is what makes a sixth namespace free.
+    expect(readCode("fold-state")).toContain(
+      "return plugin.settings.collapsedNoteSections?.[key] === true;"
+    );
+    expect(readSrc("core/settings")).toContain("collapsedNoteSections: Record<string, boolean>;");
+  });
+
+  it("stores a fold as `true` or as nothing, so the record can be pruned", () => {
+    // ABSENT MEANS OPEN, which is what `pruneCollapsedSections` needs to be able
+    // to delete a row at all — `settings.ts` names the one namespace that
+    // departs from it and why.
+    const set = fnBody("setCollapsedAt", "fold-state");
+    expect(set).toContain("if (collapsed) map[key] = true;");
+    expect(set).toContain("else delete map[key];");
+    expect(set).toContain("schedulePersist(plugin);");
+  });
+
+  it("keeps one debounced write for every fold in the plugin", () => {
+    // IT WAS PRIVATE TO `headerbar.ts` AND HAD TO MOVE, because `prose-bar.ts`
+    // cannot import that file: it imports `prose-surface.ts`, which imports
+    // `prose-bar.ts`, so the edge would close a ring the cycle check does not
+    // bless. Copying the timer instead would have put two `saveSettings` calls
+    // on one `data.json`.
+    expect(readCode("fold-state")).toContain("let persistTimer: number | null = null;");
+    expect(readCode("ui/headerbar")).not.toContain("let persistTimer");
+    expect(readCode("ui/headerbar")).toContain(
+      'import { collapsedAt, setCollapsedAt } from "./fold-state";'
+    );
+    expect(readCode("fold-state")).not.toContain("prose");
+    // AND ONE READER OF THE RECORD, which is the whole point of the move. An
+    // inline `collapsedNoteSections?.[key] === true` beside the shared one is
+    // behaviourally identical today and is the drift that makes the absent-
+    // means-open rule two rules — a measured mutant restored exactly that line
+    // and only this assertion sees it.
+    for (const module of ["ui/headerbar", "ui/prose-bar", "prose-surface"]) {
+      expect(readCode(module), module).not.toContain("collapsedNoteSections");
+    }
+  });
+
+  it("asks the field again on a press, because a fold changes no document", () => {
+    // THE FIELD RECOMPUTES ON A DOCUMENT CHANGE AND ON THE MODE FLIPPING, and a
+    // chevron press is neither. Without the effect the record would move and
+    // nothing would ask it anything.
+    expect(src()).toContain("export const proseFoldEffect = StateEffect.define<null>();");
+    expect(fnBody("proseSurface", "prose-surface")).toContain(
+      "tr.effects.some((e) => e.is(proseFoldEffect)) ||"
+    );
+    // AND IT CARRIES NO PAYLOAD: "ask again", not "the answer is X", so there is
+    // one reader of the record rather than two that can disagree.
+    expect(src()).toContain("proseFoldEffect.of(null)");
+    expect(src()).not.toContain("proseFoldEffect.of(shut)");
+  });
+
+  it("redraws by the mode's own route, which is the one thing the two cannot share", () => {
+    // READING MODE GETS NO SECOND PASS from Obsidian for something that changed
+    // no markdown, so the handler does the work the next render would: the host
+    // hides its own children and keeps the bar, and the rest of the run goes.
+    const walk = fnBody("applyProseFold", "prose-surface");
+    expect(walk).toContain("host.toggleClass(PROSE_SHUT_CLASS, shut);");
+    expect(walk).toContain("next.toggleClass(FOLD_HIDDEN_CLASS, shut);");
+    // AND THE WALK STOPS AT THE NEXT BLOCK'S TOP EDGE. A second prose block has
+    // a bar of its own and a fold of its own; without this it would be folded
+    // by its neighbour's chevron.
+    expect(walk).toContain("!next.hasClass(PROSE_FIRST_CLASS)");
+    // THE EDITOR'S ROUTE IS THE EFFECT, because the rows are CodeMirror's.
+    expect(src()).toContain("redraw: () => view.dispatch({ effects: proseFoldEffect.of(null) }),");
+    expect(fnBody("paintProse", "prose-surface")).toContain(
+      "redraw: (next) => applyProseFold(el, next),"
+    );
+  });
+
+  it("re-reads the record on every paint, so a fold survives a reload", () => {
+    // THE CHEVRON'S SIBLING WALK AND THE PAINTER'S CLASSES ARE THE SAME ANSWER
+    // arriving at different times. Only the painter runs on a reopen, a
+    // re-render or a restart, so it is the one that has to read the record.
+    const body = fnBody("paintProse", "prose-surface");
+    expect(body).toContain("const shut = mark.member && proseFolded(plugin, ctx.sourcePath, mark);");
+    expect(body).toContain("el.toggleClass(PROSE_SHUT_CLASS, shut && mark.first);");
+    expect(body).toContain("el.toggleClass(FOLD_HIDDEN_CLASS, shut && !mark.first);");
+    // AND THE EDITOR READS IT IN THE FIELD, off the view's own file.
+    expect(fnBody("stateOf", "prose-surface")).toContain(
+      "const path = state.field(editorInfoField, false)?.file?.path ?? null;"
+    );
+  });
+
+  it("keeps the first block, because it is holding the control", () => {
+    // THE ONE CASE A HEADER BAR NEVER HAS. Its bar is its own element; a prose
+    // bar is prepended INTO the first rendered block of the writing, so hiding
+    // that block would hide the chevron that brings the run back. One selector
+    // reaching past the bar is the whole rule, and the children are the
+    // reader's own rendered markdown — the painter never touches them.
+    expect(cssRule(".ca-prose-block.is-prose-shut > :not(.ca-prose-bar)")).toContain(
+      "display: none"
+    );
+    expect(cssRule(".ca-journal-section-hidden")).toContain("display: none !important");
+    // AND THE CARD CLOSES, or a folded block reads as a clipped one: a collapsed
+    // first block is both ends of the run and takes the last block's edge.
+    const closed = cssRule(".ca-prose-block.is-prose-first.is-prose-shut");
+    expect(closed).toContain("border-bottom: 1px solid var(--ca-border-subtle)");
+    expect(closed).toContain("border-radius: var(--ca-radius-md)");
+    expect(closed).toContain("margin-bottom: var(--ca-widget-gap)");
+    // NO HAIRLINE UNDER A BAR WITH NOTHING UNDER IT.
+    const shutBar = cssRule(".ca-prose-bar.is-collapsed");
+    expect(shutBar).toContain("border-bottom: none");
+    expect(shutBar).toContain("margin-bottom: 0");
+  });
+
+  it("gives the editor's widget both edges, because there are no rows left", () => {
+    // THE EDITOR NEEDS NONE OF THE CSS ABOVE: the rows are replaced out of the
+    // document, so the widget IS the card and takes `is-prose-last` from the
+    // painter rather than from a selector.
+    expect(src()).toContain("host.toggleClass(PROSE_LAST_CLASS, this.shut);");
+    expect(src()).toContain("other.shut === this.shut");
+  });
+
+  it("cannot fold a block that has no title row to fold it from", () => {
+    // 1.0.77'S TICK REACHES THIS. The chevron lives on the bar, so a `#bare`
+    // block has no control — and reaching the record anyway would let a fold
+    // survive the head being turned off, with nothing on screen to turn it
+    // back. Same for a block written before the markers existed.
+    expect(fnBody("proseIn", "prose-surface")).toContain(
+      "span.head !== null && proseFolded(plugin, path, span)"
+    );
+  });
+
+  it("folds nothing in source mode, which is where the file is shown as it is", () => {
+    // THE ONE PLACE A FOLD WOULD CONTRADICT THE MODE. Source mode shows the
+    // markers, so it shows the writing; the record is untouched, so flipping
+    // back to Live Preview restores every fold the reader had.
+    const body = fnBody("stateOf", "prose-surface");
+    expect(body).toContain("if (!live) return NOTHING_PAINTED;");
+    expect(src()).toContain(
+      "const NOTHING_PAINTED: Painted = { live: false, deco: Decoration.none, shut: [] };"
+    );
+  });
+
+  it("reads the fold off the bar's own class, not off the spec it was built with", () => {
+    // A READER MAY PRESS THE CHEVRON TWICE WITHOUT A REBUILD IN BETWEEN, so the
+    // state has to live on the element. `spec.shut` is what this bar was built
+    // with and goes stale on the first press.
+    const body = fnBody("toggleProseFold", "ui/prose-bar.ts");
+    expect(body).toContain("const shut = !bar.hasClass(FOLD_SHUT_CLASS);");
+    expect(body).toContain("bar.toggleClass(FOLD_SHUT_CLASS, shut);");
+    // AND THE RECORD IS WRITTEN BEFORE THE REDRAW, because both redraws read it
+    // back rather than being handed the new value.
+    expect(body.indexOf("setCollapsedAt(")).toBeLessThan(body.indexOf("spec.redraw("));
+  });
+
+  it("names both directions for a screen reader", () => {
+    // AN ICON HAS NO NAME, and this one's meaning reverses. The label says what
+    // pressing it will DO, which is the rule the cog's own `aria-label` follows.
+    expect(bar()).toContain('const FOLD_LABEL = "Collapse this prose block";');
+    expect(bar()).toContain('const UNFOLD_LABEL = "Expand this prose block";');
+    expect(fnBody("toggleProseFold", "ui/prose-bar.ts")).toContain(
+      'toggle.setAttribute("aria-label", shut ? UNFOLD_LABEL : FOLD_LABEL);'
+    );
+  });
+
+  it("makes the whole title strip the hit target, except the cog", () => {
+    // A HEADER BAR FOLDS ON A CLICK ANYWHERE ON ITS BARE TITLE and this does
+    // too, which is most of what *"feels like any other section"* means in the
+    // hand. The cog stops its own click, so the only thing left to press is the
+    // title — and the exclusion is written as a `closest` rather than a
+    // position, for `headerbar.ts`' reason: the control may move.
+    const build = fnBody("buildProseBar", "ui/prose-bar.ts");
+    expect(build).toContain("evt.target.closest(`.${PROSE_BAR_COG_CLASS}`)");
+    expect(build).toContain("toggleProseFold(bar, spec, plugin);");
+    expect(bar()).toContain("bar.addClass(FOLD_HOST_CLASS);");
+    expect(cssRule(".ca-journal-header-collapsible:hover .ca-journal-header-toggle")).toContain(
+      "color: var(--text-normal)"
+    );
   });
 });
 
@@ -1062,7 +1366,7 @@ describe("the block that wears no head (1.0.77)", () => {
     // asked for one piece of chrome to go, not for their prose to stop being a
     // prose block — the background, the padding and both edge classes stay.
     expect(proseSurfaceSpans([BARE, "Words.", SHUT])).toEqual([
-      { from: 1, to: 1, head: null, nth: 1 },
+      { from: 1, to: 1, head: null, nth: 1 , title: null },
     ]);
     const text = note(BARE, "", "## Overview", "", "A paragraph.", "", SHUT);
     const mark = proseMarkFor(text, 2, 2);
@@ -1091,16 +1395,16 @@ describe("the block that wears no head (1.0.77)", () => {
     // block in the file.
     const two = [OPEN, "One.", SHUT, "", BARE, "Two.", SHUT];
     expect(proseSurfaceSpans(two)).toEqual([
-      { from: 1, to: 1, head: "Prose", nth: 1 },
-      { from: 5, to: 5, head: null, nth: 2 },
+      { from: 1, to: 1, head: "Prose", nth: 1 , title: null },
+      { from: 5, to: 5, head: null, nth: 2 , title: null },
     ]);
     // AND IN THE OTHER ORDER, which is what says the flag is read off each
     // opener rather than carried between them: a block's answer must not
     // outlive the block it was written on.
     const flip = [BARE, "One.", SHUT, "", OPEN, "Two.", SHUT];
     expect(proseSurfaceSpans(flip)).toEqual([
-      { from: 1, to: 1, head: null, nth: 1 },
-      { from: 5, to: 5, head: "Prose 2", nth: 2 },
+      { from: 1, to: 1, head: null, nth: 1 , title: null },
+      { from: 5, to: 5, head: "Prose 2", nth: 2 , title: null },
     ]);
   });
 
@@ -1129,7 +1433,7 @@ describe("the block that wears no head (1.0.77)", () => {
     // blank line above a table or a `$$`, so a head declared `string` here
     // would have been a cast at exactly the place the two shapes meet.
     expect(livePreviewSpans([BARE, "Words.", SHUT])).toEqual([
-      { from: 1, to: 1, head: null, nth: 1 },
+      { from: 1, to: 1, head: null, nth: 1 , title: null },
     ]);
     // ONE TYPE, NAMED ONCE. `livePreviewSpans` returns the model's own
     // `ProseSurface`, so a `head` declared `string` would have been a cast at

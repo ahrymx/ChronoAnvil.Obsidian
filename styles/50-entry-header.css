@@ -479,6 +479,14 @@
  * is not beside the 11.2px one 4.13 §1 leaves. `em` here resolves against this
  * element, so setting the font-size to the bar's scale makes the box follow the
  * title wherever the title goes. */
+/* AND A PROSE BAR WEARS THE SAME ONE (1.0.79). *"make the head a real bar with
+   the collapse chevron, so it feels like any other section."* It is the same
+   control doing the same thing, so it is this rule with a selector added rather
+   than a second block — the lesson the three cogs in 30-header-bars.css learned
+   one release late. The box sizes off `--ca-bar-glyph` and the prose bar sets
+   the same `font-size` as a section bar's title, so it arrives the same size
+   without being told. `margin-left: auto` is harmless there: the prose title is
+   `flex: 1 1 auto` and has already eaten the free space. */
 .ca-journal-header-toggle {
   display: inline-flex;
   align-items: center;
@@ -504,7 +512,8 @@
    edge of the card now that it sits on the right. So it is the ordinary
    accordion instead: down means closed, up means open, and the base icon is the
    closed state. */
-.ca-journal-header-bar:not(.is-collapsed) .ca-journal-header-toggle {
+.ca-journal-header-bar:not(.is-collapsed) .ca-journal-header-toggle,
+.ca-prose-bar:not(.is-collapsed) .ca-journal-header-toggle {
   transform: rotate(180deg);
 }
 /* Blocks the renderer/HeaderBar marks as belonging to a collapsed section. */

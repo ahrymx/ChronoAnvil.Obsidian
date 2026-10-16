@@ -663,8 +663,30 @@ chosen, like everything else.
 in the same type, over the same hairline, as the header bar on any section above
 it. The name is kept on the block's own invisible marker rather than in a fence,
 so renaming a block moves one character of markup and nothing about your
-writing; the head has no fold arrow, because folding a prose block would hide
-lines of your own file and ChronoAnvil never does that in Live Preview.
+writing.
+
+**And it folds, like any other section.** The chevron at the right-hand end of
+the title row collapses that block down to its bar and brings it back — the same
+glyph, in the same place, pointing the same way as the one on every header bar
+in the vault, and the whole title row is the hit target, so you can click the
+name instead. It works while reading and in Live Preview: in the editor the
+lines are genuinely taken out, which is the one place ChronoAnvil hides writing
+of your own rather than markup of its own. Nothing about the file changes — a
+folded block is a line in ChronoAnvil's settings, not a line in your note, so
+unfolding restores every word and uninstalling never touched it. While a block
+is folded you cannot type into it or delete it by accident: the cursor steps
+over it, and a keystroke that would reach inside is refused rather than
+swallowing text you cannot see. That includes selecting the whole note and
+typing.
+
+The fold is remembered per block, per note, and follows the note if you rename
+it. A block you have named is remembered by that name, so inserting a block
+above it leaves its fold where it was; an unnamed block is remembered by its
+position, so inserting one above *does* shift which block is folded — one
+chevron press to put right. **Source mode folds nothing**, because source mode
+is where you go to see the file as it is. And a block whose title row you have
+hidden has no chevron, so it cannot be folded — the control and the fold live on
+the same row.
 
 **And the head carries a cog, like Attachments and What's below.** It sits at
 the right-hand end of the title row and opens a **Prose block** window for that
@@ -687,8 +709,8 @@ you gave it — tick it back and your own word is still there. Blocks show their
 head unless you say otherwise, so nothing on any note you already have changes.
 A block on a note written before those markers existed has no edge to draw one
 on, and the row says so instead of offering the tick. (Unticking the head takes
-the cog with it: the control lives on the row it is drawn in. Everything behind
-it stays in **Note: edit sections…**.)
+the cog and the chevron with it: both controls live on the row they are drawn
+in. Everything behind the cog stays in **Note: edit sections…**.)
 
 Nothing is put inside a fence to do it. Your writing is still ordinary markdown
 in the file: headings, links, tasks, callouts, tables and code blocks behave

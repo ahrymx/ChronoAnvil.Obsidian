@@ -5,6 +5,50 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.79] - 2026-10-16
+
+### Added
+
+- **A prose block's head folds, like any other section.** *"make the head a real
+  bar with the collapse chevron, so it feels like any other section."* The
+  chevron sits at the right-hand end of the title row, after the cog, which is
+  where every header bar in the vault keeps its own — same glyph, same box, same
+  direction, from the same stylesheet rule rather than a second one. The whole
+  title row is the hit target, so clicking the name folds it too.
+  - **It works in both modes**, and in Live Preview that means the lines are
+    genuinely taken out rather than painted over. That is the first place
+    ChronoAnvil hides writing of *yours* instead of markup of its own, so it
+    comes with the guards: the cursor steps over a folded block, and a keystroke
+    or a deletion that would reach inside is refused rather than swallowing text
+    you cannot see — selecting the whole note and typing included.
+  - **Nothing about the note changes.** A fold is a line in ChronoAnvil's
+    settings, not a line in your file: unfold and every word is where it was,
+    uninstall and the markdown was never touched. **Source mode folds nothing**,
+    because that is where you go to see the file as it is.
+  - **Remembered per block, per note**, in the same record every other fold in
+    the plugin uses, and it follows the note if you rename it. A block you have
+    named is remembered by that name, so inserting a block above it leaves its
+    fold alone; an unnamed one is remembered by position and does shift — one
+    press to correct.
+  - A block whose title row you have hidden has no chevron and cannot be folded.
+    The control and the fold are on the same row.
+
+### Changed
+
+- **The chevron was refused twice before this, on a premise that was too wide.**
+  1.0.75 and 1.0.78 both cited the rule that ChronoAnvil never hides a source
+  line in Live Preview. That rule is about the *header bar's* mechanism, which
+  toggles a class on sibling elements and deliberately skips the editor's own
+  rows — so a header bar's fold hides fences and leaves plain text painted, and
+  for prose it would have hidden nothing. Hiding lines from a state field is
+  something the plugin has done since 5.31 for its own markers, and the prose
+  painter has been a state field since 1.0.37. The correction is written where
+  the refusal was.
+- **One fold record, one debounced write, for every fold in the plugin.** The
+  read, the write and the 400ms coalesce were private to the header bar; they
+  are now shared, so a prose block's chevron and a section's cannot drift about
+  what "folded" means or race each other to `data.json`.
+
 ## [1.0.78] - 2026-10-16
 
 ### Added

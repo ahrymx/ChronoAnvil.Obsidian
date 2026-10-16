@@ -22,13 +22,45 @@
 // was drawn. A prose block's bar is a title row like theirs, so it gets the
 // control theirs got rather than a new one.
 //
-// THE CHEVRON IS REFUSED, which is the other half of the ask and the same
-// refusal 1.0.75 wrote into `prose-surface.ts`. Folding prose in Live Preview
-// means hiding the reader's own `.cm-line`s, and `headerbar.ts` states the rule
-// that forbids it — *"A SOURCE LINE IS NEVER HIDDEN, only painted"*. A fold
-// arrow here would work in reading mode and sit dead in the editor, which is
-// exactly the control 1.0.73 took away. Obsidian's own heading fold already
-// collapses a `## ` inside the block, in both modes, and is the reader's.
+// ── AND THE CHEVRON, WHICH WAS REFUSED TWICE AND SHOULD NOT HAVE BEEN ───
+//
+// *"make the head a real bar with the collapse chevron, so it feels like any
+// other section."*
+//
+// 1.0.75 AND 1.0.78 BOTH REFUSED IT ON A CLAIM THAT WAS TOO WIDE. The claim was
+// `headerbar.ts`' — *"A SOURCE LINE IS NEVER HIDDEN, only painted"* — read as a
+// fact about Live Preview. It is a fact about THAT PASS: it toggles a class on
+// sibling elements and explicitly skips `.cm-line`s, so a header bar's fold in
+// the editor hides the fences and leaves the reader's plain rows painted. Prose
+// has no fences — its members are all `.cm-line`s — so that mechanism folds
+// nothing, which is true, and is a different sentence from "CodeMirror will not
+// allow it".
+//
+// HIDING LINES FROM A STATE FIELD IS SOMETHING THIS PLUGIN ALREADY DOES.
+// `marker-lines.ts` hides every one of the plugin's markers that way:
+// `hiddenRanges` returns ranges that span line breaks and `Decoration.replace({})`
+// draws them as nothing. CodeMirror forbids that from a PLUGIN and not from a
+// state field — `disallowBlockEffectsFor` gates both of its throws — and
+// `prose-surface.ts` has been a state field since 1.0.37. So the fold is drawn
+// the way the markers are, and the three guards that make that safe are
+// already written and already take a callback: `protectLines` (a change filter
+// over caller-supplied spans), `EditorView.atomicRanges`, and the resting-point
+// rule. `prose-surface.ts` holds the arithmetic and the guards.
+//
+// WHAT IS GENUINELY NEW IS WHOSE TEXT IS HIDDEN. Every hidden range until now
+// has been markup this plugin wrote; a folded prose block hides the reader's
+// own writing. That is why the fold is keyed, persisted and reversible by one
+// press, why `protectLines` is handed the collapsed rows rather than only
+// `atomicRanges`, and why nothing about the FILE changes when a block is
+// folded — a fold is a way of looking at a note, and this one writes no
+// character of it.
+//
+// SAME CLASSES, SAME CHEVRON, on the reader's call: `ca-journal-header-toggle`
+// and `is-collapsed` are the header bar's own, so the glyph, its box, its hover
+// and the direction it points are one declaration each rather than two. It sits
+// at the right-hand end AFTER the cog, which is where a fenced section puts it
+// — `.ca-journal-head-tools + .ca-journal-header-toggle` is that order, written
+// down in the stylesheet since 4.13.
 //
 // WHY THE DOM LIVES HERE AND NOT IN `prose-surface.ts`. That module is the
 // painter — two passes that put classes where the FILE says — and 1.0.75's test
@@ -39,6 +71,7 @@
 
 import { setIcon } from "obsidian";
 
+import { collapsedAt, setCollapsedAt } from "./fold-state";
 import type ChronoAnvilPlugin from "../main";
 import { openProseWindow } from "./prose-window";
 
@@ -46,6 +79,29 @@ import { openProseWindow } from "./prose-window";
 export const PROSE_BAR_CLASS = "ca-prose-bar";
 export const PROSE_BAR_TITLE_CLASS = "ca-prose-bar-title";
 export const PROSE_BAR_COG_CLASS = "ca-prose-bar-cog";
+
+// THE HEADER BAR'S OWN THREE, NOT COPIES OF THEM (1.0.79). The chevron, the
+// hover that lights it and the state class that turns it over are the ones
+// `headerbar.ts` applies and `50-entry-header.css` draws. A prose bar wearing
+// its own would be two glyphs with two declarations drifting apart, which is
+// the mistake the three cogs stopped making one release ago.
+export const FOLD_TOGGLE_CLASS = "ca-journal-header-toggle";
+export const FOLD_HOST_CLASS = "ca-journal-header-collapsible";
+export const FOLD_SHUT_CLASS = "is-collapsed";
+
+// The class a member block of a FOLDED prose run wears in reading mode.
+//
+// `headerbar.ts`' OWN, for the same reason the chevron is: it means "this block
+// belongs to a collapsed section" and it is already `display: none !important`.
+// A second class with one declaration in it would be a second answer to a
+// question that has one.
+export const FOLD_HIDDEN_CLASS = "ca-journal-section-hidden";
+
+// And the class the FIRST block wears, which is the one case a header bar never
+// has: the bar is prepended INTO the first block of the writing, so that block
+// cannot simply be hidden — its own children have to go and the bar has to
+// stay. The stylesheet hides `> :not(.ca-prose-bar)` under this.
+export const PROSE_SHUT_CLASS = "is-prose-shut";
 
 // The element a bar is drawn INTO, in the editor.
 //
@@ -61,12 +117,58 @@ export const PROSE_BAR_HOST_CLASS = "ca-prose-bar-host";
 const COG_LABEL = "Prose block settings";
 const COG_HINT = "Rename this block, show or hide its title, or remove it";
 
+const FOLD_LABEL = "Collapse this prose block";
+const UNFOLD_LABEL = "Expand this prose block";
+
+// Where a prose block's fold is remembered.
+//
+// SIXTH NAMESPACE IN ONE RECORD, and `settings.ts` already says what makes that
+// safe: *nothing ever reads a key it did not write*. `pathwatch.ts` prunes and
+// retargets on the path in front of the first `::` and never looks at the rest,
+// so a note renamed takes its folds with it and a note removed takes them away
+// — with no change to this and none to that.
+//
+// THE READER'S OWN NAME WHERE THERE IS ONE, THE ORDINAL WHERE THERE IS NOT, and
+// see `ProseSurface.title` for why: a name survives a block being inserted
+// above it and a number does not. The two are told apart by a prefix rather
+// than left to collide — a reader who names a block `2` would otherwise own
+// the key of the block that happens to be second.
+export function proseFoldKey(
+  path: string,
+  block: { nth: number; title: string | null }
+): string {
+  const where = block.title ? `t:${block.title}` : `n:${block.nth}`;
+  return `${path}::prose:${where}`;
+}
+
+/** Is this block folded, as far as the reader's settings are concerned? */
+export function proseFolded(
+  plugin: ChronoAnvilPlugin,
+  path: string | null,
+  block: { nth: number; title: string | null }
+): boolean {
+  if (!path) return false;
+  return collapsedAt(plugin, proseFoldKey(path, block));
+}
+
 /** Which block the bar is on, and where to read it back from when pressed. */
 export interface ProseBarSpec {
   /** The title the bar draws. */
   title: string;
   /** Which prose block of the note this is, 1-based. */
   nth: number;
+  /** The name on the marker, or null — half of the fold's key. See `proseFoldKey`. */
+  name: string | null;
+  /** Whether this block is folded right now. */
+  shut: boolean;
+  // WHAT TO REDRAW, WHICH IS THE ONE THING THE TWO PAINTERS CANNOT SHARE. The
+  // fold itself is one line in the settings record and this file writes it; what
+  // has to happen next differs by mode. Reading mode gets no second pass from
+  // Obsidian, so the handler walks the block's own siblings (`applyProseFold`).
+  // The editor gets a state effect, which makes the field recompute and the
+  // replace range appear — a fold changes no document, so without it nothing
+  // would ask the field anything.
+  redraw: (shut: boolean) => void;
   // THE PATH AS A THUNK, NOT AS A STRING, and the editor is why. A reading-mode
   // post-processor is handed `ctx.sourcePath` and a CM6 widget is handed
   // nothing: it learns its file from `editorInfoField`, which it can only ask
@@ -90,10 +192,78 @@ export function buildProseBar(
 ): HTMLElement {
   clearProseBar(host);
   const bar = createDiv({ cls: PROSE_BAR_CLASS });
+  bar.addClass(FOLD_HOST_CLASS);
+  bar.toggleClass(FOLD_SHUT_CLASS, spec.shut);
   bar.createDiv({ cls: PROSE_BAR_TITLE_CLASS, text: spec.title });
+  // COG FIRST, THEN THE CHEVRON, which is the order a fenced section's bar has:
+  // `.ca-journal-head-tools + .ca-journal-header-toggle` puts the tools before
+  // the fold and gives the fold the end of the row.
   bar.appendChild(buildProseCog(spec, plugin));
+  bar.appendChild(buildProseFold(bar, spec, plugin));
+  // AND THE WHOLE TITLE STRIP IS A HIT TARGET, like a header bar's — the cog
+  // stops its own click, so the only thing left to press is the title.
+  bar.addEventListener("click", (evt) => {
+    if (evt.target instanceof Element && evt.target.closest(`.${PROSE_BAR_COG_CLASS}`)) {
+      return;
+    }
+    evt.preventDefault();
+    toggleProseFold(bar, spec, plugin);
+  });
   host.prepend(bar);
   return bar;
+}
+
+// The chevron, which is the header bar's glyph and the header bar's rotation.
+function buildProseFold(
+  bar: HTMLElement,
+  spec: ProseBarSpec,
+  plugin: ChronoAnvilPlugin
+): HTMLElement {
+  const toggle = createDiv({
+    cls: FOLD_TOGGLE_CLASS,
+    attr: { "aria-label": spec.shut ? UNFOLD_LABEL : FOLD_LABEL },
+  });
+  setIcon(toggle, "chevron-down");
+  toggle.addEventListener("click", (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    toggleProseFold(bar, spec, plugin);
+  });
+  return toggle;
+}
+
+// One press: the record, then the mode's own redraw.
+//
+// THE RECORD FIRST, BECAUSE BOTH REDRAWS READ IT. Reading mode's walks the
+// siblings from this bar and the editor's dispatches a state effect that makes
+// the field ask `proseFolded` again — neither is handed the new value, so a
+// redraw before the write would paint the old answer.
+//
+// AND `spec.shut` IS NOT UPDATED IN PLACE. It is what the bar was built with;
+// the next build is what carries the new one. In the editor that build is the
+// widget's, driven by the effect; in reading mode `applyProseFold` toggles the
+// classes and the bar's own `is-collapsed`, so the DOM is correct without the
+// spec being mutable.
+function toggleProseFold(
+  bar: HTMLElement,
+  spec: ProseBarSpec,
+  plugin: ChronoAnvilPlugin
+): void {
+  const path = spec.path();
+  if (!path) return;
+  // THE BAR'S OWN CLASS IS THE STATE, not `spec.shut` — the spec is what this
+  // bar was built with and a reader may press the chevron twice without a
+  // rebuild in between. Flipped here, because this function owns the bar; the
+  // host and the blocks under it are the painter's, through `redraw`.
+  const shut = !bar.hasClass(FOLD_SHUT_CLASS);
+  bar.toggleClass(FOLD_SHUT_CLASS, shut);
+  for (const toggle of Array.from(bar.children)) {
+    if (toggle instanceof HTMLElement && toggle.hasClass(FOLD_TOGGLE_CLASS)) {
+      toggle.setAttribute("aria-label", shut ? UNFOLD_LABEL : FOLD_LABEL);
+    }
+  }
+  setCollapsedAt(plugin, proseFoldKey(path, { nth: spec.nth, title: spec.name }), shut);
+  spec.redraw(shut);
 }
 
 /** The bar this host carries taken off it, where it carries one. */

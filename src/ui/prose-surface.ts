@@ -60,6 +60,7 @@ import {
 } from "obsidian";
 import {
   EditorState,
+  StateEffect,
   StateField,
   type Extension,
   type Range,
@@ -77,8 +78,12 @@ import { proseSurfaceSpans, type ProseSurface } from "../journals/journal-sectio
 import {
   buildProseBar,
   clearProseBar,
+  FOLD_HIDDEN_CLASS,
+  proseFolded,
   PROSE_BAR_HOST_CLASS,
+  PROSE_SHUT_CLASS,
 } from "./prose-bar";
+import { protectLines, type LineSpan } from "./protected-lines";
 
 /** The surface's three classes, spelled once. */
 export const PROSE_BLOCK_CLASS = "ca-prose-block";
@@ -159,6 +164,15 @@ export interface ProseMark {
   head: string | null;
   /** Which prose block of the note it is, or 0 for a run that is in none. */
   nth: number;
+  // THE NAME ON THE MARKER, which is half the fold's key and is NOT `head` —
+  // see `ProseSurface.title`, whose word this is deliberately: the two shapes
+  // are handed to the same `proseFoldKey` and a second spelling of one field
+  // would be a cast at the place they meet. On every row of the block rather than the first
+  // one only, because a fold is a property of the BLOCK: the sibling walk that
+  // hides the rest of the run reads the class and the record, and a member row
+  // that could not say which block it is in would have to ask the file again.
+  /** The title on the marker, or null where the reader has not named the block. */
+  title: string | null;
 }
 
 const NOT_PROSE: ProseMark = {
@@ -167,6 +181,7 @@ const NOT_PROSE: ProseMark = {
   last: false,
   head: null,
   nth: 0,
+  title: null,
 };
 
 // Where a block of `lineStart..lineEnd` stands in this note's prose.
@@ -200,6 +215,7 @@ export function proseMarkFor(
     // head on every row would be one bar per paragraph.
     head: first ? span.head : null,
     nth: span.nth,
+    title: span.title,
   };
 }
 
@@ -226,6 +242,17 @@ export function paintProse(
   el.toggleClass(PROSE_BLOCK_CLASS, mark.member);
   el.toggleClass(PROSE_FIRST_CLASS, mark.first);
   el.toggleClass(PROSE_LAST_CLASS, mark.last);
+  // AND THE FOLD IS READ FROM THE RECORD ON EVERY PAINT (1.0.79), which is what
+  // makes a folded block still folded after a re-render, a reopen or a restart
+  // — the chevron's own sibling walk is the same answer arriving sooner. A row
+  // in no block is never folded: `member` is false and the key would be the
+  // ordinal 0's.
+  const shut = mark.member && proseFolded(plugin, ctx.sourcePath, mark);
+  // THE FIRST BLOCK CANNOT SIMPLY BE HIDDEN — it is holding the bar. So it hides
+  // its own children and keeps the bar (`is-prose-shut`, one stylesheet rule),
+  // and every block after it in the run goes whole.
+  el.toggleClass(PROSE_SHUT_CLASS, shut && mark.first);
+  el.toggleClass(FOLD_HIDDEN_CLASS, shut && !mark.first);
   // AND THE BAR IS TAKEN OFF A ROW THAT HAS STOPPED BEING THE TOP OF THE BLOCK,
   // for the toggles' reason exactly: a re-render in place that only ever BUILT
   // one would leave a title row stranded in the middle of the writing. Built
@@ -237,12 +264,57 @@ export function paintProse(
   }
   buildProseBar(
     el,
-    { title: mark.head, nth: mark.nth, path: () => ctx.sourcePath },
+    {
+      title: mark.head,
+      nth: mark.nth,
+      name: mark.title,
+      shut,
+      path: () => ctx.sourcePath,
+      redraw: (next) => applyProseFold(el, next),
+    },
     plugin
   );
 }
 
+// Reading mode's redraw, which is a sibling walk and not a second paint.
+//
+// OBSIDIAN GIVES A POST-PROCESSOR NO SECOND PASS for something that changed no
+// markdown, so pressing the chevron has to do the work the next render would.
+// It is the same work: the host hides its own children and keeps the bar, and
+// every block after it that is still a member of the run goes. `paintProse`
+// re-asserts all of it from the record on the next real render, which is what
+// makes this safe to do locally rather than holistically — the two cannot
+// disagree about the ANSWER, only about when they arrive at it.
+//
+// THE RUN ENDS WHERE THE CLASS DOES, which is the one thing a sibling walk has
+// to get right: a prose block's members are consecutive siblings carrying
+// `PROSE_BLOCK_CLASS`, and the first sibling that does not carry it is the next
+// section — or the second prose block, which has a bar of its own and a fold of
+// its own and must not be taken by this one. `is-prose-first` is what says so.
+export function applyProseFold(host: HTMLElement, shut: boolean): void {
+  host.toggleClass(PROSE_SHUT_CLASS, shut);
+  let next = host.nextElementSibling;
+  while (
+    next instanceof HTMLElement &&
+    next.hasClass(PROSE_BLOCK_CLASS) &&
+    !next.hasClass(PROSE_FIRST_CLASS)
+  ) {
+    next.toggleClass(FOLD_HIDDEN_CLASS, shut);
+    next = next.nextElementSibling;
+  }
+}
+
 // ── LIVE PREVIEW ─────────────────────────────────────────────────────────
+
+// A FOLD CHANGES NO DOCUMENT, so nothing would ask the field anything (1.0.79).
+//
+// The field below recomputes on a document change and on the mode flipping, and
+// a chevron press is neither: the record moved and the text did not. So the
+// press dispatches this, the field's `update` watches for it, and the whole
+// paint is derived from the record exactly as it is on a reopen. The effect
+// carries no payload — it is "ask again", not "the answer is X", which is what
+// keeps one reader of the record rather than two.
+export const proseFoldEffect = StateEffect.define<null>();
 
 // A LINE DECORATION, WHICH IS THE ONE KIND THAT CAN DO THIS. A mark decoration
 // wraps the text and would paint the words rather than the row; a widget
@@ -372,24 +444,45 @@ class ProseBarWidget extends WidgetType {
   constructor(
     private readonly title: string,
     private readonly nth: number,
+    private readonly name: string | null,
+    private readonly shut: boolean,
     private readonly plugin: ChronoAnvilPlugin
   ) {
     super();
   }
 
   eq(other: ProseBarWidget): boolean {
-    return other.title === this.title && other.nth === this.nth;
+    return (
+      other.title === this.title &&
+      other.nth === this.nth &&
+      // AND WHETHER IT IS FOLDED (1.0.79), because that is drawn: the chevron
+      // turns over and the bar loses the hairline under it. Left out, the
+      // widget would claim to be the same bar and CodeMirror would keep the
+      // old DOM while the lines under it vanished.
+      other.shut === this.shut
+    );
   }
 
   toDOM(view: EditorView): HTMLElement {
     const host = createDiv({
       cls: [PROSE_BLOCK_CLASS, PROSE_FIRST_CLASS, PROSE_BAR_HOST_CLASS].join(" "),
     });
+    // A FOLDED RUN HAS NO ROWS LEFT, so the widget is the whole card and takes
+    // the bottom edge as well as the top. `is-prose-last` is not set on the
+    // lines in that case — there are none drawn.
+    host.toggleClass(PROSE_LAST_CLASS, this.shut);
     buildProseBar(
       host,
       {
         title: this.title,
         nth: this.nth,
+        name: this.name,
+        shut: this.shut,
+        // THE EFFECT AND NOT A DOM WALK, which is reading mode's answer and
+        // cannot be this one: the rows are CodeMirror's and the replace range
+        // that hides them is the field's. Dispatching makes the field read the
+        // record again and rebuild from it.
+        redraw: () => view.dispatch({ effects: proseFoldEffect.of(null) }),
         // THE FILE THE EDITOR IS SHOWING, ASKED WHEN THE COG IS PRESSED.
         // `editorInfoField` is how a CM6 extension learns its note — the view
         // is the only thing that knows, a widget outlives the state it was
@@ -407,24 +500,85 @@ class ProseBarWidget extends WidgetType {
   }
 }
 
-function proseIn(doc: Text, plugin: ChronoAnvilPlugin): DecorationSet {
+// What a folded block hides, as one range, and why that range starts where it
+// does.
+//
+// IT TAKES THE BREAK BEFORE THE RUN, NOT THE BREAK AFTER IT, and that is
+// `marker-lines.ts::hiddenRanges`' own asymmetry rather than a taste. A range
+// over `[firstLine.from, lastLine.to]` leaves both breaks standing, so the fold
+// would collapse the writing and leave one empty row where it was. Taking the
+// leading break instead merges the whole run upward into the opener's row —
+// which is itself already merged into the line above it, because the markers'
+// own range took ITS leading break for the same reason.
+//
+// AND THE TWO RANGES TOUCH RATHER THAN OVERLAP. The markers' range ends at the
+// opener line's `.to`; this one begins there. Two replace ranges from two state
+// fields sharing one endpoint is composition, which CodeMirror does; two that
+// overlapped would be a conflict neither field could see.
+//
+// `span.from > 0` IS ALWAYS TRUE and is asserted anyway: a prose surface is the
+// writing INSIDE two markers, so there is always an opener above it. A run that
+// started the document would have no leading break to take and would need the
+// trailing one, which is the shape `hiddenRanges` keeps a branch for.
+//
+// AND IT TAKES A `{ from, to }` RATHER THAN A `ProseSurface`, which is the only
+// reason `foldedSet` can call it. The decoration that HIDES a run and the atomic
+// range that stops a cursor reaching into it have to be the same two offsets, and
+// a second copy of this expression is how they would come apart — a narrower
+// atomic range leaves a position inside hidden text that an arrow key still
+// reaches, which is invisible until a reader types there.
+function foldedRange(
+  doc: Text,
+  span: { from: number; to: number }
+): { from: number; to: number } | null {
+  if (span.from <= 0 || span.from > span.to || span.to + 1 > doc.lines) return null;
+  return { from: doc.line(span.from).to, to: doc.line(span.to + 1).to };
+}
+
+interface ProsePaint {
+  deco: DecorationSet;
+  // The folded runs as whole LINES, which is what both guards are given. Line
+  // numbers rather than offsets because `protectLines` takes a `LineSpan` and
+  // `atomicRanges` is built from the same two lines one call later — one list,
+  // read twice, so the thing the cursor steps over and the thing a keystroke is
+  // refused on cannot come apart.
+  shut: LineSpan[];
+}
+
+function proseIn(doc: Text, plugin: ChronoAnvilPlugin, path: string | null): ProsePaint {
   const out: Range<Decoration>[] = [];
+  const shut: LineSpan[] = [];
   for (const span of livePreviewSpans(doc.toString().split("\n"))) {
-    for (let n = span.from; n <= span.to && n < doc.lines; n++) {
-      const cls = [PROSE_BLOCK_CLASS];
-      // THE TOP EDGE IS THE BAR'S WHERE THERE IS A BAR (1.0.78). Two elements
-      // carrying `is-prose-first` would be two rounded tops and two paddings,
-      // one of them in the middle of the card — so the line gets it only on a
-      // block that draws no head, which is `#bare` and every block written
-      // before 1.0.75.
-      if (n === span.from && span.head === null) cls.push(PROSE_FIRST_CLASS);
-      if (n === span.to) cls.push(PROSE_LAST_CLASS);
-      out.push(Decoration.line({ class: cls.join(" ") }).range(doc.line(n + 1).from));
+    // A BLOCK WITH NO HEAD HAS NO CHEVRON AND THEREFORE NO FOLD (1.0.79). The
+    // control lives on the title row, so a `#bare` block cannot be folded and
+    // a note written before the markers existed has no block to fold at all.
+    // Reaching the record anyway would let a fold survive the head being
+    // turned off, with nothing on screen to turn it back.
+    const folded =
+      span.head !== null && proseFolded(plugin, path, span) && foldedRange(doc, span) !== null;
+    if (folded) {
+      const range = foldedRange(doc, span);
+      if (range) {
+        shut.push({ from: span.from, to: span.to });
+        out.push(HIDE_RUN.range(range.from, range.to));
+      }
+    } else {
+      for (let n = span.from; n <= span.to && n < doc.lines; n++) {
+        const cls = [PROSE_BLOCK_CLASS];
+        // THE TOP EDGE IS THE BAR'S WHERE THERE IS A BAR (1.0.78). Two elements
+        // carrying `is-prose-first` would be two rounded tops and two paddings,
+        // one of them in the middle of the card — so the line gets it only on a
+        // block that draws no head, which is `#bare` and every block written
+        // before 1.0.75.
+        if (n === span.from && span.head === null) cls.push(PROSE_FIRST_CLASS);
+        if (n === span.to) cls.push(PROSE_LAST_CLASS);
+        out.push(Decoration.line({ class: cls.join(" ") }).range(doc.line(n + 1).from));
+      }
     }
     if (span.head === null || span.from >= doc.lines) continue;
     out.push(
       Decoration.widget({
-        widget: new ProseBarWidget(span.head, span.nth, plugin),
+        widget: new ProseBarWidget(span.head, span.nth, span.title, folded, plugin),
         // ABOVE THE ROW, NOT BESIDE IT. `block` makes the widget a row of its
         // own between two lines, and a negative `side` puts it before the line
         // it is anchored to — the two halves of "draw this above the writing".
@@ -435,23 +589,44 @@ function proseIn(doc: Text, plugin: ChronoAnvilPlugin): DecorationSet {
   }
   // SORTED, because a widget and the line decoration beside it are pushed in
   // the order the loop meets them and `Decoration.set` is handed both.
-  return out.length ? Decoration.set(out, true) : Decoration.none;
+  return { deco: out.length ? Decoration.set(out, true) : Decoration.none, shut };
 }
+
+// The folded writing renders as nothing at all, the way reading mode renders a
+// hidden block — no widget, no class, and `marker-lines.ts`' own `HIDE` one
+// file over is the same decoration for the same reason.
+//
+// NOT `block: true`. A block replace would take the rows out of the layout as a
+// unit and is the obvious reading of "fold these lines"; the inline form is the
+// one this plugin has shipped since 5.31 and the one the markers are drawn with,
+// and it composes with them at the shared endpoint. The proven shape wins over
+// the tidy one on a range that is hiding the reader's own writing.
+const HIDE_RUN = Decoration.replace({});
 
 interface Painted {
   live: boolean;
   deco: DecorationSet;
+  /** The folded runs, as whole lines. Empty in source mode, where nothing folds. */
+  shut: readonly LineSpan[];
 }
+
+const NOTHING_PAINTED: Painted = { live: false, deco: Decoration.none, shut: [] };
 
 function stateOf(state: EditorState, plugin: ChronoAnvilPlugin): Painted {
   // SOURCE MODE PAINTS NOTHING, which is `marker-lines.ts`' gate and the same
   // bargain: source mode is where a reader goes to see the file as it is, and a
   // surface drawn around markers that are themselves visible there would be the
   // editor disagreeing with itself about what is chrome.
+  //
+  // AND A FOLD IS PART OF THAT BARGAIN AS OF 1.0.79. Source mode shows the file,
+  // so it shows the writing — a fold there would be the one place in the plugin
+  // where "see the file as it is" hid some of it. The record is untouched, so
+  // flipping back to Live Preview restores every fold the reader had.
   const live = state.field(editorLivePreviewField, false) === true;
-  return live
-    ? { live, deco: proseIn(state.doc, plugin) }
-    : { live, deco: Decoration.none };
+  if (!live) return NOTHING_PAINTED;
+  const path = state.field(editorInfoField, false)?.file?.path ?? null;
+  const { deco, shut } = proseIn(state.doc, plugin, path);
+  return { live, deco, shut };
 }
 
 // A FIELD BUILT PER PLUGIN INSTANCE RATHER THAN A MODULE CONSTANT, which is the
@@ -461,18 +636,72 @@ function stateOf(state: EditorState, plugin: ChronoAnvilPlugin): Painted {
 // `main.ts`, so there is exactly one of these.
 //
 // AND IT IS STILL A STATE FIELD RATHER THAN A VIEW PLUGIN, for the reason the
-// original comment gives AND for a second one now: CodeMirror refuses a block
+// original comment gives AND for two more now: CodeMirror refuses a block
 // decoration from a plugin-provided facet — *"Block decorations may not be
-// specified via plugins"* — which is the same refusal `marker-lines.ts` met
-// from the other direction when it had to replace a line break.
+// specified via plugins"* — and it refuses a replace decoration that spans a
+// line break from one too, which is the fold. Both are the same gate
+// (`disallowBlockEffectsFor`) and a state field is on the right side of it.
+//
+// ── AND IT IS THREE EXTENSIONS AS OF 1.0.79, NOT ONE ──────────────────────
+//
+// A folded block hides the reader's own writing, which no hidden range in this
+// plugin has done before — every other one is markup the plugin wrote. So the
+// field comes with the two guards `marker-lines.ts` wears for its own ranges,
+// pointed at this one's:
+//
+//   `atomicRanges` makes an arrow key, a click or a restored cursor step OVER a
+//   folded run rather than into it. Without it a cursor rests on a row that is
+//   drawn nowhere and the reader is typing blind.
+//
+//   `protectLines` refuses an input or a delete that reaches into one. This is
+//   the half that matters: `atomicRanges` moves a cursor and does not stop a
+//   SELECTION, so Ctrl+A and a keystroke — 5.31.1's own case — would otherwise
+//   replace the writing the reader folded away. It is a change filter over
+//   caller-supplied spans and this is the second caller.
+//
+// WHAT IT DELIBERATELY DOES NOT HAVE is `cursorRest`'s redirect. The markers
+// need one because every character of a marker line is the plugin's, so there
+// is no position on it a cursor may legally rest at; a folded run's two ends are
+// the reader's own rows, both still in the document, and `atomicRanges` leaves
+// exactly those two endpoints legal. A cursor pushed out of a folded block
+// lands on the writing at its edge, which is where it was going.
 export function proseSurface(plugin: ChronoAnvilPlugin): Extension {
-  return StateField.define<Painted>({
+  const field = StateField.define<Painted>({
     create: (state) => stateOf(state, plugin),
     update: (value, tr) =>
       tr.docChanged ||
+      // A FOLD MOVED AND THE DOCUMENT DID NOT (1.0.79) — see `proseFoldEffect`.
+      tr.effects.some((e) => e.is(proseFoldEffect)) ||
       (tr.state.field(editorLivePreviewField, false) === true) !== value.live
         ? stateOf(tr.state, plugin)
         : value,
     provide: (f) => EditorView.decorations.from(f, (v) => v.deco),
   });
+  return [
+    field,
+    EditorView.atomicRanges.of((view) => foldedSet(view.state, field)),
+    protectLines((state) => state.field(field, false)?.shut ?? []),
+  ];
+}
+
+// The folded runs as the range set `atomicRanges` takes.
+//
+// BUILT FROM THE SAME LIST THE CHANGE FILTER READS AND THROUGH THE SAME
+// ARITHMETIC THE DECORATION USES. Three things have to agree about a folded run
+// — what is hidden, what a cursor steps over, and what a keystroke is refused on
+// — and they agree by construction: one list (`Painted.shut`) through one
+// function (`foldedRange`). A measured mutant narrowed a second copy of that
+// expression and nothing noticed, which is why there is no longer a second copy.
+function foldedSet(
+  state: EditorState,
+  field: StateField<Painted>
+): DecorationSet {
+  const shut = state.field(field, false)?.shut ?? [];
+  if (!shut.length) return Decoration.none;
+  const out: Range<Decoration>[] = [];
+  for (const span of shut) {
+    const range = foldedRange(state.doc, span);
+    if (range) out.push(HIDE_RUN.range(range.from, range.to));
+  }
+  return out.length ? Decoration.set(out, true) : Decoration.none;
 }
