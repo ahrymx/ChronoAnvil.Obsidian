@@ -1004,9 +1004,38 @@ export type SectionQuestion =
 // folder to review" is how you ask and "Folder" is what the box is called. A
 // label with no article — one somebody writes later — is left exactly as its
 // first word.
+//
+// ── AND SO DOES A DEMONSTRATIVE WITH THE POSSESSIVE BEHIND IT (1.0.76) ───
+//
+// *"rename 'This' to just 'Title' in the section editor for this section's
+// title field"*. Every `title` question in every catalogue is worded *this
+// section's title*, which is the right phrase inside the sentences this label
+// also feeds — "Set this section's title" — and whose FIRST word is `this`. So
+// four boxes across four catalogues have been headed **THIS** since 3.18,
+// naming the demonstrative instead of the noun, and nobody could tell the
+// Attachments title box from the Path title box by its name.
+//
+// THE RULE IS THE ONE ABOVE, NOT A SPECIAL CASE FOR `title`. "The article comes
+// off because the field's name is a noun" — a demonstrative is the same kind of
+// word doing the same job, and the possessive that follows it is the owner
+// rather than the thing: *this block's title* is a box called **Title**, the
+// way *the folder to review* is a box called **Folder**. Both steps are needed
+// and neither alone is enough — stopping after `this` would name the box
+// **Section's**.
+//
+// A POSSESSIVE IS ONLY STEPPED OVER BEHIND A DEMONSTRATIVE, which keeps this
+// from reaching a label nobody has written yet: "a reader's folder" is still a
+// box called **Reader's**, and will be until somebody writes one and decides
+// otherwise.
 export function fieldLabelOf(q: SectionQuestion): string {
   const words = q.label.trim().split(/\s+/);
-  const head = /^(the|a|an)$/i.test(words[0]) ? words[1] : words[0];
+  let at = 0;
+  if (/^(the|a|an)$/i.test(words[at])) at++;
+  else if (/^(this|that|these|those)$/i.test(words[at])) {
+    at++;
+    if (/['\u2019]s$/i.test(words[at] ?? "")) at++;
+  }
+  const head = words[at];
   if (!head) return q.label;
   return head.charAt(0).toUpperCase() + head.slice(1);
 }

@@ -5,6 +5,26 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.76] - 2026-10-16
+
+### Changed
+
+- **A prose block's default head is just its name.** *"remove the emoji from
+  default titles"*. 1.0.75 drew **📝 Prose**; it now reads **Prose**, **Prose 2**
+  and so on. The glyph was in the title string because a prose head has no
+  fixed slot to keep one in — but a section's title is the words, every title
+  you can type is words alone, and a default with an emoji in it invited you to
+  keep one in a box with nowhere to put it. The 📝 is still on the row in
+  **Note: edit sections…**, in that window's own icon slot, exactly like every
+  other section's.
+- **The title box is called Title.** *"rename 'This' to just 'Title' in the
+  section editor"*. Every section that can be retitled asks *this section's
+  title*, and the window names a box after its question's head noun — so the
+  Path, Attachments, Task manager and Prose boxes have all been headed **THIS**
+  since the controls were added. The rule that takes *the* off *the folder to
+  review* now takes *this section's* off *this section's title*, on every
+  surface at once.
+
 ## [1.0.75] - 2026-10-16
 
 ### Added

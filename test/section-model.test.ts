@@ -33,6 +33,7 @@ import {
   entrySectionModel,
 } from "../src/diary/entry-sections";
 import {
+  fieldLabelOf,
   holdPinned,
   joinParts,
   partsOf,
@@ -448,6 +449,28 @@ describe("the editor cannot learn which surface it is on", () => {
         ].sort());
       }
     }
+  });
+
+  it("heads every title box Title, on every surface that has one (1.0.76)", () => {
+    // *"rename 'This' to just 'Title' in the section editor for this section's
+    // title field"*. `fieldLabelOf` names a box from its question's head noun,
+    // and every `title` question in every catalogue is worded *this section's
+    // title* — so four boxes across four surfaces were headed **THIS**, naming
+    // the demonstrative instead of the thing.
+    //
+    // SWEPT RATHER THAN LISTED, because the failure is a catalogue adding a
+    // fifth title question worded some other way: the box would come up headed
+    // whatever its first word happens to be, and nothing else here would
+    // notice. The rule is in `fieldLabelOf`; this is every caller of it.
+    const titles = surfaces().flatMap(({ name, model }) =>
+      model
+        .sections()
+        .flatMap((s) => s.questions ?? [])
+        .filter((q) => q.kind === "title")
+        .map((q) => `${name}: ${fieldLabelOf(q)}`)
+    );
+    expect(titles.length).toBeGreaterThan(0);
+    expect([...new Set(titles.map((t) => t.split(": ")[1]))]).toEqual(["Title"]);
   });
 
   it("and every section that asks is one somebody decided should", () => {

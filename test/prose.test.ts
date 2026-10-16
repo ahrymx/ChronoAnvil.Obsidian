@@ -1260,21 +1260,21 @@ describe("the head a prose block wears (1.0.75)", () => {
 
     it("offers the second block's own default as its placeholder", () => {
       // A PLACEHOLDER STATES THE DEFAULT, so it has to be the default of THIS
-      // block: the second block's head reads *📝 Prose 2* and a box promising
-      // *📝 Prose* under it would be the control describing another block.
+      // block: the second block's head reads *Prose 2* and a box promising
+      // *Prose* under it would be the control describing another block.
       const text = twoBlocks();
       const headOf = (id: string) =>
         row(text, id).questions.find((q) => q.kind === "title")!;
-      expect(headOf("headings").placeholder).toBe("📝 Prose");
-      expect(headOf(proseIdFor(2)).placeholder).toBe("📝 Prose 2");
+      expect(headOf("headings").placeholder).toBe("Prose");
+      expect(headOf(proseIdFor(2)).placeholder).toBe("Prose 2");
     });
 
     it("derives that word where the painter derives it", () => {
       // ONE DERIVATION, TWO READERS — the attribute the stylesheet draws and the
-      // placeholder the box shows. A second spelling of "📝 Prose" is how the
+      // placeholder the box shows. A second spelling of "Prose" is how the
       // head over a block and the box under it come to promise different words.
-      expect(proseHeadLabel(null, 1)).toBe("📝 Prose");
-      expect(proseHeadLabel(null, 3)).toBe("📝 Prose 3");
+      expect(proseHeadLabel(null, 1)).toBe("Prose");
+      expect(proseHeadLabel(null, 3)).toBe("Prose 3");
       expect(proseHeadLabel("Chapter one", 2)).toBe("Chapter one");
     });
   });

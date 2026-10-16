@@ -659,10 +659,10 @@ cards followed by loose text. It picks up whichever aesthetic preset you have
 chosen, like everything else.
 
 **And it wears a head, like every other section.** A prose block is titled
-**📝 Prose** — **📝 Prose 2** for the second one on the note, and so on down —
-drawn in the same type, over the same hairline, as the header bar on any section
-above it. Give it your own name in **Note: edit sections…**: the Prose row's
-first box is its head, and the box shows the default so you can see what you are
+**Prose** — **Prose 2** for the second one on the note, and so on down — drawn
+in the same type, over the same hairline, as the header bar on any section above
+it. Give it your own name in **Note: edit sections…**: the Prose row's **Title**
+box is its head, and the box shows the default so you can see what you are
 replacing. Empty the box and the default comes back. The name is kept on the
 block's own invisible marker rather than in a fence, so renaming a block moves
 one character of markup and nothing about your writing; the head has no fold

@@ -586,11 +586,15 @@
  * The three tokens are the ones `.ca-journal-sec` and `.ca-journal-header-title`
  * read, so a retune of the bar reaches this head with it.
  *
- * THE GLYPH IS IN THE STRING, unlike a bar's, which keeps it in a fixed slot so
- * a column of titles aligns. There is no column here — one head per block, and
- * the blocks are far apart — and a slot would mean a second pseudo-element with
- * its own width to keep in step. `📝 Prose` is one label, which is also how
- * `header:📎 Attachments` is written. */
+ * THERE IS NO GLYPH, AND THAT IS A RULE RATHER THAN AN OMISSION (1.0.76).
+ * 1.0.75 drew `📝 Prose` here on the argument that a bar keeps its glyph in a
+ * fixed SLOT so a column of titles aligns, that there is no column here, and
+ * that one string was cheaper than a second pseudo-element. The reader's answer
+ * was about the word rather than the layout — *"remove the emoji from default
+ * titles"* — and it is the right one: this draws a TITLE, every title a reader
+ * can type is words alone, and a default with an emoji in it invites them to
+ * keep one in a box that has no slot to put it in. The 📝 lives on the row in
+ * *Edit sections…*, in that window's own icon slot, like every other section's. */
 .ca-prose-block.is-prose-first[data-ca-prose-head]::before {
   content: attr(data-ca-prose-head);
   display: block;

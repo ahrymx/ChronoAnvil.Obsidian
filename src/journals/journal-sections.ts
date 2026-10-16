@@ -607,13 +607,26 @@ export function proseLabelOf(section: JournalSection, id: string): string {
 // row is drawn in *Edit sections…*, and a block whose head says *Prose 2* while
 // its row says *Prose 3* is two answers to "which block is this" — which is the
 // only question either of them exists to answer. So the fallback goes through
-// `proseLabelOf` rather than composing a second string, and the icon comes off
-// the same catalogue row the window draws.
+// `proseLabelOf` rather than composing a second string.
+//
+// ── AND THE GLYPH IS NOT IN IT (1.0.76) ──────────────────────────────────
+//
+// *"remove the emoji from default titles"*. 1.0.75 shipped `📝 Prose` on the
+// argument that a bar keeps its glyph in a fixed SLOT so a column of titles
+// aligns, there is no column here, and one label was cheaper than a second
+// pseudo-element. That was an argument about layout and the reader's objection
+// is about the word: a section's TITLE is the words, and every one of them a
+// reader can type is words alone — the 📝 on this row is the window's chrome
+// for the row, drawn in its own slot, exactly like every other section's.
+//
+// SO THE DEFAULT IS WHAT A READER WOULD TYPE. That is the property worth
+// keeping: the placeholder states the default, an emoji in it invited a reader
+// to keep one, and the box they type into has no glyph slot to put it in.
 export function proseHeadLabel(title: string | null, nth: number): string {
   if (title) return title;
   const row = JOURNAL_SECTIONS.find((s) => s.id === PROSE_SECTION_ID);
   if (!row) return "Prose";
-  return `${row.icon} ${proseLabelOf(row, proseIdFor(nth))}`;
+  return proseLabelOf(row, proseIdFor(nth));
 }
 
 // A bracketed prose span: visible markdown, invisible edges.
@@ -2845,7 +2858,17 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       {
         kind: "title",
         key: "label",
-        label: "this block's head",
+        // ── AND IT IS A TITLE, WHICH IS WHAT THE BOX IS CALLED (1.0.76) ──
+        //
+        // *"rename 'This' to just 'Title' in the section editor for this
+        // section's title field"*. `fieldLabelOf` names the box from this
+        // string's head noun, and it now steps over the demonstrative and the
+        // possessive to find it — so *this block's title* heads a box called
+        // **Title**, the same word every other section's title field now
+        // wears. It said `head` for one release and would have read **Head**:
+        // the right noun for the thing on the page and the wrong one for a box
+        // that is the same box as the four beside it.
+        label: "this block's title",
         placeholder: proseHeadLabel(null, 1),
         // THE UNMARKED NOTE'S WORDING, AND NOT `TITLE_SETTLED`. That one says
         // "rename it on the note" because a header bar is a control the reader

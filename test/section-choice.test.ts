@@ -694,6 +694,38 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
     ).toBe("Journal");
   });
 
+  it("names a title box Title and not This (1.0.76)", () => {
+    // *"rename 'This' to just 'Title' in the section editor for this section's
+    // title field"*. Every `title` question in every catalogue is worded *this
+    // section's title* — the right phrase inside "Set this section's title",
+    // and a first word that is a demonstrative. Four boxes across four
+    // catalogues were headed **THIS**, which names none of them.
+    const titled = (label: string) =>
+      fieldLabelOf({ kind: "title", key: "label", label, placeholder: "" });
+    expect(titled("this section's title")).toBe("Title");
+    expect(titled("this block's title")).toBe("Title");
+    // BOTH STEPS, because stopping after the demonstrative names the OWNER.
+    expect(titled("this section's title")).not.toBe("Section's");
+    expect(titled("this section's title")).not.toBe("This");
+    // AND EVERY TITLE QUESTION THE CATALOGUES DECLARE IS SWEPT where the four
+    // surfaces are already built — `test/section-model.test.ts`, which is the
+    // one file that holds all of them.
+  });
+
+  it("leaves a possessive that is not behind a demonstrative alone", () => {
+    // THE NARROWING, STATED AS A TEST. The pair is stepped over together or not
+    // at all: a label nobody has written yet — "a reader's folder" — is still a
+    // box called **Reader's**, and stays that way until somebody writes one and
+    // decides otherwise. Widening this rule by accident is how "the folder to
+    // review" would one day become **To**.
+    expect(
+      fieldLabelOf({ kind: "folder", key: "arg", label: "a reader's folder" })
+    ).toBe("Reader's");
+    expect(
+      fieldLabelOf({ kind: "folder", key: "arg", label: "the folder to review" })
+    ).toBe("Folder");
+  });
+
   it("but the full phrase stays in the modal picker, which has the room", () => {
     // `addSectionHere` asks the same question through a suggester, which is a
     // full-width prompt rather than a slot in a row. Shortening it there would
