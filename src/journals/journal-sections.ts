@@ -592,12 +592,29 @@ export function isProseId(id: string): boolean {
 // block #" and "move prose block #", and a window listing three rows all
 // reading **Prose** answers neither — the number is the only thing telling
 // them apart, since every block holds different words and the same everything
-// else. The first keeps the bare label, exactly as its id keeps the bare
-// `headings`: one block is the ordinary case and numbering it would imply a
-// second that may not exist.
+// else.
+//
+// ── AND THE FIRST BLOCK IS NUMBERED LIKE THE REST (1.0.81) ───────────────
+//
+// *"rename the first prose section from just 'Prose' to 'Prose 1', so it
+// matches succeeding Prose 2/3/4."*
+//
+// 1.0.36 LEFT THE FIRST ONE BARE, matching its id — `headings`, where the
+// second is `headings#2` — on the argument that one block is the ordinary case
+// and numbering it would imply a second that may not exist. That argument is
+// about the FILE, where it still holds: the id is a key and the bare one is
+// what every note written since 5.6 carries. The label is a NAME, read beside
+// its siblings, and *Prose* over *Prose 2* reads as two kinds of row rather
+// than the first and second of one kind — which is the only thing either label
+// exists to say. So the number is unconditional now, and the id is untouched.
+//
+// THE ID IS STILL THE GATE, not the ordinal. A section that is not prose keeps
+// its own label exactly: `journal-plan.ts` hands this function every section a
+// run names, so a bare `else` on the ordinal would have numbered Tasks and
+// Habits too.
 export function proseLabelOf(section: JournalSection, id: string): string {
-  const n = isProseId(id) ? (proseOrdinalOf(id) ?? 1) : 1;
-  return n > 1 ? `${section.label} ${n}` : section.label;
+  if (!isProseId(id)) return section.label;
+  return `${section.label} ${proseOrdinalOf(id) ?? 1}`;
 }
 
 // What a prose block's HEAD reads (1.0.75): what the reader called it, or the
@@ -625,7 +642,11 @@ export function proseLabelOf(section: JournalSection, id: string): string {
 export function proseHeadLabel(title: string | null, nth: number): string {
   if (title) return title;
   const row = JOURNAL_SECTIONS.find((s) => s.id === PROSE_SECTION_ID);
-  if (!row) return "Prose";
+  // THE SAME SHAPE WHERE THE CATALOGUE CANNOT BE REACHED. A bare *Prose* here
+  // would be the one place in the plugin where block 3's head dropped its
+  // number, which is worse than a wrong word: the reader would read it as block
+  // one. The row is always there — this branch is the type's, not a case.
+  if (!row) return `Prose ${Math.max(1, nth)}`;
   return proseLabelOf(row, proseIdFor(nth));
 }
 

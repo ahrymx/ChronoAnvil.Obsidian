@@ -5,6 +5,24 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.81] - 2026-10-16
+
+### Changed
+
+- **The first prose block is called Prose 1.** *"rename the first prose section
+  from just 'Prose' to 'Prose 1', so it matches succeeding Prose 2/3/4."* It had
+  been bare since 1.0.36, matching its id — the first block is `headings` where
+  the second is `headings#2` — on the argument that one block is the ordinary
+  case and numbering it implies a second that may not exist. That argument is
+  about the file, where it still holds and nothing has changed: the markers, the
+  ids and every note on disk are untouched. The label is a name read beside its
+  siblings, and *Prose* over *Prose 2* read as two kinds of row rather than the
+  first and second of one kind.
+  - It is one derivation, so the number arrives everywhere at once: the head
+    over the block, the row in **Note: edit sections…**, the **Prose block**
+    window's own title, and the placeholder in the Title box that states the
+    default. A block you have named still shows your name and nothing else.
+
 ## [1.0.80] - 2026-10-16
 
 ### Fixed

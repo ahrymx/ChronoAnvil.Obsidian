@@ -20,7 +20,9 @@ import {
   normaliseProseTitle,
   proseCountIn,
   proseHeadIn,
+  JOURNAL_SECTIONS,
   proseHeadLabel,
+  proseLabelOf,
   proseIdFor,
   proseOpenerIn,
   proseOrdinalOf,
@@ -221,8 +223,23 @@ describe("one block, or as many as the note needs", () => {
       .filter((s) => isProseId(s.id));
     expect(rows.map((r) => r.id)).toEqual(["headings", "headings#2"]);
     // Told apart by their number and by nothing else — same blurb, same icon,
-    // different words inside.
-    expect(rows.map((r) => r.label)).toEqual(["Prose", "Prose 2"]);
+    // different words inside. AND THE FIRST IS NUMBERED TOO (1.0.81): *Prose*
+    // over *Prose 2* read as two kinds of row rather than the first and second
+    // of one kind, which is the only thing either label exists to say.
+    expect(rows.map((r) => r.label)).toEqual(["Prose 1", "Prose 2"]);
+    // AND NOTHING ELSE IS NUMBERED. `journal-plan.ts` hands `proseLabelOf` every
+    // section a run names, not only the repeating one, so the id is the gate and
+    // not the ordinal — which defaults to 1 for anything that is not a prose id.
+    // A measured mutant dropped that gate and the whole suite stayed green while
+    // every row in the note read *Tasks 1*, *Habits 1*, *Pages 1*.
+    const others = journalSectionModel(lessonCtx)
+      .sections(text)
+      .filter((s) => !isProseId(s.id));
+    expect(others.length).toBeGreaterThan(0);
+    for (const row of others) expect(row.label, row.id).not.toMatch(/ 1$/);
+    const plain = JOURNAL_SECTIONS.find((s) => s.id === "tasks")!;
+    expect(proseLabelOf(plain, "tasks")).toBe(plain.label);
+    expect(proseLabelOf(plain, "headings")).toBe(`${plain.label} 1`);
   });
 
   it("offers one more than the note holds, and never lists the spare", () => {
@@ -1291,11 +1308,11 @@ describe("the head a prose block wears (1.0.75)", () => {
     it("offers the second block's own default as its placeholder", () => {
       // A PLACEHOLDER STATES THE DEFAULT, so it has to be the default of THIS
       // block: the second block's head reads *Prose 2* and a box promising
-      // *Prose* under it would be the control describing another block.
+      // *Prose 1* under it would be the control describing another block.
       const text = twoBlocks();
       const headOf = (id: string) =>
         row(text, id).questions.find((q) => q.kind === "title")!;
-      expect(headOf("headings").placeholder).toBe("Prose");
+      expect(headOf("headings").placeholder).toBe("Prose 1");
       expect(headOf(proseIdFor(2)).placeholder).toBe("Prose 2");
     });
 
@@ -1303,7 +1320,7 @@ describe("the head a prose block wears (1.0.75)", () => {
       // ONE DERIVATION, TWO READERS — the attribute the stylesheet draws and the
       // placeholder the box shows. A second spelling of "Prose" is how the
       // head over a block and the box under it come to promise different words.
-      expect(proseHeadLabel(null, 1)).toBe("Prose");
+      expect(proseHeadLabel(null, 1)).toBe("Prose 1");
       expect(proseHeadLabel(null, 3)).toBe("Prose 3");
       expect(proseHeadLabel("Chapter one", 2)).toBe("Chapter one");
     });
