@@ -759,6 +759,37 @@ export interface FlagQuestion extends SectionQuestionCommon {
   // body region the field owns; a question that wrote into it would be
   // repointing the field at another region every time the box was ticked.
   token?: string;
+  // ── A FLAG WHOSE ANSWER IS A `#token` ON A MARKER (1.0.77) ──────────
+  //
+  // THE THIRD WALL, AND THE LAST SHAPE A SECTION COMES IN. `line` is a fact
+  // about a fence, `token` a fact about a directive inside one, and a
+  // BRACKETED section has neither: prose is the reader's own markdown between
+  // two HTML comments, which is 5.6's whole argument — *"visible markdown,
+  // invisible edges"* — and the reader's own reason for it, *"directive blocks
+  // breaking markdown syntax"*. The edges are the only thing about such a
+  // section that is the plugin's to write on, so that is where the answer
+  // goes: `<!--chronoanvil-prose#bare-->`.
+  //
+  // THE WORD, NOT A BOOLEAN, for `token`'s reason one field up — it is the
+  // token the marker carries, written by the catalogue that spells it — and
+  // the two fields are exclusive: a question answers on a directive or on a
+  // marker, never on both.
+  //
+  // `derived` COMES WITH IT and is not implied by it. Nothing in this file
+  // writes a marker — `withFlagToken` is the directive's writer and
+  // `withFlagLine` the fence's — so the catalogue owns both halves exactly as
+  // it does for the headings tick beside this one. What `marker` adds over
+  // `derived` alone is that the planner can FIND this question without
+  // knowing its key, which is the contract every read in `journal-plan.ts`
+  // holds to: two derived flags on one row would otherwise be told apart by
+  // spelling one of them out.
+  //
+  // AND `answersOn` MUST DROP IT. That function reads every flag off the
+  // fence around the section's anchor, and the nearest fence above a prose
+  // marker belongs to another section — so its answer here is not a wrong
+  // reading of this question, it is a reading of something else. See
+  // `answeredIn`, which deletes it and supplies the opener's.
+  marker?: string;
 }
 
 // The two answers a `FlagQuestion` takes, spelled as strings for

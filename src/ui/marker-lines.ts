@@ -152,7 +152,12 @@ const REGION_OPEN = /^<!--(?:chronoanvil|almanac):[A-Za-z0-9_-]+(?:\s*-->)?$/;
 // that missed a titled opener would leave the marker VISIBLE in Live Preview
 // on exactly the notes a reader has named — the one place the name is supposed
 // to appear as a head rather than as markup.
-const BRACKET = /^<!--\/?chronoanvil-[A-Za-z0-9_-]+(?::[^\n]*?)?-->$/;
+//
+// AND SO ARE ITS FLAGS (1.0.77). `#bare` says the block draws no head, and a
+// pattern that missed it would show the marker to the one reader who asked for
+// LESS chrome on their prose.
+const BRACKET =
+  /^<!--\/?chronoanvil-[A-Za-z0-9_-]+(?:#[A-Za-z0-9_-]+)*(?::[^\n]*?)?-->$/;
 
 // The graph block's first line. Its second is the links, matched loosely
 // (`%% … %%`) because what is between them is a wikilink list this file has no

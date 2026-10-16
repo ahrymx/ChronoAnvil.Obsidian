@@ -579,6 +579,14 @@
  * string, which would still draw the hairline and the padding — a blank band
  * above the writing on any row the painter has not named yet.
  *
+ * AND THAT IS WHAT 1.0.77's TICK TURNS OFF. *"add a hide title row button"* —
+ * a block whose marker carries `#bare` is painted with no attribute at all, so
+ * this rule does not match it and NOTHING here needs a second state. The
+ * stylesheet has one head and one way not to have one; the decision is the
+ * painters', which is where the reader's answer is read. See
+ * `journal-sections.ts::proseSurfaceSpans`, whose `head` is null for such a
+ * block, and the question on the prose row that writes it.
+ *
  * THE TYPE IS THE BAR'S, RESTATED RATHER THAN INHERITED, because the row this
  * sits on is the reader's own markdown: a `## ` heading, a paragraph, a list.
  * Everything a title has to settle is settled here, or the head would be a

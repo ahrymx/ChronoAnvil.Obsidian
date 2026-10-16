@@ -131,7 +131,7 @@ import {
   proseCountIn,
   proseSpanIn,
   normaliseProseTitle,
-  proseHeadIn,
+  proseOpenerIn,
   proseHeadLabel,
   proseSpansIn,
   proseTitlesIn,
@@ -2191,7 +2191,7 @@ export function applySections(
             // the title across on purpose. Naming the block last means the
             // answer the reader typed is the last word either way, rather than
             // depending on which branch the tick took.
-            out = withProseTitle(
+            out = withProseOpener(
               out,
               listedSection,
               ctx,
@@ -2855,7 +2855,14 @@ function withListedHeadings(
   //   on → off   take the defaults nobody has written under out
   //   off → on   put them back, around whatever survived
   //   unchanged  the list below answers, exactly as it did before the tick
-  const q = questionsOf(section, ctx).find((x) => x.kind === "flag" && x.derived);
+  //
+  // AND IT IS THE DERIVED FLAG WITHOUT A MARKER (1.0.77). The row carries two
+  // of them since the head got its tick — both derived for the same reason,
+  // neither with a line in a fence — and `marker` is how they are told apart
+  // without this file spelling either key out. See `FlagQuestion.marker`.
+  const q = questionsOf(section, ctx).find(
+    (x) => x.kind === "flag" && x.derived && !x.marker
+  );
   const asked = q ? options?.[q.key] : undefined;
   const defaults = defaultProseTitles(section, ctx);
   const span = proseSpanIn(lines, nth);
@@ -2911,25 +2918,45 @@ function withListedHeadings(
 // not asked about comes out byte for byte. Comparing against the span's own
 // title is the cheapest honest form of that: `null === null` on the ordinary
 // block, and the file is returned rather than rebuilt.
-function withProseTitle(
+// ── AND WHETHER IT DRAWS ONE, WHICH IS THE SAME LINE (1.0.77) ─────────
+//
+// ONE WRITE FOR BOTH ANSWERS. Two functions each rewriting `span.open` would
+// be the second overwriting the first — the shape 4.16 states for a directive
+// written by two questions, arriving on a marker — and the one that ran second
+// would compose its own field over the other's. So the opener is resolved once
+// and written once.
+//
+// AN ANSWER THE READER DID NOT TOUCH IS WHAT THE MARKER ALREADY SAYS, which is
+// what makes either field writable alone. The editor sends back only the keys
+// it was given — `shownAnswer` seeds a control without dirtying it — so a
+// reader who only unticks the head sends no name, and `span.title` is the name
+// that survives. Defaulting to "no name" instead would make the tick a control
+// that also renames the section, which is the defect `pruneBracketedSpan`
+// records on the other side of this same line.
+//
+// `FLAG_OFF` MEANS BARE. The tick says the head is SHOWN — see the question,
+// which says why a box cannot be labelled to hide something — so unticked is
+// the token and ticked is its absence.
+function withProseOpener(
   lines: string[],
   section: JournalSection,
   ctx: SectionContext,
   options: Record<string, unknown> | undefined,
   nth = 1
 ): string[] {
-  const q = questionsOf(section, ctx).find(
-    (x) => x.kind === "title" && !x.directive
-  );
-  if (!q) return lines;
-  const answer = options?.[q.key];
-  if (typeof answer !== "string") return lines;
+  const questions = questionsOf(section, ctx);
+  const titleQ = questions.find((x) => x.kind === "title" && !x.directive);
+  const bareQ = questions.find((x) => x.kind === "flag" && x.marker);
   const span = proseSpanIn(lines, nth);
   if (!span) return lines;
-  const title = normaliseProseTitle(answer);
-  if (title === span.title) return lines;
+  const named = titleQ ? options?.[titleQ.key] : undefined;
+  const title =
+    typeof named === "string" ? normaliseProseTitle(named) : span.title;
+  const shown = bareQ ? options?.[bareQ.key] : undefined;
+  const bare = typeof shown === "string" ? shown === FLAG_OFF : span.bare;
+  if (title === span.title && bare === span.bare) return lines;
   const out = [...lines];
-  out[span.open] = bracketOpen(span.key, title);
+  out[span.open] = bracketOpen(span.key, title, bare);
   return out;
 }
 
@@ -3006,7 +3033,10 @@ function pruneBracketedSpan(
       // blank line — so a marker that carries the reader's own name for this
       // block has to be written back carrying it. Dropping it would make
       // *Add default headings* a control that also renames the section.
-      bracketOpen(PROSE_KEY, span.title),
+      // AND SO DOES THE TICK (1.0.77), for the same reason and on the same
+      // line: a block drawn without its head keeps being drawn without it
+      // through an untick of the headings below.
+      bracketOpen(PROSE_KEY, span.title, span.bare),
       "",
       ...(body.length ? body : [""]),
       "",
@@ -3575,6 +3605,18 @@ function answeredIn(
   if (questions.some((q) => q.kind === "form" || q.kind === "flag")) {
     Object.assign(out, answersOn(section.locate(text, ctx), questions, text));
   }
+  // EXCEPT A FLAG WHOSE ANSWER IS ON A MARKER (1.0.77). `answersOn` reads every
+  // flag off the fence around the section's anchor, and a prose marker is in no
+  // fence — the nearest one above it belongs to the trackers band. So what it
+  // returns for this question is not a wrong reading of the question, it is a
+  // reading of another section's block, and it is dropped rather than left to
+  // be overwritten: the branch below supplies it only where there is an opener
+  // to read, and a note with no markers must reach the editor with NOTHING for
+  // it, so the tick is replaced by its `settled` sentence instead of standing
+  // over a block it cannot write to.
+  for (const q of questions) {
+    if (q.kind === "flag" && q.marker) delete out[q.key];
+  }
   // THE KEY IS READ OFF THE QUESTION, not written here. This file knows that a
   // bracketed section's prose answers a `lines` question; it does not need to
   // know that the journal catalogue happens to call the answer "headings".
@@ -3598,10 +3640,21 @@ function answeredIn(
   // `settled` refusal over a block whose marker is right there to write to.
   // Absent stays reserved for the note that has no markers at all, where the
   // write genuinely cannot land; `proseSpanIn` returning null is that note.
-  if (head) {
-    const named = proseHeadIn(text, nth);
-    if (named !== null) out[head.key] = named;
-  }
+  // ── AND WHETHER IT WEARS ONE (1.0.77) ───────────────────────────────
+  //
+  // ONE READ FOR BOTH, which is what `proseOpenerIn` is for: the name and the
+  // tick are two questions about one marker, and two reads of it would be two
+  // places for the ordinal and the pre-5.6 null to stop agreeing.
+  //
+  // `#bare` IS THE DEPARTURE AND ITS ABSENCE IS THE DEFAULT, so a marked block
+  // with nothing on it answers `FLAG_ON` — the head is there, which is what
+  // every note in every vault written before this release draws and what the
+  // composer still writes. Nothing is migrated and the tick is honest on the
+  // first note it is shown on.
+  const opener = proseOpenerIn(text, nth);
+  const bare = questions.find((q) => q.kind === "flag" && q.marker);
+  if (head && opener) out[head.key] = opener.title ?? "";
+  if (bare && opener) out[bare.key] = opener.bare ? FLAG_OFF : FLAG_ON;
   if (!list) return out;
   // THE NTH BLOCK'S HEADINGS, NOT THE FIRST'S (1.0.36). `id` is which prose
   // block this row is; a reader editing the headings of their second block
@@ -3622,7 +3675,9 @@ function answeredIn(
   // "All of them" is the answer the write can actually produce and undo: after
   // a prune the box reads unticked, and re-ticking composes exactly what the
   // prune removed.
-  const flag = questions.find((q) => q.kind === "flag" && q.derived);
+  const flag = questions.find(
+    (q) => q.kind === "flag" && q.derived && !q.marker
+  );
   if (flag && titles) {
     out[flag.key] = proseDefaultsOn(titles, defaultProseTitles(section, ctx))
       ? FLAG_ON

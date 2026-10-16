@@ -5,6 +5,28 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.77] - 2026-10-16
+
+### Added
+
+- **A prose block can hide its title row.** *"add a hide title row button to the
+  sections entry in the section editor"*. The Prose row in **Note: edit
+  sections…** now carries a **Show the title** tick beside its **Title** box;
+  untick it and that block keeps its card and loses the head 1.0.75 gave it.
+  Every other section has had this button since 5.11 and it is **Show as
+  widget**, which takes the title line out of the section's fence — prose
+  composes no fence, which is why it never had one.
+  - **Per block, and it keeps your name.** One block on a note can wear a head
+    while the next does not, and a block you have named keeps the name while
+    the head is off: tick it back and your own word is still there, rather than
+    an empty box over a marker that still holds it.
+  - **The answer rides the block's own marker**, as `#bare` on the opening
+    comment, which is where the name already lives. Showing the head is the
+    default and its absence is the departure, so nothing on any note you
+    already have changed and no vault was migrated. A block on a note written
+    before those markers existed has no edge to draw a head on, and the row
+    says so instead of offering a tick that could not act.
+
 ## [1.0.76] - 2026-10-16
 
 ### Changed

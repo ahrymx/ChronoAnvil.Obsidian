@@ -22,6 +22,7 @@ import {
   proseHeadIn,
   proseHeadLabel,
   proseIdFor,
+  proseOpenerIn,
   proseOrdinalOf,
   proseSpanIn,
   proseSpansIn,
@@ -37,6 +38,7 @@ import {
   answerInText,
   describeAnswers,
 } from "../src/core/section-model";
+import type { FlagQuestion } from "../src/core/section-model";
 import {
   applySections,
   journalSectionModel,
@@ -46,6 +48,7 @@ import {
 import { wantFromJournalNote } from "../src/journals/journal-template";
 import { toPlainMarkdown } from "../src/core/plain-markdown";
 import { readNoteRegion } from "../src/core/notestore";
+import { markerLinesIn } from "../src/ui/marker-lines";
 import { readCode, readSrc } from "./sources";
 
 // ── PROSE, AND WHY IT IS A SECTION AT ALL (1.0.36) ───────────────────────
@@ -173,7 +176,13 @@ describe("the marker is not a region, under any of the three parsers", () => {
     // a marker with two bugs waiting.
     const src = readSrc("journal-sections");
     expect(src.match(/<!--\$\{/g) ?? []).toHaveLength(0);
-    expect(src).toContain("`<!--chronoanvil-${key}-->`");
+    // ONE TEMPLATE PER SHAPE THE OPENER COMES IN, which is two since 1.0.75's
+    // title and still two after 1.0.77's flags: the flag is a SLOT in both,
+    // rather than a third spelling of the marker.
+    expect(src).toContain("`<!--chronoanvil-${key}${flag}-->`");
+    expect(src).toContain(
+      "`<!--chronoanvil-${key}${flag}${BRACKET_TITLE_SEP}${clean}-->`"
+    );
     expect(src).toContain("`<!--/chronoanvil-${key}-->`");
     for (const name of ["journal-plan", "journal-template"]) {
       expect(readSrc(name), name).not.toContain("<!--chronoanvil-");
@@ -804,6 +813,12 @@ describe("the tick and the list", () => {
     findSection(PROSE_SECTION_ID)!.questions!(lessonCtx).find(
       (q) => q.kind === kind
     )!;
+  // BY KEY, BECAUSE THE ROW CARRIES TWO FLAGS SINCE 1.0.77 and `question`
+  // above would hand both of them the first one.
+  const keyed = (key: string) =>
+    findSection(PROSE_SECTION_ID)!.questions!(lessonCtx).find(
+      (q) => q.key === key
+    )!;
   const wantWith = (
     text: string,
     options: Record<string, string>,
@@ -822,20 +837,34 @@ describe("the tick and the list", () => {
     // than under the two because every other section's title question is the
     // first row of its card, and a reader who has learned where a title lives
     // should not have to look for this one.
+    //
+    // AND THE SECOND TICK SITS BETWEEN THEM (1.0.77). *Show the title* is
+    // about the head directly above it and nothing below it, so it reads in
+    // the order the two are drawn on the page: the name, whether the name is
+    // drawn, and then what the block opens with.
     const qs = findSection(PROSE_SECTION_ID)!.questions!(lessonCtx);
-    expect(qs.map((q) => q.kind)).toEqual(["title", "flag", "lines"]);
-    expect(question("title").key).toBe("label");
-    expect(question("flag").key).toBe("defaults");
-    expect(question("lines").key).toBe("headings");
+    expect(qs.map((q) => q.kind)).toEqual(["title", "flag", "flag", "lines"]);
+    expect(qs.map((q) => q.key)).toEqual([
+      "label",
+      "head",
+      "defaults",
+      "headings",
+    ]);
   });
 
   it("draws the list only while the tick is on (1.0.39)", () => {
     // Unticked, there are no default headings for the box to name, and a box
     // left on screen read as a second way to add them.
     expect(question("lines").shownWhen).toEqual({
-      key: question("flag").key,
+      key: keyed("defaults").key,
       is: FLAG_ON,
     });
+    // AND THE HEAD'S BOX IS GATED ON NOTHING (1.0.77). `shownWhen` clears a
+    // hidden question's answer — see the editor's own rule — so gating the
+    // name on the tick that draws it would throw the name away the moment a
+    // reader hid the head, and give it back empty when they showed it again.
+    expect(keyed("label").shownWhen).toBeUndefined();
+    expect(keyed("head").shownWhen).toBeUndefined();
   });
 
   it("hands the row the headings the note already has, and the tick on", () => {
@@ -1187,15 +1216,16 @@ describe("the head a prose block wears (1.0.75)", () => {
       expect(bracketOpenerOf("<!--chronoanvil-prose-->", keys)).toEqual({
         key: PROSE_KEY,
         title: null,
+        bare: false,
       });
       expect(
         bracketOpenerOf("<!--chronoanvil-prose:Chapter one-->", keys)
-      ).toEqual({ key: PROSE_KEY, title: "Chapter one" });
+      ).toEqual({ key: PROSE_KEY, title: "Chapter one", bare: false });
       // A NOTE WRITTEN BEFORE THE RENAME CAN BE NAMED TOO, which falls out of
       // the keys being a list rather than being arranged for.
       expect(
         bracketOpenerOf("<!--chronoanvil-skeleton:Old notes-->", keys)
-      ).toEqual({ key: LEGACY_PROSE_KEY, title: "Old notes" });
+      ).toEqual({ key: LEGACY_PROSE_KEY, title: "Old notes", bare: false });
     });
 
     it("declines a closer, another key, and a key this is only a prefix of", () => {
@@ -1348,7 +1378,7 @@ describe("the head a prose block wears (1.0.75)", () => {
       // prune's own job rather than the head write's. The editor sends back the
       // keys the reader TOUCHED — see `shownAnswer`, which seeds a control
       // without dirtying it — so a reader who only clears this checkbox sends
-      // no name at all, and `withProseTitle` has nothing to put back.
+      // no name at all, and `withProseOpener` has nothing to put back.
       const text = named("Chapter one");
       const want = sectionsPresent(text, lessonCtx).map((x) =>
         x === "headings" ? { id: x, options: { defaults: FLAG_OFF } } : x
@@ -1367,7 +1397,10 @@ describe("the head a prose block wears (1.0.75)", () => {
       const src = readCode("journal-plan");
       const at = src.indexOf("const nth = proseSpanOfRun(run.sectionIds, id);");
       expect(at).toBeGreaterThan(-1);
-      const site = src.slice(at, src.indexOf("}", src.indexOf("withProseTitle(", at)));
+      const site = src.slice(
+        at,
+        src.indexOf("}", src.indexOf("withProseOpener(", at))
+      );
       expect(site.match(/\n\s+nth,?\n/g) ?? []).toHaveLength(2);
       expect(site).not.toContain("1\n");
     });
@@ -1453,6 +1486,382 @@ describe("the head a prose block wears (1.0.75)", () => {
       // A regex of its own here is how the two would stop agreeing.
       expect(readCode("marker-lines")).toContain("bracketOpenerOf(line, [");
       expect(readCode("marker-lines")).not.toContain("PROSE_OPENERS");
+    });
+  });
+});
+
+// ── AND WHETHER IT WEARS ONE AT ALL (1.0.77) ─────────────────────────────
+//
+// *"add a hide title row button to the sections entry in the section editor"*.
+//
+// EVERY FENCED SECTION HAS HAD THIS BUTTON SINCE 5.11 and it is `FormQuestion`:
+// *Show as widget* takes the `header:` line out of the fence and the block
+// keeps its contents. Prose composes no fence, has never carried a `form`
+// question for exactly that reason, and 1.0.75 gave it the one piece of chrome
+// that made the gap visible — so the answer rides the opening marker as a
+// `#token`, which is the route `FlagQuestion.token` already found in 1.0.42 for
+// a flag whose fence cannot hold it.
+describe("hiding the head a prose block wears (1.0.77)", () => {
+  const keys = [PROSE_KEY, LEGACY_PROSE_KEY];
+  const row = (text: string, id = "headings") =>
+    journalSectionModel(lessonCtx)
+      .sections(text)
+      .find((s) => s.id === id)!;
+  const answering = (
+    text: string,
+    options: Record<string, string>,
+    id = "headings"
+  ) =>
+    sectionsPresent(text, lessonCtx).map((x) =>
+      x === id ? { id: x, options } : x
+    );
+  const asked = (
+    text: string,
+    options: Record<string, string>,
+    id = "headings"
+  ) => applySections(text, lessonCtx, answering(text, options, id));
+  const hidden = (): string => asked(lesson(), { head: FLAG_OFF })!;
+  const named = (title: string): string =>
+    asked(lesson(), { label: title })!;
+
+  describe("the grammar on the marker", () => {
+    it("writes the flag between the key and the name, and never on the closer", () => {
+      // ONE MARKER CARRIES BOTH, which is 1.0.75's rule about the pair said
+      // again: the closer is found by key, so anything written on it is a
+      // second string to keep equal to the first for no gain.
+      expect(bracketOpen(PROSE_KEY, null, true)).toBe(
+        "<!--chronoanvil-prose#bare-->"
+      );
+      expect(bracketOpen(PROSE_KEY, "Chapter one", true)).toBe(
+        "<!--chronoanvil-prose#bare:Chapter one-->"
+      );
+      expect(bracketClose(PROSE_KEY)).toBe("<!--/chronoanvil-prose-->");
+    });
+
+    it("leaves the marker bare where the head is shown, which is every note", () => {
+      // THE TOKEN IS THE DEPARTURE AND ITS ABSENCE IS THE DEFAULT, which is
+      // what keeps every note in every vault reading as "head shown" with
+      // nothing migrated — and the goldens where they are.
+      expect(bracketOpen(PROSE_KEY, null, false)).toBe(
+        "<!--chronoanvil-prose-->"
+      );
+      expect(bracketOpen(PROSE_KEY, "Chapter one", false)).toBe(
+        "<!--chronoanvil-prose:Chapter one-->"
+      );
+      expect(lesson()).not.toContain("#bare");
+    });
+
+    it("reads the flag back, with a name and without, off either spelling", () => {
+      expect(bracketOpenerOf("<!--chronoanvil-prose#bare-->", keys)).toEqual({
+        key: PROSE_KEY,
+        title: null,
+        bare: true,
+      });
+      expect(
+        bracketOpenerOf("<!--chronoanvil-prose#bare:Chapter one-->", keys)
+      ).toEqual({ key: PROSE_KEY, title: "Chapter one", bare: true });
+      // A NOTE WRITTEN BEFORE THE RENAME CAN HIDE ITS HEAD TOO, which falls
+      // out of the keys being a list rather than being arranged for.
+      expect(
+        bracketOpenerOf("<!--chronoanvil-skeleton#bare-->", keys)
+      ).toEqual({ key: LEGACY_PROSE_KEY, title: null, bare: true });
+    });
+
+    it("is why the flag goes before the name and not after a second colon", () => {
+      // THE TITLE TAKES EVERYTHING AFTER THE FIRST COLON, which is what makes
+      // a reader's *Part: one* one title — so a modifier has to be readable
+      // BEFORE the title starts. A flag spelled after it would be a word out
+      // of somebody's heading.
+      const line = bracketOpen(PROSE_KEY, "Part: one");
+      expect(line).toBe("<!--chronoanvil-prose:Part: one-->");
+      expect(bracketOpenerOf(line, keys)).toEqual({
+        key: PROSE_KEY,
+        title: "Part: one",
+        bare: false,
+      });
+    });
+
+    it("leaves a `#` the reader typed inside their own name alone", () => {
+      // `#` CANNOT APPEAR IN A KEY, which is the whole reason it can separate
+      // one — and the flags are parsed off the front, so a hash in the title
+      // is never read as one.
+      const line = bracketOpen(PROSE_KEY, "Part #2");
+      expect(line).toBe("<!--chronoanvil-prose:Part #2-->");
+      expect(bracketOpenerOf(line, keys)).toEqual({
+        key: PROSE_KEY,
+        title: "Part #2",
+        bare: false,
+      });
+      expect(bracketOpenerOf("<!--chronoanvil-prose#bare:Part #2-->", keys))
+        .toEqual({ key: PROSE_KEY, title: "Part #2", bare: true });
+    });
+
+    it("skips a token it has never heard of rather than refusing the marker", () => {
+      // A MARKER IS THE PLUGIN'S MARKER WHATEVER A LATER BUILD WRITES ON IT.
+      // Refusing an unknown token would mean a reader who moves back a version
+      // stops having a prose SECTION at all — the span would not be found, the
+      // window would offer to add one over the block they are looking at, and
+      // the markers would turn up as text in an export.
+      expect(bracketOpenerOf("<!--chronoanvil-prose#later-->", keys)).toEqual({
+        key: PROSE_KEY,
+        title: null,
+        bare: false,
+      });
+      expect(
+        bracketOpenerOf("<!--chronoanvil-prose#bare#later:Name-->", keys)
+      ).toEqual({ key: PROSE_KEY, title: "Name", bare: true });
+      const text = lesson().replace(
+        bracketOpen(PROSE_KEY),
+        "<!--chronoanvil-prose#later-->"
+      );
+      expect(proseCountIn(text)).toBe(1);
+      expect(proseTitlesIn(text)).toContain("Overview");
+    });
+
+    it("still declines a closer, another key, and a key it is a prefix of", () => {
+      // THE PREFIX TRAP, RE-RUN OVER THE FLAG. `startsWith(key)` is where the
+      // read begins, so the thing that makes it a key is what comes next —
+      // which is now one of three characters rather than two.
+      expect(bracketOpenerOf("<!--/chronoanvil-prose#bare-->", keys)).toBeNull();
+      expect(bracketOpenerOf("<!--chronoanvil-prosey#bare-->", keys)).toBeNull();
+      expect(bracketOpenerOf("<!--chronoanvil-recall#bare-->", keys)).toBeNull();
+    });
+
+    it("is still invisible in both modes, and still gone from an export", () => {
+      // THREE READERS WIDENED TOGETHER (1.0.75's rule, with a third shape to
+      // read). A pattern that missed `#bare` would show the marker as text in
+      // Live Preview — to the one reader who asked for LESS chrome — or leave
+      // it behind in a copy of the note.
+      const text = hidden();
+      expect(text).toContain("<!--chronoanvil-prose#bare-->");
+      expect(markerLinesIn(text.split("\n"))).toContainEqual({
+        from: text.split("\n").indexOf("<!--chronoanvil-prose#bare-->"),
+        to: text.split("\n").indexOf("<!--chronoanvil-prose#bare-->"),
+        keepLine: false,
+        opensRegion: false,
+      });
+      const plain = toPlainMarkdown(text, journalSectionModel(lessonCtx));
+      expect(plain).not.toContain("chronoanvil-prose");
+      expect(plain).not.toContain("#bare");
+      expect(plain).toContain("## Overview");
+    });
+
+    it("is still where the section starts", () => {
+      // `locate` FALLS BACK TO A `##` PROBE, so a regex that missed a flagged
+      // opener would not fail loudly — it would report the reader's own first
+      // heading as where the section begins.
+      const text = hidden();
+      const at = findSection(PROSE_SECTION_ID)!.locate(text, lessonCtx);
+      expect(text.slice(at)).toMatch(/^<!--chronoanvil-prose#bare-->/);
+      expect(sectionsPresent(text, lessonCtx)).toContain("headings");
+      expect(proseCountIn(text)).toBe(1);
+    });
+  });
+
+  describe("the question, and what the window shows", () => {
+    const question = findSection(PROSE_SECTION_ID)!
+      .questions!(lessonCtx)
+      .find((q) => q.key === "head") as FlagQuestion;
+
+    it("is a derived flag whose answer is a token on the marker", () => {
+      // `derived` BECAUSE THERE IS NO FENCE and `marker` because there is no
+      // directive either — the two fields together are what let the planner
+      // find this question without this file naming its key, and what keep
+      // `withAnswers` from writing a modifier line into the reader's prose.
+      expect(question.kind).toBe("flag");
+      expect(question.derived).toBe(true);
+      expect(question.marker).toBe("bare");
+      expect(question.token).toBeUndefined();
+      expect(question.line).toBe("");
+      expect(question.after).toBe("");
+    });
+
+    it("says what ticking it does, which is SHOW the head", () => {
+      // A BOX LABELLED *HIDE* WOULD BE TICKED ON EVERY NOTE THAT SHOWS ONE.
+      // `renderFlagQuestion` reads an absent answer as on and labels the box
+      // `on`, so a question worded the other way round is a control that lies
+      // about its own state. The reader asked for a button that hides the row
+      // and this is it, unticked.
+      expect(question.on).toBe("Show the title");
+      expect(question.off).toBe("Hide the title");
+    });
+
+    it("answers on for a marked block with nothing on its opener", () => {
+      // EVERY BLOCK IN EVERY VAULT, and the reason nothing is migrated.
+      expect(row(lesson()).answered?.["head"]).toBe(FLAG_ON);
+      expect(proseOpenerIn(lesson())?.bare).toBe(false);
+    });
+
+    it("answers off for a block whose marker carries the flag", () => {
+      const text = hidden();
+      expect(row(text).answered?.["head"]).toBe(FLAG_OFF);
+      expect(proseOpenerIn(text)?.bare).toBe(true);
+    });
+
+    it("answers nothing at all for a note that carries no markers", () => {
+      // AND THAT IS THE ONE PLACE A FLAG HAS NO ANSWER. `flagAt` answers
+      // `FLAG_OFF` for a fence with no modifier in it, so an ordinary flag
+      // always has something true to show — but a marker flag on a pre-5.6
+      // block has nothing to read and nowhere to write, and a tick that does
+      // neither is a dead control. `readable()` draws the `settled` sentence
+      // in its place, which is what an absent answer is for.
+      const text = unmarked(lesson());
+      expect(proseOpenerIn(text)).toBeNull();
+      expect(row(text).answered?.["head"]).toBeUndefined();
+      expect(question.settled?.text).toBeTruthy();
+      // AND THE NEAREST FENCE IS NOT CONSULTED, which is what the delete in
+      // `answeredIn` is for: `answersOn` reads every flag off the fence around
+      // the section's anchor, and the one above a prose marker is the trackers
+      // band's.
+      expect(readCode("journal-plan")).toContain(
+        'if (q.kind === "flag" && q.marker) delete out[q.key];'
+      );
+    });
+
+    it("hands the two ticks to the two writers that own them", () => {
+      // TWO DERIVED FLAGS ON ONE ROW, TOLD APART BY `marker` AND NOT BY KEY.
+      // Every read in the planner finds its flag by shape — a lookup that took
+      // the first derived flag would have handed the headings prune the head's
+      // answer the moment this question was added above it.
+      const src = readCode("journal-plan");
+      expect(src.match(/x\.derived && !x\.marker/g) ?? []).toHaveLength(1);
+      expect(src.match(/q\.derived && !q\.marker/g) ?? []).toHaveLength(1);
+      expect(src).not.toContain('=== "defaults"');
+      expect(src).not.toContain('=== "head"');
+    });
+  });
+
+  describe("the write, and everything it leaves alone", () => {
+    it("writes the flag onto the opener and touches nothing else", () => {
+      const before = lesson();
+      const after = hidden();
+      const a = before.split("\n");
+      const b = after.split("\n");
+      expect(b).toHaveLength(a.length);
+      const moved = a.map((l, i) => (l === b[i] ? null : i)).filter((i) => i !== null);
+      expect(moved).toHaveLength(1);
+      expect(b[moved[0]!]).toBe("<!--chronoanvil-prose#bare-->");
+      expect(proseTitlesIn(after)).toEqual(proseTitlesIn(before));
+    });
+
+    it("takes it off again, byte for byte", () => {
+      // THE UNDO IS THE SAME LINE, which is what makes the tick a tick rather
+      // than a one-way door — `pruneBracketedSpan`'s own standard, applied to
+      // the smallest write in the file.
+      const text = hidden();
+      const back = asked(text, { head: FLAG_ON })!;
+      expect(back).toBe(lesson());
+    });
+
+    it("keeps the name the reader gave when the head goes", () => {
+      // THE EDITOR SENDS BACK ONLY WHAT THE READER TOUCHED — `shownAnswer`
+      // seeds a control without dirtying it — so a reader who only unticks the
+      // head sends no name, and what the marker already says is the answer.
+      // Dropping it would make the tick a control that also renames the block.
+      const text = named("Chapter one");
+      const after = asked(text, { head: FLAG_OFF })!;
+      expect(after).toContain("<!--chronoanvil-prose#bare:Chapter one-->");
+      expect(proseHeadIn(after)).toBe("Chapter one");
+    });
+
+    it("keeps the head hidden when the reader renames the block", () => {
+      // The same rule from the other side, and the reason there is ONE writer
+      // for this line: two, each resolving its own field and rewriting the
+      // opener, would have the second composing over the first's answer.
+      const text = hidden();
+      const after = asked(text, { label: "Chapter one" })!;
+      expect(after).toContain("<!--chronoanvil-prose#bare:Chapter one-->");
+      expect(proseOpenerIn(after)?.bare).toBe(true);
+    });
+
+    it("writes one opener for both answers at once", () => {
+      const after = asked(lesson(), { label: "Chapter one", head: FLAG_OFF })!;
+      expect(after).toContain("<!--chronoanvil-prose#bare:Chapter one-->");
+      expect(after.match(/<!--chronoanvil-prose/g) ?? []).toHaveLength(1);
+    });
+
+    it("writes nothing when the answer is what the marker already says", () => {
+      // AND THE LINE IT PROTECTS IS ONE THE READER HAS TOUCHED. Rewriting a
+      // marker to what it already holds produces the same bytes, so the guard
+      // is invisible on a composed note — until the opener carries trailing
+      // spaces, which `proseSpansIn` trims to match and a write would silently
+      // tidy. `applySections` promising "nothing to do" is the property.
+      expect(asked(lesson(), { head: FLAG_ON })).toBeNull();
+      const text = hidden();
+      expect(asked(text, { head: FLAG_OFF })).toBeNull();
+      const spaced = lesson().replace(
+        bracketOpen(PROSE_KEY),
+        `${bracketOpen(PROSE_KEY)}  `
+      );
+      expect(asked(spaced, { head: FLAG_ON })).toBeNull();
+    });
+
+    it("carries the flag through an untick of the default headings", () => {
+      // `pruneBracketedSpan` REWRITES THE OPENER — the shape has to be
+      // `renderBlock`'s to the blank line — so everything the marker says has
+      // to be written back. 1.0.75 carried the title across for this reason and
+      // the flag is the second thing in the same place.
+      const text = hidden();
+      const after = asked(text, { defaults: FLAG_OFF })!;
+      expect(proseTitlesIn(after)).toEqual([]);
+      expect(proseOpenerIn(after)?.bare).toBe(true);
+    });
+
+    it("carries the flag and the name together through one", () => {
+      const text = asked(lesson(), { label: "Chapter one", head: FLAG_OFF })!;
+      const after = asked(text, { defaults: FLAG_OFF })!;
+      expect(after).toContain("<!--chronoanvil-prose#bare:Chapter one-->");
+    });
+
+    it("hides the block the reader was looking at, not the first one", () => {
+      // THE ORDINAL IS THE BLOCK'S IDENTITY, and the second block's row is
+      // keyed `headings#2`. A write that read the first span would hide a head
+      // the reader can see while leaving the one they ticked.
+      const text = twoBlocks();
+      const after = asked(text, { head: FLAG_OFF }, proseIdFor(2))!;
+      expect(proseOpenerIn(after, 1)?.bare).toBe(false);
+      expect(proseOpenerIn(after, 2)?.bare).toBe(true);
+    });
+  });
+
+  describe("a block composed with a head, and unticked afterwards", () => {
+    it("composes the head whatever the tick says, like the headings do", () => {
+      // `render` DOES NOT HONOUR THIS ANSWER, which is `FlagQuestion`'s own
+      // rule — *"a flag's `render` is unconditional"* — and what keeps every
+      // composed note byte-identical. Nobody arranges a prose head before the
+      // page exists; they hide it on a page that has one.
+      const prose = findSection(PROSE_SECTION_ID)!;
+      expect(
+        renderSection(prose, lessonCtx, { head: FLAG_OFF } as never).split("\n")[0]
+      ).toBe("<!--chronoanvil-prose-->");
+      expect(lesson()).not.toContain("#bare");
+    });
+
+    it("is not one of the answers a layout carries across", () => {
+      // `SectionOverrides` HAS NO FIELD FOR IT, exactly as it has none for the
+      // headings tick: both are derived, so there is nothing to store, and a
+      // layout that tried would be storing an answer `render` does not read.
+      // The reader's own choice about chrome stays on the note they made it on.
+      const fields = readSrc("journal-sections")
+        .slice(
+          readSrc("journal-sections").indexOf("export interface SectionOverrides"),
+          readSrc("journal-sections").indexOf("export interface TemplateLayout")
+        );
+      expect(fields).toContain("label?: string;");
+      expect(fields).not.toContain("head?");
+      expect(fields).not.toContain("bare?");
+      // AND *SAVE AS LAYOUT…* STORES THE HEADINGS AND NOTHING ELSE OFF THIS
+      // BLOCK, which is where it stood before this release: `label` is read
+      // through `headerTitleIn` over a section's `claims`, and prose claims no
+      // directive — so a named block's NAME is not captured either. The gap is
+      // 1.0.75's and is written down rather than closed in passing, on the rule
+      // `journal-template.ts` states about a widget's folder answer.
+      const want = wantFromJournalNote(
+        asked(named("Chapter one"), { head: FLAG_OFF })!,
+        lessonCtx,
+        STUDY_JOURNAL
+      );
+      expect(Object.keys(want.options?.["headings"] ?? {})).toEqual(["headings"]);
     });
   });
 });

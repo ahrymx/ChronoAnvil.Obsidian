@@ -666,17 +666,45 @@ function bracketed(
 // carries today and what the composer still writes; the head falls back to the
 // row's own label (`proseLabelOf` — *Prose*, *Prose 2*, …), so nothing has to
 // be migrated for a head to appear.
-export function bracketOpen(key: string, title: string | null = null): string {
+//
+// ── AND IT MAY SAY THE HEAD IS NOT DRAWN (1.0.77) ────────────────────────
+//
+// *"add a hide title row button"*. Every other section answers that question
+// with `FormQuestion` — *Show as widget*, which takes the `header:` line out of
+// its fence — and prose has no fence to take a line out of. So the answer is a
+// `#token` ON THE MARKER, which is the mechanism 1.0.42 already found for a
+// flag whose fence cannot hold it: `FlagQuestion.token`, where a diary field's
+// *Compact* rides its own directive because the band's seven sections share one
+// fence.
+//
+// `#` RATHER THAN A SECOND COLON, because the title takes everything after the
+// first colon — a reader's *Part: one* is one title — so a modifier has to be
+// readable BEFORE the title starts. `#` cannot appear in a key for the same
+// reason `:` cannot, and a `#` the reader types lands in the title where it is
+// left alone.
+//
+// THE TOKEN IS THE DEPARTURE AND ITS ABSENCE IS THE DEFAULT, which is what
+// keeps every note in every vault reading as "head shown" with nothing
+// migrated. `bare` is this codebase's own word for a section drawn without its
+// bar — see `FormQuestion`, whose widget answer composes one.
+export function bracketOpen(
+  key: string,
+  title: string | null = null,
+  bare = false
+): string {
   const clean = title === null ? null : normaliseProseTitle(title);
+  const flag = bare ? `${BRACKET_FLAG_SEP}${BRACKET_BARE_FLAG}` : "";
   return clean
-    ? `<!--chronoanvil-${key}${BRACKET_TITLE_SEP}${clean}-->`
-    : `<!--chronoanvil-${key}-->`;
+    ? `<!--chronoanvil-${key}${flag}${BRACKET_TITLE_SEP}${clean}-->`
+    : `<!--chronoanvil-${key}${flag}-->`;
 }
 export function bracketClose(key: string): string {
   return `<!--/chronoanvil-${key}-->`;
 }
 
 export const BRACKET_TITLE_SEP = ":";
+export const BRACKET_FLAG_SEP = "#";
+export const BRACKET_BARE_FLAG = "bare";
 
 // A title the opener can hold, or null where there is nothing usable in it.
 //
@@ -705,10 +733,12 @@ export function normaliseProseTitle(raw: string): string | null {
   return clean || null;
 }
 
-/** An opener's key and the title it carries, or null where it is not one. */
+/** An opener's key, the title it carries and the flags on it. */
 export interface BracketOpener {
   key: string;
   title: string | null;
+  /** `#bare` is on the marker: this block draws no head. */
+  bare: boolean;
 }
 
 // Whether this line opens one of `keys`' brackets, and what it is called.
@@ -726,11 +756,35 @@ export function bracketOpenerOf(
   if (!t.startsWith("<!--chronoanvil-") || !t.endsWith("-->")) return null;
   const inner = t.slice("<!--chronoanvil-".length, -"-->".length);
   for (const key of keys) {
-    if (inner === key) return { key, title: null };
-    if (inner.startsWith(key + BRACKET_TITLE_SEP)) {
+    if (!inner.startsWith(key)) continue;
+    // WHAT FOLLOWS THE KEY DECIDES WHETHER THIS IS THAT KEY AT ALL. `prose` is
+    // a prefix of a key nobody has written yet, so the three shapes are named
+    // rather than left to `startsWith`: nothing, a flag, or a title.
+    let rest = inner.slice(key.length);
+    // THE FLAGS COME FIRST AND THE TITLE TAKES THE REST, which is the only
+    // order that reads: a title may contain `#` and may contain further
+    // colons, and a modifier may contain neither.
+    let bare = false;
+    while (rest.startsWith(BRACKET_FLAG_SEP)) {
+      const after = rest.slice(BRACKET_FLAG_SEP.length);
+      // One token, ending at the next flag or at the title, whichever comes
+      // first — and running to the end of the marker where there is neither.
+      const ends = after.search(/[#:]/);
+      const word = ends === -1 ? after : after.slice(0, ends);
+      if (!word) break;
+      if (word === BRACKET_BARE_FLAG) bare = true;
+      // AN UNKNOWN TOKEN IS SKIPPED RATHER THAN REFUSED, which is the rule
+      // every reader of this marker follows: one written by a later build must
+      // still DELIMIT a block this one can find, or a reader's prose stops
+      // being a section the moment they move back a version.
+      rest = ends === -1 ? "" : after.slice(ends);
+    }
+    if (!rest) return { key, title: null, bare };
+    if (rest.startsWith(BRACKET_TITLE_SEP)) {
       return {
         key,
-        title: normaliseProseTitle(inner.slice(key.length + BRACKET_TITLE_SEP.length)),
+        title: normaliseProseTitle(rest.slice(BRACKET_TITLE_SEP.length)),
+        bare,
       };
     }
   }
@@ -744,6 +798,8 @@ export interface ProseSpan {
   key: string;
   /** What the reader called this block, or null where the opener is bare. */
   title: string | null;
+  /** `#bare` is on the opener: this block draws no head (1.0.77). */
+  bare: boolean;
 }
 
 // Every prose span in these lines, in file order.
@@ -779,6 +835,7 @@ export function proseSpansIn(lines: readonly string[]): ProseSpan[] {
   let open = -1;
   let key = "";
   let title: string | null = null;
+  let bare = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     const starts = bracketOpenerOf(line, [PROSE_KEY, LEGACY_PROSE_KEY]);
@@ -786,13 +843,15 @@ export function proseSpansIn(lines: readonly string[]): ProseSpan[] {
       open = i;
       key = starts.key;
       title = starts.title;
+      bare = starts.bare;
       continue;
     }
     if (open !== -1 && line === bracketClose(key)) {
-      out.push({ open, close: i, key, title });
+      out.push({ open, close: i, key, title, bare });
       open = -1;
       key = "";
       title = null;
+      bare = false;
     }
   }
   return out;
@@ -832,8 +891,16 @@ export interface ProseSurface {
   from: number;
   /** Last line of the writing, 0-based and inside the markers. */
   to: number;
-  /** The head this block wears — see `proseHeadLabel`. */
-  head: string;
+  // ── AND NULL IS A BLOCK THAT WEARS NONE (1.0.77) ─────────────────────
+  //
+  // `#bare` on the opener. NOT THE EMPTY STRING, which `proseHeadLabel` can
+  // never return anyway: a head of `""` would be an attribute the stylesheet
+  // still matches, so the hairline and the padding above the reader's first
+  // paragraph would be drawn over nothing. The painters skip the attribute
+  // entirely on null, and `70-section-surface.css` says why its selector asks
+  // for the attribute rather than only reading it.
+  /** The head this block wears, or null where it wears none. */
+  head: string | null;
 }
 
 export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
@@ -851,7 +918,11 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
     while (from <= to && lines[from].trim() === "") from++;
     while (to >= from && lines[to].trim() === "") to--;
     if (from <= to)
-      out.push({ from, to, head: proseHeadLabel(span.title, i + 1) });
+      out.push({
+        from,
+        to,
+        head: span.bare ? null : proseHeadLabel(span.title, i + 1),
+      });
   });
   return out;
 }
@@ -895,8 +966,22 @@ export function proseCountIn(text: string): number {
 // a name to give and nowhere yet to show it, which is every block composed
 // before 1.0.75; `answeredIn` leans on the distinction and says why.
 export function proseHeadIn(text: string, n = 1): string | null {
+  const opener = proseOpenerIn(text, n);
+  return opener ? (opener.title ?? "") : null;
+}
+
+// This note's nth prose opener, as what is written on it.
+//
+// ONE READ FOR BOTH ANSWERS (1.0.77). The head and the *Show the title* tick
+// are two questions about one line, and the planner answers them together —
+// two reads of the same marker is two places for the ordinal, the loose-lines
+// treatment and the pre-5.6 null to stop agreeing. `proseHeadIn` is this
+// function now, kept because it is the narrower question and most callers only
+// ask it.
+export function proseOpenerIn(text: string, n = 1): BracketOpener | null {
   const span = proseSpanIn(looseLines(text), n);
-  return span ? (span.title ?? "") : null;
+  if (!span) return null;
+  return { key: span.key, title: span.title, bare: span.bare };
 }
 
 export function proseTitlesIn(text: string, n = 1): string[] | null {
@@ -2854,7 +2939,7 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       // `"📝 Prose"` here would be a second spelling of it, and the first
       // release to change the icon would have the box promising the old one.
       // `rowFor` NUMBERS IT per block — the second block's head reads
-      // *📝 Prose 2* and so must the box under it.
+      // *Prose 2* and so must the box under it.
       {
         kind: "title",
         key: "label",
@@ -2882,6 +2967,67 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
             "This note's prose was written before ChronoAnvil marked where a " +
             "prose block starts and ends, so there is nowhere to keep a head " +
             "for it. Use Reload this note to get the markers, and the box.",
+        },
+      },
+      // ── AND WHETHER IT WEARS ONE AT ALL (1.0.77) ─────────────────────
+      //
+      // *"add a hide title row button to the sections entry in the section
+      // editor"*.
+      //
+      // EVERY OTHER SECTION ALREADY HAS THIS BUTTON AND IT IS `FormQuestion`.
+      // *Show as widget* takes the `header:` line out of a section's fence, so
+      // a reader who wants the block without the strip above it unticks one
+      // box. Prose has no fence, which is why it has never carried a `form`
+      // question — and 1.0.75 gave it the one piece of chrome that made the
+      // absence visible.
+      //
+      // SO IT IS A `flag`, AND `derived`, FOR `defaults`' REASON ONE QUESTION
+      // DOWN: there is no modifier line to write, the answer rides the opening
+      // marker (`#bare` — see `bracketOpen`), and the journal planner owns the
+      // read and the write the way it owns the headings'.
+      //
+      // TICKED MEANS THE HEAD IS THERE, which is `renderFlagQuestion`'s own
+      // rule — `on` says what ticking DOES and the box reads as on unless the
+      // answer says off. A box labelled *Hide the title* would be ticked on
+      // every note that shows one: a control that lies about its own state.
+      // The reader asked for a button that hides the row and this is it,
+      // unticked.
+      //
+      // AND THE TITLE BOX IS NOT GATED ON IT. `shownWhen` would be the obvious
+      // wiring and it is the wrong one: the editor clears a hidden question's
+      // answer when the tick closes the gate — *A QUESTION THIS TICK HIDES
+      // TAKES ITS ANSWER WITH IT* — so unticking the head would throw away the
+      // name the reader typed, and ticking it back would show an empty box over
+      // a marker that still holds their word. The name survives the head going;
+      // `bracketOpen` writes both onto one marker and says so.
+      //
+      // **How**, WHICH IS THE WORD EVERY FENCED SECTION'S FORM ROW WEARS.
+      // `fieldLabelOf` heads the field off this string, `formQuestion`'s label
+      // is *how this is drawn*, and this question is that question for the one
+      // section that cannot be asked it. Two rows, one word, one meaning.
+      {
+        kind: "flag",
+        key: "head",
+        label: "how this block is drawn",
+        derived: true,
+        marker: BRACKET_BARE_FLAG,
+        line: "",
+        after: "",
+        on: "Show the title",
+        off: "Hide the title",
+        // AND THE PRE-5.6 NOTE GETS THE SENTENCE, NOT THE TICK. This is the
+        // first flag anywhere with `settled` wording, and the first that
+        // needed it: `flagAt` answers `FLAG_OFF` for a fence with no modifier
+        // in it, so an ordinary flag always has something true to show —
+        // `renderFlagQuestion` says as much. A marker flag has nothing to read
+        // and nowhere to write on a block that carries no markers, and a tick
+        // that does neither is the dead control 1.0.73 spent a round removing.
+        settled: {
+          text: "this block has no edge to draw",
+          hint:
+            "This note's prose was written before ChronoAnvil marked where a " +
+            "prose block starts and ends, so it has no title row to show or " +
+            "hide. Use Reload this note to get the markers, and the tick.",
         },
       },
       // ── THE TICK, AND THEN WHICH (1.0.36) ────────────────────────────
@@ -2948,8 +3094,11 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       // THE TITLE IS OPTIONAL AND THE CLOSER NEVER HAS ONE (1.0.75), which is
       // what `(?::[^\n]*)?` after the key says. A `locate` that missed a titled
       // opener would fall through to the `##` probe and report the reader's own
-      // first heading as where this section starts.
-      const at = t.search(/^<!--\/?chronoanvil-(?:prose|skeleton)(?::[^\n]*)?-->$/m);
+      // first heading as where this section starts. `(?:#[A-Za-z0-9_-]+)*` is
+      // the flags 1.0.77 put in front of it — `#bare`, today.
+      const at = t.search(
+        /^<!--\/?chronoanvil-(?:prose|skeleton)(?:#[A-Za-z0-9_-]+)*(?::[^\n]*)?-->$/m
+      );
       return at >= 0 ? at : probe(t, /^##\s+\S/m);
     },
     render: (ctx, opts) => {

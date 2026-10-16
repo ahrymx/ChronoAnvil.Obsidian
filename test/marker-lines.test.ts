@@ -193,6 +193,27 @@ describe("which lines are this plugin's", () => {
     expect(markerLinesIn(note)[0].opensRegion).toBe(false);
   });
 
+  it("takes a flagged bracket's edges too (1.0.77)", () => {
+    // A BLOCK THAT DRAWS NO HEAD STILL HIDES ITS MARKERS. `#bare` is the
+    // answer of the one reader who asked for LESS chrome on their prose, so a
+    // pattern that missed it would show them the markup instead — the exact
+    // opposite of what they ticked.
+    const note = [
+      "<!--chronoanvil-prose#bare-->",
+      "## Heading",
+      "<!--/chronoanvil-prose-->",
+    ];
+    expect(markerLinesIn(note)).toEqual([
+      { from: 0, to: 0, keepLine: false, opensRegion: false },
+      { from: 2, to: 2, keepLine: false, opensRegion: false },
+    ]);
+    // AND THE FLAG AND THE NAME TOGETHER, which is the shape a named block the
+    // reader has unticked carries.
+    expect(
+      markerLinesIn(["<!--chronoanvil-prose#bare:Chapter one-->"])
+    ).toEqual([{ from: 0, to: 0, keepLine: false, opensRegion: false }]);
+  });
+
   it("takes the graph block's links line with its head", () => {
     const note = ["prose", "%% chronoanvil-graph %%", "%% [[Weekly|​]] %%"];
     expect(markerLinesIn(note)).toEqual([

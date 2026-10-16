@@ -307,7 +307,16 @@ export function stripPluginMarkup(raw: string): string {
       // so it goes the same way: an export that left a titled opener behind
       // would put an HTML comment at the top of the reader's own writing on
       // every note that has been given a head.
-      .replace(/<!--\/?chronoanvil-[A-Za-z0-9_-]+(?::[^\n]*?)?-->/g, "")
+      //
+      // AND A FLAG SINCE 1.0.77 — `<!--chronoanvil-prose#bare-->`. `(?:#…)*`
+      // rather than `(?:#…)?` so a token this build has never heard of is
+      // still stripped: a marker is the plugin's markup whatever a later
+      // release writes on it, and an export is the one place where leaving
+      // one behind is permanent.
+      .replace(
+        /<!--\/?chronoanvil-[A-Za-z0-9_-]+(?:#[A-Za-z0-9_-]+)*(?::[^\n]*?)?-->/g,
+        ""
+      )
       .split("\n")
       .filter((l) => l.trim() !== "`chronoanvil:spacer`")
       .join("\n")

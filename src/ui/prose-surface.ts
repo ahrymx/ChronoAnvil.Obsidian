@@ -267,7 +267,7 @@ function mountedLines(lines: readonly string[]): Set<number> {
 
 export function livePreviewSpans(
   lines: readonly string[]
-): { from: number; to: number; head: string }[] {
+): { from: number; to: number; head: string | null }[] {
   const mounted = mountedLines(lines);
   return proseSurfaceSpans(lines).map(({ from, to, head }) => ({
     from:
@@ -291,7 +291,11 @@ function proseIn(doc: Text): DecorationSet {
       out.push(
         Decoration.line({
           class: cls.join(" "),
-          ...(n === span.from
+          // AND NULL PUTS NO ATTRIBUTE ON THE LINE AT ALL (1.0.77), rather
+          // than an empty one: the stylesheet's selector asks for the
+          // attribute, so `data-ca-prose-head=""` would still draw the
+          // hairline and the padding above a block that asked for neither.
+          ...(n === span.from && span.head !== null
             ? { attributes: { [PROSE_HEAD_ATTR]: span.head } }
             : {}),
         }).range(doc.line(n + 1).from)

@@ -14,7 +14,7 @@ import {
   readSrc,
   styleSheets,
 } from "./sources";
-import { proseSurfaceSpans } from "../src/journals/journal-sections";
+import { proseSpansIn, proseSurfaceSpans } from "../src/journals/journal-sections";
 import { livePreviewSpans, proseMarkFor } from "../src/ui/prose-surface";
 
 const OPEN = "<!--chronoanvil-prose-->";
@@ -839,5 +839,87 @@ describe("the head, which travels as data (1.0.75)", () => {
     const head = cssRule(".ca-prose-block.is-prose-first[data-ca-prose-head]::before");
     expect(head).not.toContain("cursor");
     expect(src()).not.toContain("addEventListener");
+  });
+});
+
+// ── AND THE BLOCK THAT WEARS NONE (1.0.77) ───────────────────────────────
+//
+// *"add a hide title row button"*. The answer is `#bare` on the opening marker
+// — see `test/prose.test.ts` for the grammar and the write — and what reaches
+// the two painters is one thing: a `head` of null.
+describe("the block that wears no head (1.0.77)", () => {
+  const BARE = "<!--chronoanvil-prose#bare-->";
+  const NAMED_BARE = "<!--chronoanvil-prose#bare:Chapter one-->";
+
+  it("is still a surface, and still paints every row of the writing", () => {
+    // THE HEAD IS THE ONLY THING THE FLAG TAKES. A reader hiding the title row
+    // asked for one piece of chrome to go, not for their prose to stop being a
+    // prose block — the background, the padding and both edge classes stay.
+    expect(proseSurfaceSpans([BARE, "Words.", SHUT])).toEqual([
+      { from: 1, to: 1, head: null },
+    ]);
+    const text = note(BARE, "", "## Overview", "", "A paragraph.", "", SHUT);
+    const mark = proseMarkFor(text, 2, 2);
+    expect(mark.member).toBe(true);
+    expect(mark.first).toBe(true);
+    expect(mark.head).toBeNull();
+  });
+
+  it("keeps its name while the head is gone", () => {
+    // THE NAME SURVIVES THE HEAD GOING, which is the whole reason the two are
+    // separate answers on one marker — a reader who hides the row and shows it
+    // again gets their own word back, not an empty box.
+    expect(proseSurfaceSpans([NAMED_BARE, "Words.", SHUT])[0].head).toBeNull();
+    expect(proseSpansIn([NAMED_BARE, "Words.", SHUT])[0]).toEqual({
+      open: 0,
+      close: 2,
+      key: "prose",
+      title: "Chapter one",
+      bare: true,
+    });
+  });
+
+  it("names one block and not the one beside it", () => {
+    // THE FLAG IS PER BLOCK, like the name and the number: a note may hold one
+    // block with a head and one without, and the ordinal still counts every
+    // block in the file.
+    const two = [OPEN, "One.", SHUT, "", BARE, "Two.", SHUT];
+    expect(proseSurfaceSpans(two)).toEqual([
+      { from: 1, to: 1, head: "Prose" },
+      { from: 5, to: 5, head: null },
+    ]);
+    // AND IN THE OTHER ORDER, which is what says the flag is read off each
+    // opener rather than carried between them: a block's answer must not
+    // outlive the block it was written on.
+    const flip = [BARE, "One.", SHUT, "", OPEN, "Two.", SHUT];
+    expect(proseSurfaceSpans(flip)).toEqual([
+      { from: 1, to: 1, head: null },
+      { from: 5, to: 5, head: "Prose 2" },
+    ]);
+  });
+
+  it("puts no attribute on the line at all, rather than an empty one", () => {
+    // `data-ca-prose-head=""` WOULD STILL MATCH THE STYLESHEET, whose selector
+    // asks for the attribute — see the 1.0.75 rule above — so the hairline and
+    // the padding would be drawn over nothing at the top of the writing. Both
+    // painters skip it instead: reading mode removes it, and the editor's
+    // decoration never carries it.
+    const body = fnBody("proseIn", "prose-surface");
+    expect(body).toContain("n === span.from && span.head !== null");
+    expect(fnBody("paintProse", "prose-surface")).toContain(
+      "if (mark.head) el.setAttr(PROSE_HEAD_ATTR, mark.head);"
+    );
+  });
+
+  it("hands the editor's decoration a head that may be null", () => {
+    // ONE TYPE THROUGH BOTH PAINTERS. `livePreviewSpans` widens the run to the
+    // blank line above a table or a `$$`, so a head declared `string` here
+    // would have been a cast at exactly the place the two shapes meet.
+    expect(livePreviewSpans([BARE, "Words.", SHUT])).toEqual([
+      { from: 1, to: 1, head: null },
+    ]);
+    expect(readCode("prose-surface")).toContain(
+      "{ from: number; to: number; head: string | null }[]"
+    );
   });
 });

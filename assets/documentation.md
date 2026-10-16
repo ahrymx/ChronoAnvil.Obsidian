@@ -669,6 +669,15 @@ one character of markup and nothing about your writing; the head has no fold
 arrow, because folding a prose block would hide lines of your own file and
 ChronoAnvil never does that in Live Preview.
 
+**And you can turn the head off.** The Prose row's **Show the title** tick is
+the same choice every other section makes with **Show as widget**: untick it and
+that block keeps its card and loses the title row above it. It is per block, so
+one block on a note can wear a head while the next does not, and it keeps
+whatever name you gave it — tick it back and your own word is still there.
+Blocks show their head unless you say otherwise, so nothing on any note you
+already have changes. A block on a note written before those markers existed has
+no edge to draw one on, and the row says so instead of offering the tick.
+
 Nothing is put inside a fence to do it. Your writing is still ordinary markdown
 in the file: headings, links, tasks, callouts, tables and code blocks behave
 exactly as they did, the outline still lists your headings, and the card is gone
