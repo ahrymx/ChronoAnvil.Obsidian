@@ -33,7 +33,7 @@ import {
   moveTargets,
   moveValue,
   prunedSelection,
-  removableKinds,
+  removalBlock,
   selectionLabel,
   targetOf,
 } from "../src/ui/widgets/below-edit";
@@ -1013,54 +1013,61 @@ describe("how the foot is drawn", () => {
 // 'what's below', but only if it has no entries."*
 //
 // TWO QUESTIONS, AND THE SUITE KEEPS THEM APART because the code does. Whether
-// a group may be OFFERED a removal is about this card and is answered on every
-// render — `removableKinds`. Whether the removal may HAPPEN is about the whole
-// journal and is answered once, at the press — `kindRemovalRefusal`. A card
-// showing no Lessons is not a journal with no Lessons, and a suite that tested
-// only the first would be pinning a door that declassifies notes.
+// a group's removal is LIVE is about this card and is answered on every render —
+// `removalBlock`. Whether the removal may HAPPEN is about the whole journal and
+// is answered once, at the press — `kindRemovalRefusal`. A card showing no
+// Lessons is not a journal with no Lessons, and a suite that tested only the
+// first would be pinning a door that declassifies notes.
+//
+// IT WAS A LIST OF IDS UNTIL 1.0.73 (`removableKinds`), which could say who may
+// and not why the rest may not. The reader asked for the ✕ to be greyed rather
+// than omitted, and a dimmed control with nothing to say is the omission with
+// extra pixels — so the rule now answers with a REASON.
 
-describe("which groups are offered a removal", () => {
-  it("offers an empty titled group", () => {
-    expect(
-      removableKinds([{ kindId: "decision", rows: 0, titled: true }])
-    ).toEqual(["decision"]);
+describe("whether a group's removal is live", () => {
+  it("is live for an empty titled group", () => {
+    expect(removalBlock({ kindId: "decision", rows: 0, titled: true })).toBeNull();
   });
 
-  it("withholds one with entries in it, which is the reader's own condition", () => {
-    expect(
-      removableKinds([
-        { kindId: "update", rows: 4, titled: true },
-        { kindId: "decision", rows: 0, titled: true },
-      ])
-    ).toEqual(["decision"]);
+  it("is blocked by entries in it, which is the reader's own condition", () => {
+    expect(removalBlock({ kindId: "update", rows: 4, titled: true })).toBe("notes");
   });
 
-  it("withholds a group with no head to hang it on", () => {
-    // A fence composed without `header:2:` lines draws a table under the
-    // section's own bar and nothing names the type — so there is nowhere to put
-    // the control and no way to say which type it would take.
-    expect(
-      removableKinds([{ kindId: "decision", rows: 0, titled: false }])
-    ).toEqual([]);
+  it("is blocked on a card that lists one type", () => {
+    // A fence composed without `header:2:` lines is the one-type card — groups
+    // get heads only where there are several — so removing it would leave the
+    // card with no table at all.
+    expect(removalBlock({ kindId: "decision", rows: 0, titled: false })).toBe(
+      "solo"
+    );
   });
 
-  it("withholds a bare `kind-table:` naming no type at all", () => {
-    expect(removableKinds([{ kindId: "", rows: 0, titled: true }])).toEqual([]);
+  it("is blocked for a bare `kind-table:` naming no type at all", () => {
+    expect(removalBlock({ kindId: "", rows: 0, titled: true })).toBe("unnamed");
+  });
+
+  it("names the reason an unnamed group cannot be removed before any other", () => {
+    // ORDER IS LOAD-BEARING, because the sentences are not interchangeable: a
+    // group with no id cannot be NAMED in one of them, so that arm has to win
+    // over both the others even when they also apply.
+    expect(removalBlock({ kindId: "", rows: 3, titled: false })).toBe("unnamed");
+    expect(removalBlock({ kindId: "decision", rows: 3, titled: false })).toBe(
+      "solo"
+    );
   });
 
   it("is a rule about the card, and says nothing about the vault", () => {
-    // THE LINE THIS SUITE IS DRAWN AT. `removableKinds` cannot see a note, so
-    // it cannot be the thing that decides a removal is safe — it decides only
-    // that a control is worth drawing. The refusal below is the other half, and
-    // the pair is asserted together so neither can quietly grow into the other.
+    // THE LINE THIS SUITE IS DRAWN AT. `removalBlock` cannot see a note, so it
+    // cannot be the thing that decides a removal is safe — it decides only what
+    // the control says. The refusal below is the other half, and the pair is
+    // asserted together so neither can quietly grow into the other.
     expect(readCode("ui/widgets/below-edit")).not.toContain("getMarkdownFiles");
     // IT STAYED HERE WHEN ITS CONTROL LEFT (1.0.69). The ✕ is a row in the Note
     // types window now and `promptRemoveKind` is called from there, but the rule
-    // is still this module's: `removableKinds` is the one answer to "may this
-    // group be offered a removal", exported rather than re-derived, so the
-    // window and 1.0.24's gate cannot drift apart.
-    expect(readSrc("ui/widgets/below-edit")).toContain("export function removableKinds(");
-    expect(readCode("ui/note-types-window")).toContain("removableKinds(counted)");
+    // is still this module's — exported rather than re-derived, so the window
+    // and 1.0.24's gate cannot drift apart.
+    expect(readSrc("ui/widgets/below-edit")).toContain("export function removalBlock(");
+    expect(readCode("ui/note-types-window")).toContain("removalBlock(row)");
     expect(readCode("ui/note-types-window")).toContain("promptRemoveKind(");
   });
 });

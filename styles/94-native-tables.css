@@ -1816,6 +1816,21 @@ body.is-mobile .ca-list.is-editing {
   opacity: 0.35;
   cursor: default;
 }
+/* THE ✕ THAT CANNOT GO YET (1.0.73). It is drawn on every row now and dimmed
+   where the answer is no, so the row says which type is the special case
+   instead of leaving a gap for the reader to interpret.
+
+   THE HOVER HAS TO BE UNDONE AS WELL AS THE INK: `.ca-tags-remove:hover` paints
+   this control red, which on a dead one promises a destructive act it will not
+   perform. Two classes and a pseudo outrank one class and a pseudo, so the
+   override needs no `!important`. */
+.ca-note-type-remove.is-static,
+.ca-note-type-remove.is-static:hover {
+  opacity: 0.35;
+  color: var(--text-faint);
+  background: none;
+  cursor: default;
+}
 .ca-note-type-reset {
   align-self: flex-start;
   margin-left: 5.5em;

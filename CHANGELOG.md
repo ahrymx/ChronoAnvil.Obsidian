@@ -5,6 +5,19 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.73] - 2026-10-16
+
+### Changed
+
+- **The remove ✕ in the Note types window is greyed out instead of left out.**
+  Asked for as *"grey out the remove 'x' button instead of omittence of it"* —
+  a card listing a type with notes and a type without drew the ✕ on one row and
+  nothing on the other, which reads as a control that failed to render rather
+  than an answer. Every row now carries it, dimmed where it cannot act and
+  carrying the reason as its name: the type still has notes on this card, it is
+  the only type the note lists, or the card names a type that cannot be
+  identified. A dimmed ✕ refuses the press as well as the eye.
+
 ## [1.0.72] - 2026-10-15
 
 ### Added

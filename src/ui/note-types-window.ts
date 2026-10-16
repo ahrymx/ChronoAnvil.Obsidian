@@ -58,7 +58,12 @@ import type ChronoAnvilPlugin from "../main";
 import { getFile, plural } from "../core/util";
 import { addKindToJournal, promptRemoveKind } from "../journals/kind-create";
 import { ROW_NOTE_ATTR } from "./tables";
-import { removableKinds, type BelowFoot, type KindHost } from "./widgets/below-edit";
+import {
+  removalBlock,
+  type BelowFoot,
+  type KindHost,
+  type RemovalBlock,
+} from "./widgets/below-edit";
 import { notify } from "../core/notify";
 import { ratingChoices } from "../core/settings-editors";
 import type { JournalKind, JournalType } from "../journals/journal";
@@ -125,17 +130,61 @@ export function movedCols(
 export interface NoteTypeSeed {
   kind: JournalKind;
   rows: number;
-  // Whether the ✕ is drawn. NOT `rows === 0` read again here: `removableKinds`
-  // is the rule, it also refuses an untitled group and a kind the fence names
-  // but the journal has lost, and a second derivation would be a second answer
-  // to the question 1.0.24 settled.
-  removable: boolean;
+  // WHY the ✕ is dead, or null where it is live. NOT `rows === 0` read again
+  // here: `removalBlock` is the rule — it also refuses the one-type card and a
+  // group naming no type — and a second derivation would be a second answer to
+  // the question 1.0.24 settled.
+  blocked: RemovalBlock | null;
+}
+
+// What the ✕ says it would do, or why it would not.
+//
+// ── THE CONTROL IS DRAWN EITHER WAY, AS OF 1.0.73 ───────────────────────
+//
+// *"Grey out the remove 'x' button instead of omittence of it."* 1.0.69 omitted
+// it, on `discoverability`'s rule that a control which opens and then explains
+// it cannot help is worse than no control. The reader's report is the other side
+// of that rule and it is the stronger one here: *"see how lessons is missing the
+// x button? that's because lessons has notes, but practices is empty"* — an
+// absence cannot be read, so a reader comparing two rows has to GUESS which of
+// the two is the special case and why.
+//
+// WHICH IS ALSO WHAT ITS SIBLING ALREADY DOES. The Attachments categories window
+// draws its ✕ dimmed with *"… still has 3 items — remove them first"*, and these
+// two windows are meant to read as one feature (1.0.49 §3 renamed a whole
+// section for that). The narrow case the "nothing dead is drawn" rule allows is
+// exactly this one: a control whose answer is momentarily no, saying so.
+//
+// A SENTENCE PER REASON, because "cannot be removed" would leave the reader with
+// the same guess the absence did.
+export function removalHint(
+  blocked: RemovalBlock | null,
+  label: string,
+  rows: number
+): string {
+  const name = plural(label);
+  switch (blocked) {
+    case null:
+      return `Remove ${name} from this note`;
+    case "notes":
+      return `${name} still has ${rows} note${
+        rows === 1 ? "" : "s"
+      } on this note — move or remove them first`;
+    case "solo":
+      return `${name} is the only note type this note lists — removing it would leave the card with nothing to show`;
+    default:
+      // A bare `kind-table:` line. `buildNoteTypesCog` draws no row for a group
+      // whose type the journal does not have, so the window never shows this —
+      // it is here because the rule has three arms and a hint that silently
+      // fell through would be the empty tooltip this round exists to remove.
+      return "This card names a note type that cannot be identified";
+  }
 }
 
 interface Row {
   kind: JournalKind;
   rows: number;
-  removable: boolean;
+  blocked: RemovalBlock | null;
   // The page's answer for this type, as this sitting has it. Seeded from the
   // note and handed back by Save where it differs from the note's.
   over: KindTableOverride;
@@ -176,7 +225,7 @@ export class NoteTypesWindow extends EditorModal {
       return {
         kind: s.kind,
         rows: s.rows,
-        removable: s.removable,
+        blocked: s.blocked,
         over,
         was: JSON.stringify(over),
       };
@@ -250,30 +299,33 @@ export class NoteTypesWindow extends EditorModal {
       this.renderBody();
     });
 
-    // ── AND THE REMOVAL, WHERE THERE IS NOTHING TO LOSE (1.0.24) ─────────
+    // ── AND THE REMOVAL, DRAWN EITHER WAY (1.0.24, then 1.0.73) ──────────
     //
-    // The gate is the count this row is already showing. A type with notes in
-    // it is not offered the control at all rather than offered it disabled:
-    // *"a menu that opens and then explains it cannot help is worse than no
-    // menu"*, which `discoverability.test.ts` holds for this surface too.
-    if (row.removable) {
-      const gone = head.createEl("button", {
-        cls: "ca-journal-btn-ghost ca-tags-remove ca-note-type-remove",
-        attr: { type: "button" },
-      });
-      setIcon(gone.createSpan({ cls: "ca-journal-btn-icon" }), "x");
-      const why = `Remove ${plural(row.kind.label)} from this note`;
-      gone.setAttr("aria-label", why);
-      gone.setAttr("title", why);
-      gone.addEventListener("click", () => {
-        // CLOSES FIRST. See the header: the act behind this asks its own
-        // question, and a confirmation that opens on top of an unsaved form is
-        // a reader being asked to agree to something while another window is
-        // still holding edits they have not committed.
-        this.close();
-        void this.removeKind(row.kind.id);
-      });
-    }
+    // The gate is the count this row is already showing, and as of 1.0.73 the
+    // control says so instead of vanishing — see `removalHint`, which is where
+    // the reader's report is quoted. Dimmed rather than hidden: *a control that
+    // vanishes on some rows and not others is harder to read than a quiet one*,
+    // which is the categories window's own sentence for the same ✕.
+    const gone = head.createEl("button", {
+      cls: "ca-journal-btn-ghost ca-tags-remove ca-note-type-remove",
+      attr: { type: "button" },
+    });
+    setIcon(gone.createSpan({ cls: "ca-journal-btn-icon" }), "x");
+    const can = row.blocked === null;
+    gone.disabled = !can;
+    gone.toggleClass("is-static", !can);
+    const why = removalHint(row.blocked, row.kind.label, row.rows);
+    gone.setAttr("aria-label", why);
+    gone.setAttr("title", why);
+    gone.addEventListener("click", () => {
+      if (!can) return;
+      // CLOSES FIRST. See the header: the act behind this asks its own
+      // question, and a confirmation that opens on top of an unsaved form is a
+      // reader being asked to agree to something while another window is still
+      // holding edits they have not committed.
+      this.close();
+      void this.removeKind(row.kind.id);
+    });
   }
 
   // ── THE ORDER THE CARD DRAWS THEM IN (1.0.72) ──────────────────────────
@@ -702,7 +754,6 @@ export function buildNoteTypesCog(
       rows: h.host.querySelectorAll(`[${ROW_NOTE_ATTR}]`).length,
       titled: h.head !== null,
     }));
-    const removable = new Set(removableKinds(counted));
     const seeds: NoteTypeSeed[] = [];
     for (const row of counted) {
       const kind = type.kinds.find((k) => k.id === row.kindId);
@@ -711,7 +762,7 @@ export function buildNoteTypesCog(
       // `prune` is the repair — and there is no kind to carry the answers, so a
       // row here would be a form over nothing.
       if (!kind) continue;
-      seeds.push({ kind, rows: row.rows, removable: removable.has(row.kindId) });
+      seeds.push({ kind, rows: row.rows, blocked: removalBlock(row) });
     }
     new NoteTypesWindow(plugin.app, plugin, type, path, seeds, () =>
       foot()?.pick()

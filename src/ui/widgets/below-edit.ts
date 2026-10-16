@@ -212,28 +212,47 @@ export function selectionLabel(n: number): string {
   return `${n} note${n === 1 ? "" : "s"} selected`;
 }
 
-// Which of a card's groups may be offered a removal, by id.
+// WHY one of a card's groups may not be offered a removal, or null where it may.
 //
 // EMPTY ON THIS CARD IS THE QUESTION THIS ONE ANSWERS, and it is the only one
-// asked on a render. A group with rows in it is a group whose note type plainly
-// has notes, and drawing a dead control over every one of them would be four
-// disabled buttons on a Study topic for a mode about selecting notes. Whether
-// the type is empty in the whole JOURNAL is a walk of the vault — asked once, at
-// the press, by `promptRemoveKind`, which is also where the refusal is worded.
+// asked on a render. Whether the type is empty in the whole JOURNAL is a walk of
+// the vault — asked once, at the press, by `promptRemoveKind`, which is also
+// where that refusal is worded.
 //
-// A GROUP WITH NO HEAD IS NOT OFFERED, because the control hangs on the title
-// and a card composed without `header:2:` lines has none. A group whose id is
-// empty is not offered either: a bare `kind-table:` names no type, so there is
-// nothing to remove and nothing to call it.
+// ── IT WAS A LIST OF IDS UNTIL 1.0.73, AND THE READER'S ASK IS WHY ───────
+//
+// *"Grey out the remove 'x' button instead of omittence of it … see how lessons
+// is missing the x button? that's because lessons has notes, but practices is
+// empty"*. A list of who MAY cannot say why the rest may not, and the whole
+// point of drawing the control disabled is the sentence on it — a dimmed ✕ with
+// no explanation is the omission with extra pixels.
+//
+// So one rule, three reasons, and the reasons are CODES rather than sentences:
+// the wording belongs with the surface that has the note type's name and its
+// count to put in it (`removalHint` in `note-types-window.ts`), and this stays
+// a pure function over three numbers.
+//
+// A GROUP WITH NO HEAD is the one-type card — `childrenParts` composes group
+// heads only where there are several types — so removing it would leave the card
+// with no table at all. A group whose id is empty is a bare `kind-table:`, which
+// names no type: there is nothing to remove and nothing to call it.
 //
 // PURE, AND OVER THE COUNT RATHER THAN THE DOM, so the rule is testable without
 // a browser — the file's own standard for `moveTargets` and `prunedSelection`.
-export function removableKinds(
-  groups: readonly { kindId: string; rows: number; titled: boolean }[]
-): string[] {
-  return groups
-    .filter((g) => g.titled && g.kindId !== "" && g.rows === 0)
-    .map((g) => g.kindId);
+export type RemovalBlock = "unnamed" | "solo" | "notes";
+
+export function removalBlock(group: {
+  kindId: string;
+  rows: number;
+  titled: boolean;
+}): RemovalBlock | null {
+  // IN THIS ORDER, because the sentences are not interchangeable: a group with
+  // no id cannot be named in one, and "it is the only type here" is true of a
+  // one-type card whether or not that type has notes.
+  if (group.kindId === "") return "unnamed";
+  if (!group.titled) return "solo";
+  if (group.rows > 0) return "notes";
+  return null;
 }
 
 // The destinations a set of notes can be sent to, in the order they are offered.

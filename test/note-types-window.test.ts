@@ -36,7 +36,7 @@
 
 import { describe, expect, it } from "vitest";
 import { cssRule, readCode, readCss, readSrc } from "./sources";
-import { COL_REMOVE, movedCols } from "../src/ui/note-types-window";
+import { COL_REMOVE, movedCols, removalHint } from "../src/ui/note-types-window";
 
 const win = () => readSrc("ui/note-types-window");
 const code = () => readCode("ui/note-types-window");
@@ -167,6 +167,113 @@ describe("what each note type's row says before it is opened", () => {
     expect(c).toContain("private open_: string | null = null;");
     expect(c).toContain("this.open_ = open ? null : row.kind.id;");
     expect(c).toContain("if (this.open_ === row.kind.id) this.renderDetail(el, row);");
+  });
+});
+
+// ── the ✕, which is drawn either way as of 1.0.73 ───────────────────────
+//
+// *"Grey out the remove 'x' button instead of omittence of it … see how lessons
+// is missing the x button? that's because lessons has notes, but practices is
+// empty"*.
+//
+// 1.0.69 OMITTED IT, on `discoverability`'s rule that a control which opens and
+// then explains it cannot help is worse than no control. The report is the other
+// side of that rule and it is the stronger one here: an absence cannot be read,
+// so a reader comparing two rows is left to guess which is the special case and
+// why. Its sibling window — Attachments categories — had always drawn its ✕
+// dimmed with the reason on it.
+
+describe("the ✕ that says why it cannot go yet", () => {
+  it("is drawn on every row, dimmed where the answer is no", () => {
+    const c = code();
+    expect(c).toContain("const can = row.blocked === null;");
+    expect(c).toContain("gone.disabled = !can;");
+    expect(c).toContain('gone.toggleClass("is-static", !can);');
+    // NOT behind a condition any more. The old shape was `if (row.removable) {`
+    // around the whole control, which is exactly what the reader reported.
+    expect(c).not.toContain("if (row.removable)");
+    expect(c).not.toContain("removable");
+  });
+
+  it("refuses the press as well as dimming it", () => {
+    // `disabled` is the browser's half and is enough for a pointer; the guard
+    // is for every other way a click arrives — a synthetic event, a keyboard on
+    // a host that re-enables it, an `is-static` left on by a later edit.
+    const c = code();
+    const at = c.indexOf('gone.addEventListener("click"');
+    expect(at).toBeGreaterThan(-1);
+    expect(c.slice(at, at + 160)).toContain("if (!can) return;");
+  });
+
+  it("says what it would do, where it can do it", () => {
+    expect(removalHint(null, "Lesson", 0)).toBe("Remove Lessons from this note");
+  });
+
+  it("counts the notes in the way, because that is the condition", () => {
+    // THE SENTENCE THE READER'S REPORT ASKED FOR. "Cannot be removed" would
+    // leave them with the same guess the absence did, so the reason names the
+    // count they can see in the slot beside it.
+    expect(removalHint("notes", "Lesson", 3)).toBe(
+      "Lessons still has 3 notes on this note — move or remove them first"
+    );
+    expect(removalHint("notes", "Lesson", 1)).toBe(
+      "Lessons still has 1 note on this note — move or remove them first"
+    );
+  });
+
+  it("says the other two reasons in their own words", () => {
+    // A sentence per reason. One blocked ✕ reading the same words as another
+    // would be the omission again, told rather than shown.
+    expect(removalHint("solo", "Film", 0)).toContain("the only note type");
+    expect(removalHint("unnamed", "", 0)).toContain("cannot be identified");
+    const said = new Set([
+      removalHint(null, "Lesson", 0),
+      removalHint("notes", "Lesson", 2),
+      removalHint("solo", "Lesson", 0),
+      removalHint("unnamed", "Lesson", 0),
+    ]);
+    expect(said.size).toBe(4);
+  });
+
+  it("names the type in the plural, as the row above it does", () => {
+    expect(removalHint("notes", "Practice", 2)).toContain("Practices");
+  });
+
+  it("puts the sentence in both names a button has", () => {
+    // An icon button's `aria-label` is the ONLY name a screen reader has, and a
+    // disabled control is exactly the one a reader needs the reason for.
+    const c = code();
+    expect(c).toContain(
+      "const why = removalHint(row.blocked, row.kind.label, row.rows);"
+    );
+    expect(c).toContain('gone.setAttr("aria-label", why);');
+    expect(c).toContain('gone.setAttr("title", why);');
+  });
+
+  it("asks the card's rule for the reason instead of re-deriving it", () => {
+    // 1.0.24's gate: `removalBlock` is the one answer, and a `row.rows === 0`
+    // read again in the window would be a second one that could disagree.
+    const c = code();
+    expect(c).toContain("blocked: removalBlock(row)");
+    // Scoped to the control, because the row's own COUNT legitimately reads
+    // `row.rows === 0` one line up — that is the word "empty", not a gate.
+    const at = c.indexOf("const can = row.blocked === null;");
+    const block = c.slice(at, c.indexOf('gone.setAttr("title", why);'));
+    // The count is still PASSED, because the sentence names it; what must not
+    // be here is a second COMPARISON deciding whether the control is live.
+    expect(block).toContain("row.rows)");
+    expect(block).not.toMatch(/row\.rows\s*[=<>]/);
+    expect(block).not.toContain("titled");
+  });
+
+  it("is dimmed in the stylesheet, and its red hover is undone with it", () => {
+    // `.ca-tags-remove:hover` paints this control red. On a dead one that
+    // promises a destructive act it will not perform — which is worse than the
+    // omission, not better.
+    const rule = cssRule(".ca-note-type-remove.is-static");
+    expect(rule).toContain("opacity: 0.35");
+    expect(rule).toContain("cursor: default");
+    expect(readCss()).toContain(".ca-note-type-remove.is-static:hover");
   });
 });
 
