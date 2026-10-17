@@ -734,7 +734,9 @@ where the block does however much space you have left at the top of it — delet
 the first line and nothing moves but that line. The one blank row the plugin
 writes under the title and above the closing marker is the gap between the head
 and your writing, and sits outside the card; anything beyond that you put there
-yourself, and it stays inside, where you typed it.
+yourself, and it stays inside, where you typed it. Reading mode draws it from
+the same two markers, so a block reads as the same card whichever mode you are
+in, however far your writing sits from either end of it.
 
 You can also write the list without leaving the change window. The cog on the
 block's own head and the Prose row in **Note: edit sections…** both give you a

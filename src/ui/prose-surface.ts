@@ -89,8 +89,10 @@ import { protectLines, type LineSpan } from "./protected-lines";
 export const PROSE_BLOCK_CLASS = "ca-prose-block";
 export const PROSE_FIRST_CLASS = "is-prose-first";
 export const PROSE_LAST_CLASS = "is-prose-last";
-/** The opening marker's own block, which holds the card an empty block shows. */
+/** The opening marker's own block, which carries the card's top edge and bar. */
 export const PROSE_OPENER_CLASS = "ca-prose-opener";
+/** The closing marker's own block, which carries the card's bottom edge. */
+export const PROSE_CLOSER_CLASS = "ca-prose-closer";
 
 // ── THE HEAD IS AN ATTRIBUTE AND THE STYLESHEET DRAWS IT (1.0.75) ────────
 //
@@ -168,11 +170,15 @@ export interface ProseMark {
   member: boolean;
   first: boolean;
   last: boolean;
-  // WHETHER THIS IS THE OPENING MARKER'S OWN BLOCK (1.0.84), which is a
-  // different claim from `first` and the stylesheet needs both: `first` says
-  // the card's top edge is here, and this says the card has nothing in it but
-  // its bar because the writing is elsewhere — or is not there at all.
+  // WHICH MARKER'S OWN BLOCK THIS IS, IF EITHER (1.0.84, 1.0.86). `first` and
+  // `last` say where the card's edges are drawn, which is the stylesheet's
+  // question; these say which row of the FILE is drawing them, which is the
+  // one the margins need — the air under the bar belongs to the block after
+  // the opener, and the air above the closing edge to the block before the
+  // closer. They move together with `first`/`last` today and are not the same
+  // claim: an edge is a look, a marker is a place.
   opener: boolean;
+  closer: boolean;
   /** The head this block wears, on the first row of it only. */
   head: string | null;
   /** Which prose block of the note it is, or 0 for a run that is in none. */
@@ -193,111 +199,76 @@ const NOT_PROSE: ProseMark = {
   first: false,
   last: false,
   opener: false,
+  closer: false,
   head: null,
   nth: 0,
   title: null,
 };
 
-// And the one block the post-processor is handed that is not the reader's: the
-// opening marker, which is where an emptied block's bar has to live.
+// Where a rendered block of `lineStart..lineEnd` stands in this note's prose.
 //
-// 1.0.82 gave a block whose writing has been backspaced away its card back, and
-// the editor draws it on the blank row the cursor is sitting on. READING MODE
-// HAS NO SUCH ROW — a blank line renders nothing, so nothing between the two
-// markers is ever handed to the painter — and 1.0.83 put the card on the opener
-// for that case. *"that works but an empty prose block still hides in reading
-// mode."*
+// ── THE MARKERS OWN THE CARD'S EDGES (1.0.86) ────────────────────────────
 //
-// AND THEN TYPING INTO THAT BLOCK DREW THE HEAD TWICE, which is the fact this
-// whole shape now answers:
+// Reading mode is handed one RENDERED block at a time, and the thing that makes
+// it different from the editor is what it is NOT handed: a blank line renders
+// nothing. So any edge this function hangs on a row of the WRITING can fall on
+// a row nobody draws, and then nobody carries it. Both halves of that failed in
+// one round — a block with blank rows above its first words lost its head, and
+// one with blank rows below its last words lost its bottom edge — because
+// 1.0.85 let the span reach those rows, which is right for the editor, where
+// every row is drawn, and unanswerable here.
 //
-//   OBSIDIAN RE-RENDERS A SECTION WHEN THAT SECTION'S OWN LINES CHANGE. The
-//   opener's line does not change when a word appears underneath it, so the
-//   painter is never called for it again, and whatever it painted last time
-//   stays on screen. A card that asks "is the block below me empty?" is asking
-//   a question whose answer can change while nobody is listening.
+// SO THE TWO MARKERS CARRY THE TWO ENDS. They are always rendered — an HTML
+// comment is a block of its own that draws nothing — they are always exactly
+// one row, and they are the only rows of a prose block that cannot move
+// without the block itself moving. The opener takes the card's top edge and
+// the bar; the closer takes the bottom edge; every rendered block between them
+// is a member and carries neither. Nothing here asks where the writing starts
+// or stops, so nothing here can be wrong about it.
 //
-// SO THE OPENER IS ALWAYS THE OPENER, emptiness not consulted: it carries the
-// block's card and the block's bar on every note, and the stylesheet withdraws
-// it where the block has writing of its own to carry them (`:has(+ …)` in
-// 70-section-surface.css). The paint depends on the opener's OWN line and the
-// ordinal, both of which it is re-rendered for; the part that depends on the
-// writing is CSS, which re-decides itself the instant a sibling appears or
-// goes, with no render to wait for.
+// AND THAT IS ALSO WHAT MAKES IT STALE-PROOF, which 1.0.84 bought at the price
+// of a stylesheet rule and is now simply true: Obsidian re-renders a section
+// when that section's own lines change, and every answer below is a question
+// about the element's own lines. A word typed under the opener changes nothing
+// about the opener. The `:has(+ .ca-prose-block)` withdrawal 1.0.84 needed is
+// gone with the duplicate it was withdrawing — the writing never carries a bar
+// to be a duplicate OF.
 //
-// AND IT MUST HOLD NONE OF THE WRITING, which is the second half of the test
-// and not a flourish: a rendered block REACHING BACK over the opener is a case
-// this file has handled since 1.0.37 — a reader who deletes the blank line the
-// composer leaves gives the first paragraph a range that starts on the marker —
-// and such an element has the reader's words in it. It is the writing's first
-// block and takes the writing's branch; only an element that stops before the
-// writing begins is the bare opener. The opener's OWN element always passes,
-// whatever the block holds, because `from` is past `open` by construction.
+// 1.0.78's REFUSAL IS THE ONE THING THIS REVERSES, and it is worth saying
+// plainly rather than quietly: *"the marker's own line is still not the host …
+// hosting on it would mean one owner in one mode and a second mechanism in the
+// other."* Two modes DO own it differently, and always did — Live Preview has
+// no marker row at all (`marker-lines.ts` replaces it and the break before it),
+// so its bar is a block widget and this function is not consulted. The refusal
+// was written to avoid a split that already existed, and three rounds of edge
+// cases were the cost of keeping reading mode's chrome on the reader's words.
 //
-// THIS IS NOT 1.0.78's REFUSAL REVERSED. That paragraph refused the marker as
-// the host of the bar a reader sees over their writing, and it still is not
-// one: where there is writing, the writing's first block carries the visible
-// bar exactly as it has since 1.0.78, and this card is withdrawn. What the
-// opener hosts is the case that has no writing at all.
-function proseOpenerOn(
-  spans: readonly ProseSurface[],
-  lineStart: number,
-  lineEnd: number
-): ProseSurface | undefined {
-  return spans.find(
-    (s) => s.open >= lineStart && s.open <= lineEnd && lineEnd < s.from
-  );
-}
-
-// Where a block of `lineStart..lineEnd` stands in this note's prose.
-//
-// INCLUSIVE AT BOTH ENDS AND OVERLAP-BASED, because a rendered block is a RANGE
-// of lines and the question is whether it is inside one — a paragraph, a list
-// and a fenced code block are each one block spanning several lines, and a
-// table is one block spanning as many as it has rows.
-//
-// `<=` / `>=` ON THE ENDS RATHER THAN `===`, for the case that actually occurs:
-// the composer writes a blank line after the opener, so the first block of the
-// writing starts at `span.from` exactly — but a reader who deletes that blank
-// makes it start one line earlier and the block would stop carrying the
-// rounding. The wider test is right for the same reason `computeSectionRuns`
-// falls back to index 0: the ends belong to whatever block reaches them.
+// INCLUSIVE AT BOTH ENDS AND OVERLAP-BASED, which is unchanged: a rendered
+// block is a RANGE of lines — a paragraph, a list and a fenced code block are
+// each one block spanning several rows, and a table is one block spanning as
+// many as it has rows — so an element that touches the opener's row is the
+// opener's element even when it holds writing too, which is what a reader who
+// deletes the composer's blank line has.
 export function proseMarkFor(
   text: string,
   lineStart: number,
   lineEnd: number
 ): ProseMark {
   const spans = proseSurfaceSpans(text.split("\n"));
-  // THE OPENER IS ASKED FIRST, because it is the one element whose answer does
-  // not depend on anything below it — and because a block with one line of
-  // writing has an opener that `lineStart <= s.to && lineEnd >= s.from` would
-  // otherwise swallow into the writing's own branch.
-  const opener = proseOpenerOn(spans, lineStart, lineEnd);
-  if (opener) {
-    // BOTH ENDS, so it is a closed card rather than a top edge with nothing
-    // under it: standing alone is the whole case it exists for.
-    return {
-      member: true,
-      first: true,
-      last: true,
-      opener: true,
-      head: opener.head,
-      nth: opener.nth,
-      title: opener.title,
-    };
-  }
-  const span = spans.find((s) => lineStart <= s.to && lineEnd >= s.from);
+  const span = spans.find((s) => lineEnd >= s.open && lineStart <= s.close);
   if (!span) return NOT_PROSE;
-  const first = lineStart <= span.from;
+  const opener = lineStart <= span.open && lineEnd >= span.open;
+  const closer = lineStart <= span.close && lineEnd >= span.close;
   return {
     member: true,
-    first,
-    opener: false,
-    last: lineEnd >= span.to,
-    // ONLY THE FIRST ROW CARRIES IT, which is what makes the head one head: the
-    // bar is prepended into the block that draws the card's top edge, and a
-    // head on every row would be one bar per paragraph.
-    head: first ? span.head : null,
+    first: opener,
+    last: closer,
+    opener,
+    closer,
+    // ONLY THE OPENER CARRIES IT, which is what makes one head: the bar is
+    // prepended into the block that draws the card's top edge, and a head on
+    // every row would be one bar per paragraph.
+    head: opener ? span.head : null,
     nth: span.nth,
     title: span.title,
   };
@@ -327,6 +298,7 @@ export function paintProse(
   el.toggleClass(PROSE_FIRST_CLASS, mark.first);
   el.toggleClass(PROSE_LAST_CLASS, mark.last);
   el.toggleClass(PROSE_OPENER_CLASS, mark.opener);
+  el.toggleClass(PROSE_CLOSER_CLASS, mark.closer);
   // AND THE FOLD IS READ FROM THE RECORD ON EVERY PAINT (1.0.79), which is what
   // makes a folded block still folded after a re-render, a reopen or a restart
   // — the chevron's own sibling walk is the same answer arriving sooner. A row

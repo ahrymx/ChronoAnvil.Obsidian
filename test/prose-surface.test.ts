@@ -10,6 +10,7 @@ import {
   cssRule,
   cssRules,
   fnBody,
+  readCss,
   readCode,
   readSrc,
   styleSheets,
@@ -120,186 +121,216 @@ describe("what a prose surface covers", () => {
 });
 
 describe("where a rendered block stands in the prose", () => {
+  // THE MARKERS OWN THE CARD'S EDGES (1.0.86). Reading mode is handed rendered
+  // blocks, and a blank line renders none — so an edge hung on a row of the
+  // WRITING can fall on a row nobody draws. Both halves of that failed in one
+  // round: a block with blank rows above its first words lost its head, and one
+  // with blank rows below its last words lost its bottom edge. The two markers
+  // are always rendered, always one row, and cannot move without the block
+  // moving.
   const TEXT = note(
     "---",
     "type: lesson",
     "---",
     "",
-    OPEN,
+    OPEN,            // 4
     "",
-    "## Overview",
+    "## Overview",   // 6
     "",
-    "A paragraph.",
+    "A paragraph.",  // 8
     "",
-    "## Notes",
+    "## Notes",      // 10
     "",
-    "Another.",
+    "Another.",      // 12
     "",
-    SHUT,
+    SHUT,            // 14
     "",
     "%% chronoanvil-graph %%"
   );
 
   const mark = (from: number, to: number) => proseMarkFor(TEXT, from, to);
 
-  it("carries the first end on the block the writing starts in", () => {
-    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose 1", nth: 1 , title: null, opener: false });
-  });
-
-  it("carries the last end on the block it ends in", () => {
-    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null, nth: 1 , title: null, opener: false });
-  });
-
-  it("carries neither in the middle", () => {
-    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null, opener: false });
-    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null, opener: false });
-  });
-
-  it("carries both when one block is the whole of it", () => {
-    // A paragraph spanning every line of the writing, which is what a reader
-    // who has not used a heading has.
-    expect(proseMarkFor(note(OPEN, "One line.", SHUT), 1, 1)).toEqual({
-      member: true,
-      first: true,
-      last: true,
-      opener: false,
-      head: "Prose 1",
-      nth: 1,
-      title: null,
-    });
-  });
-
-  it("gives the opening marker's own block the card, writing or not (1.0.84)", () => {
-    // OBSIDIAN RE-RENDERS A SECTION WHEN ITS OWN LINES CHANGE, and the opener's
-    // line does not change when a word appears below it. So a card that asked
-    // "is this block empty?" went stale the moment the reader typed, and drew
-    // the head twice — once empty, once over the writing. The opener is simply
-    // always the opener; the stylesheet withdraws it where the writing carries
-    // a bar of its own.
-    const empty = note(OPEN, "", SHUT);
-    expect(proseMarkFor(empty, 0, 0)).toEqual({
-      member: true,
-      first: true,
-      last: true,
-      opener: true,
-      head: "Prose 1",
-      nth: 1,
-      title: null,
-    });
-    // THE SAME ANSWER WITH WRITING UNDER IT — the one assertion that says this
-    // does not depend on what the rest of the block holds.
-    const written = note(OPEN, "", "Words.", "", SHUT);
-    expect(proseMarkFor(written, 0, 0)).toEqual({
-      member: true,
-      first: true,
-      last: true,
-      opener: true,
-      head: "Prose 1",
-      nth: 1,
-      title: null,
-    });
-    // And the closing marker is not a second host.
-    expect(proseMarkFor(empty, 2, 2).member).toBe(false);
-    expect(proseMarkFor(written, 4, 4).member).toBe(false);
-  });
-
-  it("leaves the writing's own first block carrying the bar (1.0.84)", () => {
-    // 1.0.78's refusal is NOT reversed: where there is writing, the visible bar
-    // is still the one on the writing's first block, and the opener's card is
-    // the duplicate the stylesheet takes away.
-    const written = note(OPEN, "", "Words.", "", SHUT);
-    expect(proseMarkFor(written, 2, 2)).toEqual({
-      member: true,
-      first: true,
-      last: true,
-      opener: false,
-      head: "Prose 1",
-      nth: 1,
-      title: null,
-    });
-  });
-
-  it("gives a block that reaches back over its opener the writing's branch (1.0.84)", () => {
-    // A reader who deletes the composer's blank line gives the first paragraph
-    // a range that starts on the marker. That element HOLDS WORDS, so it is the
-    // writing's first block and not the bare opener — the opener's own element
-    // stops before the writing, which is what tells the two apart.
-    const tight = note(OPEN, "One.", "", "Two.", SHUT);
-    expect(proseMarkFor(tight, 0, 1)).toEqual({
+  it("carries the top edge and the head on the opening marker", () => {
+    expect(mark(4, 4)).toEqual({
       member: true,
       first: true,
       last: false,
-      opener: false,
+      opener: true,
+      closer: false,
       head: "Prose 1",
       nth: 1,
       title: null,
     });
   });
 
-  it("withdraws the opener's card in CSS, not in the painter (1.0.84)", () => {
-    // THE PAINTER CANNOT BE THE ONE TO DO IT. Obsidian re-renders a section
-    // when that section's own lines change, so the opener is never repainted
-    // when a word appears below it — the first cut asked the painter and drew
-    // the head twice. A sibling selector re-decides itself the instant the
-    // writing's block appears or goes, with no render to wait for.
-    expect(cssRule(".ca-prose-opener:has(+ .ca-prose-block)")).toContain("display: none");
-    // AND THE PAINT ITSELF ASKS NOTHING ABOUT THE WRITING: the class goes on
-    // every opener, which is what makes it safe to leave on a stale element.
-    const body = fnBody("paintProse", "prose-surface");
-    expect(body).toContain("el.toggleClass(PROSE_OPENER_CLASS, mark.opener);");
-    expect(fnBody("proseOpenerOn", "prose-surface")).not.toContain("trim()");
-  });
-
-  it("gives an emptied bare block's opener nothing either (1.0.83)", () => {
-    // `#bare` produces no span at all, which is 1.0.82's line kept: no name, no
-    // cog, no chevron, so an empty one is a band of colour with nothing in it.
-    const bare = note("<!--chronoanvil-prose#bare-->", "", SHUT);
-    expect(proseMarkFor(bare, 0, 0).member).toBe(false);
-    expect(proseMarkFor(bare, 1, 1).member).toBe(false);
-    expect(proseMarkFor(bare, 2, 2).member).toBe(false);
-  });
-
-  it("numbers an emptied block off the block, not off the blocks that drew (1.0.83)", () => {
-    const text = note(OPEN, "", SHUT, "", OPEN, "Second.", SHUT);
-    expect(proseMarkFor(text, 0, 0).head).toBe("Prose 1");
-    expect(proseMarkFor(text, 5, 5).head).toBe("Prose 2");
-    // The emptied block's own interior row is still its own, which is 1.0.82's
-    // half — the editor draws the card on exactly this row.
-    expect(proseMarkFor(text, 1, 1).head).toBe("Prose 1");
-  });
-
-  it("belongs to nothing outside the markers", () => {
-    // The frontmatter, the CLOSING marker and the graph block below. The
-    // opening marker is a member as of 1.0.84 — it is what an emptied block
-    // hangs its card on — and has its own tests above.
-    expect(mark(1, 2).member).toBe(false);
-    expect(mark(4, 4).opener).toBe(true);
-    expect(mark(14, 14).member).toBe(false);
-    expect(mark(16, 16).member).toBe(false);
-  });
-
-  it("holds an end that reaches past it, rather than only one that equals it", () => {
-    // A reader who deletes the blank the composer left makes the first block
-    // start one line earlier than `span.from`. The rounding belongs to whatever
-    // block reaches the end, not to the one whose number matches.
-    expect(proseMarkFor(TEXT, 4, 6)).toEqual({
-      member: true,
-      first: true,
-      last: false,
-      opener: false,
-      head: "Prose 1",
-      nth: 1,
-      title: null,
-    });
-    expect(proseMarkFor(TEXT, 12, 15)).toEqual({
+  it("carries the bottom edge on the closing marker", () => {
+    expect(mark(14, 14)).toEqual({
       member: true,
       first: false,
       last: true,
       opener: false,
+      closer: true,
       head: null,
       nth: 1,
       title: null,
     });
+  });
+
+  it("gives the writing itself neither end, wherever it begins and ends", () => {
+    // THE ONE ASSERTION THE 1.0.86 ROUND EXISTS FOR: the first and last blocks
+    // of the writing are not special, so blank rows above or below them cannot
+    // take an edge with them.
+    for (const [from, to] of [[6, 6], [8, 8], [10, 10], [12, 12]]) {
+      expect(mark(from, to), `${from}`).toEqual({
+        member: true,
+        first: false,
+        last: false,
+        opener: false,
+        closer: false,
+        head: null,
+        nth: 1,
+        title: null,
+      });
+    }
+  });
+
+  it("belongs to nothing outside the markers", () => {
+    // The frontmatter above and the graph block below.
+    expect(mark(1, 2).member).toBe(false);
+    expect(mark(16, 16).member).toBe(false);
+  });
+
+  it("gives an emptied block both ends, across its two markers (1.0.86)", () => {
+    // A blank line renders nothing, so these two elements are the whole of what
+    // the note produces for this block — the bar, and the edge under it.
+    const empty = note(OPEN, "", SHUT);
+    expect(proseMarkFor(empty, 0, 0)).toMatchObject({
+      first: true,
+      last: false,
+      opener: true,
+      closer: false,
+      head: "Prose 1",
+    });
+    expect(proseMarkFor(empty, 2, 2)).toMatchObject({
+      member: true,
+      first: false,
+      last: true,
+      closer: true,
+    });
+  });
+
+  it("keeps the head on the marker when the writing starts rows later (1.0.86)", () => {
+    // *The reader's case.* Blank rows above the first words used to leave the
+    // head on a row nobody draws, and the card came out headless.
+    const late = note(OPEN, "", "", "", "a", "", SHUT);
+    expect(proseMarkFor(late, 0, 0).head).toBe("Prose 1");
+    expect(proseMarkFor(late, 4, 4).head).toBeNull();
+    expect(proseMarkFor(late, 4, 4).first).toBe(false);
+    // AND THE BOTTOM EDGE IS THE CLOSER'S, which is the same failure read the
+    // other way: trailing blank rows used to take it off the card entirely.
+    expect(proseMarkFor(late, 4, 4).last).toBe(false);
+    expect(proseMarkFor(late, 6, 6).last).toBe(true);
+  });
+
+  it("takes an element that reaches back over a marker as that marker's (1.0.86)", () => {
+    // A reader who deletes the composer's blank line gives the first paragraph
+    // a range that starts on the opener. The element IS the opener's element —
+    // it holds the marker — so it carries the top edge and the bar, with its
+    // words under them. Overlap, not equality, which is what this function has
+    // meant since 1.0.37.
+    const tight = note(OPEN, "One.", "", "Two.", SHUT);
+    expect(proseMarkFor(tight, 0, 1)).toMatchObject({
+      member: true,
+      first: true,
+      opener: true,
+      closer: false,
+      head: "Prose 1",
+    });
+    expect(proseMarkFor(tight, 3, 4)).toMatchObject({
+      member: true,
+      last: true,
+      closer: true,
+      head: null,
+    });
+    // AND IT REACHES THE OTHER WAY TOO, which is why this is overlap and not
+    // containment: writing pressed against the opener from ABOVE renders as one
+    // block holding both, and that block holds the marker, so it is the card's
+    // top edge. Containment would hand it to nobody and the head would vanish.
+    const joined = note("Above.", OPEN, "Words.", SHUT);
+    expect(proseMarkFor(joined, 0, 1)).toMatchObject({
+      member: true,
+      first: true,
+      opener: true,
+      head: "Prose 1",
+    });
+    const trailing = note(OPEN, "Words.", SHUT, "Below.");
+    expect(proseMarkFor(trailing, 2, 3)).toMatchObject({
+      member: true,
+      last: true,
+      closer: true,
+    });
+  });
+
+  it("asks nothing about where the writing is (1.0.86)", () => {
+    // THE WHOLE POINT, AS A SOURCE SHAPE. Obsidian re-renders a section when
+    // that section's own lines change, so an answer that depends on another
+    // row's content goes stale while nobody is listening — 1.0.83 and 1.0.84
+    // were both that bug. Every answer here is about the element's own lines
+    // and the two markers' positions.
+    const body = fnBody("proseMarkFor", "prose-surface");
+    expect(body).toContain("const opener = lineStart <= span.open && lineEnd >= span.open;");
+    expect(body).toContain("const closer = lineStart <= span.close && lineEnd >= span.close;");
+    expect(body).not.toContain("s.from");
+    expect(body).not.toContain("s.to");
+    expect(body).not.toContain("trim()");
+    // AND THE DUPLICATE 1.0.84 HAD TO WITHDRAW IS GONE WITH IT: the writing
+    // never carries a bar, so there is nothing to withdraw and no stylesheet
+    // rule standing in for a paint.
+    expect(readCss()).not.toContain(".ca-prose-opener:has(+ .ca-prose-block)");
+    // AND BOTH CLASSES ARE ACTUALLY PAINTED. `closer` is read by the stylesheet
+    // alone, so nothing but this and the dead-export sweep would notice the
+    // toggle going missing.
+    const paint = fnBody("paintProse", "prose-surface");
+    expect(paint).toContain("el.toggleClass(PROSE_OPENER_CLASS, mark.opener);");
+    expect(paint).toContain("el.toggleClass(PROSE_CLOSER_CLASS, mark.closer);");
+  });
+
+  it("hands the margins to the blocks beside the markers (1.0.86)", () => {
+    // The markers' own blocks draw nothing and have no margin to give up, so
+    // the writing whose margin reads as a band of colour is the block AFTER the
+    // opener and the block BEFORE the closer.
+    expect(cssRule(".ca-prose-opener + .ca-prose-block > :first-child")).toContain(
+      "margin-top: 0"
+    );
+    expect(cssRule(".ca-prose-block:has(+ .ca-prose-closer) > :last-child")).toContain(
+      "margin-bottom: 0"
+    );
+    // ONE LEVEL DOWN AS WELL. A paragraph is the block's first child, but a
+    // list or a quote puts its own first child inside that, and it is the inner
+    // one carrying the margin — 1.0.78's pair of selectors, which the reach
+    // over the marker has to match or a list's air comes back.
+    expect(
+      cssRule(".ca-prose-opener + .ca-prose-block > :first-child > :first-child")
+    ).toContain("margin-top: 0");
+    expect(
+      cssRule(".ca-prose-block:has(+ .ca-prose-closer) > :last-child > :last-child")
+    ).toContain("margin-bottom: 0");
+  });
+
+  it("gives an emptied bare block's markers nothing at all", () => {
+    // `#bare` produces no span, which is 1.0.36's argument kept where it was
+    // right: no name, no cog and no chevron, so an empty one really is a band
+    // of colour with nothing in it.
+    const bare = note("<!--chronoanvil-prose#bare-->", "", SHUT);
+    expect(proseMarkFor(bare, 0, 0).member).toBe(false);
+    expect(proseMarkFor(bare, 2, 2).member).toBe(false);
+  });
+
+  it("numbers each block off the file, not off what drew", () => {
+    const text = note(OPEN, "", SHUT, "", OPEN, "Second.", SHUT);
+    expect(proseMarkFor(text, 0, 0).head).toBe("Prose 1");
+    expect(proseMarkFor(text, 4, 4).head).toBe("Prose 2");
+    expect(proseMarkFor(text, 5, 5).nth).toBe(2);
   });
 });
 
@@ -1008,6 +1039,7 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
       first: false,
       last: false,
       opener: false,
+      closer: false,
       head: null,
       nth: 0,
       title: null,
@@ -1018,7 +1050,8 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     // The bar lands on `.is-prose-first`, so a head on every row would be a
     // title repeated down the whole of the writing.
     const text = note(OPEN, "", "## Overview", "", "A paragraph.", "", SHUT);
-    expect(proseMarkFor(text, 2, 2).head).toBe("Prose 1");
+    expect(proseMarkFor(text, 0, 0).head).toBe("Prose 1");
+    expect(proseMarkFor(text, 2, 2).head).toBeNull();
     expect(proseMarkFor(text, 4, 4).head).toBeNull();
   });
 
@@ -1611,10 +1644,13 @@ describe("the block that wears no head (1.0.77)", () => {
       { from: 1, to: 1, head: null, nth: 1, title: null, close: 2, open: 0 },
     ]);
     const text = note(BARE, "", "## Overview", "", "A paragraph.", "", SHUT);
-    const mark = proseMarkFor(text, 2, 2);
-    expect(mark.member).toBe(true);
-    expect(mark.first).toBe(true);
-    expect(mark.head).toBeNull();
+    expect(proseMarkFor(text, 2, 2).member).toBe(true);
+    // The edges are the markers' as of 1.0.86, and a bare block keeps them —
+    // what the flag takes is the head and nothing else.
+    const opener = proseMarkFor(text, 0, 0);
+    expect(opener.first).toBe(true);
+    expect(opener.head).toBeNull();
+    expect(proseMarkFor(text, 6, 6).last).toBe(true);
   });
 
   it("keeps its name while the head is gone", () => {

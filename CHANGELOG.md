@@ -5,6 +5,30 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.86] - 2026-10-17
+
+### Fixed
+
+- **In reading mode a prose card could lose its head or its bottom edge.** The
+  two faults were one: 1.0.85 gave the card's edges to the first and last rows
+  of the *writing*, and a blank row renders no element at all. So a block whose
+  writing began a row or two below the marker had a top edge nobody carried —
+  no name, no cog, no chevron — and one whose writing ended above the closing
+  marker had no bottom edge. Live Preview was right in both cases, which is what
+  made it look like two separate bugs.
+  - **The two markers carry the two ends now**, and the question "where is the
+    writing" is gone from the reading-mode painter entirely. The opening marker
+    takes the top edge and the head, the closing marker takes the bottom edge,
+    and every rendered block between them is the middle of the card. Nothing in
+    that answer depends on a row the element does not contain, which matters
+    because Obsidian re-renders a section only when that section's own lines
+    change — an answer about a neighbour goes stale with no event to correct it,
+    and that is the bug 1.0.83 and 1.0.84 each fixed one face of.
+  - The margin the card's colour band reads off now belongs to the block beside
+    each marker rather than the marker's own block, which draws nothing. 1.0.84's
+    rule hiding a duplicate head went with it: the writing never carries a bar
+    any more, so there is nothing left to withdraw.
+
 ## [1.0.85] - 2026-10-17
 
 ### Fixed
