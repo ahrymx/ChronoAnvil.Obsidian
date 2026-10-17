@@ -153,6 +153,79 @@ describe("where a rendered block stands in the prose", () => {
     });
   });
 
+  it("hands an emptied block to its opener, which is the only row it has (1.0.83)", () => {
+    // Reading mode renders nothing for a blank line, so the post-processor is
+    // never handed a row BETWEEN the markers — the opener's own block, line 0
+    // here, is the only element the note produces for this prose.
+    const text = note(OPEN, "", SHUT);
+    expect(proseMarkFor(text, 0, 0)).toEqual({
+      member: true,
+      first: true,
+      last: true,
+      head: "Prose 1",
+      nth: 1,
+      title: null,
+    });
+    // BOTH ENDS, not just the first: the opener sits above `span.from`, so the
+    // ordinary arithmetic reads `first` true and `last` false, and a card with
+    // a top edge and no bottom one is the mutant this line exists for.
+    expect(proseMarkFor(text, 0, 0).last).toBe(true);
+    // And the closing marker is not a second host, or an emptied block would
+    // draw its card twice.
+    expect(proseMarkFor(text, 2, 2).member).toBe(false);
+  });
+
+  it("gives the opener of a block that still has writing nothing (1.0.83)", () => {
+    // The 1.0.78 refusal, unchanged: a block with a row of its own hosts the
+    // bar on that row, in both modes, and its opener stays outside the card.
+    const text = note(OPEN, "", "Still here.", "", SHUT);
+    expect(proseMarkFor(text, 0, 0).member).toBe(false);
+    expect(proseMarkFor(text, 2, 2)).toEqual({
+      member: true,
+      first: true,
+      last: true,
+      head: "Prose 1",
+      nth: 1,
+      title: null,
+    });
+    // AND THE CASE WHERE THE OPENER REALLY IS THE ROW ABOVE THE WRITING, which
+    // the fixture above does NOT reach: the composer leaves a blank line after
+    // the marker, so a trimmed span's `from - 1` is usually that blank rather
+    // than the marker. Delete it and the two are the same row — the only
+    // fixture in which the blankness test is what refuses the opener.
+    const tight = note(OPEN, "Words.", SHUT);
+    expect(proseMarkFor(tight, 0, 0).member).toBe(false);
+    expect(proseMarkFor(tight, 1, 1).member).toBe(true);
+  });
+
+  it("does not hand an emptied block to whatever is above it (1.0.83)", () => {
+    // The opener has to BE the element, not merely be at or after its start: a
+    // paragraph above the block reaches lineEnd 0 and the marker is on line 2,
+    // and a test that only checks the near end would paint the paragraph with
+    // the empty block's card.
+    const text = note("Above.", "", OPEN, "", SHUT);
+    expect(proseMarkFor(text, 0, 0).member).toBe(false);
+    expect(proseMarkFor(text, 2, 2).head).toBe("Prose 1");
+  });
+
+  it("gives an emptied bare block's opener nothing either (1.0.83)", () => {
+    // `#bare` produces no span at all, which is 1.0.82's line kept: no name, no
+    // cog, no chevron, so an empty one is a band of colour with nothing in it.
+    const bare = note("<!--chronoanvil-prose#bare-->", "", SHUT);
+    expect(proseMarkFor(bare, 0, 0).member).toBe(false);
+    expect(proseMarkFor(bare, 1, 1).member).toBe(false);
+    expect(proseMarkFor(bare, 2, 2).member).toBe(false);
+  });
+
+  it("numbers an emptied block off the block, not off the blocks that drew (1.0.83)", () => {
+    const text = note(OPEN, "", SHUT, "", OPEN, "Second.", SHUT);
+    expect(proseMarkFor(text, 0, 0).head).toBe("Prose 1");
+    expect(proseMarkFor(text, 5, 5).head).toBe("Prose 2");
+    // The emptied block's own interior row is still its own, which is 1.0.82's
+    // half — the editor draws the card on exactly this row.
+    expect(proseMarkFor(text, 1, 1).head).toBe("Prose 1");
+  });
+
   it("belongs to nothing outside the markers", () => {
     // The frontmatter, the marker rows themselves and the graph block below.
     expect(mark(1, 2).member).toBe(false);

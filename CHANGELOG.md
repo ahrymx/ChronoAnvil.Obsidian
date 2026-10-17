@@ -5,6 +5,30 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.83] - 2026-10-17
+
+### Fixed
+
+- **An emptied prose block was still hidden while reading.** *"that works but an
+  empty prose block still hides in reading mode. Edit mode is just about
+  perfect."* 1.0.82 gave a block whose writing had been backspaced away its card
+  back, and the editor draws it on the blank row the cursor is sitting on.
+  Reading mode has no such row — a blank line renders nothing, so the
+  post-processor was never handed an element between the two markers — and the
+  block that was plainly there in Live Preview was plainly gone the moment the
+  note was read.
+  - **The opener hosts it, and only when the block is empty.** 1.0.78 refused
+    the marker's own line as the general host, and that refusal stands for every
+    block that has writing: it would mean one owner in reading mode and another
+    in the editor, where the marker's line is replaced out of the document
+    altogether. A block with no body has no other candidate in this mode, and
+    the refusal's own paragraph had already noted that the opener renders as a
+    block that draws nothing and could hold the bar.
+  - The card carries **both** its ends, so it is a closed box rather than a top
+    edge with nothing under it, and the head, the cog and the chevron are the
+    ones the block already had — it is the same bar, on the only row left.
+  - `#bare` is unchanged and still draws nothing at all, in either mode.
+
 ## [1.0.82] - 2026-10-16
 
 ### Fixed

@@ -154,6 +154,12 @@ export const PROSE_LAST_CLASS = "is-prose-last";
 // Hosting on it would mean one owner in one mode and a second mechanism in the
 // other — against a pseudo-element's single declaration, which the reader has
 // been looking at since 1.0.75 and which this keeps.
+//
+// (1.0.83 made one exception to that, and it is the case this paragraph did not
+// have: a block with NOTHING BETWEEN THE MARKERS renders no block in reading
+// mode, so there is no other candidate to be inconsistent with. See
+// `emptiedBlockOn` below. The rule above still governs every block that has a
+// row of its own.)
 
 /** Whether a run of lines is inside a prose block, and which ends it carries. */
 export interface ProseMark {
@@ -197,14 +203,67 @@ const NOT_PROSE: ProseMark = {
 // makes it start one line earlier and the block would stop carrying the
 // rounding. The wider test is right for the same reason `computeSectionRuns`
 // falls back to index 0: the ends belong to whatever block reaches them.
+// And the one block that has no row of its own: an emptied one, in reading mode.
+//
+// 1.0.82 gave a block whose writing has been backspaced away its card back, and
+// the editor draws it on the blank row the cursor is sitting on. READING MODE
+// HAS NO SUCH ROW: a blank line renders nothing, so the post-processor is never
+// handed an element between the two markers, and the block that is plainly
+// there in Live Preview is plainly gone one keypress later in reading mode —
+// which is what the reader saw. *"that works but an empty prose block still
+// hides in reading mode."*
+//
+// SO THE OPENER HOSTS IT, AND ONLY THEN. 1.0.78's header refused the marker's
+// own line as the general host and the refusal stands for every block that has
+// writing: it would mean one owner in reading mode and another in the editor,
+// where `marker-lines.ts` replaces that line and the break before it, so the
+// row does not exist to host anything. The refusal was about blocks with a body
+// to sit above. A block with NO body has no other candidate in this mode, and
+// the paragraph that rejected the opener said in passing what makes it work
+// here — *"in reading mode the opener renders as a block that draws nothing and
+// could hold the bar"*.
+//
+// ALL-BLANK IS THE WHOLE TEST, which is exactly the condition `proseSurfaceSpans`
+// fell back on: a span it did not trim away has at least one row with a word in
+// it, so a span whose every row is blank is an emptied block and nothing else.
+// That keeps the two halves of 1.0.82 reading off one fact rather than off two
+// spellings of it — and `#bare`, which produces no span at all, is still
+// nothing here for free.
+function emptiedBlockOn(
+  lines: readonly string[],
+  spans: readonly ProseSurface[],
+  lineStart: number,
+  lineEnd: number
+): ProseSurface | undefined {
+  return spans.find((s) => {
+    const opener = s.from - 1;
+    if (opener < lineStart || opener > lineEnd) return false;
+    for (let i = s.from; i <= s.to; i++) if (lines[i]?.trim() !== "") return false;
+    return true;
+  });
+}
+
 export function proseMarkFor(
   text: string,
   lineStart: number,
   lineEnd: number
 ): ProseMark {
-  const spans = proseSurfaceSpans(text.split("\n"));
-  const span = spans.find((s) => lineStart <= s.to && lineEnd >= s.from);
+  const lines = text.split("\n");
+  const spans = proseSurfaceSpans(lines);
+  const span =
+    spans.find((s) => lineStart <= s.to && lineEnd >= s.from) ??
+    emptiedBlockOn(lines, spans, lineStart, lineEnd);
   if (!span) return NOT_PROSE;
+  // ── AN EMPTIED BLOCK IS ITS OWN FIRST AND LAST ROW (1.0.83) ───────────
+  //
+  // The opener is one row and the block is all of it, so both ends land on it
+  // — which the arithmetic below would get wrong in one direction: `first`
+  // reads true because the opener sits above `span.from`, and `last` reads
+  // false for the same reason. A card with a top edge and no bottom one is
+  // worse than no card.
+  if (lineEnd < span.from) {
+    return { member: true, first: true, last: true, head: span.head, nth: span.nth, title: span.title };
+  }
   const first = lineStart <= span.from;
   return {
     member: true,

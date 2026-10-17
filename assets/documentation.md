@@ -722,12 +722,11 @@ is for.
 **And an emptied block keeps its head.** Delete every word inside one and the
 card stays where you left it, carrying its name, its cog and its chevron, with
 one empty row inside to type into — a section that disappeared under the
-backspace key would read as having been deleted, and nothing has been. (Reading
-mode has none of your writing left to draw the card around, so a block you have
-emptied comes back there once you have written in it again.) A block whose title
-row you have turned off is the exception: with no name and no controls on it, an
-empty one really is a card with nothing in it, and it is not drawn until there
-is something to draw it around.
+backspace key would read as having been deleted, and nothing has been. Reading
+mode shows it too, as the head alone with nothing under it, which is all there
+is to show. A block whose title row you have turned off is the exception: with
+no name and no controls on it, an empty one really is a card with nothing in it,
+and it is not drawn until there is something to draw it around.
 
 You can also write the list without leaving the change window. The cog on the
 block's own head and the Prose row in **Note: edit sections…** both give you a
