@@ -964,12 +964,25 @@ export interface ProseSurface {
   // to live on, and an empty `.cm-line` under a folded card is exactly the
   // blank row the break-before arithmetic was chosen to avoid.
   //
-  // THE OPENER IS DELIBERATELY NOT HERE. It merges UPWARD into the row above
+  // THE OPENER IS NOT PART OF THAT ANSWER. It merges UPWARD into the row above
   // it — `marker-lines.ts` has taken the break before a marker run since 5.31 —
-  // so the line holding it has visible content and needs nothing from us. Only
-  // the end of the block is ours to close.
+  // so for the FOLD's purposes the line holding it has visible content and
+  // needs nothing from us. Only the end of the block is ours to close.
   /** The closing marker's line, 0-based. */
   close: number;
+  // ── AND THE LINE IT OPENS ON, WHICH READING MODE HOSTS ON (1.0.84) ────
+  //
+  // The paragraph above said the opener was not needed, and for the editor it
+  // still is not. Reading mode asks a different question: a post-processor is
+  // handed one rendered block at a time and must say what that block is, and
+  // the opener's own line IS one of those blocks — it is where the bar goes
+  // when the block has no writing to put it above. `prose-surface.ts` needs to
+  // recognise that element, and recognising it by `from - 1` is wrong on every
+  // block that HAS writing, because `from` has been trimmed past the blank line
+  // the composer leaves. So the marker says where it is, the way the closing
+  // one already does.
+  /** The opening marker's line, 0-based. */
+  open: number;
 }
 
 export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
@@ -1023,6 +1036,7 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
       nth: i + 1,
       title: span.title,
       close: span.close,
+      open: span.open,
     });
   });
   return out;

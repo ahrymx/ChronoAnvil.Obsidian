@@ -28,7 +28,7 @@ describe("what a prose surface covers", () => {
     // Preview, so a surface that included its row would open with a blank band.
     const lines = [OPEN, "## Overview", "", "Some words.", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4 },
+      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
   });
 
@@ -38,7 +38,7 @@ describe("what a prose surface covers", () => {
     // Blank rows are not rows of prose.
     const lines = [OPEN, "", "", "Words.", "", "", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 3, to: 3, head: "Prose 1", nth: 1, title: null, close: 6 },
+      { from: 3, to: 3, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
     ]);
   });
 
@@ -51,14 +51,14 @@ describe("what a prose surface covers", () => {
     // only visible identity and its only control, and a section vanishing under
     // the backspace key reads as having been deleted.
     expect(proseSurfaceSpans([OPEN, "", SHUT])).toEqual([
-      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2 },
+      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2, open: 0 },
     ]);
     // THE BLANK ROW THE READER IS SITTING ON IS THE WRITING, so the card has
     // somewhere to type — which is where `marker-lines.ts`' landings were
     // already sending the cursor, and is why typing a line below brought the
     // block back rather than making a new one.
     expect(proseSurfaceSpans([OPEN, "", "", SHUT])).toEqual([
-      { from: 1, to: 2, head: "Prose 1", nth: 1, title: null, close: 3 },
+      { from: 1, to: 2, head: "Prose 1", nth: 1, title: null, close: 3, open: 0 },
     ]);
     // AND 1.0.36'S ARGUMENT IS KEPT EXACTLY WHERE IT WAS RIGHT. A `#bare` block
     // has no name, no cog and no chevron on it, so an empty one really is a band
@@ -81,8 +81,8 @@ describe("what a prose surface covers", () => {
       OPEN, "Second.", SHUT,
     ];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2 },
-      { from: 7, to: 7, head: "Prose 2", nth: 2, title: null, close: 8 },
+      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2, open: 0 },
+      { from: 7, to: 7, head: "Prose 2", nth: 2, title: null, close: 8, open: 6 },
     ]);
   });
 
@@ -92,7 +92,7 @@ describe("what a prose surface covers", () => {
     // that contract rather than restating it.
     const lines = ["<!--chronoanvil-skeleton-->", "Words.", "<!--/chronoanvil-skeleton-->"];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2 },
+      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2, open: 0 },
     ]);
   });
 
@@ -128,16 +128,16 @@ describe("where a rendered block stands in the prose", () => {
   const mark = (from: number, to: number) => proseMarkFor(TEXT, from, to);
 
   it("carries the first end on the block the writing starts in", () => {
-    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose 1", nth: 1 , title: null });
+    expect(mark(6, 6)).toEqual({ member: true, first: true, last: false, head: "Prose 1", nth: 1 , title: null, opener: false });
   });
 
   it("carries the last end on the block it ends in", () => {
-    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null, nth: 1 , title: null });
+    expect(mark(12, 12)).toEqual({ member: true, first: false, last: true, head: null, nth: 1 , title: null, opener: false });
   });
 
   it("carries neither in the middle", () => {
-    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null });
-    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null });
+    expect(mark(8, 8)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null, opener: false });
+    expect(mark(10, 10)).toEqual({ member: true, first: false, last: false, head: null, nth: 1 , title: null, opener: false });
   });
 
   it("carries both when one block is the whole of it", () => {
@@ -147,65 +147,92 @@ describe("where a rendered block stands in the prose", () => {
       member: true,
       first: true,
       last: true,
+      opener: false,
       head: "Prose 1",
       nth: 1,
       title: null,
     });
   });
 
-  it("hands an emptied block to its opener, which is the only row it has (1.0.83)", () => {
-    // Reading mode renders nothing for a blank line, so the post-processor is
-    // never handed a row BETWEEN the markers — the opener's own block, line 0
-    // here, is the only element the note produces for this prose.
-    const text = note(OPEN, "", SHUT);
-    expect(proseMarkFor(text, 0, 0)).toEqual({
+  it("gives the opening marker's own block the card, writing or not (1.0.84)", () => {
+    // OBSIDIAN RE-RENDERS A SECTION WHEN ITS OWN LINES CHANGE, and the opener's
+    // line does not change when a word appears below it. So a card that asked
+    // "is this block empty?" went stale the moment the reader typed, and drew
+    // the head twice — once empty, once over the writing. The opener is simply
+    // always the opener; the stylesheet withdraws it where the writing carries
+    // a bar of its own.
+    const empty = note(OPEN, "", SHUT);
+    expect(proseMarkFor(empty, 0, 0)).toEqual({
       member: true,
       first: true,
       last: true,
+      opener: true,
       head: "Prose 1",
       nth: 1,
       title: null,
     });
-    // BOTH ENDS, not just the first: the opener sits above `span.from`, so the
-    // ordinary arithmetic reads `first` true and `last` false, and a card with
-    // a top edge and no bottom one is the mutant this line exists for.
-    expect(proseMarkFor(text, 0, 0).last).toBe(true);
-    // And the closing marker is not a second host, or an emptied block would
-    // draw its card twice.
-    expect(proseMarkFor(text, 2, 2).member).toBe(false);
-  });
-
-  it("gives the opener of a block that still has writing nothing (1.0.83)", () => {
-    // The 1.0.78 refusal, unchanged: a block with a row of its own hosts the
-    // bar on that row, in both modes, and its opener stays outside the card.
-    const text = note(OPEN, "", "Still here.", "", SHUT);
-    expect(proseMarkFor(text, 0, 0).member).toBe(false);
-    expect(proseMarkFor(text, 2, 2)).toEqual({
+    // THE SAME ANSWER WITH WRITING UNDER IT — the one assertion that says this
+    // does not depend on what the rest of the block holds.
+    const written = note(OPEN, "", "Words.", "", SHUT);
+    expect(proseMarkFor(written, 0, 0)).toEqual({
       member: true,
       first: true,
       last: true,
+      opener: true,
       head: "Prose 1",
       nth: 1,
       title: null,
     });
-    // AND THE CASE WHERE THE OPENER REALLY IS THE ROW ABOVE THE WRITING, which
-    // the fixture above does NOT reach: the composer leaves a blank line after
-    // the marker, so a trimmed span's `from - 1` is usually that blank rather
-    // than the marker. Delete it and the two are the same row — the only
-    // fixture in which the blankness test is what refuses the opener.
-    const tight = note(OPEN, "Words.", SHUT);
-    expect(proseMarkFor(tight, 0, 0).member).toBe(false);
-    expect(proseMarkFor(tight, 1, 1).member).toBe(true);
+    // And the closing marker is not a second host.
+    expect(proseMarkFor(empty, 2, 2).member).toBe(false);
+    expect(proseMarkFor(written, 4, 4).member).toBe(false);
   });
 
-  it("does not hand an emptied block to whatever is above it (1.0.83)", () => {
-    // The opener has to BE the element, not merely be at or after its start: a
-    // paragraph above the block reaches lineEnd 0 and the marker is on line 2,
-    // and a test that only checks the near end would paint the paragraph with
-    // the empty block's card.
-    const text = note("Above.", "", OPEN, "", SHUT);
-    expect(proseMarkFor(text, 0, 0).member).toBe(false);
-    expect(proseMarkFor(text, 2, 2).head).toBe("Prose 1");
+  it("leaves the writing's own first block carrying the bar (1.0.84)", () => {
+    // 1.0.78's refusal is NOT reversed: where there is writing, the visible bar
+    // is still the one on the writing's first block, and the opener's card is
+    // the duplicate the stylesheet takes away.
+    const written = note(OPEN, "", "Words.", "", SHUT);
+    expect(proseMarkFor(written, 2, 2)).toEqual({
+      member: true,
+      first: true,
+      last: true,
+      opener: false,
+      head: "Prose 1",
+      nth: 1,
+      title: null,
+    });
+  });
+
+  it("gives a block that reaches back over its opener the writing's branch (1.0.84)", () => {
+    // A reader who deletes the composer's blank line gives the first paragraph
+    // a range that starts on the marker. That element HOLDS WORDS, so it is the
+    // writing's first block and not the bare opener — the opener's own element
+    // stops before the writing, which is what tells the two apart.
+    const tight = note(OPEN, "One.", "", "Two.", SHUT);
+    expect(proseMarkFor(tight, 0, 1)).toEqual({
+      member: true,
+      first: true,
+      last: false,
+      opener: false,
+      head: "Prose 1",
+      nth: 1,
+      title: null,
+    });
+  });
+
+  it("withdraws the opener's card in CSS, not in the painter (1.0.84)", () => {
+    // THE PAINTER CANNOT BE THE ONE TO DO IT. Obsidian re-renders a section
+    // when that section's own lines change, so the opener is never repainted
+    // when a word appears below it — the first cut asked the painter and drew
+    // the head twice. A sibling selector re-decides itself the instant the
+    // writing's block appears or goes, with no render to wait for.
+    expect(cssRule(".ca-prose-opener:has(+ .ca-prose-block)")).toContain("display: none");
+    // AND THE PAINT ITSELF ASKS NOTHING ABOUT THE WRITING: the class goes on
+    // every opener, which is what makes it safe to leave on a stale element.
+    const body = fnBody("paintProse", "prose-surface");
+    expect(body).toContain("el.toggleClass(PROSE_OPENER_CLASS, mark.opener);");
+    expect(fnBody("proseOpenerOn", "prose-surface")).not.toContain("trim()");
   });
 
   it("gives an emptied bare block's opener nothing either (1.0.83)", () => {
@@ -227,9 +254,11 @@ describe("where a rendered block stands in the prose", () => {
   });
 
   it("belongs to nothing outside the markers", () => {
-    // The frontmatter, the marker rows themselves and the graph block below.
+    // The frontmatter, the CLOSING marker and the graph block below. The
+    // opening marker is a member as of 1.0.84 — it is what an emptied block
+    // hangs its card on — and has its own tests above.
     expect(mark(1, 2).member).toBe(false);
-    expect(mark(4, 4).member).toBe(false);
+    expect(mark(4, 4).opener).toBe(true);
     expect(mark(14, 14).member).toBe(false);
     expect(mark(16, 16).member).toBe(false);
   });
@@ -242,6 +271,7 @@ describe("where a rendered block stands in the prose", () => {
       member: true,
       first: true,
       last: false,
+      opener: false,
       head: "Prose 1",
       nth: 1,
       title: null,
@@ -250,6 +280,7 @@ describe("where a rendered block stands in the prose", () => {
       member: true,
       first: false,
       last: true,
+      opener: false,
       head: null,
       nth: 1,
       title: null,
@@ -682,20 +713,20 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "<!--/chronoanvil-prose-->",
     ];
     expect(livePreviewSpans(lines)).toEqual([
-      { from: 1, to: 5, head: "Prose 1", nth: 1, title: null, close: 6 },
+      { from: 1, to: 5, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
     ]);
     // Writing at the ends keeps the trimmed span it always had.
     const written = [...lines];
     written.splice(2, 0, "Intro.");
     written.splice(6, 0, "Outro.");
     expect(livePreviewSpans(written)).toEqual([
-      { from: 2, to: 6, head: "Prose 1", nth: 1, title: null, close: 8 },
+      { from: 2, to: 6, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
     ]);
     // No blank to take: the span is left alone rather than stepping onto the
     // bracket.
     const tight = lines.filter((l) => l !== "");
     expect(livePreviewSpans(tight)).toEqual([
-      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4 },
+      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
     // And the painter reads it.
     expect(readCode("ui/prose-surface.ts")).toContain(
@@ -769,7 +800,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "<!--/chronoanvil-prose-->",
     ];
     expect(livePreviewSpans(lines)).toEqual([
-      { from: 1, to: 5, head: "Prose 1", nth: 1, title: null, close: 6 },
+      { from: 1, to: 5, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
     ]);
 
     // A one-line `$$ x $$` is the same row: Obsidian mounts that one too, and
@@ -783,7 +814,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "<!--/chronoanvil-prose-->",
     ];
     expect(livePreviewSpans(oneLine)).toEqual([
-      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4 },
+      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
 
     // Writing at the ends keeps the trimmed span it always had — an equation
@@ -792,7 +823,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
     written.splice(2, 0, "Simplify by the HCF:");
     written.splice(7, 0, "Which is in its lowest terms.");
     expect(livePreviewSpans(written)).toEqual([
-      { from: 2, to: 7, head: "Prose 1", nth: 1, title: null, close: 8 },
+      { from: 2, to: 7, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
     ]);
 
     // AND `$$` MID-LINE IS NOT A BLOCK. Obsidian draws it inside the row, the
@@ -805,7 +836,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "<!--/chronoanvil-prose-->",
     ];
     expect(livePreviewSpans(inline)).toEqual([
-      { from: 2, to: 2, head: "Prose 1", nth: 1, title: null, close: 4 },
+      { from: 2, to: 2, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
   });
 
@@ -826,7 +857,7 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "<!--/chronoanvil-prose-->",
     ];
     expect(livePreviewSpans(lines)).toEqual([
-      { from: 2, to: 6, head: "Prose 1", nth: 1, title: null, close: 8 },
+      { from: 2, to: 6, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
     ]);
   });
 
@@ -929,7 +960,7 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
     // can see both blocks in the file; the number has to count what is there.
     const lines = ["<!--chronoanvil-prose#bare-->", "", SHUT, "", OPEN, "Words.", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 5, to: 5, head: "Prose 2", nth: 2, title: null, close: 6 },
+      { from: 5, to: 5, head: "Prose 2", nth: 2, title: null, close: 6, open: 4 },
     ]);
     // AND AN EMPTIED BLOCK THAT KEPT ITS HEAD KEEPS ITS NUMBER TOO, which is
     // the same rule read the other way: emptying block one must not renumber
@@ -961,6 +992,7 @@ describe("the head, and the cog that rides it (1.0.75, 1.0.78)", () => {
       member: false,
       first: false,
       last: false,
+      opener: false,
       head: null,
       nth: 0,
       title: null,
@@ -1561,7 +1593,7 @@ describe("the block that wears no head (1.0.77)", () => {
     // asked for one piece of chrome to go, not for their prose to stop being a
     // prose block — the background, the padding and both edge classes stay.
     expect(proseSurfaceSpans([BARE, "Words.", SHUT])).toEqual([
-      { from: 1, to: 1, head: null, nth: 1, title: null, close: 2 },
+      { from: 1, to: 1, head: null, nth: 1, title: null, close: 2, open: 0 },
     ]);
     const text = note(BARE, "", "## Overview", "", "A paragraph.", "", SHUT);
     const mark = proseMarkFor(text, 2, 2);
@@ -1590,16 +1622,16 @@ describe("the block that wears no head (1.0.77)", () => {
     // block in the file.
     const two = [OPEN, "One.", SHUT, "", BARE, "Two.", SHUT];
     expect(proseSurfaceSpans(two)).toEqual([
-      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2 },
-      { from: 5, to: 5, head: null, nth: 2, title: null, close: 6 },
+      { from: 1, to: 1, head: "Prose 1", nth: 1, title: null, close: 2, open: 0 },
+      { from: 5, to: 5, head: null, nth: 2, title: null, close: 6, open: 4 },
     ]);
     // AND IN THE OTHER ORDER, which is what says the flag is read off each
     // opener rather than carried between them: a block's answer must not
     // outlive the block it was written on.
     const flip = [BARE, "One.", SHUT, "", OPEN, "Two.", SHUT];
     expect(proseSurfaceSpans(flip)).toEqual([
-      { from: 1, to: 1, head: null, nth: 1, title: null, close: 2 },
-      { from: 5, to: 5, head: "Prose 2", nth: 2, title: null, close: 6 },
+      { from: 1, to: 1, head: null, nth: 1, title: null, close: 2, open: 0 },
+      { from: 5, to: 5, head: "Prose 2", nth: 2, title: null, close: 6, open: 4 },
     ]);
   });
 
@@ -1626,7 +1658,7 @@ describe("the block that wears no head (1.0.77)", () => {
     // blank line above a table or a `$$`, so a head declared `string` here
     // would have been a cast at exactly the place the two shapes meet.
     expect(livePreviewSpans([BARE, "Words.", SHUT])).toEqual([
-      { from: 1, to: 1, head: null, nth: 1, title: null, close: 2 },
+      { from: 1, to: 1, head: null, nth: 1, title: null, close: 2, open: 0 },
     ]);
     // ONE TYPE, NAMED ONCE. `livePreviewSpans` returns the model's own
     // `ProseSurface`, so a `head` declared `string` would have been a cast at

@@ -5,6 +5,35 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.84] - 2026-10-17
+
+### Fixed
+
+- **Typing into an emptied prose block drew its head twice.** 1.0.83 put the
+  card of an emptied block on its opening marker's own block, which is the only
+  element reading mode produces for a block with no writing. It asked whether
+  the block was empty — and that is a question whose answer changes while nobody
+  is listening: **Obsidian re-renders a section when that section's own lines
+  change**, and the opener's line does not change when a word appears below it.
+  So the empty card stayed on screen above the real one, two bars both reading
+  *Prose 1*.
+  - **The opener is now simply the opener**, on every note, emptiness never
+    consulted: it carries the block's card and bar, and one stylesheet rule
+    withdraws it where the next sibling is the writing's own block. The painter
+    now asks only about the opener's own line and the block's ordinal — the two
+    things it is re-rendered for — and the part that depends on the writing is
+    CSS, which re-decides itself the instant a sibling appears or goes, with no
+    render to wait for.
+  - **1.0.78's refusal is not reversed.** Where a block has writing, the visible
+    bar is still the one on the writing's first block; the opener's card is the
+    duplicate that stands down. And a rendered block that reaches back over the
+    marker — what a reader gets by deleting the blank line the composer leaves —
+    holds words, so it takes the writing's branch and not the bare opener's.
+  - `ProseSurface` gained `open`, the opening marker's line, beside the `close`
+    it has carried since 1.0.80. Recognising the opener by *the row above the
+    writing* is wrong on every block that has any: that row is the composer's
+    blank line, not the marker.
+
 ## [1.0.83] - 2026-10-17
 
 ### Fixed
