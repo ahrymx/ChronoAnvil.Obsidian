@@ -68,6 +68,7 @@ import type { JournalKind, JournalType } from "../../journals/journal";
 import { JOURNAL_DATE_PROPERTY } from "../../core/constants";
 import { CLASS_DEFS, getTracker, TRACKER_CLASSES } from "../../trackers/trackers";
 import { chartableType } from "../../charts/charts";
+import type { PeriodBounds } from "../../charts/charts";
 import { pointsInWindow } from "../../charts/charts";
 import { collectPoints, renderTrackerChart } from "../../charts/chart-render";
 import type { ChartTeardown } from "../../charts/chart-render";
@@ -107,7 +108,11 @@ function hostSurface(
 
 export function bridgeHostFacts(
   plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  // The unit of a `period-nav:` in the same fence, from the loop that walks it
+  // — see `BridgeHostFacts.navUnit`. Null on the legacy inline path and on any
+  // bridge written without one beside it.
+  navUnit: PeriodBounds["unit"] | null = null
 ): BridgeHostFacts {
   const file = fileOfCtx(plugin, ctx);
   const fm = file ? frontmatterOf(plugin.app, file) : {};
@@ -121,6 +126,7 @@ export function bridgeHostFacts(
     // period a bridge anchors to, and treating one as a one-day dashboard would
     // let a Lesson note silently bridge to the diary day it was written.
     iso: typeof fm["journal-date"] === "string" ? fm["journal-date"] : null,
+    navUnit,
     surface: hostSurface(plugin, ctx.sourcePath),
   };
 }
@@ -594,9 +600,11 @@ function buildBridge(
   // behind that outlives its element. Only the trend needs it — a Chart.js
   // instance survives the DOM node it drew into — and it is optional rather
   // than required so the notes side is not made to declare an empty one.
-  cleanup?: () => void
+  cleanup: (() => void) | undefined,
+  // The unit of a `period-nav:` sharing this fence — see `BridgeHostFacts`.
+  navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
-  const host = bridgeHostFacts(plugin, ctx);
+  const host = bridgeHostFacts(plugin, ctx, navUnit);
   const catalogue = bridgeCatalogue(plugin, otherSurface(host.surface));
 
   // `bridge-notes:<target> <filters>` — the target is the first token, the rest
@@ -724,7 +732,8 @@ export function buildBridgeNotesRegion(
   plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
   const journalFolders = journalFolderScope(plugin, "all", null);
   return buildBridge(
@@ -835,7 +844,9 @@ export function buildBridgeNotesRegion(
         label: hit.entry.title,
         detail: hit.entry.iso ?? "",
       }));
-    }
+    },
+    undefined,
+    navUnit
   );
 }
 
@@ -872,7 +883,8 @@ export function buildBridgeReadingsRegion(
   plugin: ChronoAnvilPlugin,
   rest: string,
   label: string | null,
-  ctx: MarkdownPostProcessorContext
+  ctx: MarkdownPostProcessorContext,
+  navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
   const { rest: spec, trend } = readingsFlags(rest);
   // The live Chart.js instance, so a rebuild disposes the one it is replacing.
@@ -947,6 +959,7 @@ export function buildBridgeReadingsRegion(
     () => {
       teardown?.();
       teardown = null;
-    }
+    },
+    navUnit
   );
 }

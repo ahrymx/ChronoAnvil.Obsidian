@@ -158,7 +158,7 @@ describe("patch 3: the trend is a flag on the directive that already exists", ()
     expect(s).toContain("let teardown: ChartTeardown = null;");
     expect(s).toContain("teardown?.()");
     // Threaded through the shared entry point rather than added to one builder.
-    expect(s).toContain("cleanup?: () => void");
+    expect(s).toContain("cleanup: (() => void) | undefined,");
     expect(s).toContain("}, cleanup);");
   });
 

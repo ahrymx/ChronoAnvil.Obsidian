@@ -169,7 +169,7 @@ import {
 import {
   buildEntryContext,
 } from "../../diary/entryheader";
-import { buildPeriodNav } from "../../diary/periodnav";
+import { buildPeriodNav, periodNavUnit } from "../../diary/periodnav";
 import {
   fieldFrame,
   foldableSection,
@@ -1279,6 +1279,19 @@ export class Widgets implements
       // no group head under it at all. A fence whose tables hang under no
       // level-1 head gets -1, and no cog: there is no bar a reader would point
       // at and call the card.
+      // The period navigator this fence carries, if it carries one.
+      //
+      // ONE PASS UP FRONT, for `headerOwning`'s reason just below: the line
+      // that answers may come after the line that asks. The journal's `bridge`
+      // section writes the nav first, but a reader rearranging their own fence
+      // is not wrong to put it under the thing it scopes.
+      const navUnit =
+        lines
+          .map((line) => line.trim())
+          .filter((line) => line.split(":")[0].trim() === "period-nav")
+          .map((line) => periodNavUnit(line.slice(line.indexOf(":") + 1)))[0] ??
+        null;
+
       const headerOwning = (keyword: string, atLevel?: number): number => {
         let seen = -1;
         let owner = -1;
@@ -1816,7 +1829,8 @@ export class Widgets implements
           // one per shelf — the category error the ✕ was removed for.
           shelfHeader === -1 && line.trim() === firstShelf,
           nestInto,
-          noteTextNow
+          noteTextNow,
+          navUnit
         );
 
         if (!widget) {
@@ -3146,7 +3160,13 @@ export class Widgets implements
     // The whole note, re-read on each call. Only the Habits section asks, and
     // `noteTextNow` at the call site says why it is a thunk rather than a
     // string: a `liveScopedWidget` repaints long after this returns.
-    noteText: () => string = () => ""
+    noteText: () => string = () => "",
+    // The unit of a `period-nav:` line in this fence, or null where there is
+    // none. Only a bridge reads it — see the `bridge-notes` case — and it is
+    // threaded rather than met in the loop for `wearsActions`' reason: the
+    // answer is a fact about the FENCE, and the line that supplies it may be
+    // drawn before or after the line that needs it.
+    navUnit: PeriodGrain | null = null
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const title = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -3437,9 +3457,7 @@ export class Widgets implements
         // Same shape as the bug formatPeriodLabel was extracted for in 2.52,
         // one layer up.
         const arg = rest.trim();
-        const unit =
-          arg === "month" || arg === "quarter" || arg === "year" ? arg : "week";
-        return buildPeriodNav(this.plugin, ctx, unit);
+        return buildPeriodNav(this.plugin, ctx, periodNavUnit(arg));
       }
       // `diary:N` ONLY, as of 3.11 §7.1. `calendar` and `calendar:agenda`
       // shared this case and were written by no shipped note in the plugin's
@@ -3713,10 +3731,18 @@ export class Widgets implements
       // the tracker series, which are different stores with different caching,
       // and a single case would have made that a runtime branch instead of a
       // spelling the reader picks.
+      //
+      // AND THE NAVIGATOR BESIDE IT, WHICH IS ITS ANCHOR (1.0.88). The journal
+      // section composes `period-nav:` and `bridge-readings:` into one fence
+      // precisely because a leaf note has no period of its own; the nav passes
+      // its answer through the note's frontmatter, which it does not write
+      // until a pill is pressed. Read off the fence here, the way `wearsActions`
+      // is, so a freshly composed section reads the period its own navigator is
+      // already showing instead of refusing under it.
       case "bridge-notes":
-        return buildBridgeNotesRegion(this.plugin, rest, label, ctx);
+        return buildBridgeNotesRegion(this.plugin, rest, label, ctx, navUnit);
       case "bridge-readings":
-        return buildBridgeReadingsRegion(this.plugin, rest, label, ctx);
+        return buildBridgeReadingsRegion(this.plugin, rest, label, ctx, navUnit);
       default:
         return null;
     }

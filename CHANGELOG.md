@@ -5,6 +5,34 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.88] - 2026-10-17
+
+### Fixed
+
+- **A freshly composed "From the diary" section refused to draw.** *"from the
+  diary section seems to be broken."* The section drew its period navigator
+  showing October 2026, and directly under it a red box saying the note had no
+  period to anchor to — one card giving two answers. The section composes the
+  navigator with the bridge precisely because a journal note has no period of
+  its own, but the navigator passes its answer through the note's frontmatter
+  and only writes that property when you press one of its pills. Until then the
+  note declared nothing and the bridge refused, even though the period it needed
+  was on screen above it.
+  - **The bridge now reads the period its own navigator is showing.** A
+    navigator with no property resolves to the current period and prints it —
+    that is how every other period-scoped widget in the plugin reads one — so
+    this is the window you are already looking at, not a guessed one. Pressing a
+    pill writes the property as it always did, and from then on the property is
+    the answer.
+  - **Only a note that says nothing else asks its chrome.** A declared
+    `week-start` / `month-start` / `quarter-start` / `year-start` still wins, and
+    a dated diary entry is still a window of one day. A bridge written by hand
+    onto a plain note with no navigator still refuses, and still names the four
+    properties that would fix it.
+  - The four-unit parse behind `period-nav:` is now one function rather than two
+    copies — the navigator and the bridge beside it have to agree about which
+    period the line means.
+
 ## [1.0.87] - 2026-10-17
 
 ### Fixed

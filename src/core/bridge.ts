@@ -104,6 +104,18 @@ export interface BridgeHostFacts {
   valueOf: (prop: string) => unknown;
   // The host's own date, when it is a dated entry rather than a dashboard.
   iso: string | null;
+  // ── AND THE NAVIGATOR IT WAS COMPOSED WITH (1.0.88) ─────────────────
+  //
+  // The unit of a `period-nav:` sharing this bridge's fence, or null where the
+  // bridge stands alone. The journal-side section composes the two together and
+  // `journal-sections.ts` says why in as many words: *"a leaf note has no
+  // period of its own and the anchor has to come from somewhere"*. The
+  // navigator is that somewhere — but it reaches the bridge through the note's
+  // frontmatter, and it writes that property on a CLICK. Until the reader has
+  // pressed one, the note declares nothing and the bridge refused while the
+  // navigator directly above it was showing a period: one card saying two
+  // things. This is the navigator's own answer, asked before the refusal.
+  navUnit: PeriodBounds["unit"] | null;
   // Which side the host note is on. The bridge targets the other one.
   surface: IndexSurface;
 }
@@ -205,6 +217,32 @@ export function bridgeWindow(host: BridgeHostFacts): BridgeResult<BridgeWindow> 
         end: host.iso,
         unit: "day",
         label: moment(host.iso).format("D MMM YYYY"),
+      },
+    };
+  }
+
+  // ── OR THE PERIOD THE NAVIGATOR BESIDE IT IS SHOWING (1.0.88) ──────
+  //
+  // LAST, AFTER BOTH PROPERTIES, which is what keeps this from being the
+  // fallback §2 refuses to have. A note that declares a period means it; a
+  // dated entry IS one; only a note that says neither asks its own chrome. And
+  // what the chrome says is not a guess — `periodAnchor` resolves a navigator
+  // with no property to the CURRENT period and prints it on the strip, so this
+  // is the window the reader is already looking at, read the same way.
+  //
+  // IT ANCHORS TO TODAY RATHER THAN READING THE PROPERTY, because there is no
+  // property to read: the first branch takes every note that has one. The first
+  // press of a navigator pill writes it and the first branch answers from then
+  // on, with the same unit and the period the reader chose.
+  if (host.navUnit) {
+    const bounds = periodBoundsFor(host.navUnit, moment());
+    return {
+      ok: true,
+      value: {
+        start: bounds.start,
+        end: bounds.end,
+        unit: bounds.unit,
+        label: formatPeriodLabel(bounds.unit, bounds.start),
       },
     };
   }

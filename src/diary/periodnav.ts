@@ -58,6 +58,17 @@ const META: Record<Unit, PeriodMeta> = {
   year: { prop: "year-start", momentUnit: "year" },
 };
 
+// Which navigator a `period-nav:<arg>` line asks for.
+//
+// ONE PARSE, TWO READERS, which is the whole reason it is a function. The
+// widget switch builds the strip from it and the bridge beside it asks the same
+// line which period it is showing (1.0.88) — two copies of a four-value default
+// is how `period-nav:quarter` silently built a week navigator until 2.57.0.
+export function periodNavUnit(arg: string): Unit {
+  const a = arg.trim();
+  return a === "month" || a === "quarter" || a === "year" ? a : "week";
+}
+
 function metaFor(unit: Unit): PeriodMeta {
   return META[unit];
 }

@@ -13,11 +13,12 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readSrc } from "./sources";
+import { fnBody, readSrc } from "./sources";
 import { computeSectionRuns } from "../src/ui/headerbar";
 import { OBSIDIAN_DOM } from "../src/core/constants";
 import { DEFAULT_BRIDGE_TRACKER } from "../src/journals/journal-sections";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
+import { moment } from "../src/core/util";
 import {
   BRIDGE_SELECTORS,
   bridgeRefusal,
@@ -52,11 +53,13 @@ import type {
 const host = (
   fm: Record<string, unknown>,
   iso: string | null = null,
-  surface: "diary" | "journal" = "diary"
+  surface: "diary" | "journal" = "diary",
+  navUnit: "week" | "month" | "quarter" | "year" | null = null
 ): BridgeHostFacts => ({
   declares: (prop) => prop in fm,
   valueOf: (prop) => fm[prop],
   iso,
+  navUnit,
   surface,
 });
 
@@ -243,6 +246,56 @@ describe("the window is the host note's own period", () => {
     expect(result.value.end).toBe("2026-07-23");
   });
 
+  it("takes the period its own navigator is showing (1.0.88)", () => {
+    // *"from the diary section seems to be broken."* The journal's bridge
+    // section composes `period-nav:month` above `bridge-readings:` precisely
+    // because a leaf note has no period of its own — and the navigator passes
+    // its answer through frontmatter, which it does not write until a pill is
+    // pressed. So a freshly composed section drew a navigator saying October
+    // 2026 over a refusal saying the note has no period: one card, two answers.
+    const nowMonth = moment().startOf("month");
+    const result = bridgeWindow(host({}, null, "journal", "month"));
+    if (!result.ok) throw new Error("expected a window");
+    expect(result.value.unit).toBe("month");
+    expect(result.value.start).toBe(nowMonth.format("YYYY-MM-DD"));
+    expect(result.value.end).toBe(
+      nowMonth.clone().endOf("month").format("YYYY-MM-DD")
+    );
+    // THE UNIT IS THE NAVIGATOR'S, all four of them — this is not a month-
+    // shaped special case for the one section that ships today.
+    const week = bridgeWindow(host({}, null, "journal", "week"));
+    if (!week.ok) throw new Error("expected a window");
+    expect(week.value.unit).toBe("week");
+  });
+
+  it("lets a declared period and a dated entry both outrank the navigator", () => {
+    // LAST, AFTER BOTH PROPERTIES, which is what keeps this from being the
+    // defaulted window §2 refuses to have. A note that declares a period means
+    // it, and a dated entry IS one; the chrome is asked only by a note that
+    // says neither.
+    const declared = bridgeWindow(
+      host({ "week-start": "2026-07-22" }, null, "journal", "month")
+    );
+    if (!declared.ok) throw new Error("expected a window");
+    expect(declared.value.unit).toBe("week");
+    expect(declared.value.start).toBe("2026-07-20");
+
+    const dated = bridgeWindow(host({}, "2026-07-23", "diary", "month"));
+    if (!dated.ok) throw new Error("expected a window");
+    expect(dated.value.unit).toBe("day");
+    expect(dated.value.start).toBe("2026-07-23");
+  });
+
+  it("still refuses a note with no period and no navigator (1.0.88)", () => {
+    // The refusal does not become unreachable: a bridge written by hand into a
+    // plain note has nothing to anchor to and still says which line to add.
+    const result = bridgeWindow(host({}, null, "journal", null));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected a refusal");
+    expect(result.refusal.check).toBe("host-period");
+    expect(result.refusal.message).toContain("`month-start`");
+  });
+
   it("accepts a declared-but-blank period property", () => {
     // The shipped templates ship `week-start:` empty until you navigate. A note
     // that says it is a weekly dashboard is one whether or not it has chosen
@@ -380,8 +433,34 @@ describe("both directives are routed and neither skips the guard", () => {
     // 2.56.25's rule: the switch keeps the routing and not the work. Both
     // cases are a single delegating call.
     const src = widgets();
-    expect(src).toContain("buildBridgeNotesRegion(this.plugin, rest, label, ctx)");
-    expect(src).toContain("buildBridgeReadingsRegion(this.plugin, rest, label, ctx)");
+    expect(src).toContain(
+      "buildBridgeNotesRegion(this.plugin, rest, label, ctx, navUnit)"
+    );
+    expect(src).toContain(
+      "buildBridgeReadingsRegion(this.plugin, rest, label, ctx, navUnit)"
+    );
+    // `navUnit` IS A FENCE FACT AND NOT WORK EITHER (1.0.88): one pass over the
+    // fence's lines, computed where `headerOwning` is, and threaded in. The
+    // switch still only routes.
+    expect(src).toContain("const navUnit =");
+  });
+
+  it("carries the navigator's unit from the fence to the host facts (1.0.88)", () => {
+    // THE WHOLE CHAIN, AS A SOURCE SHAPE, because the suite has no DOM and
+    // every link in it is wiring: the fence finds the `period-nav:` line, the
+    // loop hands it to the builder, the builder hands it to `bridgeHostFacts`,
+    // and `bridgeWindow` reads it. A break anywhere along it is a bridge that
+    // refuses under a navigator — which is the bug this round is, and it is
+    // invisible to every test that calls `bridgeWindow` directly.
+    const src = widgets();
+    // 1. The fence's own pass, matching the directive by keyword.
+    expect(src).toContain('line.split(":")[0].trim() === "period-nav"');
+    expect(src).toContain("periodNavUnit(line.slice(line.indexOf(\":\") + 1))");
+    // 2. Threaded into the per-line builder, last of the fence facts.
+    expect(src).toContain("noteTextNow,\n          navUnit\n        );");
+    // 3. And into the host facts, which is what `bridgeWindow` reads.
+    expect(bridge()).toContain("bridgeHostFacts(plugin, ctx, navUnit)");
+    expect(fnBody("bridgeHostFacts", "bridge-widgets")).toContain("navUnit,");
   });
 
   it("plans through one shared entry point, so the guard cannot be on one and not the other", () => {
@@ -531,7 +610,16 @@ describe("period-nav routes all four units", () => {
       .filter((l) => !l.trim().startsWith("//"))
       .join("\n");
     expect(code).not.toContain('rest.trim() === "month" ? "month" : "week"');
-    expect(code).toContain('arg === "month" || arg === "quarter" || arg === "year"');
+    // THE FOUR-VALUE DEFAULT IS ONE FUNCTION AS OF 1.0.88, because a bridge in
+    // the same fence now asks the same line which period it is showing — and
+    // two copies of this default is exactly how `period-nav:quarter` built a
+    // week navigator for five releases.
+    expect(code).toContain("periodNavUnit(arg)");
+    const nav = readSrc("periodnav")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    expect(nav).toContain('a === "month" || a === "quarter" || a === "year" ? a : "week"');
   });
 
   it("has a period property for every unit it routes", () => {
