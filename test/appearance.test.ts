@@ -1250,10 +1250,19 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     // was not stretched and the used alignment fell back to flex-start — which
     // is why the whole shortfall read as a box drawn underneath rather than as
     // air on both sides.
-    // `\n  height:` and not `height:` — the rule still carries `line-height: 1`,
-    // and a bare substring match passes for the wrong reason either way round.
+    // ── AND `auto` RATHER THAN NO DECLARATION, WHICH IS NOT THE SAME ────
+    //
+    // DELETING IT MOVED THE BOX INSTEAD OF CLOSING IT. This is a `<button>`,
+    // and Obsidian's app.css gives every one `height: var(--input-height)` —
+    // 30px. `height: 2em` was shadowing that, so removing the line handed the
+    // trigger to app.css rather than to `stretch`: measured again, 30px in a
+    // 34px strip on a diary entry (the 2px "slither") and 30px against 22px
+    // pills on a bridge's bar, where the trigger became the TALLEST item and
+    // the blank box moved under the chevrons. `obsidian-button-height` in its
+    // second form — there a chip-shaped button is 30px until you reset it, here
+    // a button is 30px again the moment you stop.
     const base = body(".ca-jeh-datenav-trigger");
-    expect(base).not.toContain("\n  height:");
+    expect(base).toContain("height: auto");
     // THE PILLS STILL SET THE ROW, which is why removing the one declaration
     // changes no height anywhere: the trigger's content was never the tallest
     // thing in the strip.

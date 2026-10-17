@@ -50,11 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--ca-text-sm`. 0.85 of the number beside it, in every context neither
   overrode; and `stretch` applies only to an `auto` cross-size, so a definite
   height was not stretched and the alignment fell back to flex-start, putting
-  the whole shortfall below the text. The trigger declares no height now and
+  the whole shortfall below the text. The trigger is `height: auto` now and
   stretches into the row the pills set, which changes no height anywhere — its
   content was never the tallest thing in the strip. The overview banner had
   already arrived at this once for its own reason; what it could not do from
   inside one context was stop the other three re-deriving the mismatch.
+  **`auto` and not deletion**: the trigger is a `<button>`, and Obsidian's
+  app.css gives every one of them `height: var(--input-height)` — 30px — which
+  the `2em` was shadowing. Removing the line handed it to app.css rather than to
+  `stretch`, which left a 2px sliver on a diary entry and, on a bridge's bar,
+  made the trigger the tallest item and moved the blank box under the chevrons.
 - **A bridge did not follow its navigator.** The period came from one
   frontmatter read taken when the block was postprocessed, outside the live
   widget — so pressing *next* repainted the rows and the header from the period

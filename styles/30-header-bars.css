@@ -1472,11 +1472,9 @@ body.is-mobile
 .ca-journal-widget-block.ca-journal-stack
   > .ca-journal-entry-context.ca-jec-nav-only
   .ca-jeh-datenav-trigger {
-  /* NO HEIGHT HERE EITHER (1.0.91). This restated the base's `2em` beside a
-     restated `--ca-text-sm`, which is the mismatch 50-entry-header.css names in
-     full: the pills above set the row at the strip's em and this measured 2em
-     against 0.85 of it, so the stack's navigator carried the same blank box
-     under its date. The pills keep their `2em`; this stretches into it. */
+  /* NO HEIGHT HERE EITHER — it restated the base's `2em` beside a restated
+     `--ca-text-sm`, which is the blank box 50-entry-header.css names in full
+     (1.0.91). The pills above keep the row; this takes the base's `auto`. */
   padding: 0 12px;
   font-size: var(--ca-text-sm);
 }

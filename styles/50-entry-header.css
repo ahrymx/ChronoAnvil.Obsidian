@@ -184,10 +184,23 @@
  * alignment fell back to flex-start — which is why none of the shortfall landed
  * above the text and all of it read as a box drawn underneath.
  *
- * SO THE HEIGHT COMES OFF, AND NOTHING REPLACES IT. The pills still set the row
- * and the trigger now stretches into it; its own `align-items: center` centres
- * the label in whatever it gets. The row's height is unchanged everywhere —
- * the trigger's content was never the tallest thing in it.
+ * SO THE HEIGHT BECOMES `auto`, AND THAT WORD IS THE WHOLE FIX. The pills still
+ * set the row and the trigger stretches into it; its own `align-items: center`
+ * centres the label in whatever it gets. The row's height is unchanged
+ * everywhere — the trigger's content was never the tallest thing in it.
+ *
+ * ── AND `auto` RATHER THAN NO DECLARATION AT ALL, WHICH IS NOT THE SAME ──
+ *
+ * DELETING IT WAS THE FIRST ATTEMPT AND IT MOVED THE BOX INSTEAD OF CLOSING IT.
+ * This is a `<button>`, and Obsidian's app.css gives every one of them
+ * `height: var(--input-height)` — 30px. `height: 2em` was shadowing that, so
+ * removing the line did not hand the trigger to `stretch`, it handed it to
+ * app.css: 30px in a 34px strip on a diary entry (a 2px "slither", measured),
+ * and 30px against 22px pills on a bridge's bar, where the trigger became the
+ * TALLEST item and the blank box moved under the chevrons. That is the memo
+ * `obsidian-button-height` records, in its second form — there a chip-shaped
+ * button is 30px until you reset it, here a button is 30px again the moment you
+ * stop. `auto` is the reset; absence is not.
  *
  * THE OVERVIEW BANNER HAD ALREADY ARRIVED HERE ONCE, for its own reason, and
  * its words are the argument for making it the base: *"the segments stop
@@ -199,6 +212,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: auto;
   padding: 0 10px;
   border: none;
   border-radius: 0;
