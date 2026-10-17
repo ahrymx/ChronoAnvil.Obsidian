@@ -5,6 +5,50 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.92] - 2026-10-17
+
+### Fixed
+
+- **A refused bridge kept nothing.** *"switched trend view and this error
+  popped up, but it also replaced the entire section so its sort of a
+  soft-lock."* It did, twice over.
+
+  `buildBridge` decided the refusal at postprocess time and returned the
+  message **before `liveScopedWidget` existed**, so there was no live widget to
+  repaint and nothing could ever ask the question a second time: the section was
+  a red sentence until the note was closed and reopened. Every refusal is
+  decided from facts that change under the block — the host note's frontmatter,
+  its `type:`, the kinds and trackers the vault defines — and `frontmatterOf`
+  answers `{}` for a file the metadata cache has not parsed yet, the fallback
+  its own comment anticipates. A question asked one tick too early was answered
+  no, for good. The refusal now lives inside the build closure beside the
+  per-paint resolve that was already there, so the next change to the host note
+  re-asks it.
+
+  And the refusal **replaced the bar** — the title, the chevron, the period
+  navigator and the cog — with one line of text. 1.0.89 argued for that in as
+  many words (*"a refused bridge has no bar to carry one. Its door is* Edit
+  sections…*"*) and the door it named is on the page's banner, not on the
+  block. That is reversed: the bar is the invariant and the body is what varies,
+  so every one of the eight refusals now reads as "this section, and why it
+  cannot draw", and the one row that could never be offered before — **Bridge
+  settings…**, the window that changes the very answer being refused — is one
+  press away. A refused bar carries no Freeze/Refresh/Unfreeze row: there is no
+  resolved period for a snapshot to be of.
+
+### Changed
+
+- The bridge's watch list and snapshot key are computed from the **directive**
+  rather than from a first resolve. `plan.surface` is `otherSurface(
+  host.surface)` by definition and `planBridge` returns the target it was given
+  unchanged, so neither ever needed a plan — and asking a resolve for them was
+  the only thing keeping the postprocess-time gate alive. Both are still
+  computed once, which is the constraint that matters: a scope recomputed per
+  paint is a different watch list handed to a `LiveWidget` that has already
+  registered one.
+- The shipped documentation's two stale `⋯` references for a bridge are now the
+  cog that replaced them in 1.0.91.
+
 ## [1.0.91] - 2026-10-17
 
 ### Changed

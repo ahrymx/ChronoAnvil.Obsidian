@@ -195,15 +195,56 @@ describe("the cog sits on the bridge's own title row", () => {
     expect(menu).toContain('i.setTitle("Unfreeze (go live)")');
   });
 
-  it("is not drawn on a refusal, and cannot be", () => {
-    // `buildBridge` returns `refusalEl` before the frame exists, so a refused
-    // bridge has no bar for a cog to stand on. The door onto one is *Edit
-    // sections…*, which lists the section whatever its directive says.
+  it("is drawn on a refusal too, which is where it matters most (1.0.92)", () => {
+    //   "switched trend view and this error popped up, but it also replaced
+    //    the entire section so its sort of a soft-lock"
+    //
+    // 1.0.89 asserted the OPPOSITE here — *"`buildBridge` returns `refusalEl`
+    // before the frame exists, so a refused bridge has no bar for a cog to
+    // stand on. The door onto one is* Edit sections…*"* — and the door it named
+    // is on the page's banner rather than on the block. A reader who pressed a
+    // control on this bar and got a refusal was left with no control at all,
+    // and three of the eight refusals are about the HOST, so one can arrive at
+    // a block nobody typed in.
+    //
+    // THE BAR IS THE INVARIANT NOW. The refusal goes in the body where the rows
+    // would be, and the one row a refused block can offer — the window that
+    // changes the very answer being refused — is one press away.
     const body = fnBody("buildBridge", "bridge-widgets");
-    expect(body.indexOf("return refusalEl(")).toBeGreaterThan(0);
-    expect(body.indexOf("return refusalEl(")).toBeLessThan(
-      body.indexOf("liveScopedWidget(")
+    const live = body.indexOf("liveScopedWidget(");
+    expect(live).toBeGreaterThan(0);
+    // Nothing returns a bare refusal ahead of the live widget any more.
+    expect(readCode("bridge-widgets")).not.toContain(
+      "return refusalEl(planned.refusal.message)"
     );
+    const refused = body.indexOf("const refused = bridgeHeader(");
+    expect(refused).toBeGreaterThan(live);
+    const call = body.slice(refused, body.indexOf("return el;", refused));
+    // A null plan, the reader's label, the stepper, and the cog.
+    expect(call).toContain("{ rescoping: false, configure }");
+    expect(call).toContain("navFor");
+    expect(call).toContain("{ store: foldStore, key }");
+    expect(call).toContain("body.appendChild(refusalEl(again.refusal.message))");
+  });
+
+  it("offers no snapshot row on a refused bar, having no window to take one of", () => {
+    // Freeze, Refresh and Unfreeze are writes about a RESOLVED period. A
+    // refused block has none, so the three actions are absent rather than
+    // handed in as no-ops — a menu row that presses and cannot mean anything is
+    // the defect `journal-sections.ts` names as "a control that draws, flips,
+    // saves and changes nothing".
+    const head = fnBody("bridgeHeader", "bridge-widgets");
+    expect(head).toContain("freeze?: () => void;");
+    expect(head).toContain("refresh?: () => void;");
+    expect(head).toContain("thaw?: () => void;");
+    const menu = head.slice(head.indexOf("const buildMenu"));
+    expect(menu).toContain(
+      "if (!actions.freeze && !actions.refresh && !actions.thaw) return;"
+    );
+    // And it stands BEFORE every row that would press one.
+    expect(
+      menu.indexOf("if (!actions.freeze && !actions.refresh && !actions.thaw) return;")
+    ).toBeLessThan(menu.indexOf('i.setTitle("Freeze this view")'));
   });
 
   it("keeps the opener in the window's own file", () => {

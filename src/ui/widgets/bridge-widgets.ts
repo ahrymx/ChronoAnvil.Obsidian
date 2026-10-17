@@ -377,16 +377,28 @@ function refusalEl(message: string): HTMLElement {
 // indistinguishable from an unscoped one that has quietly lost most of its rows
 // — the argument formatPeriodLabel was extracted for in 2.52, and it binds
 // harder here because the reader did not choose this window, the host note did.
+//
+// ── AND IT IS DRAWN ON A REFUSAL TOO, WHICH IS THE WHOLE OF 1.0.92 ────────
+//
+// `plan` is nullable because a refused bridge has no plan and still has to
+// have a bar. Everything this function reads off one — the title's fallback,
+// the window phrase, the count — has an answer without it; everything it does
+// NOT have an answer for is a snapshot action, and those are optional below for
+// the same reason. See `buildBridge` for why a refusal stopped being a bare
+// sentence in place of the section.
 function bridgeHeader(
   host: HTMLElement,
-  plan: BridgePlan,
+  plan: BridgePlan | null,
   label: string | null,
   count: number | null,
   snap: { frozen: boolean; takenIso: string | null },
   actions: {
-    freeze: () => void;
-    refresh: () => void;
-    thaw: () => void;
+    // Absent on a refused bridge: there is no window resolved, so there is
+    // nothing a snapshot could be OF. The menu withholds the rows rather than
+    // offering a press that cannot mean anything.
+    freeze?: () => void;
+    refresh?: () => void;
+    thaw?: () => void;
     rescoping: boolean;
     toggleMode?: () => void;
     mode?: "cards" | "list";
@@ -443,14 +455,24 @@ function bridgeHeader(
   // The stepper, or nothing at all — the note slot below is where both of those
   // are argued.
   const stepper = snap.frozen ? null : nav;
-  const phrase =
-    snap.frozen && snap.takenIso
+  // THE WINDOW, OR NOTHING TO SAY ABOUT IT. A refused bridge has resolved no
+  // period — half the refusals ARE "this note has no period" — so the slot
+  // falls to the stepper, which on those is the control that fixes it.
+  const phrase = !plan
+    ? null
+    : snap.frozen && snap.takenIso
       ? `${plan.window.label} · frozen ${snap.takenIso}`
       : plan.window.label;
   const section = foldableSection(
     host,
     {
-      title: `🌉 ${label ?? plan.targetLabel}`,
+      // THE READER'S OWN TITLE FIRST, which is what makes a refused bar
+      // nameable at all: both catalogues compose one (`|From the diary`,
+      // `|From the journals`), so the only bridge that reaches the bare word
+      // is a hand-typed line with no label — and naming it after a target the
+      // renderer just declined would be the bar agreeing with the refusal
+      // under it.
+      title: `🌉 ${label ?? plan?.targetLabel ?? "Bridge"}`,
       level: 2,
       // The rows, once they are known. Null while the read is still out,
       // because a pill reading `0` because nothing has counted yet is worse
@@ -479,7 +501,7 @@ function bridgeHeader(
       // the rows are not of — §8's decay, which `isRescopingNote` refuses
       // freezing for in the first place. There the phrase is the whole point:
       // the window, and when it was taken.
-      note: stepper ? undefined : phrase,
+      note: stepper ? undefined : (phrase ?? undefined),
       noteRender: stepper
         ? (slot) => {
             slot.appendChild(stepper());
@@ -566,7 +588,9 @@ function bridgeHeader(
       );
     }
     // Freezing is not offered where it cannot mean anything — a dashboard that
-    // re-scopes in place would keep the snapshot when the reader pressed next.
+    // re-scopes in place would keep the snapshot when the reader pressed next,
+    // and (1.0.92) a refused block has no resolved window to take one of.
+    if (!actions.freeze && !actions.refresh && !actions.thaw) return;
     if (!snap.frozen && actions.rescoping) {
       menu.addItem((i) =>
         i
@@ -578,15 +602,15 @@ function bridgeHeader(
     }
     if (snap.frozen) {
       menu.addItem((i) =>
-        i.setTitle("Refresh snapshot").setIcon("refresh-cw").onClick(actions.refresh)
+        i.setTitle("Refresh snapshot").setIcon("refresh-cw").onClick(actions.refresh!)
       );
       menu.addItem((i) =>
-        i.setTitle("Unfreeze (go live)").setIcon("play").onClick(actions.thaw)
+        i.setTitle("Unfreeze (go live)").setIcon("play").onClick(actions.thaw!)
       );
       return;
     }
     menu.addItem((i) =>
-      i.setTitle("Freeze this view").setIcon("snowflake").onClick(actions.freeze)
+      i.setTitle("Freeze this view").setIcon("snowflake").onClick(actions.freeze!)
     );
   };
 
@@ -618,10 +642,32 @@ function bridgeHeader(
   // offers Refresh and Unfreeze in its place, so the record is still not
   // editable and the way back is still one press.
   //
-  // NOT ON A REFUSAL, and that needs no test: `buildBridge` returns `refusalEl`
-  // before this frame is built, so a refused bridge has no bar to carry one.
-  // Its door is *Edit sections…*, which lists the section whatever its
-  // directive says.
+  // ── AND ON A REFUSAL, WHICH IS THE REVERSAL (1.0.92) ────────────────
+  //
+  //   "switched trend view and this error popped up, but it also replaced
+  //    the entire section so its sort of a soft-lock"
+  //
+  // 1.0.89 said the opposite here, in these words: *"NOT ON A REFUSAL, and
+  // that needs no test: `buildBridge` returns `refusalEl` before this frame is
+  // built, so a refused bridge has no bar to carry one. Its door is* Edit
+  // sections…*, which lists the section whatever its directive says."* The
+  // first sentence was a description of the code and the second was the
+  // mistake: a refusal replaced the bar, the cog, the chevron and the stepper
+  // with one red sentence, and the door it named is on the PAGE's banner, not
+  // on the block. A reader who had just pressed a control on that bar was left
+  // with no control at all.
+  //
+  // AND IT IS A TRAP OF OUR OWN MAKING, which is what settles it. Three of the
+  // eight refusals are about the HOST — its period, its surface — so they can
+  // arrive at a block nobody typed and nobody edited, and the reader's only
+  // evidence is that the section they were using is gone. A control that can
+  // put the block into a state with no way out is not a control.
+  //
+  // SO THE BAR IS THE INVARIANT AND THE BODY IS WHAT VARIES. Every refusal now
+  // reads as "this section, and why it cannot draw" rather than as a sentence
+  // where a section used to be, and the one row that could not be offered
+  // before — *Bridge settings…*, the window that changes the very answer being
+  // refused — is one press away.
   const cog = settingsButton(frame.actions, "ca-bridge-cog", buildMenu);
   cog.setAttr("aria-label", "Bridge settings");
   cog.setAttr("title", "Bridge settings");
@@ -893,7 +939,10 @@ function buildBridge(
   rest: string,
   label: string | null,
   fill: (body: HTMLElement, plan: BridgePlan) => void,
-  scope: (plan: BridgePlan) => string[],
+  // The folders this bridge reads, asked of the SURFACE it reads rather than
+  // of a plan — see the block comment below, which is why a refused bridge can
+  // still be a live one.
+  scope: (surface: IndexSurface) => string[],
   rowsFor: (plan: BridgePlan) => Promise<SnapshotRow[]>,
   // Run before each rebuild and once on unload, for anything a `fill` leaves
   // behind that outlives its element. Only the trend needs it — a Chart.js
@@ -943,19 +992,79 @@ function buildBridge(
     });
   };
 
-  const planned = resolve();
+  // ── A REFUSAL IS A STATE OF THE BLOCK, NOT INSTEAD OF IT (1.0.92) ─────
+  //
+  // THIS USED TO RETURN BEFORE THE LIVE WIDGET EXISTED:
+  //
+  //     const planned = resolve();
+  //     if (!planned.ok) return refusalEl(planned.refusal.message);
+  //
+  // — which made a refusal decided at POSTPROCESS TIME permanent. There was no
+  // `LiveWidget` to repaint, so nothing could ever ask the question a second
+  // time; the section was a red sentence until the note was closed and
+  // reopened. Every refusal here is decided from facts that change under the
+  // block — the host's frontmatter, its `type:`, the catalogue of kinds and
+  // trackers the vault defines — and `frontmatterOf` answers `{}` for a file
+  // the metadata cache has not parsed yet, the fallback its own comment
+  // anticipates. So a question asked one tick too early was answered "no"
+  // forever.
+  //
+  // THE SECOND RESOLVE WAS ALREADY INSIDE THE CLOSURE and said so — *"a
+  // directive that has become unresolvable since the first paint says so"* —
+  // so the only thing the outer one decided was whether the inner one would
+  // ever run. It is gone, and the refusal lives where the re-ask does.
+  //
+  // THE TWO THINGS IT USED TO SETTLE ARE BOTH ANSWERABLE WITHOUT IT:
+  //
+  // · THE WATCH LIST. `plan.surface` IS `otherSurface(host.surface)` — the one
+  //   line `core/bridge.ts` states as the whole join — so the folders can be
+  //   asked of the surface directly. That keeps the list computed ONCE, which
+  //   is the constraint: a scope recomputed per paint is a different watch list
+  //   handed to a `LiveWidget` that has already registered one.
+  //
+  // · THE SNAPSHOT KEY. `snapshotKeyFor` is built from the direction and the
+  //   target, and `planBridge` returns the target it was given, unchanged — so
+  //   the directive's own target is the same key the plan would have produced,
+  //   available whether or not there is a plan. A key that could stop finding
+  //   the region it wrote was the hazard, and a key derived from the LINE
+  //   rather than from a resolve cannot drift at all.
+  const watch = scope(otherSurface(hostSurface(plugin, path)));
+  const key = snapshotKeyFor(direction, target);
 
-  // Refused at render as well as in the editor — §2.3. A hand-written
-  // directive, or one whose target lost its date property after it was written,
-  // says why instead of going quiet. A vault outlives the session that
-  // configured it.
-  if (!planned.ok) return refusalEl(planned.refusal.message);
+  // The fold's memory, in the two methods `foldableSection` asks for. The
+  // KEY is this module's — `bridgeFoldKey` namespaces it under `bridge:` so a
+  // bridge and a `header:` bar of the same name in the same note cannot
+  // collide — so the store ignores the one handed back and answers about the
+  // bridge it was built for.
+  //
+  // Hoisted out of the build closure in 1.0.92: a refused bar folds like any
+  // other section, and it is the same fold — the reader who collapsed this
+  // section does not want it open again because it has stopped resolving.
+  const foldStore: FoldStore = {
+    isCollapsed: () => bridgeFoldState(plugin, path, key),
+    setCollapsed: (_foldKey, value) => {
+      void setBridgeFold(plugin, path, key, value);
+    },
+  };
 
-  // THE SNAPSHOT KEY IS THE FIRST RESOLVE'S, DELIBERATELY. It is built from the
-  // direction and the TARGET, neither of which a period step can change, and a
-  // key recomputed per paint is a key that could stop finding the region it
-  // wrote.
-  const key = snapshotKeyFor(direction, planned.value.target);
+  // THE DOOR, OPENED FROM HERE BECAUSE THIS IS WHERE THE FACTS ARE. The window
+  // needs the note and which of the two directives it is configuring;
+  // everything else it resolves for itself, through the same `modelForNote`
+  // every other read-only door goes through.
+  //
+  // Hoisted beside the fold store for the same reason: it is the one row a
+  // refused bar can offer, and the only one that can change the answer being
+  // refused.
+  const configure = () => {
+    void openBridgeWindow(plugin.app, plugin, path, (next) =>
+      bridgeTextRefusal(plugin, path, direction, next)
+    );
+  };
+
+  // The stepper, where the fence carries a navigator. A builder rather than an
+  // element — see `bridgeHeader`'s `nav` — and named here because both the
+  // refused bar and the resolved one hand it over.
+  const navFor = navUnit ? () => buildPeriodNav(plugin, ctx, navUnit) : null;
 
   const act = (run: () => Promise<boolean>, done: string) => () => {
     void run().then((ok) => {
@@ -963,7 +1072,7 @@ function buildBridge(
     });
   };
 
-  return liveScopedWidget(plugin, ctx, scope(planned.value), () => {
+  return liveScopedWidget(plugin, ctx, watch, () => {
     const el = createDiv({ cls: "ca-bridge" });
     const body = el.createDiv({ cls: "ca-bridge-body" });
 
@@ -971,20 +1080,26 @@ function buildBridge(
     // become unresolvable since the first paint says so rather than drawing the
     // period it used to have.
     const again = resolve();
-    if (!again.ok) return refusalEl(again.refusal.message);
+    if (!again.ok) {
+      // THE SECTION, SAYING WHY IT CANNOT DRAW. The bar carries the title, the
+      // chevron, the stepper and the cog; the refusal goes in the body where
+      // the rows would be. No snapshot actions — there is no resolved window
+      // for one to be of — so the menu is the single *Bridge settings…* row.
+      const refused = bridgeHeader(
+        el,
+        null,
+        label,
+        null,
+        { frozen: false, takenIso: null },
+        { rescoping: false, configure },
+        { store: foldStore, key },
+        navFor
+      );
+      body.appendChild(refusalEl(again.refusal.message));
+      refused.body.appendChild(body);
+      return el;
+    }
     const plan = again.value;
-
-    // The fold's memory, in the two methods `foldableSection` asks for. The
-    // KEY is this module's — `bridgeFoldKey` namespaces it under `bridge:` so a
-    // bridge and a `header:` bar of the same name in the same note cannot
-    // collide — so the store ignores the one handed back and answers about the
-    // bridge it was built for.
-    const foldStore: FoldStore = {
-      isCollapsed: () => bridgeFoldState(plugin, path, key),
-      setCollapsed: (_foldKey, value) => {
-        void setBridgeFold(plugin, path, key, value);
-      },
-    };
 
     // THE FROZEN STATE IS READ FROM THE FILE, ASYNCHRONOUSLY, AND THAT ORDER
     // IS FORCED. LiveWidget's `build` is synchronous by contract; Obsidian has
@@ -1040,15 +1155,9 @@ function buildBridge(
           }, "Bridge is live again."),
           rescoping: isRescopingNote(plugin, path, navUnit),
           mode: currentMode,
-          // THE DOOR, OPENED FROM HERE BECAUSE THIS IS WHERE THE FACTS ARE.
-          // The window needs the note and which of the two directives it is
-          // configuring; everything else it resolves for itself, through the
-          // same `modelForNote` every other read-only door goes through.
-          configure: () => {
-            void openBridgeWindow(plugin.app, plugin, path, (next) =>
-              bridgeTextRefusal(plugin, path, direction, next)
-            );
-          },
+          // Named above the live widget, so the refused bar offers the same
+          // row — see `configure` there.
+          configure,
           // AND THE TREND, ON THE DIRECTION THAT HAS ONE. `plan.trend` is not
           // a field — the flag is read off the directive by the readings
           // builder, which passes what it found — so this closure is handed
@@ -1117,7 +1226,7 @@ function buildBridge(
         // there is exactly one navigator on the note and it is this one. The
         // `period-nav:` LINE is untouched either way: it is what `navUnit` is
         // read from and what the window's *Over* question writes.
-        navUnit ? () => buildPeriodNav(plugin, ctx, navUnit) : null);
+        navFor);
         // The body was drawn before the header could be — the frozen read is
         // async and the header must not flash the wrong state — so it MOVES
         // into the frame's body rather than the frame being built around it.
@@ -1237,7 +1346,7 @@ export function buildBridgeNotesRegion(
         renderContent();
       })();
     },
-    (plan) => (plan.surface === "journal" ? journalFolders : diaryFolders(plugin)),
+    (surface) => (surface === "journal" ? journalFolders : diaryFolders(plugin)),
     // What freezing would write. Built from the same read the live block draws
     // from, so a snapshot is the block as it stood — not a second query that
     // could answer differently.

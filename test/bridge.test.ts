@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fnBody, readSrc } from "./sources";
+import { fnBody, readCode, readSrc } from "./sources";
 import { computeSectionRuns } from "../src/ui/headerbar";
 import { OBSIDIAN_DOM } from "../src/core/constants";
 import {
@@ -579,13 +579,64 @@ describe("every bridge names the period it covered", () => {
     const src = readSrc("bridge-widgets");
     const at = src.indexOf("const section = foldableSection(");
     const call = src.slice(at, src.indexOf("fold.store", at));
-    expect(call).toContain("note: stepper ? undefined : phrase,");
+    expect(call).toContain("note: stepper ? undefined : (phrase ?? undefined),");
     expect(call).toContain("noteRender: stepper");
     // The phrase itself, computed just above the call — frozen appends when the
     // snapshot was taken, and that is one phrase rather than two spans.
     const lead = src.slice(src.indexOf("const stepper = "), at);
     expect(lead).toContain("plan.window.label");
     expect(lead).toContain("frozen ${snap.takenIso}");
+  });
+
+  it("makes a refusal a repaintable state, not a terminal one (1.0.92)", () => {
+    // THE SOFT-LOCK'S ROOT, AND IT IS NOT THE MISSING COG. A refusal decided at
+    // POSTPROCESS time returned before `liveScopedWidget` existed, so there was
+    // no `LiveWidget` to repaint and nothing could ever ask the question a
+    // second time. Every refusal here is decided from facts that change under
+    // the block — the host's frontmatter, its `type:`, the kinds and trackers
+    // the vault defines — and `frontmatterOf` answers `{}` for a file the
+    // metadata cache has not parsed yet, which is the fallback its own comment
+    // anticipates. One tick early and the answer was "no" until the note was
+    // closed and reopened.
+    // COMMENT LINES OUT FIRST. The comment above the change quotes the two
+    // lines it deleted, `refusalEl` included, so a raw read finds a refusal
+    // ahead of the live widget and the assertion passes for the wrong reason in
+    // reverse. Same trap `readCode` exists for, applied to one function.
+    const body = fnBody("buildBridge", "bridge-widgets")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    const live = body.indexOf("liveScopedWidget(");
+    expect(live).toBeGreaterThan(0);
+    // Every refusal this function draws is INSIDE the build closure.
+    const refusals = [...body.matchAll(/refusalEl\(/g)].map((m) => m.index!);
+    expect(refusals.length).toBeGreaterThan(0);
+    for (const at of refusals) expect(at).toBeGreaterThan(live);
+    // AND NONE OF THEM IS RETURNED, which is the half the positions above do
+    // not cover: a `return refusalEl(…)` placed INSIDE the closure is still
+    // inside the live widget and still throws the bar away — it just repaints
+    // the same bare chip. The only thing this function does with a refusal is
+    // put it in the body of a frame.
+    expect(body).not.toMatch(/return refusalEl\(/);
+    expect(body).toContain("body.appendChild(refusalEl(again.refusal.message))");
+    // And the resolve that decides it is the per-paint one.
+    expect(body.indexOf("const again = resolve();")).toBeGreaterThan(live);
+  });
+
+  it("lets a refused bar name itself and say nothing about a period", () => {
+    // A refused bridge has resolved no window — half the refusals ARE "this
+    // note has no period" — so the note slot falls to the stepper, which on
+    // those is the control that fixes it. And the title is the READER's: both
+    // catalogues compose one, so the bare word is only ever reached by a
+    // hand-typed line, and naming the bar after a target the renderer just
+    // declined would be the bar agreeing with the refusal under it.
+    const head = fnBody("bridgeHeader", "bridge-widgets");
+    expect(head).toContain("plan: BridgePlan | null,");
+    // NOTHING, and not a stand-in. A phrase in this slot is a claim about which
+    // period the rows below cover, and a refused block has no rows and no
+    // period — so the slot is empty and the stepper takes it.
+    expect(head).toContain("const phrase = !plan\n    ? null");
+    expect(head).toContain('title: `🌉 ${label ?? plan?.targetLabel ?? "Bridge"}`');
   });
 
   it("gives a frozen block the phrase and never the stepper", () => {
@@ -631,12 +682,22 @@ describe("every bridge names the period it covered", () => {
     expect(live).toBeGreaterThan(0);
     expect(body.indexOf("const again = resolve();")).toBeGreaterThan(live);
     expect(body).toContain("const plan = again.value;");
-    // AND THE SCOPE IS STILL THE FIRST RESOLVE'S: a watch list recomputed per
-    // paint is a different list handed to a `LiveWidget` that has already
-    // registered one. Same for the snapshot key, which is built from the target
-    // and would otherwise be a key that could stop finding its own region.
-    expect(body).toContain("liveScopedWidget(plugin, ctx, scope(planned.value)");
-    expect(body).toContain("snapshotKeyFor(direction, planned.value.target)");
+    // AND THE WATCH LIST AND THE KEY ARE STILL COMPUTED ONCE — but off the
+    // DIRECTIVE rather than off a first resolve (1.0.92), which is what lets a
+    // refused bridge be a live one. `plan.surface` is `otherSurface(
+    // host.surface)` by definition and `planBridge` returns the target it was
+    // given, so neither needed a plan to begin with.
+    expect(body).toContain("liveScopedWidget(plugin, ctx, watch,");
+    expect(body).toContain(
+      "const watch = scope(otherSurface(hostSurface(plugin, path)));"
+    );
+    expect(body).toContain("const key = snapshotKeyFor(direction, target);");
+    // The outer resolve is gone, not moved. A `planned` left in this function
+    // is the gate this round removed — asked of the CODE, because the comment
+    // above it quotes the line it deleted and a raw read would find that.
+    const code = readCode("bridge-widgets");
+    expect(code).not.toContain("const planned = resolve();");
+    expect(code).not.toContain("planned.value");
 
     // THE FRONTMATTER READ IS INSIDE `resolve`, WHICH IS THE WHOLE POINT. A
     // mutant that kept the per-paint call and hoisted `bridgeHostFacts` out of
