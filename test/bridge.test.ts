@@ -598,7 +598,36 @@ describe("every bridge names the period it covered", () => {
     // collapsed bar no longer needs.
     expect(css).not.toContain(".ca-bridge-chevron");
     expect(css).not.toContain(".ca-bridge.is-collapsed");
-    expect(css).toContain(
+
+    // ── AND THE CARD IS THE FRAME'S TOO, AS OF 1.0.90 ──────────────────
+    //
+    // *"its rendered as a widget? this section should never be a widget"*.
+    // `.ca-bridge` painted a background, a border, a radius, 10/12 of padding
+    // and a bottom margin, and withheld them only inside `.ca-journal-sec-block`
+    // or `.ca-journal-sec-fold` — neither of which is where it sits. Its own
+    // frame is one element DOWN, so the two cancel rules never fired and every
+    // bridge in every vault drew a card inside a card.
+    //
+    // ASSERTED AS AN ABSENCE OF DECLARATIONS rather than of a selector, because
+    // `.ca-bridge` still exists: it is the flex column the rows live in.
+    const block = css.slice(css.indexOf("\n.ca-bridge {"));
+    const rule = block.slice(0, block.indexOf("}"));
+    for (const decl of ["background:", "border:", "border-radius:", "padding:", "margin:"]) {
+      expect(rule, decl).not.toContain(decl);
+    }
+    // The two cancel rules went with it — there is nothing left to cancel.
+    expect(css).not.toContain(".ca-journal-sec-block .ca-bridge");
+    expect(css).not.toContain(".ca-journal-sec-fold .ca-bridge");
+    expect(css).not.toContain(".ca-bridge:focus-within");
+    // AND THE BAR IS THE FRAME'S SHAPE. `.ca-bridge .ca-journal-sec` set
+    // `padding: 2px 0`, which beat the frame's own `8px var(--ca-sec-pad-x)` on
+    // file order — so a bridge's title sat on the card's left border and its
+    // rows sat 12px inside it.
+    expect(css).not.toContain(".ca-bridge .ca-journal-sec {");
+    // The private undo of that private rule goes with it: a collapsed bar takes
+    // 70-section-surface.css's own rule, which zeroes the margin and drops the
+    // hairline together.
+    expect(css).not.toContain(
       ".ca-bridge .ca-journal-sec-fold.is-collapsed > .ca-journal-sec"
     );
   });

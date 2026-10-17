@@ -5,6 +5,31 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.90] - 2026-10-17
+
+### Fixed
+
+- **A bridge section was being drawn as a widget.** *"its rendered as a widget?
+  this section should never be a widget"*, reported with a lesson note whose
+  **From the diary** section sat inside a widget card, with its own section
+  frame drawn inside that and a third box inside that one. Three nested boxes
+  where a section has one, and all three came from the same place: nothing
+  joined up the fact that a bridge draws its own section.
+  - **The block stopped taking a name off the navigator beside it.** 1.0.88 put
+    the period navigator in the bridge's own fence, because a journal note has
+    no period of its own — and the navigator is a control this plugin can name
+    while a bridge is not. So the fence read as one nameable thing, the block
+    wore a head calling the whole section *Go to period*, and a head needs a
+    card under it. A fence holding a bridge is now named by the bridge's own bar
+    and by nothing beside it, whichever order the two lines are in.
+  - **The bridge gave up the card it drew for itself.** It had carried one since
+    2.57 and withheld it inside a section's surface — but since the bar became a
+    shared section frame, the surface it sits in is its OWN, one element further
+    in, which neither of those two rules could see.
+  - **And its title row stopped starting at the card's border.** A private
+    padding rule outranked the section frame's, so a bridge was the one section
+    in the plugin whose head and body disagreed about the left edge.
+
 ## [1.0.89] - 2026-10-17
 
 ### Added

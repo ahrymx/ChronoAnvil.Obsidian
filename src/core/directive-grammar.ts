@@ -1118,6 +1118,35 @@ export const FIELD_KEYWORDS: ReadonlySet<string> = new Set([
   "recall",
 ]);
 
+// ── AND THE TWO THAT DRAW A WHOLE SECTION FRAME OF THEIR OWN (1.0.90) ──
+//
+// A bridge is not a field. It owns no `|Title`-headed span of the note body;
+// it builds a `foldableSection` — bar, glyph, count, period, actions, chevron
+// and fold — and `bridge-widgets.ts` says why in as many words: *"a bridge is a
+// section, not a thing that sits in one"*. So it titles itself for a different
+// reason than a field does, and the set above cannot simply be widened: its
+// second half hands every NAMED widget in a fence of fields a field frame of
+// its own, and a navigator wrapped in one would be a control dressed as a
+// section.
+//
+// WHAT THIS IS FOR IS THE ONE QUESTION BOTH SETS ANSWER THE SAME WAY: whether a
+// block may be named after a widget in it. `blockTitle` asks both.
+//
+// THE DEFECT, REPORTED FROM A VAULT: *"its rendered as a widget? this section
+// should never be a widget"*, with a lesson note whose From-the-diary section
+// sat inside a widget card. The journal catalogue composes `period-nav:` and
+// `bridge-readings:` into one fence — 1.0.88's anchor, and the reason the pair
+// shares a block — and `period-nav` IS in `WIDGETS`, with the bar
+// "⏮️ Go to period". So the fence held exactly one keyword the title map could
+// name, the block took a head reading that, and `has-head` drew the widget card
+// the section then sat inside. The same shape as 5.26's band, arriving by the
+// other door: the one nameable thing in the fence was the CONTROL, and what it
+// named was the section beside it.
+export const SELF_FRAMED_KEYWORDS: ReadonlySet<string> = new Set([
+  "bridge-notes",
+  "bridge-readings",
+]);
+
 // What this directive titles itself, or "" for one that titles itself nothing.
 //
 // TRIMMED, AND A BARE TRAILING `|` IS NOTHING. That is the renderer's own rule —

@@ -258,6 +258,43 @@ describe("what a block's head calls it", () => {
     expect(blockTitle(["tasks-table"])).toBe("⏳ Open tasks");
   });
 
+  it("never names a bridge's fence after the navigator beside it", () => {
+    // ── THE 1.0.90 DEFECT, REPORTED FROM A VAULT WITH A SCREENSHOT ──────
+    //
+    // *"its rendered as a widget? this section should never be a widget"* — a
+    // lesson note whose From-the-diary section sat inside a widget card, with
+    // its own section frame drawn inside that.
+    //
+    // 1.0.88 put the navigator in the bridge's fence, because a journal leaf
+    // has no period of its own and the bridge reads the one the navigator is
+    // showing. `period-nav` is in `WIDGETS` with the bar "⏮️ Go to period";
+    // neither bridge keyword is in it at all. So the fence held EXACTLY ONE
+    // nameable thing, the block took that head, and `has-head` drew the card.
+    //
+    // The same shape as the band above, by the other door: the one nameable
+    // thing in the fence was the CONTROL, and what it named was the section
+    // beside it.
+    expect(
+      blockTitle(["period-nav:month", "bridge-readings:Mood|From the diary"])
+    ).toBeNull();
+    // WHATEVER ORDER THEY ARE IN. The catalogue writes the navigator first; a
+    // reader rearranging their own fence is not wrong to put it under the thing
+    // it scopes, and the answer must not depend on that.
+    expect(
+      blockTitle(["bridge-readings:Mood|From the diary", "period-nav:month"])
+    ).toBeNull();
+    // BOTH DIRECTIONS, and the prefix trap is why they are both written out:
+    // `bridge-notes` and `bridge-readings` share seven characters, so a sweep
+    // for one that anchors loosely passes for the other.
+    expect(
+      blockTitle(["period-nav:week", "bridge-notes:meal|From the journals"])
+    ).toBeNull();
+    // AND IT IS THE BRIDGE THAT REFUSES, NOT THE COUNT. A navigator alone is
+    // still a block this map can name — the rule is about what a bridge is, not
+    // about what a navigator is worth.
+    expect(blockTitle(["period-nav:month"])).toBe("⏮️ Go to period");
+  });
+
   it("asks one predicate which fences are bands", () => {
     // A FIELD IS THE TELL. Every keyword in `FIELD_KINDS` owns a keyed span of
     // the note body and draws its own head over it.

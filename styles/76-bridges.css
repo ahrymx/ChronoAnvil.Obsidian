@@ -8,61 +8,58 @@
    of its rows. Same argument formatPeriodLabel was extracted for in 2.52,
    binding harder because the scope is implicit rather than typed.
 
-   Deliberately NOT its own card. A bridge is normally written inside a section
-   that already drew a surface (70-section-surface.css paints the run), and a
-   second background inside that one is the box-in-a-box the empty-state rule
-   names. So: a title row, a muted period, rows. Nothing that competes with the
-   section it sits in.
+   Deliberately NOT its own card. A bridge IS a section — since 2.57.7 it draws
+   the frame, and since 5.10 that frame is `foldableSection`'s — so everything
+   this file would add around it is the box-in-a-box the empty-state rule names.
+   What is left here is the rows: a list, cards, a trend, and the two empty
+   states. Nothing that competes with the frame it hangs under.
 
    Numbered 76 to land after the section surface and before the path/resources
    block, so the muted colours here resolve against a surface that has already
    been painted. */
 
+/* ── AND THE CARD IT DREW ANYWAY IS GONE (1.0.90) ───────────────────────
+ *
+ * THE PARAGRAPH ABOVE WAS TRUE AND THE RULE UNDER IT WAS NOT. `.ca-bridge`
+ * carried a background, a border, a radius, 10/12 of padding and a bottom
+ * margin — a card — and withheld them only where it found itself inside
+ * someone else's. Since 5.10 it is never inside its own: `bridgeHeader` builds
+ * a `foldableSection`, and 70-section-surface.css paints `.ca-journal-sec-fold`
+ * as the card every other section on the page wears. So the two cancel rules
+ * covered the cases where this block sits in a section and missed the one it is
+ * in on every note — its own frame, one element down.
+ *
+ * THE PRIVATE FRAME IS THE ONE THAT STANDS DOWN, which is the rule
+ * 05-inline-widgets.css already states for the summary, entry and journals
+ * widgets: *"the widget gives up the frame it drew for itself"*. The shared one
+ * carries the bar, the count, the period, the cog and the fold, and every other
+ * section measures against it.
+ *
+ * AND THE BAR BECOMES FULL-BLEED WITH IT. `.ca-bridge .ca-journal-sec` set
+ * `padding: 2px 0`, which beat `.ca-journal-sec-fold > .ca-journal-sec`'s
+ * `8px var(--ca-sec-pad-x)` on file order — so a bridge's title started at the
+ * card's border while its own rows started 12px inside it, the one section in
+ * the plugin whose head and body disagreed about the left edge. Deleting the
+ * rule is the fix: the head the frame draws is already the right one. */
 .ca-bridge {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--ca-radius-md);
-  padding: 10px 12px;
-  margin: 0 0 0.9em;
-  transition: border-color 0.15s ease;
 }
 
-.ca-bridge:focus-within {
-  border-color: var(--interactive-accent);
-}
-
-/* Withhold surface when already inside a section card/block surface */
-.ca-journal-sec-block .ca-bridge,
-.ca-journal-sec-fold .ca-bridge {
-  background: none;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  margin: 0;
-}
-
-.ca-bridge .ca-journal-sec {
-  padding: 2px 0;
-  margin-bottom: var(--ca-space-2);
-}
-
-/* ── THE FOLD IS THE FRAME'S (5.10) ──────────────────────────────────────
+/* ── THE FOLD IS THE FRAME'S (5.10), AND SO IS ITS LAST RULE (1.0.90) ───
    Thirty lines stood here drawing a bridge's own chevron on the LEFT, rotating
    it by hand, and hiding `.ca-bridge-body` off a private `.is-collapsed` on the
    block root. All four of those are `foldableSection`'s already — including the
    SIDE, which is the part a reader sees, and which disagreed with every other
    section on the same page for three releases.
 
-   What is left is the one thing that is genuinely this block's: a collapsed
-   bridge is a bar and nothing else, so the bar's own bottom margin — which
-   exists to separate it from the rows — has nothing to separate. The state now
-   sits on the wrapper, so the selector reaches it through the wrapper. */
-.ca-bridge .ca-journal-sec-fold.is-collapsed > .ca-journal-sec {
-  margin-bottom: 0;
-}
+   5.10 kept one, scoped under `.ca-bridge`: it put a collapsed bar's bottom
+   margin back to nothing. That was needed only because `.ca-bridge
+   .ca-journal-sec` had SET one — and with that rule gone the collapsed bar
+   takes the shared one in 70-section-surface.css, which zeroes the margin and
+   drops the hairline in the same two lines. A private rule whose whole job is
+   undoing another private rule goes out with it. */
 
 .ca-bridge .ca-journal-sec.is-foldable {
   cursor: pointer;

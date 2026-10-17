@@ -210,6 +210,7 @@ import {
   parseTabs,
   parseWide,
   FIELD_KEYWORDS,
+  SELF_FRAMED_KEYWORDS,
   hasToken,
   WIDGET_TOKEN,
 } from "../../core/directive-grammar";
@@ -644,6 +645,29 @@ export function blockTitle(lines: readonly string[]): string | null {
   // what it could NAME and ignored everything it could not, which is the same
   // rule only on a fence where everything unnamed is a control.
   if (fieldBand(lines)) return null;
+  // ── AND NEITHER IS A FENCE HOLDING A BRIDGE (1.0.90) ────────────────
+  //
+  // THE THIRD CASE OF THIS FUNCTION'S OWN SENTENCE, and it arrived the way the
+  // second one did — from a vault, with a screenshot: *"its rendered as a
+  // widget? this section should never be a widget"*. A journal leaf's
+  // From-the-diary section is `period-nav:` and `bridge-readings:` in one fence
+  // (1.0.88 put them there, because a leaf has no period of its own), and
+  // `period-nav` is the only one of the two this map can name. So the block
+  // took a head reading "⏮️ Go to period", `has-head` drew the widget card that
+  // head needs under it, and the section drew its own frame inside that.
+  //
+  // A BRIDGE TITLES ITSELF, which is what `SELF_FRAMED_KEYWORDS` records: it
+  // builds a `foldableSection` with its own bar, count, period, cog and fold.
+  // A fence holding one is therefore named by that band and by nothing beside
+  // it — whatever order the directives are in, and whatever else shares the
+  // block.
+  //
+  // ASKED HERE RATHER THAN IN `hasOwnBar`, which is 4.19.1's mistake restated:
+  // that function asks about a block's FIRST CHILD, deliberately, and the
+  // navigator is composed first. The name is chosen here, so the rule belongs
+  // here — the same move 4.21 made for banners after the first fix missed the
+  // entry.
+  if (keywords.some((k) => SELF_FRAMED_KEYWORDS.has(k))) return null;
   const named = new Set(keywords.filter((k) => SECTION_TITLES[k]));
   const only = [...named];
   return only.length === 1 ? SECTION_TITLES[only[0]] : null;
