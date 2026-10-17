@@ -1106,6 +1106,11 @@ export class SectionInserter {
       // re-runnable half"), and a title is the change least worth spending it
       // on, being the one that costs nothing to make later.
       if (q.kind === "title") continue;
+      // A `text` IS SKIPPED ON THE TITLE'S ARGUMENT EXACTLY (1.0.89). The
+      // section is about to be written with no filter tail, which is the answer
+      // "empty" means and the one every shipped composition carries; and the
+      // cog on the block's own bar is one gesture away the moment it is there.
+      if (q.kind === "text") continue;
       // A form is skipped at ADD time on the title's argument exactly (4.59.0),
       // and one step stronger. The section is about to be written in the form
       // the catalogue composes — with its bar — which is the answer an

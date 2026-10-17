@@ -231,9 +231,15 @@ describe("what the toggle is offered on", () => {
     expect(asks("banner")).toBe(false);
     expect(asks("trackers")).toBe(false);
     // AND THE BRIDGE IS THE CASE THAT PROVES THE GATE DOES WORK. It carries a
-    // `|From the journals` and is NOT a field: `bridge-notes` is in
-    // `SECTION_TITLES`, so a line stripped of its label still takes a head from
-    // there and the tick would be a control that changes nothing.
+    // `|From the journals` and is NOT a field, so a line stripped of its label
+    // still takes a head — `bridgeHeader` falls back to the target's own label
+    // — and the tick would be a control that changes nothing.
+    //
+    // THIS SAID "`bridge-notes` is in `SECTION_TITLES`" (1.0.89 §5.7). That map
+    // was replaced by `WIDGETS[k].bar` in 1.0.22 and neither bridge keyword is
+    // in `WIDGETS` at all — both are in `NOT_PAGE_WIDGETS`. The head is the
+    // renderer's, which is why the gate still holds; the table named for it had
+    // been gone for sixty-odd patches.
     expect(asks("bridge")).toBe(false);
     expect(FIELD_KEYWORDS.has("bridge-notes")).toBe(false);
   });

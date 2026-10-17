@@ -83,7 +83,7 @@ export interface BridgeWindow {
 // wants to know *which* guard tripped so it can disable the right control; the
 // reader only ever sees `message`.
 export interface BridgeRefusal {
-  check: "host-period" | "target-date" | "selector";
+  check: "host-period" | "direction" | "target-date" | "selector";
   message: string;
 }
 
@@ -170,6 +170,103 @@ export interface BridgePlan {
 // The join, in one line: a bridge reads the surface its host is not on.
 export function otherSurface(s: IndexSurface): IndexSurface {
   return s === "diary" ? "journal" : "diary";
+}
+
+// ── the directive line, read and written (1.0.89) ─────────────────────
+
+// A bridge directive, taken apart.
+//
+// WHY THIS IS HERE AND NOT IN `directive-grammar.ts`. That file's `splitArgHead`
+// cuts an argument at its first `:`, which is right for every directive whose
+// argument is one value and wrong for this one: `bridge-readings:Mood is:lesson`
+// would come back as `Mood` and `lesson`, having eaten the selector's own key.
+// The bridge's argument is a target followed by a space-separated filter tail in
+// diary-index's grammar, so it needs its own reader — and this is the file that
+// already owns what that tail may contain.
+//
+// IT IS THE SAME PARSE THE RENDERER RUNS, not a second one that agrees by
+// inspection. `buildBridge` split the target off itself and `readingsFlags`
+// stripped the flag one function away from it; both now call this, so the window
+// that WRITES a line and the renderer that READS it cannot drift. That is the
+// rule `directive-grammar.ts` was extracted to keep — "the two share a body
+// rather than agreeing by inspection, the mistake this file exists to have
+// stopped making".
+export interface BridgeDirective {
+  direction: BridgeDirection;
+  // The kind id (notes) or tracker id (readings). Empty where the reader has
+  // added a bridge and not yet chosen one — an ordinary first state since 3.8,
+  // not a typo, and `planBridge` refuses it by naming the alternatives.
+  target: string;
+  // `#trend`, readings only. See `writeBridgeArg` for why the direction decides.
+  trend: boolean;
+  // The raw selector text after the target, untouched.
+  filters: string;
+  // The reader's own title, after the `|`, or null where the line carries none.
+  label: string | null;
+}
+
+// The argument half: everything after the colon and before the label bar.
+//
+// THE DIRECTION DECIDES WHETHER A `#` IS A FLAG, which is not a parameter smell
+// but the grammar: `#trend` is a rendering choice about a series and there is no
+// series on the notes side. So `bridge-notes:meal#trend` leaves the `#trend` in
+// the target and earns `No note type called "meal#trend"` — the message it earns
+// today, kept deliberately. Stripping a flag the directive does not have would
+// render a working block for a line that asked for something impossible.
+export function readBridgeArg(
+  direction: BridgeDirection,
+  arg: string
+): { target: string; trend: boolean; filters: string } {
+  const trimmed = arg.trim();
+  const cut = trimmed.search(/\s/);
+  const head = cut === -1 ? trimmed : trimmed.slice(0, cut);
+  const filters = cut === -1 ? "" : trimmed.slice(cut + 1).trim();
+  if (direction === "notes") return { target: head, trend: false, filters };
+  const hash = head.indexOf("#");
+  if (hash === -1) return { target: head, trend: false, filters };
+  const flags = head
+    .slice(hash + 1)
+    .split("#")
+    .map((f) => f.trim().toLowerCase());
+  return {
+    target: head.slice(0, hash),
+    trend: flags.includes("trend"),
+    filters,
+  };
+}
+
+export function writeBridgeArg(d: {
+  direction: BridgeDirection;
+  target: string;
+  trend: boolean;
+  filters: string;
+}): string {
+  const flag = d.direction === "readings" && d.trend ? "#trend" : "";
+  const tail = d.filters.trim();
+  return `${d.target.trim()}${flag}${tail ? ` ${tail}` : ""}`;
+}
+
+const DIRECTIVE_RE = /^bridge-(notes|readings):([^|]*)(?:\|(.*))?$/;
+
+// One whole directive line, or null where this is not one.
+export function readBridgeDirective(line: string): BridgeDirective | null {
+  const m = DIRECTIVE_RE.exec(line.trim());
+  if (!m) return null;
+  const direction = m[1] as BridgeDirection;
+  const label = m[3] == null ? null : m[3].trim();
+  return { direction, label, ...readBridgeArg(direction, m[2]) };
+}
+
+// The inverse, and the only thing that composes one.
+//
+// The window never assembles a directive string itself: it hands a
+// `BridgeDirective` to this, and `planBridge` is run over the result before it
+// is written. That is §2.3's "refused twice" used a third time, at the one place
+// that can PREVENT a refusal rather than report it.
+export function writeBridgeDirective(d: BridgeDirective): string {
+  const arg = writeBridgeArg(d);
+  const label = d.label?.trim();
+  return `bridge-${d.direction}:${arg}${label ? `|${label}` : ""}`;
 }
 
 // ── §1: the window ────────────────────────────────────────────────────
@@ -320,7 +417,39 @@ export function planBridge(spec: BridgeSpec): BridgeResult<BridgePlan> {
   const win = bridgeWindow(host);
   if (!win.ok) return win;
 
-  // Check 2: the target, and whether it can be joined by date at all.
+  // Check 2: whether this direction has anything to read (1.0.89).
+  //
+  // READINGS LIVE ON THE DIARY, AND ONLY THERE. `collectPoints` takes no
+  // surface and walks `entriesOfGrain` — the diary's own entries — whatever
+  // note the directive was written on. So `bridge-readings` on a diary entry
+  // is a note asking itself a question and getting its own answer back, which
+  // is worse than a refusal because it draws rows and looks right.
+  //
+  // IT WAS REACHABLE AND WRONG RATHER THAN UNREACHABLE. No catalogue composes
+  // it — the diary side offers `bridge-notes` alone, which turns out to have
+  // been right for a reason nobody had written down — but a hand-typed line
+  // got this far, because `bridgeCatalogue` handed back the journal surface's
+  // trackers and this function had no opinion about the pairing. 1.0.89 drops
+  // those trackers AND states the rule here, because the catalogue is what the
+  // editor offers and this is what a vault that outlived it still asks.
+  //
+  // AHEAD OF THE TARGET, BEHIND THE PERIOD, for the reason the order already
+  // has: a note with no period cannot bridge in either direction, and a
+  // direction with no store to read is not a question about which tracker.
+  if (direction === "readings" && host.surface === "diary") {
+    return {
+      ok: false,
+      refusal: {
+        check: "direction",
+        message:
+          "`bridge-readings` reads the diary's own readings, so a diary entry " +
+          "asking for them would be reading itself. Use `bridge-notes:` to pull " +
+          "journal notes into this entry, or put a readings bridge on a journal note.",
+      },
+    };
+  }
+
+  // Check 3: the target, and whether it can be joined by date at all.
   if (!target) {
     // NAMES WHAT THIS VAULT HAS, not just the grammar. The message used to be
     // an example — "e.g. `bridge-notes:meal`" — which was right while the only
@@ -395,7 +524,7 @@ export function planBridge(spec: BridgeSpec): BridgeResult<BridgePlan> {
     targetLabel = tracker.label;
   }
 
-  // Check 3: the selectors.
+  // Check 4: the selectors.
   //
   // Validated against the RAW tokens, before parseQuery sees them, and that
   // ordering is load-bearing. parseQuery's rule is that an unrecognised filter
@@ -544,8 +673,9 @@ export interface SnapshotRow {
 // `[[path|Lesson [draft]]]`, which is a BROKEN LINK IN OBSIDIAN, not merely one
 // this plugin failed to parse back. That matters more than a rendering bug:
 // §3.2's whole claim for storing plain markdown is that a frozen bridge is a
-// list of links whether or not ChronoAnvil is installed, and a malformed wikilink
-// is exactly the case where that claim fails.
+// list of links the reader can open and edit (see `serializeSnapshot` for how
+// far that reaches), and a malformed wikilink is exactly the case where even
+// the narrow version of the claim fails.
 //
 // Substituted rather than escaped because a wikilink alias has no escape: there
 // is no spelling of `]` that survives inside one. The replacements are visually
@@ -562,10 +692,27 @@ function linkSafe(text: string): string {
 
 // Plain markdown, deliberately.
 //
-// Wikilinks rather than the plugin's own markup, so a frozen bridge is a list
-// of links in a note whether or not ChronoAnvil is installed — which is the point:
-// the reader asked to edit and revisit these, and a block that renders as raw
-// HTML comments once the plugin is gone is not something anyone can revisit.
+// Wikilinks rather than the plugin's own markup, so what a reader opens and
+// edits is a list of links: the reader asked to revisit these, and a block
+// written in the plugin's own markup is not something anyone can revisit.
+//
+// ── AND IT DOES NOT YET SURVIVE AN UNINSTALL, WHICH THIS USED TO CLAIM ──
+//
+// The claim here was "a list of links in a note whether or not ChronoAnvil is
+// installed", and `plain-markdown.ts` cites this function as the precedent for
+// that whole doctrine. It is not true of the result: `writeNoteRegion` puts
+// these lines INSIDE `<!--chronoanvil:…-->`, so with the plugin gone they are
+// inside a comment and render as nothing, and the exporter's own
+// `<!--chronoanvil:[\s\S]*?-->` deletes them outright.
+//
+// 5.6 already built the answer and named it — a BRACKET form, whose markers go
+// and whose contents stay, "because that content is a field's value and the
+// field is going; a bracket's markers are around the reader's own document".
+// A frozen bridge is the second thing in the tree with that shape. Moving it
+// there is a storage change plus a migration for every snapshot already
+// written, so it is its own round rather than a line here; what is not
+// deferrable is the sentence, because a comment asserting a promise the code
+// does not keep is worse than the gap it describes. 1.0.89.
 export function serializeSnapshot(rows: readonly SnapshotRow[]): string {
   return rows
     .map((r) => {

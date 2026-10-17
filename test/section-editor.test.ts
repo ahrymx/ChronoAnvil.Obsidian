@@ -38,7 +38,7 @@ import {
 } from "../src/diary/home-sections";
 import { DEFAULT_PATHS } from "../src/core/constants";
 import { SECTION_CATEGORIES, categoryRank } from "../src/core/sections";
-import { idsOf } from "../src/core/section-model";
+import { idsOf, questionIsRequired } from "../src/core/section-model";
 import type { SectionModel, SectionWant } from "../src/core/section-model";
 
 const editor = (): string => readSrc("section-editor");
@@ -658,7 +658,15 @@ const wantOf = (
       if (original.includes(id)) return true;
       const given = answers.get(id) ?? {};
       const asked = model.sections().find((s) => s.id === id)?.questions ?? [];
-      return asked.every((q) => given[q.key]);
+      // THROUGH `questionIsRequired`, WHICH IS WHAT THE WINDOW ASKS (1.0.89).
+      // This read `asked.every((q) => given[q.key])`, which is the same answer
+      // for exactly as long as every question of a row being added is a
+      // required one — true while the bridge asked one thing and false the
+      // moment it asked three. `unanswered()` has filtered on the model's
+      // predicate since §4, so a transcription that does not is a transcription
+      // of something else: it reported an addable row as unaddable, and the
+      // assertion that caught it was `apply` returning null.
+      return asked.every((q) => !questionIsRequired(q) || given[q.key]);
     })
     .map((id) => {
       const options = answers.get(id);

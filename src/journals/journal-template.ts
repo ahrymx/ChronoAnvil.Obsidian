@@ -39,6 +39,7 @@ import {
 import type { ReloadLoss } from "../core/reload-loss";
 import { looseLines } from "../core/reload-loss";
 import {
+  BRIDGE_SECTION_ID,
   JOURNAL_SECTIONS,
   headingTitlesIn,
   sectionOverrides,
@@ -231,8 +232,25 @@ export function wantFromJournalNote(
     // stores for every existing journal, which is a decision to make on its
     // own rather than under a door's banner. The gap is real and is written
     // down here rather than closed in passing.
+    //
+    // ── AND THE BRIDGE, BECAUSE A WINDOW NOW WRITES ITS ANSWERS (1.0.89) ──
+    //
+    // The paragraph above was written when the gap was harmless: no door could
+    // configure a journal note's bridge, so there was nothing on the page for
+    // this read to lose. 1.0.89 gives it a cog with three answers on it — the
+    // tracker, the filters and the period — and the moment a reader can choose
+    // those, a save that drops them is a silent loss at the exact moment they
+    // asked to keep something. That is the sentence `answerInText` was hoisted
+    // for, and the diary side has avoided it since 1.0.46.
+    //
+    // ONE ID, NOT EVERY SECTION. The decision the paragraph above reserves is
+    // still reserved: a `folder` answer on `tasks` is not carried, and widening
+    // this read wholesale would change what every existing journal stores. What
+    // changes is scoped to the section whose answers a window writes — which is
+    // the rule, and `BRIDGE_SECTION_ID` is how it is said rather than by a
+    // literal spelled here.
     const section = byId.get(id);
-    if (section && isPageWidgetId(id)) {
+    if (section && (isPageWidgetId(id) || id === BRIDGE_SECTION_ID)) {
       Object.assign(next, answersInText(text, section.questions?.(ctx) ?? []));
     }
 

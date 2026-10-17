@@ -5,6 +5,78 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.89] - 2026-10-17
+
+### Added
+
+- **The bridge sections got their doors.** *"the from the diary/journal bridge
+  sections are half-baked. Retire them or upgrade?"* — upgraded. The engine
+  behind **From the diary** and **From the journals** has been complete since
+  2.57: a closed set of filters, eight refusals that each name what would fix
+  them, freeze/refresh/thaw snapshots, a trend chart, cards and list. What a
+  reader could reach of it was the tracker the catalogue hard-coded, and
+  `documentation.md` did not mention either directive once. This release is the
+  surface catching up with it.
+  - **A cog on the section's own title row**, beside the chevron — *"the editor
+    window should be a cog wheel on the sections title row (next to the
+    chevron)"* — the fourth section to get one, after Attachments, What's below
+    and Prose. It opens a window for what the bridge pulls across, the filters
+    to narrow it by, and (on a journal note) the period it covers. Nothing is
+    written until you press Save.
+  - **An answer the block would refuse is refused in the window instead**, while
+    it is still yours to change. A bridge was already refused twice — in the
+    editor and at render — and this is the only place that can prevent a refusal
+    rather than report one.
+  - **A journal note's bridge finally asks which tracker.** It composed
+    `bridge-readings:Mood` for six releases because the catalogue could not read
+    the tracker registry; it can, and the old default is now the answer you get
+    by leaving the box alone rather than the only answer there is. It also asks
+    which period, so the navigator above it is no longer always a month.
+  - **The filters are reachable from both windows** — `is:`, `tag:`, `has:`,
+    `from:`, `to:`, after the target and separated by spaces.
+  - **The trend is a button on the bar**, in the slot a notes bridge uses for
+    cards-or-list. It writes the flag onto the directive, so the note remembers
+    which you chose.
+  - **Both directives are documented**, in the reference written into every
+    vault: what they join, the five filters, where the period comes from,
+    freezing, and the cog. The filter list is asserted against the constant, so
+    a sixth cannot ship undocumented.
+  - **A journal note's bar is titled *From the diary*** rather than **🌉 Mood** —
+    the line carried no name and fell back to the tracker's. Its mirror has
+    composed one since 3.15.
+
+### Fixed
+
+- **Answering the target wiped a filter you had typed by hand.** A bridge
+  argument is a target and then a filter tail, and the editor treated the whole
+  of it as the answer: choosing a different note type replaced
+  `meal tag:dinner` with `meal`, and reading the answer back gave
+  `meal tag:dinner` as though you had chosen that. The two are declared as two
+  pieces of one argument now, so answering either leaves the other exactly as
+  you left it.
+- **"Save this note as the default" reset a journal note's bridge.** The save
+  carried a renamed header and a rearranged prose skeleton and dropped the
+  bridge's answers, so a leaf pointed at Energy came back pointing at Mood — a
+  loss at the exact moment you asked to keep something.
+- **A readings bridge on a diary entry now says why it cannot work.** The
+  readings it reads are the diary's own, whatever note asks, so a diary entry
+  asking for them is a note reading itself. It is refused with that sentence and
+  told to use `bridge-notes:` instead, and the tracker list the editor offers no
+  longer includes trackers for that direction at all.
+- **Freeze is no longer offered on a journal note that re-scopes in place.**
+  Pressing a navigator pill rewrites the period property of whatever note holds
+  the navigator — which, for a bridge, is the note the bridge is on. Freezing in
+  October and pressing next rendered October's rows under a header naming
+  November. The guard asks about the note now rather than matching a list of
+  four dashboard paths.
+- **The cards/list button is drawn only where it does something.** On a readings
+  bridge the icon swapped and nothing else happened.
+- **A tracker with no diary readings is no longer offered to a bridge.** The
+  editor's list and the block's own refusal were filtered differently, so a
+  journal-logged tracker could be chosen and then found nothing.
+- A dead row in Settings → Quick capture's table, and three comments naming a
+  method, a settings group and a lookup table that no longer exist.
+
 ## [1.0.88] - 2026-10-17
 
 ### Fixed

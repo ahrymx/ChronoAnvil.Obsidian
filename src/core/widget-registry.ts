@@ -1091,8 +1091,10 @@ export const WIDGETS: Record<string, WidgetSpec> = {
 // carries their `since` and their replacement, which is the data, in the table
 // whose job it is.
 //
-// AND `needs-vault-answer` IS A DEFERRAL, NOT A JUDGEMENT. Those five are
+// AND `needs-vault-answer` IS A DEFERRAL, NOT A JUDGEMENT. Those six are
 // perfectly good page widgets; what is missing is a way to ask their question.
+// (Five when this was written, and the count went stale rather than the
+// argument — it is read off the table below, not from here.)
 // `FlatNoteSpec` carries the catalogue, the host folder and two nouns, and
 // `note-sections.ts` opens by forbidding it to carry anything that would tell
 // it which note it is on or what this vault contains. Offering a tracker

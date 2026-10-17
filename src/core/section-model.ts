@@ -544,6 +544,41 @@ export interface TitleQuestion extends SectionQuestionCommon {
   placeholder: string;
 }
 
+// ── A LINE OF TEXT THAT IS NOT A TITLE (1.0.89) ───────────────────────
+//
+// THE SEVENTH KIND, AND IT EXISTS BECAUSE A SWEEP SAID SO. The bridge's filter
+// tail wanted exactly `TitleQuestion`'s control — a text box with a placeholder,
+// spliced into a directive's argument — and nothing about that interface is
+// title-specific except its name. So the first cut of 1.0.89 reused it, and
+// `section-model.test.ts` failed on the rule 1.0.76 put there: *"heads every
+// title box Title, on every surface that has one"*, swept rather than listed
+// "because the failure is a catalogue adding a fifth title question worded some
+// other way".
+//
+// That test is right and the reuse was the mistake it was written to catch. A
+// `title` question means THE SECTION'S TITLE, every catalogue words it the same
+// way on purpose, and `fieldLabelOf` heads the box from that wording — so a
+// second meaning on one kind would have made the box's name unpredictable and
+// the sweep's rule unstatable.
+//
+// WHAT IT ADDS OVER `title` IS NOTHING BUT THE MEANING, which is the whole
+// point: same field, same control, same "placeholder states the default rather
+// than pre-filling it" rule, and a name that says what the answer is about. The
+// editor renders the two with one body — see `renderTitleQuestion` — because
+// drawing is not where they differ.
+//
+// NEVER REQUIRED, and it needs no entry in `questionIsRequired` to say so: that
+// function requires a `choice` with no `emptyLabel` and nothing else. Empty is
+// a working directive here for the title's exact reason — `bridge-notes:meal`
+// with no filters is every note of that type in the period, which is what a
+// reader who sets none means.
+export interface TextQuestion extends SectionQuestionCommon {
+  kind: "text";
+  // What the argument means when the reader has not set one — shown in the
+  // placeholder, on `TitleQuestion.placeholder`'s rule and for its reason.
+  placeholder: string;
+}
+
 // Whether this section is drawn as a SECTION or as a bare WIDGET. 4.59.0.
 //
 // THE FOURTH KIND, AND THE FIRST THAT IS NOT ABOUT A DIRECTIVE'S ARGUMENT. The
@@ -1005,6 +1040,7 @@ export type SectionQuestion =
   | ChoiceQuestion
   | FolderQuestion
   | TitleQuestion
+  | TextQuestion
   | FormQuestion
   | LinesQuestion
   | FlagQuestion;
@@ -1750,18 +1786,20 @@ export function describeAnswers(
     }
     // A title has no list of answers to name one from, and an empty one is the
     // catalogue's own heading rather than a host folder — so both halves below
-    // are asked per kind rather than of a union that has neither.
+    // are asked per kind rather than of a union that has neither. A `text`
+    // answers both halves identically (1.0.89): no list, and an empty one means
+    // whatever its placeholder says.
     const shown =
       answer.trim() ||
       (q.kind === "folder"
         ? hostLabel
-        : q.kind === "title"
+        : q.kind === "title" || q.kind === "text"
           ? q.placeholder
           : "");
     const named =
       q.kind === "folder"
         ? q.keywords?.find((k) => k.value === answer.trim())?.label
-        : q.kind === "title"
+        : q.kind === "title" || q.kind === "text"
           ? undefined
           : q.values.find((v) => v.value === answer.trim())?.label;
     parts.push(`${q.label} → ${named ?? shown}`);

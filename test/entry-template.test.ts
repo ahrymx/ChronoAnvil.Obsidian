@@ -159,9 +159,15 @@ describe("the shared band's order", () => {
 
   it("is kept in step when the settings table ticks a section on", () => {
     // THE ONE WAY THE TWO STORES COULD DISAGREE. A band is authoritative, so a
-    // grain that has one would ignore a tick in Settings → Diary entries —
+    // grain that has one would ignore a tick in Settings → Quick capture —
     // changing a setting and nothing else, which is the "built and unreachable"
     // shape that table was added to fix, arriving by the other door.
+    //
+    // THE GROUP NAMED HERE WAS *Diary entries*, AND THERE IS NO SUCH GROUP
+    // (1.0.89 §5.6). The table lives in Quick capture and holds one row, which
+    // is the whole of the surface `renderEntrySectionCell` is reachable from —
+    // so the rule below is about the capture tick and is stated for whatever
+    // else that table ever grows.
     expect(bandWithSection(["log", "todo"], "capture", true)).toEqual([
       "log",
       "todo",

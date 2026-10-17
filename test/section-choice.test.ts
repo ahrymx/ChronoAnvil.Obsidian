@@ -414,16 +414,33 @@ describe("patch 8: From the journals", () => {
     })
       .sections()
       .find((s) => s.id === "bridge")!;
-    expect(view.questions?.length).toBe(1);
-    expect(view.questions?.[0].values.map((v) => v.value)).toEqual([
+    // TWO QUESTIONS AS OF 1.0.89, AND ONLY THE FIRST DECIDES ADDABILITY. The
+    // filters question is a `text` and `questionIsRequired` requires only a
+    // `choice` with no empty state, so the rule the paragraph above states is
+    // unchanged: the target still has to be answered before the row can be
+    // added, and the tail still has a working empty form.
+    expect(view.questions?.length).toBe(2);
+    const target = view.questions![0];
+    expect(target.kind).toBe("choice");
+    expect(target.values.map((v: { value: string }) => v.value)).toEqual([
       "meal",
       "lesson",
     ]);
+    expect(view.questions![1].kind).toBe("text");
     // And the answer the control writes is the one the directive reads.
-    const key = view.questions![0].key;
+    const key = target.key;
     expect(bridge.directive({ grain: "daily", extra: ["bridge"] }, { [key]: "meal" })).toBe(
       "bridge-notes:meal|From the journals"
     );
+    // AND THE TAIL IS COMPOSED ONTO THE SAME LINE, not a second directive: the
+    // five selectors are `parseQuery`'s own words and the bridge hands them to
+    // it whole.
+    expect(
+      bridge.directive(
+        { grain: "daily", extra: ["bridge"] },
+        { [key]: "meal", filters: "tag:dinner" }
+      )
+    ).toBe("bridge-notes:meal tag:dinner|From the journals");
   });
 
   it("and offers only the kinds a bridge could actually join", () => {
@@ -776,15 +793,20 @@ describe("patch 7 follow-up: the control is sized for the answer", () => {
 // out for itself, because the suite has no DOM and anything decided in a
 // renderer is a rule that rots unwatched.
 describe("entrySectionMatrix", () => {
-  it("has a row only for a section some grain can be offered", () => {
-    // Six of the ten shared sections ship on all five grains, so a row for one
-    // would read "Ships" five times — which is what the group's own subtitle,
-    // "beyond what its grain ships", already says.
-    expect(entrySectionMatrix().rows.map((r) => r.id)).toEqual([
-      "habits",
-      "bridge",
-      "capture",
-    ]);
+  it("computes nothing for a table nobody draws (1.0.89)", () => {
+    // THIS ASSERTED `rows`, AND `rows` HAD NO READER IN `src/`. It listed the
+    // sections some grain can be offered — `["habits", "bridge", "capture"]` —
+    // for a per-section settings table that was never built:
+    // `renderEntrySectionCell` has one caller, `renderCapture`, which draws the
+    // capture row alone off `grains` and `cell`. A derivation read only by the
+    // test asserting it is a field with no reader, and §5.6 removed it rather
+    // than filtering the one row that made it look alive.
+    //
+    // WHAT THE MATRIX IS FOR SURVIVES AND IS BELOW: `cell` is the decision the
+    // renderer must not take for itself, and `grains` is the column list. The
+    // reason those are here at all — "the suite has no DOM, so anything decided
+    // in a renderer is a rule that rots unwatched" — is untouched.
+    expect("rows" in entrySectionMatrix()).toBe(false);
   });
 
   it("says a grain SHIPS what its template already writes", () => {

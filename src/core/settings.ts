@@ -2057,10 +2057,19 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       this.refresh();
     };
 
-    // The cell IS the control, and the name and blurb are the row's — see
-    // `renderEntrySections`. `ca-list-toggle` inside a `<td>` is the
-    // pattern the trackers table already uses to put an Obsidian `Setting`
-    // control in a cell without its two-column flex fighting the column.
+    // The cell IS the control, and the name and blurb are the row's, which
+    // `renderCapture` draws. `ca-list-toggle` inside a `<td>` is the pattern the
+    // trackers table already uses to put an Obsidian `Setting` control in a cell
+    // without its two-column flex fighting the column.
+    //
+    // ── AND THE METHOD THIS NAMED DOES NOT EXIST (1.0.89 §5.6) ────────
+    //
+    // Both notes in this method pointed at a `renderEntrySections` — the headed
+    // stack per grain that 4.33 replaced with a table. The table was only ever
+    // built for one section, so the name survived in two comments describing a
+    // caller that was gone and a branch that lives here. Corrected rather than
+    // deleted: what they say about the cell and about an empty menu is still
+    // true, and only the file they attribute it to was wrong.
     const row = new Setting(td.createDiv({ cls: "ca-list-toggle" }));
 
     if (!questions.length) {
@@ -2079,11 +2088,12 @@ export class ChronoAnvilSettingTab extends PluginSettingTab {
       // store a section with no answer where the other two draw a control.
       // If one ever does, this row needs the field, not a skip.
       if (q.kind !== "choice") continue;
-      // Nothing in the vault to answer with. THE ROW SAYS SO, ONCE, and the
-      // caller does not reach this cell at all in that case — see the
-      // `unanswerable` branch in `renderEntrySections`. Kept as a guard rather
-      // than deleted because this method is reachable from one caller today and
-      // an empty menu is a worse failure than an early return.
+      // Nothing in the vault to answer with. Kept as a guard rather than
+      // deleted because an empty menu is a worse failure than an early return
+      // — and the caller that was said to screen for this does not: the
+      // `unanswerable` branch was `renderEntrySections`', which no longer
+      // exists, and `renderCapture` reaches this cell for a section that asks
+      // nothing at all. So this clause is the only thing standing there.
       if (!q.values.length) continue;
       const answer = held[q.key];
       row.addDropdown((d) => {

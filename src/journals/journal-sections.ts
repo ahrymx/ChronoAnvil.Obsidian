@@ -247,7 +247,22 @@ export interface SectionOverrides {
   // the catalogue supplies a generic default because it holds a JournalType and
   // no plugin, so it cannot read the tracker registry to ask what a vault
   // actually defines — and a type that knows better says so here.
+  //
+  // ── AND AS OF 1.0.89 IT IS ALSO A READER'S ANSWER ───────────────────
+  //
+  // The three fields are one section's three questions, and the keys ARE the
+  // question keys: `withAnswers` writes `options[q.key]` into the directive, so
+  // a saved layout and a reader's answer arrive through the same field by
+  // construction rather than by two names being kept equal. That is why
+  // `filters` and `grain` are spelled as they are and not as `only` and
+  // `period` — the window would then be writing fields nothing reads.
   tracker?: string;
+  // The selector tail after a bridge's target: `tag:revision from:2026-02-10`.
+  // Validated by `planBridge` against `BRIDGE_SELECTORS`, never by this file.
+  filters?: string;
+  // Which period a bridge's navigator opens on — one of `periodNavUnit`'s four.
+  // `BRIDGE_NAV_GRAIN` is what an unanswered section composes.
+  grain?: string;
   // WHICH TRACKERS A NOTE OF THIS TEMPLATE STARTS WITH. 4.35 §1.5.
   //
   // Ids into the registry, exactly as `rating` is. `trackerSeeds` seeds only
@@ -1737,6 +1752,32 @@ function probe(text: string, re: RegExp): number {
 // default that drifts from the registry emits a directive that refuses.
 export const DEFAULT_BRIDGE_TRACKER = "Mood";
 
+// What the bridge's navigator shows until the reader says otherwise.
+//
+// `month` RATHER THAN `week`, which is the judgement the section's own comment
+// has carried since 2.57 and is now a default rather than the only answer: "a
+// journal leaf is revisited over weeks, and a week-scoped bridge on a routine
+// note would be empty more often than not". Named here so the question's
+// `emptyLabel`, the composed line and the test all read one word (1.0.89).
+export const BRIDGE_NAV_GRAIN = "month";
+
+// The name the bridge's bar wears, where the reader has not renamed it.
+//
+// THE CATALOGUE'S OWN LABEL, SPELLED ONCE. It equals the section's `label`
+// because they are the same name — the row in the editor and the bar in the
+// note — and a second spelling of one word is what `product-name.test.ts`
+// exists to stop at a larger scale (1.0.89).
+export const BRIDGE_SECTION_TITLE = "From the diary";
+
+// The catalogue id of the bridge section, which two other files have to name.
+//
+// SPELLED ONCE BECAUSE IT IS NOW LOAD-BEARING OUTSIDE THIS FILE (1.0.89).
+// `wantFromJournalNote` reads this section's answers back off the page when a
+// reader saves it as the grain's default, and it is the one catalogue section
+// it does that for — so the id is a fact two modules share rather than a string
+// each spells for itself.
+export const BRIDGE_SECTION_ID = "bridge";
+
 const always = (): boolean => true;
 const never = (): boolean => false;
 
@@ -2829,10 +2870,10 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
   },
 
   {
-    id: "bridge",
+    id: BRIDGE_SECTION_ID,
     icon: "🌉",
     category: "diary",
-    label: "From the diary",
+    label: BRIDGE_SECTION_TITLE,
     blurb: "A tracker's diary readings, over a period this note picks.",
     surface: "leaf",
     locked: false,
@@ -2855,6 +2896,114 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
 
     claims: ["period-nav", "bridge-readings"],
     locate: (t) => probe(t, /^bridge-readings\b/m),
+
+    // ── AND IT ASKS, AS OF 1.0.89 ───────────────────────────────────────
+    //
+    // THIS SECTION ASKED NOTHING FOR SIX RELEASES, and `entry-sections.ts` has
+    // called its own bridge *"THE ONE SECTION IN EITHER DIARY CATALOGUE THAT
+    // ASKS THE READER ANYTHING"* the whole time. So the two directions of one
+    // feature were a tick that could be pointed anywhere and a tick that could
+    // be pointed nowhere: every bridge this catalogue has ever composed reads
+    // `Mood`, whatever the reader keeps readings about, and a vault that
+    // renamed or disabled that tracker got a refusal on a section the editor
+    // had just offered.
+    //
+    // WHAT RETIRES THE DEFAULT'S ARGUMENT. The tick above says this file "has a
+    // JournalType and no plugin, so it cannot read the tracker registry", and
+    // that is still true of the FILE and was never true of a question: `ctx`
+    // carries `vault` for exactly this, and `section-insert.ts` has filled in
+    // `vault.trackers` since 5.26. `DEFAULT_BRIDGE_TRACKER` stays as what an
+    // unanswered tick composes — a working first render is still worth more
+    // than an empty one — and stops being the only answer.
+    //
+    // AND THIS IS NOT THE `NOT_PAGE_WIDGETS` DEFERRAL BEING REVERSED. Both
+    // bridge keywords sit there under `needs-vault-answer`, `bridge-readings`
+    // noting that its list "follows from the host note rather than the vault".
+    // That is the PAGE WIDGET window, which resolves one `vault` argument for
+    // the whole window before a surface is chosen; a catalogue section's
+    // questions are handed `ctx` and answer for the note being edited.
+    // `widget-registry.ts` draws that boundary in those words, and nothing here
+    // crosses it.
+    questions: (ctx) => [
+      {
+        kind: "choice",
+        key: "tracker",
+        label: "a tracker to pull across",
+        directive: "bridge-readings",
+        // THE TARGET IS THE FIRST PIECE OF THE ARGUMENT, NOT THE WHOLE OF IT
+        // (1.0.89), and declaring that is what stops this question eating the
+        // filter question's answer. `argSpanIn` ends an argument at the label
+        // bar, so without a `part` the span over
+        // `bridge-readings:Mood is:lesson` is `Mood is:lesson` and answering
+        // the tracker would splice `Mood` over all of it. `withAnswers`
+        // composes a compound argument once, seeded from what is there, "so
+        // answering one piece leaves the other exactly as the reader left it" —
+        // 4.70's mechanism, for 4.70's reason, on a second grammar.
+        part: { at: 0, of: 2, join: " " },
+        values: (ctx.vault?.trackers ?? []).map((t) => ({
+          value: t.value,
+          label: t.label,
+        })),
+        // THE SAME GATE THE BLOCK'S OWN REFUSAL USES. `vault.trackers` is
+        // filtered on `isChartable` and so is `bridgeCatalogue`, which is what
+        // keeps this menu from offering a tracker the note would then refuse.
+        empty:
+          "This vault has no diary trackers to chart yet — add a number, " +
+          "scale, time or yes/no tracker on the diary, and this can pull it across.",
+        emptyLabel: DEFAULT_BRIDGE_TRACKER,
+      },
+      {
+        // A TEXT BOX OVER A CLOSED SET, WHICH IS THE ONE THING THIS WINDOW
+        // COULD NOT DO AS FIVE CONTROLS. `BRIDGE_SELECTORS` is closed and the
+        // closure is the promise, so five named controls would be the better
+        // shape — and a filter is OPTIONAL and ORDER-FREE, which a compound
+        // argument of fixed pieces cannot express. What makes the box honest
+        // instead is that the grammar refuses by NAME: an unknown selector
+        // earns "`sort:` is not a bridge filter. Available: `is`, `tag`, `has`,
+        // `from`, `to`." — the list, from the constant, at the moment it is
+        // typed wrong. §2.3's refusal doing the work a control would have.
+        //
+        // `text` AND NOT `title`, WHICH A SWEEP SETTLED. The control is the
+        // title box's and the meaning is not — see `TextQuestion`, added for
+        // this question after `section-model.test.ts` caught the reuse.
+        kind: "text",
+        key: "filters",
+        label: "the filters to narrow it by",
+        directive: "bridge-readings",
+        part: { at: 1, of: 2, join: " " },
+        // THE LAST PIECE TAKES THE REMAINDER, which `part` promises and which
+        // is the whole reason a tail with spaces in it can be one answer.
+        placeholder: "no filters — e.g. tag:revision from:2026-02-10",
+      },
+      {
+        // ── THE PERIOD, ON THE LINE THAT ALREADY SAYS IT ────────────────
+        //
+        // `period-nav:month` was hardcoded by `render` below, and the paragraph
+        // under it argues for the DEFAULT — "a journal leaf is revisited over
+        // weeks" — not for there being only one. The navigator is already in
+        // this section's `claims`, so the grain is an ordinary question about a
+        // directive this section owns, answered on the line the reader can see
+        // saying it.
+        kind: "choice",
+        key: "grain",
+        label: "the period it covers",
+        directive: "period-nav",
+        values: [
+          { value: "week", label: "This week" },
+          { value: "month", label: "This month" },
+          { value: "quarter", label: "This quarter" },
+          { value: "year", label: "This year" },
+        ],
+        // UNREACHABLE, AND REQUIRED ANYWAY. The four values are the four
+        // `periodNavUnit` resolves and no vault can have fewer, so this
+        // sentence cannot be shown — the field is not optional on
+        // `ChoiceQuestion`, and inventing an optional one to describe a case
+        // that cannot happen would weaken the type for every question that
+        // needs it.
+        empty: "Every period this navigator can show is listed.",
+        emptyLabel: BRIDGE_NAV_GRAIN,
+      },
+    ],
 
     // THE ANCHOR SHIPS WITH THE BRIDGE, and that pairing is the whole section.
     //
@@ -2882,11 +3031,29 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       // directive that refuses the moment it renders, which is the state §2.3
       // exists to make impossible — a section is offered because it works.
       const tracker = opts?.tracker ?? DEFAULT_BRIDGE_TRACKER;
+      const filters = (opts?.filters ?? "").trim();
+      const grain = opts?.grain ?? BRIDGE_NAV_GRAIN;
       // NO `header:` LINE. A bridge draws its own section frame as of 2.57.7 —
       // it is a section, not a thing that sits in one — so a header directive
       // above it would be a bar inside a bar. The period navigator rides in the
       // same fence and lands above it.
-      return [fence(["period-nav:month", `bridge-readings:${tracker}`])];
+      //
+      // ── AND IT CARRIES ITS OWN NAME NOW (1.0.89) ──────────────────────
+      //
+      // The line carried no `|label`, so `bridgeHeader` fell back to
+      // `plan.targetLabel` and a section this catalogue calls *From the diary*
+      // drew a bar reading **🌉 Mood**. Its mirror has composed
+      // `|From the journals` since 3.15 and matched its own name; this is the
+      // half that was missing, and it is the same `opts?.label` override every
+      // other titled section here takes.
+      return [
+        fence([
+          `period-nav:${grain}`,
+          `bridge-readings:${tracker}${filters ? ` ${filters}` : ""}|${
+            opts?.label ?? BRIDGE_SECTION_TITLE
+          }`,
+        ]),
+      ];
     },
   },
 

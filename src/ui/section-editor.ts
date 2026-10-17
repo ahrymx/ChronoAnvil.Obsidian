@@ -110,6 +110,7 @@ import type {
   LinesQuestion,
   SectionQuestion,
   SectionView,
+  TextQuestion,
   TitleQuestion,
   SectionWant,
 } from "../core/section-model";
@@ -2175,7 +2176,12 @@ export class SectionEditorModal extends EditorModal {
         this.renderFolderQuestion(field(q), section, q);
         continue;
       }
-      if (q.kind === "title") {
+      // ONE BODY FOR BOTH TEXT KINDS (1.0.89). `TextQuestion` is
+      // `TitleQuestion`'s control with a different meaning — see the note on
+      // the interface — and drawing is not where they differ, so the renderer
+      // is shared rather than copied. What differs is the box's NAME, which
+      // `fieldLabelOf` takes from the question's own wording either way.
+      if (q.kind === "title" || q.kind === "text") {
         this.renderTitleQuestion(field(q), section, q);
         continue;
       }
@@ -2272,7 +2278,7 @@ export class SectionEditorModal extends EditorModal {
   private renderTitleQuestion(
     host: HTMLElement,
     section: SectionView,
-    q: TitleQuestion
+    q: TitleQuestion | TextQuestion
   ): void {
     const input = host.createEl("input", {
       type: "text",

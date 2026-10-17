@@ -134,10 +134,21 @@ describe("patch 3: the trend is a flag on the directive that already exists", ()
   });
 
   it("and no grammar — `#` is the suffix the plugin already uses", () => {
-    expect(src()).toContain("function readingsFlags(");
+    // ONE PARSE, IN THE PURE HALF (1.0.89). This was `readingsFlags`, private
+    // to the renderer, and it was the only thing in the tree that knew a `#`
+    // after a tracker is a flag rather than part of its name. 1.0.89 gives the
+    // reader a window that WRITES these lines, so the same grammar is now read
+    // in three places — the renderer, the window and the catalogue's answers —
+    // and `core/bridge.ts` is where a grammar shared by three readers belongs.
+    // `splitArgHead` is still not it: it splits the tail at the first `:`, so
+    // `bridge-readings:Mood is:lesson` comes back wrong.
+    const b = readCode("core/bridge");
+    expect(b).toContain("export function readBridgeArg(");
+    expect(b).toContain("export function writeBridgeArg(");
     // Stripped before the target is split off, or the tracker is called
     // "Mood#trend" everywhere below.
-    expect(src()).toContain("const { rest: spec, trend } = readingsFlags(rest);");
+    expect(src()).toContain('const { trend } = readBridgeArg("readings", rest);');
+    expect(src()).not.toContain("readingsFlags");
   });
 
   it("passes the window it was given rather than deriving a second one", () => {

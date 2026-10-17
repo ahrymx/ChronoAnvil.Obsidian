@@ -618,6 +618,22 @@ describe("the editor cannot learn which surface it is on", () => {
       "journal index/resources",
       "journal leaf/banner",
       "journal leaf/resources",
+      // AND `journal leaf/bridge` ARRIVED IN 1.0.89, SIX RELEASES AFTER THE
+      // DIARY'S. The two halves of one feature were asymmetric from the day
+      // the second was written: `diary entry/bridge` has asked which journal
+      // kind to pull since 3.8, and the journal side composed
+      // `bridge-readings:Mood` with no way to say otherwise — the comment on
+      // it claimed the catalogue "cannot read the tracker registry", which a
+      // `questions:` closure handed `ctx` retires.
+      //
+      // THREE QUESTIONS, AND NOT ONE OF THEM IS REQUIRED. The tracker choice
+      // names its empty state (`DEFAULT_BRIDGE_TRACKER`), the filters are a
+      // `text` question and the period is a choice naming its own default, so
+      // the paragraph above about the bridge's REQUIRED choice is still true
+      // of the diary's and deliberately not true here: a journal leaf's bridge
+      // stays addable with every box left alone, which is what keeps the
+      // shipped presets composing what they composed before.
+      "journal leaf/bridge",
       // AND `journal leaf/checklist` WAS HERE FOR ONE ROUND. The Compact flag
       // arrived in 1.0.42 — *"I do not think that `tasks` needs its special
       // action row just for the compact button. Make it a option on the sections

@@ -61,7 +61,7 @@ import type {
 import {
   FLAG_OFF,
   SECTION_FORM,
-  answerInText,
+  answersInText,
 } from "../core/section-model";
 import type { SectionChoice } from "../core/section-model";
 import { answersOn, replaceBody } from "../core/note-sections";
@@ -225,13 +225,28 @@ function choiceFor(
 ): SectionChoice {
   const questions = section.questions?.(ctx) ?? [];
   const options: Record<string, unknown> = {};
-  for (const q of questions) {
-    const answer = answerInText(text, q);
+  // ── AND A QUESTION THAT OWNS A PIECE IS READ AS A PIECE (1.0.89) ─────────
+  //
+  // This loop called `answerInText` directly, which hands back the WHOLE
+  // argument span. That was the same answer for a question owning the whole
+  // argument and was right for six releases, because no diary question
+  // declared a `part`. The bridge's filters question does, and the whole span
+  // of `bridge-notes:lesson tag:dinner` is `lesson tag:dinner` — so both
+  // questions read back the same string and the store kept `target` and
+  // `filters` as copies of each other.
+  //
+  // `answersInText` IS THAT READ WITH `partsOf` AFTER IT, written once in
+  // `section-model.ts` for exactly this reason and already what the journal
+  // side calls. Using it here is what keeps the two read paths agreeing about
+  // what a compound argument says.
+  for (const [key, answer] of Object.entries(answersInText(text, questions))) {
     // EMPTY IS NOT AN ANSWER. An unset bridge writes `bridge-notes:` with
     // nothing after the colon, and storing `""` would make "the reader chose
     // nothing" indistinguishable from "the reader chose the empty string" — and
-    // `directiveFor` already treats a blank target as unconfigured.
-    if (answer != null && answer.trim() !== "") options[q.key] = answer.trim();
+    // `directiveFor` already treats a blank target as unconfigured. An
+    // unanswered TAIL is the same thing: `partsOf` gives the missing piece as
+    // the empty string, so a bridge with no filters stores no filters.
+    if (answer.trim() !== "") options[key] = answer.trim();
   }
   // AND THE ANSWERS WRITTEN ON THE SECTION'S OWN LINE, off the line `locate`
   // found rather than off the fence — a band is one fence holding seven fields,

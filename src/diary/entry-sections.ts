@@ -871,12 +871,48 @@ const ENTRY_DECLS: EntryDecl[] = [
         // splices a span rather than re-composing the line. A reader who
         // retitled theirs to `|My journals` keeps it.
         directive: "bridge-notes",
+        // ── AND IT IS THE FIRST PIECE, NOT THE WHOLE ARGUMENT (1.0.89) ──
+        //
+        // THE PARAGRAPH ABOVE WAS RIGHT ABOUT THE LABEL AND WRONG ABOUT THE
+        // REST OF THE LINE. `argSpanIn` ends an argument at the label bar, so
+        // on `bridge-notes:meal tag:dinner|From the journals` the span is
+        // `meal tag:dinner` and answering the target spliced `meal` over all of
+        // it — a reader who hand-wrote a filter lost it by changing the journal
+        // in the editor, and `answerInText` read the same span back and stored
+        // `meal tag:dinner` as the "answer". Silent both ways.
+        //
+        // 4.70 BUILT THE FIX FOR `time-grid` AND STATED THE RULE: a directive
+        // whose argument is a compound declares its pieces, `withAnswers`
+        // composes it once "seeded from what is there, so answering one piece
+        // leaves the other exactly as the reader left it", and the LAST piece
+        // takes the remainder — which is what lets a space-separated filter
+        // tail be one answer. The join is a space here and a `|` there; nothing
+        // else differs.
+        part: { at: 0, of: 2, join: " " },
         values: (ctx.journalKinds ?? [])
           .filter((k) => k.dated)
           .map((k) => ({ value: k.id, label: k.label })),
         empty:
           "This vault has no dated journal kinds yet — make a journal first, " +
           "and this can pull from it.",
+      },
+      {
+        // THE FILTERS, REACHABLE AT LAST. `BRIDGE_SELECTORS` has been a closed
+        // set with five entries and eight refusal paths since 2.57, and no
+        // editor on either surface could set one of them — the capability was
+        // hand-typed or nothing, and then eaten by the question above it.
+        //
+        // A TEXT BOX RATHER THAN FIVE CONTROLS, and the mirror catalogue holds
+        // the argument for that in full: a filter is optional and order-free,
+        // which a compound argument of fixed pieces cannot express, and the
+        // grammar already refuses an unknown selector BY NAME with the list
+        // beside it. §2.3's refusal doing the work a control would have.
+        kind: "text",
+        key: "filters",
+        label: "the filters to narrow it by",
+        directive: "bridge-notes",
+        part: { at: 1, of: 2, join: " " },
+        placeholder: "no filters — e.g. tag:dinner has:task",
       },
     ],
     directive: (ctx, opts) => {
@@ -896,7 +932,14 @@ const ENTRY_DECLS: EntryDecl[] = [
         typeof opts?.target === "string" && opts.target.trim()
           ? opts.target.trim()
           : "";
-      return `bridge-notes:${target}|From the journals`;
+      // The filter tail, where the reader has set one. Composed here as well as
+      // answered in place, so a grain's saved default carries it into every
+      // entry made afterwards rather than only into the one it was typed on.
+      const filters =
+        typeof opts?.filters === "string" ? opts.filters.trim() : "";
+      return `bridge-notes:${target}${
+        filters ? ` ${filters}` : ""
+      }|From the journals`;
     },
   },
   {
@@ -2155,11 +2198,29 @@ export type EntrySectionOffer = "ships" | "offer" | "absent";
 
 export interface EntrySectionMatrix {
   grains: TrackerClass[];
-  // Only sections some grain can be offered — the ones a settings table would
-  // have a control for. A row every grain ships is a row of "Ships" five times
-  // over, which says nothing the group's own subtitle ("beyond what its grain
-  // ships") has not already said.
-  rows: EntrySection[];
+  // ── AND THERE WAS A `rows` HERE, FOR A TABLE NOBODY DRAWS (1.0.89 §5.6) ──
+  //
+  // It was "only sections some grain can be offered — the ones a settings table
+  // would have a control for", it computed `["habits", "bridge", "capture"]`,
+  // and nothing in `src/` ever read it. `renderEntrySectionCell` has exactly
+  // one caller — `renderCapture` — which draws the capture row alone off
+  // `grains` and `cell`, so the per-section table this field was the index of
+  // does not exist: the headed stack it replaced went away in 4.33 and the
+  // table that replaced it was only ever built for one section.
+  //
+  // REMOVED RATHER THAN FILTERED. The tempting edit, and the one the plan
+  // asked for, was to take the dead `bridge` row OUT of the list — but the
+  // list is derived from what each grain can be offered and `bridge` is
+  // genuinely offerable on four of the five. A derivation that answers
+  // correctly and is read by nothing is not a wrong row; it is a field with no
+  // reader, and the honest version of "remove the dead row" is to remove the
+  // thing that has none. `cell` and `grains` stay: they are what the capture
+  // table asks.
+  //
+  // AND THE DOOR IT WOULD HAVE BEEN IS NOT WANTED. A bridge is configured from
+  // its own cog (1.0.89) and from *Edit sections…*; a third door in Settings
+  // would be a vault-wide control over a per-note arrangement, which is the
+  // argument `renderCapture`'s own deleted fold toggle lost in 1.0.46.
   cell(sectionId: string, grain: TrackerClass): EntrySectionOffer;
 }
 // The settings tab renders one table from this rather than a headed stack per
@@ -2208,14 +2269,7 @@ export function entrySectionMatrix(
     if (g.ships.has(sectionId)) return "ships";
     return g.offer.has(sectionId) ? "offer" : "absent";
   };
-  return {
-    grains,
-    // Catalogue order, so the table reads in the order an entry is composed.
-    rows: ENTRY_SECTIONS.filter((s) =>
-      grains.some((grain) => cell(s.id, grain) === "offer")
-    ),
-    cell,
-  };
+  return { grains, cell };
 }
 
 // Which of this entry's sections the note already has, in the order they

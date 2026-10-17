@@ -30,9 +30,11 @@
 // ── THE DOCTRINE IS OLD; ONLY THE SCOPE IS NEW ─────────────────────────
 //
 // This is not a new value for the project, it is one that has never been asked
-// of a whole note. `bridge.ts` serialises a frozen bridge as wikilinks "so a
-// frozen bridge is a list of links in a note whether or not ChronoAnvil is
-// installed". `journal-sections.ts` makes the prose skeleton real `##` headings
+// of a whole note. `bridge.ts` serialises a frozen bridge as wikilinks so that
+// what the reader opens and edits is a list of links rather than the plugin's
+// own markup — though its own region swallows them again, which 1.0.89 records
+// there and does not fix here. `journal-sections.ts` makes the prose skeleton
+// real `##` headings
 // "because they survive the plugin being uninstalled". `attach:` regions have
 // stored real markdown since 2.7. 2.57 §3.2 states the rule: LINKS AND VALUES,
 // NOT MARKUP. Four arguments, each made at one section, each correct.

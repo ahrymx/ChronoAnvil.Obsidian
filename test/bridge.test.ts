@@ -16,7 +16,10 @@ import { resolve } from "node:path";
 import { fnBody, readSrc } from "./sources";
 import { computeSectionRuns } from "../src/ui/headerbar";
 import { OBSIDIAN_DOM } from "../src/core/constants";
-import { DEFAULT_BRIDGE_TRACKER } from "../src/journals/journal-sections";
+import {
+  BRIDGE_NAV_GRAIN,
+  DEFAULT_BRIDGE_TRACKER,
+} from "../src/journals/journal-sections";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import { moment } from "../src/core/util";
 import {
@@ -83,6 +86,19 @@ const spec = (over: Partial<BridgeSpec> = {}): BridgeSpec => ({
   catalogue,
   ...over,
 });
+
+// A readings bridge's host, which is a JOURNAL note and cannot be anything
+// else (1.0.89 §5.3). `collectPoints` walks the diary's own entries whatever
+// the host, so a readings bridge on a diary entry is a note asking itself a
+// question — `planBridge`'s direction check refuses it, and every spec in this
+// file that names `readings` has to carry a host the feature actually has.
+const readingsSpec = (over: Partial<BridgeSpec> = {}): BridgeSpec =>
+  spec({
+    direction: "readings",
+    target: "exercise",
+    host: host({ "month-start": "2026-07-01" }, null, "journal"),
+    ...over,
+  });
 
 // ── the refusals ──────────────────────────────────────────────────────
 
@@ -158,9 +174,7 @@ describe("a selector that names nothing is refused", () => {
   });
 
   it("refuses an unknown tracker and lists what exists", () => {
-    const refusal = bridgeRefusal(
-      spec({ direction: "readings", target: "hydration" })
-    );
+    const refusal = bridgeRefusal(readingsSpec({ target: "hydration" }));
     expect(refusal?.check).toBe("selector");
     expect(refusal?.message).toContain("exercise");
   });
@@ -382,9 +396,7 @@ describe("the query goes through diary-index's own parser", () => {
   });
 
   it("plans a readings bridge against a tracker", () => {
-    const planned = planBridge(
-      spec({ direction: "readings", target: "exercise" })
-    );
+    const planned = planBridge(readingsSpec());
     if (!planned.ok) throw new Error("expected a plan");
     expect(planned.value.targetLabel).toBe("Exercise");
     expect(planned.value.direction).toBe("readings");
@@ -459,7 +471,7 @@ describe("both directives are routed and neither skips the guard", () => {
     // 2. Threaded into the per-line builder, last of the fence facts.
     expect(src).toContain("noteTextNow,\n          navUnit\n        );");
     // 3. And into the host facts, which is what `bridgeWindow` reads.
-    expect(bridge()).toContain("bridgeHostFacts(plugin, ctx, navUnit)");
+    expect(bridge()).toContain("bridgeHostFacts(plugin, ctx.sourcePath, navUnit)");
     expect(fnBody("bridgeHostFacts", "bridge-widgets")).toContain("navUnit,");
   });
 
@@ -467,8 +479,24 @@ describe("both directives are routed and neither skips the guard", () => {
     // The failure this prevents: a refusal wired into bridge-notes and
     // forgotten on bridge-readings, which would render an unanchored block
     // that looks exactly like an anchored one.
+    //
+    // TWO CALLS AS OF 1.0.89, AND NEITHER IS IN A BUILDER. One is the shared
+    // render entry this test was written for; the other stands before the cog
+    // window's write, which is §2.3's double refusal used a third time — at
+    // the only place that can PREVENT a refusal rather than report it. The
+    // assertion is therefore about WHERE, not how many: a `planBridge` inside
+    // `buildBridgeNotesRegion` or `buildBridgeReadingsRegion` is the
+    // per-direction guard the paragraph above forbids.
     const src = bridge();
-    expect(src.match(/planBridge\(/g)?.length).toBe(1);
+    expect(src.match(/planBridge\(/g)?.length).toBe(2);
+    expect(fnBody("buildBridge", "bridge-widgets")).toContain("planBridge({");
+    expect(fnBody("bridgeTextRefusal", "bridge-widgets")).toContain("planBridge({");
+    for (const builder of [
+      "buildBridgeNotesRegion",
+      "buildBridgeReadingsRegion",
+    ]) {
+      expect(fnBody(builder, "bridge-widgets")).not.toContain("planBridge");
+    }
   });
 
   it("refuses in the note rather than throwing or rendering empty", () => {
@@ -635,16 +663,32 @@ describe("period-nav routes all four units", () => {
 describe("the anchor ships with the bridge", () => {
   const sections = () => readSrc("journal-sections");
 
+  // The catalogue row, as source.
+  //
+  // ANCHORED ON THE ID CONSTANT, NOT ON A SPELLING OF IT (1.0.89). The row
+  // declared `id: "bridge"` until `wantFromJournalNote` had to name the same id
+  // to carry this section's answers through a save — two modules sharing a
+  // string is what `BRIDGE_SECTION_ID` exists for, and a test matching the
+  // literal would make naming it a failure.
+  const decl = () => {
+    const src = sections();
+    const at = src.indexOf("id: BRIDGE_SECTION_ID");
+    expect(at).toBeGreaterThan(0);
+    return src.slice(at, src.indexOf("\n  {", at + 10));
+  };
+
   it("emits the navigator and the directive in one section", () => {
     // A journal note has no period of its own — the four `*-start` properties
     // live only on diary dashboards — so a `bridge-readings:` on a leaf could
     // ONLY ever refuse until something let the note say which period it meant.
     // Shipping the two separately would put that discovery on the reader.
-    const src = sections();
-    const at = src.indexOf('id: "bridge"');
-    expect(at).toBeGreaterThan(0);
-    const body = src.slice(at, src.indexOf("\n  {", at + 10));
-    expect(body).toContain("period-nav:month");
+    const body = decl();
+    // THE UNIT IS AN ANSWER NOW AND `month` IS ITS DEFAULT (1.0.89), so the
+    // composition names the constant and the constant is the word. Matching
+    // `period-nav:month` here would have passed for one release and then
+    // failed the first time a reader could choose a week.
+    expect(body).toContain("`period-nav:${grain}`");
+    expect(BRIDGE_NAV_GRAIN).toBe("month");
     expect(body).toContain("bridge-readings:");
   });
 
@@ -667,17 +711,11 @@ describe("the anchor ships with the bridge", () => {
     // A page names its parent instead of a date and has no frontmatter worth
     // anchoring, so a period property on one would be a window nothing else on
     // the page agrees with. Refused by not being offered — §2.3's first half.
-    const src = sections();
-    const at = src.indexOf('id: "bridge"');
-    const body = src.slice(at, src.indexOf("\n  {", at + 10));
-    expect(body).toContain('applies: (ctx) => ctx.noteKind !== "page"');
+    expect(decl()).toContain('applies: (ctx) => ctx.noteKind !== "page"');
   });
 
   it("is off by default", () => {
-    const src = sections();
-    const at = src.indexOf('id: "bridge"');
-    const body = src.slice(at, src.indexOf("\n  {", at + 10));
-    expect(body).toContain("default: never");
+    expect(decl()).toContain("default: never");
   });
 });
 
@@ -928,12 +966,12 @@ describe("a snapshot needs a note whose period is its identity", () => {
     // the reader presses next — the block then renders the old period's rows
     // under a header naming the new one. §8's decay, on day one, and the reason
     // per-week and per-quarter entries exist at all.
-    expect(src()).toContain("isRescopingDashboard");
+    expect(src()).toContain("isRescopingNote");
     expect(src()).toContain("Freeze — needs a week or quarter entry");
   });
 
-  it("names all four of them", () => {
-    const at = src().indexOf("export function isRescopingDashboard");
+  it("names all four of them, and asks about the note before it looks", () => {
+    const at = src().indexOf("export function isRescopingNote");
     const body = src().slice(at, src().indexOf("\n}", at));
     for (const target of [
       "weeklyOverviewPath",
@@ -943,6 +981,16 @@ describe("a snapshot needs a note whose period is its identity", () => {
     ]) {
       expect(body).toContain(target);
     }
+    // AND THE FIFTH IS NOT A PATH (1.0.89 §5.4). `setPeriod` writes the period
+    // property into whatever note hosts the navigator, and the journal
+    // catalogue's bridge section composes `period-nav:` right above its own
+    // directive — so a journal leaf re-scopes in place exactly like the four
+    // overviews do, and freeze on it decays the same way. The guard is a
+    // question about the note rather than a list of paths, which is why it was
+    // renamed; the navigator answers first, because a note carrying one
+    // re-scopes wherever it lives.
+    expect(body).toContain("navUnit");
+    expect(body.indexOf("navUnit")).toBeLessThan(body.indexOf("weeklyOverviewPath"));
   });
 });
 

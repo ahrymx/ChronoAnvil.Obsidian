@@ -32,6 +32,9 @@ import type ChronoAnvilPlugin from "../../main";
 import {
   otherSurface,
   planBridge,
+  readBridgeArg,
+  readBridgeDirective,
+  writeBridgeDirective,
   serializeSnapshot,
   serializeSnapshotMeta,
   snapshotKeyFor,
@@ -67,7 +70,7 @@ import {
 import type { JournalKind, JournalType } from "../../journals/journal";
 import { JOURNAL_DATE_PROPERTY } from "../../core/constants";
 import { CLASS_DEFS, getTracker, TRACKER_CLASSES } from "../../trackers/trackers";
-import { chartableType } from "../../charts/charts";
+import { isChartable } from "../../charts/charts";
 import type { PeriodBounds } from "../../charts/charts";
 import { pointsInWindow } from "../../charts/charts";
 import { collectPoints, renderTrackerChart } from "../../charts/chart-render";
@@ -80,14 +83,23 @@ import type { FoldableSection, FoldStore } from "../section-frame";
 import { getFile, today } from "../../core/util";
 import { emptyLine } from "../empty";
 import { liveScopedWidget } from "./live-widgets";
+import { fenceBlocks } from "../../core/reload-loss";
+import { periodNavUnit } from "../../diary/periodnav";
+import { openBridgeWindow } from "../bridge-window";
 
 // ── the vault half of the facts ───────────────────────────────────────
 
-function fileOfCtx(
-  plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext
-): TFile | null {
-  const f = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+// ── A PATH, NOT A RENDER CONTEXT (1.0.89) ─────────────────────────────
+//
+// This took a `MarkdownPostProcessorContext` and read one field off it, which
+// was true of every caller while the only caller was a renderer. The bridge's
+// cog opens a window that has a path and no render context, and it has to
+// assemble the SAME host facts the renderer does — `planBridge` is asked before
+// the window writes, so a window resolving its own near-copy of these facts is
+// exactly the two-correct-copies-of-one-lookup drift `modelForNote` was written
+// to end. So the parameter narrows to what was always being used.
+function fileAt(plugin: ChronoAnvilPlugin, path: string): TFile | null {
+  const f = plugin.app.vault.getAbstractFileByPath(path);
   return f instanceof TFile ? f : null;
 }
 
@@ -108,13 +120,13 @@ function hostSurface(
 
 export function bridgeHostFacts(
   plugin: ChronoAnvilPlugin,
-  ctx: MarkdownPostProcessorContext,
+  path: string,
   // The unit of a `period-nav:` in the same fence, from the loop that walks it
   // — see `BridgeHostFacts.navUnit`. Null on the legacy inline path and on any
   // bridge written without one beside it.
   navUnit: PeriodBounds["unit"] | null = null
 ): BridgeHostFacts {
-  const file = fileOfCtx(plugin, ctx);
+  const file = fileAt(plugin, path);
   const fm = file ? frontmatterOf(plugin.app, file) : {};
   return {
     // Presence, not truthiness — a dashboard that declares `week-start:` and
@@ -127,7 +139,7 @@ export function bridgeHostFacts(
     // let a Lesson note silently bridge to the diary day it was written.
     iso: typeof fm["journal-date"] === "string" ? fm["journal-date"] : null,
     navUnit,
-    surface: hostSurface(plugin, ctx.sourcePath),
+    surface: hostSurface(plugin, path),
   };
 }
 
@@ -159,9 +171,34 @@ export function bridgeCatalogue(
   plugin: ChronoAnvilPlugin,
   target: IndexSurface
 ): BridgeCatalogue {
-  const trackers = plugin.settings.trackers
-    .filter(chartableType)
-    .map((t) => ({ id: t.id, label: t.label || t.id }));
+  // READINGS ONLY EXIST ON THE DIARY SIDE, so this list is only ever the diary
+  // target's (1.0.89). `collectPoints` walks `entriesOfGrain` whatever the host
+  // note is, so a tracker offered for a JOURNAL target would be offered for a
+  // question that reads the diary and calls the answer the journal's. The
+  // refusal in `planBridge` is the rule; this is what the editor offers, and
+  // the two have to say the same thing — a picker whose entries are known in
+  // advance to refuse is the defect patch 7 named one function below.
+  // ── AND `isChartable`, NOT `chartableType` (1.0.89) ─────────────────
+  //
+  // `isChartable` is `chartableType && scopesFor(def).length > 0`, and the
+  // second half is the question this list was getting wrong: a JOURNAL tracker
+  // has no diary grain to read from, so `collectPoints` finds nothing for it
+  // and the block draws "no readings logged inside February 2026" — the empty
+  // state, over a tracker that cannot ever have one here.
+  //
+  // `chart-ui.ts` has filtered its own menu on `isChartable` all along and
+  // states this reason in those words: offering one "would put a row in the
+  // menu that composes a widget refusing in the note". `section-insert.ts`'s
+  // `vault()` filters on it too, which matters more now than it did — the
+  // journal catalogue's tracker question reads THAT list, and a refusal and a
+  // picker that disagree about what is offerable is the defect patch 7 named
+  // one function below. One predicate, three menus.
+  const trackers =
+    target === "diary"
+      ? plugin.settings.trackers
+          .filter(isChartable)
+          .map((t) => ({ id: t.id, label: t.label || t.id }))
+      : [];
 
   if (target === "diary") {
     // ONE WALK, FIVE GRAINS. This was two literals — `daily` and `monthly` —
@@ -279,8 +316,7 @@ function kindIsDated(
   return { kinds: deduped, trackers };
 }
 
-// The four dashboards, whose period is a scroll position rather than an
-// identity.
+// A note whose period is a scroll position rather than an identity.
 //
 // The weekly, quarterly and yearly "overviews" are ONE note each, re-scoped in
 // place by rewriting a blank `*-start`. A snapshot frozen into one of them stays
@@ -290,10 +326,33 @@ function kindIsDated(
 //
 // Daily and monthly entries, and the per-week/per-quarter entries added in 2.57,
 // are all fine — their period is part of what the note IS.
-export function isRescopingDashboard(
+//
+// ── AND A JOURNAL LEAF WITH A NAVIGATOR IS ONE OF THEM (1.0.89) ───────
+//
+// THIS WAS FOUR PATHS, AND IT MISSED THE ONE SURFACE THE FEATURE SHIPS A
+// NAVIGATOR FOR. `journal-sections.ts` composes `period-nav:month` beside every
+// bridge it offers, precisely because "a leaf note has no period of its own and
+// the anchor has to come from somewhere" — and pressing a pill calls
+// `setPeriod(ctx.sourcePath, …)`, which writes `month-start` into THAT NOTE'S
+// own frontmatter. So a leaf carrying a bridge re-scopes in place by exactly
+// the mechanism the four overviews do, and freeze was offered on it: freeze in
+// October, press next, and the block renders October's rows under a header
+// naming November. §8's decay on day one, on the surface the feature is for.
+//
+// THE FACT THAT ANSWERS IT WAS ALREADY THREADED HERE. 1.0.88 carried the
+// navigator's unit from the fence to the host facts so the window could read
+// it; the same value is the whole of this question. A bridge standing beside a
+// navigator has one, a bridge on a dated entry does not, and the four paths
+// stay because an overview re-scopes whether or not its navigator shares the
+// bridge's fence.
+//
+// So the test is the note's, not the path list's, and the name says so.
+export function isRescopingNote(
   plugin: ChronoAnvilPlugin,
-  path: string
+  path: string,
+  navUnit: PeriodBounds["unit"] | null
 ): boolean {
+  if (navUnit) return true;
   const p = plugin.settings.paths;
   return (
     path === weeklyOverviewPath(p) ||
@@ -331,6 +390,12 @@ function bridgeHeader(
     rescoping: boolean;
     toggleMode?: () => void;
     mode?: "cards" | "list";
+    // The cog, and what it opens. 1.0.89.
+    configure?: () => void;
+    // The trend flag on a readings bridge: what the directive says, and the
+    // write that flips it. Absent on a notes bridge, which has cards/list in
+    // the same slot and no chart to offer.
+    trend?: { on: boolean; toggle: () => void };
   },
   fold: { store: FoldStore; key: string }
 ): FoldableSection {
@@ -406,7 +471,86 @@ function bridgeHeader(
     });
   }
 
+  // ── THE TREND, IN THE SLOT THE OTHER DIRECTION USES FOR ITS VIEW (1.0.89) ──
+  //
+  // One control per block, in one place: a notes bridge shows cards or a list
+  // and a readings bridge shows a list or a chart, and both are "how am I
+  // looking at this". They are mutually exclusive by direction, so the slot is
+  // never crowded and a reader who knows one knows the other.
+  //
+  // NOT ON A FROZEN BLOCK, for the same reason the cards/list toggle is not: a
+  // snapshot is markdown, `renderFrozen` is the only thing that draws it, and
+  // neither view applies to it.
+  if (actions.trend && !snap.frozen) {
+    const trendBtn = frame.actions.createEl("button", {
+      cls: "clickable-icon ca-journal-widget-viewmode",
+      attr: {
+        "aria-label": actions.trend.on ? "Show as a list" : "Show as a trend",
+        title: actions.trend.on ? "Show as a list" : "Show as a trend",
+      },
+    });
+    setIcon(trendBtn, actions.trend.on ? "list" : "trending-up");
+    trendBtn.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      actions.trend?.toggle();
+    });
+  }
+
+  // ── AND THE COG, WHICH IS WHAT THE READER ASKED FOR (1.0.89) ────────
+  //
+  //   "the editor window should be a cog wheel on the sections title row
+  //   (next to the chevron).."
+  //
+  // The fourth section to get one, after Attachments (1.0.49 §3), What's below
+  // (1.0.69) and Prose (1.0.78), and drawn the way those three are: a
+  // `clickable-icon` `<button>` with `setIcon(btn, "settings")`, in the frame's
+  // action slot so the chevron keeps the end of the row. `clickable-icon`
+  // rather than a bare button, or the 30px chip-shaped default would make the
+  // row taller than the one beside it — the trap `obsidian-button-height`
+  // records and the view-mode button above is the proof against.
+  //
+  // THE OPENER IS SOMEBODY ELSE'S (1.0.49 §3's rule). This function draws a
+  // button and calls a closure; `bridge-window.ts` resolves the model, reads
+  // the note and writes it, and nothing about chrome reaches that file.
+  //
+  // NOT ON A FROZEN BLOCK. Reconfiguring a snapshot would edit a RECORD —
+  // change the tracker and the block names one thing and holds the readings of
+  // another — and the way back is Unfreeze in the menu below, which is §2.6's
+  // "never automatic, never silent" applied to the door rather than the write.
+  //
+  // NOT ON A REFUSAL EITHER, and that one needs no test here: `buildBridge`
+  // returns `refusalEl` before this frame is built, so a refused bridge has no
+  // bar for a cog to sit on. The door onto a refused bridge is *Edit
+  // sections…*, which lists the section whatever its directive says.
+  if (actions.configure && !snap.frozen) {
+    const cog = frame.actions.createEl("button", {
+      cls: "clickable-icon ca-bridge-cog",
+      attr: {
+        "aria-label": "Bridge settings",
+        title: "Bridge settings",
+      },
+    });
+    setIcon(cog, "settings");
+    cog.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      actions.configure?.();
+    });
+  }
+
   const buildMenu = (menu: Menu): void => {
+    if (actions.configure && !snap.frozen) {
+      menu.addItem((i) =>
+        i.setTitle("Bridge settings…").setIcon("settings").onClick(actions.configure!)
+      );
+    }
+    if (actions.trend && !snap.frozen) {
+      menu.addItem((i) =>
+        i
+          .setTitle(actions.trend!.on ? "Show as a list" : "Show as a trend")
+          .setIcon(actions.trend!.on ? "list" : "trending-up")
+          .onClick(() => actions.trend?.toggle())
+      );
+    }
     if (actions.toggleMode && !snap.frozen) {
       menu.addItem((i) =>
         i
@@ -557,6 +701,121 @@ async function clearSnapshot(
   );
 }
 
+// Why the renderer would refuse this text, or null if it would draw it.
+//
+// ── THE THIRD PLACE A BRIDGE IS REFUSED, AND THE ONLY ONE THAT PREVENTS IT ──
+//
+// §2.3's rule is that a bridge is refused twice — once in the editor and once
+// at render — so that a hand-written directive and one whose target lost its
+// date property both say why instead of going quiet. The cog's window is the
+// third, and it is the only one standing BEFORE the write: the reader hears "a
+// Recipe has no date, so there is nothing to join on" while their answer is
+// still theirs to change.
+//
+// IT IS ASKED OF THE TEXT A SAVE WOULD WRITE, not of a directive composed from
+// the window's answers. Those would be two compositions of one line, and a
+// window that approves what the renderer then refuses is the exact failure the
+// double refusal exists to avoid. So `applySections` runs, and this reads the
+// result the way the render loop reads a file.
+//
+// HERE RATHER THAN IN THE WINDOW, because assembling a host's facts and the
+// other surface's catalogue is this file's job and has one copy. A window that
+// imported the two would put a renderer and a modal in one import component —
+// the tangle `test/module-cycles.test.ts` records under *"no longer runs the
+// diary link through one"*.
+export function bridgeTextRefusal(
+  plugin: ChronoAnvilPlugin,
+  path: string,
+  direction: BridgeDirection,
+  text: string
+): string | null {
+  const isOurs = (line: string): boolean =>
+    readBridgeDirective(line)?.direction === direction;
+  const block = fenceBlocks(text).find((lines) => lines.some(isOurs));
+  const line = block?.find(isOurs);
+  // NO LINE IS NOT A REFUSAL. A reader who removed the section from *Edit
+  // sections…* while this window was open has a note with no bridge in it, and
+  // there is nothing for the renderer to decline.
+  if (!block || !line) return null;
+  const directive = readBridgeDirective(line)!;
+  // THE NAVIGATOR IS READ OFF THE FENCE THE SAVE WOULD WRITE, not off the one
+  // in the file. The period question writes `period-nav:`, so a reader
+  // switching month to week has changed the window this bridge resolves, and
+  // the refusal has to be about the window they are choosing. Found in one pass
+  // over the fence, the way the render loop finds it, because the line that
+  // answers may come after the line that asks.
+  const nav = block
+    .filter((l) => l.split(":")[0].trim() === "period-nav")
+    .map((l) => periodNavUnit(l.slice(l.indexOf(":") + 1)))[0];
+  const host = bridgeHostFacts(plugin, path, nav ?? null);
+  const planned = planBridge({
+    direction: directive.direction,
+    target: directive.target,
+    filters: directive.filters,
+    host,
+    catalogue: bridgeCatalogue(plugin, otherSurface(host.surface)),
+  });
+  return planned.ok ? null : planned.refusal.message;
+}
+
+// The trend flag, written onto the directive the reader is looking at.
+//
+// ── A VIEW CONTROL THAT IS PART OF THE NOTE (1.0.89) ──────────────────
+//
+// `#trend` chooses between a list of dates and values and a chart of the same
+// readings, and it has been reachable only by hand-typing it since 2.57. It is
+// NOT the cards/list toggle's sibling, even though it sits in the same slot: a
+// cards/list mode is held in the render closure and forgotten, because a view
+// mode is not a note's shape. This one is written in the directive, so the note
+// already says which of the two it is and a toggle that did not write would be
+// a control the next render undoes.
+//
+// WHY IT IS NOT A QUESTION IN THE WINDOW. The section machinery reconfigures by
+// splicing an ARGUMENT SPAN, and a flag question routes through `withToken` →
+// `splitArgHead`, which cuts the argument at its first `:` — so
+// `bridge-readings:Mood is:lesson` would come back as
+// `bridge-readings:Mood is#trend:lesson`, a filter with a flag inside it. The
+// flag is glued to the target rather than space-separated from it, so it is not
+// a `part` either. The pair `readBridgeDirective`/`writeBridgeDirective` is the
+// one thing in the tree that knows this grammar whole, and this is the write
+// that needs it.
+//
+// THROUGH `vault.process`, which serialises against every other body write —
+// `writeSnapshot`'s rule and the same reason.
+//
+// SOLE OR NOTHING. A note with two readings bridges on one tracker has two
+// lines this could mean, and rewriting the first is the ambiguity rule
+// `soleArgSpanIn` states for every other answer in the plugin: an answer that
+// cannot be told apart from another section's is one nothing may claim to have
+// read. The section machinery cannot compose that shape, so this is a guard
+// against a hand-written note rather than a case the plugin produces.
+async function setBridgeTrend(
+  plugin: ChronoAnvilPlugin,
+  path: string,
+  direction: BridgeDirection,
+  target: string,
+  on: boolean
+): Promise<boolean> {
+  const file = plugin.app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof TFile)) return false;
+  const matches = (line: string): boolean => {
+    const d = readBridgeDirective(line);
+    return d !== null && d.direction === direction && d.target === target;
+  };
+  let wrote = false;
+  await plugin.app.vault.process(file, (text) => {
+    const lines = text.split("\n");
+    const at = lines.map((l, i) => (matches(l) ? i : -1)).filter((i) => i >= 0);
+    if (at.length !== 1) return text;
+    const indent = /^\s*/.exec(lines[at[0]])![0];
+    const directive = readBridgeDirective(lines[at[0]])!;
+    lines[at[0]] = indent + writeBridgeDirective({ ...directive, trend: on });
+    wrote = true;
+    return lines.join("\n");
+  });
+  return wrote;
+}
+
 export function bridgeFoldKey(sourcePath: string, key: string): string {
   return `${sourcePath}::bridge:${key}`;
 }
@@ -604,15 +863,15 @@ function buildBridge(
   // The unit of a `period-nav:` sharing this fence — see `BridgeHostFacts`.
   navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
-  const host = bridgeHostFacts(plugin, ctx, navUnit);
+  const host = bridgeHostFacts(plugin, ctx.sourcePath, navUnit);
   const catalogue = bridgeCatalogue(plugin, otherSurface(host.surface));
 
-  // `bridge-notes:<target> <filters>` — the target is the first token, the rest
-  // is query text in the grammar the search box already uses.
-  const trimmed = rest.trim();
-  const cut = trimmed.search(/\s/);
-  const target = cut === -1 ? trimmed : trimmed.slice(0, cut);
-  const filters = cut === -1 ? "" : trimmed.slice(cut + 1);
+  // `bridge-<direction>:<target>[#trend] <filters>`, read by the one function
+  // that also WRITES it (1.0.89). The split used to be here and the flag strip
+  // one function below, so three readers of one grammar agreed by inspection;
+  // `readBridgeArg` is the body they now share, which is the rule
+  // `directive-grammar.ts` was extracted to keep.
+  const { target, filters, trend } = readBridgeArg(direction, rest);
 
   const planned = planBridge({ direction, target, filters, host, catalogue });
 
@@ -700,13 +959,69 @@ function buildBridge(
             await clearSnapshot(plugin, path, key);
             return true;
           }, "Bridge is live again."),
-          rescoping: isRescopingDashboard(plugin, path),
+          rescoping: isRescopingNote(plugin, path, navUnit),
           mode: currentMode,
-          toggleMode: () => {
-            mode = mode === "cards" ? "list" : "cards";
-            (body as HTMLElement & { toggleMode?: (m: "cards" | "list") => void }).toggleMode?.(mode);
-            redrawHeader(mode);
+          // THE DOOR, OPENED FROM HERE BECAUSE THIS IS WHERE THE FACTS ARE.
+          // The window needs the note and which of the two directives it is
+          // configuring; everything else it resolves for itself, through the
+          // same `modelForNote` every other read-only door goes through.
+          configure: () => {
+            void openBridgeWindow(plugin.app, plugin, path, (next) =>
+              bridgeTextRefusal(plugin, path, direction, next)
+            );
           },
+          // AND THE TREND, ON THE DIRECTION THAT HAS ONE. `plan.trend` is not
+          // a field — the flag is read off the directive by the readings
+          // builder, which passes what it found — so this closure is handed
+          // the state rather than deriving a second opinion about it.
+          trend:
+            direction === "readings"
+              ? {
+                  on: trend,
+                  toggle: () => {
+                    void setBridgeTrend(
+                      plugin,
+                      path,
+                      direction,
+                      plan.target,
+                      !trend
+                    ).then((ok) => {
+                      if (!ok) {
+                        notify.info(
+                          "ChronoAnvil: this note has more than one bridge " +
+                            "to that tracker, so there is no single line to " +
+                            "change. Edit the directive you mean."
+                        );
+                      }
+                    });
+                  },
+                }
+              : undefined,
+          // ── DRAWN WHERE IT ACTS, AND NOWHERE ELSE (1.0.89) ──────────
+          //
+          // Only `buildBridgeNotesRegion` installs `body.toggleMode`: a
+          // readings bridge is a list of dates and values or a chart, and
+          // neither has a cards form. This was passed unconditionally, so a
+          // readings block drew the icon and the menu row, the icon swapped on
+          // click, the optional call found nothing, and nothing else happened
+          // — "a control that draws, flips, saves and changes nothing", which
+          // `journal-sections.ts` names as a defect in those words.
+          //
+          // THE DIRECTION IS THE TEST, NOT A PROBE OF `body`. The two are the
+          // same fact today, and the direction is the one a reader of this
+          // line can check: a `body` with no `toggleMode` on it is the symptom
+          // of the notes region not having run yet, which is also true for one
+          // render tick of a block that does have the control.
+          toggleMode:
+            direction === "notes"
+              ? () => {
+                  mode = mode === "cards" ? "list" : "cards";
+                  (body as HTMLElement & {
+                    toggleMode?: (m: "cards" | "list") => void;
+                  }).toggleMode?.(mode);
+                  redrawHeader(mode);
+                }
+              : undefined,
         }, { store: foldStore, key });
         // The body was drawn before the header could be — the frozen read is
         // async and the header must not flash the wrong state — so it MOVES
@@ -862,22 +1177,12 @@ export function buildBridgeNotesRegion(
 // same `collectPoints` call, so they are one directive and a rendering choice.
 //
 // `#` because that is the plugin's existing flag suffix — `note:focus#line:`,
-// `note:capture#collapse:`, `links:…#diary` — so this adds no grammar. It is
-// stripped before `buildBridge` splits the target off, because everything below
-// this point is about a tracker called `Mood` and not one called `Mood#trend`.
-function readingsFlags(rest: string): { rest: string; trend: boolean } {
-  const trimmed = rest.trim();
-  const cut = trimmed.search(/\s/);
-  const head = cut === -1 ? trimmed : trimmed.slice(0, cut);
-  const tail = cut === -1 ? "" : trimmed.slice(cut);
-  const hash = head.indexOf("#");
-  if (hash === -1) return { rest: trimmed, trend: false };
-  const flags = head
-    .slice(hash + 1)
-    .split("#")
-    .map((f) => f.trim().toLowerCase());
-  return { rest: head.slice(0, hash) + tail, trend: flags.includes("trend") };
-}
+// `note:capture#collapse:`, `links:…#diary` — so this adds no grammar.
+//
+// THE PARSE MOVED TO `core/bridge.ts` IN 1.0.89 and this read is all that is
+// left of it. `readBridgeArg` strips the flag on its way to the target, so the
+// line is read once rather than once here and once inside `buildBridge`, and
+// the window that writes `#trend` writes it with the inverse of this read.
 
 export function buildBridgeReadingsRegion(
   plugin: ChronoAnvilPlugin,
@@ -886,7 +1191,7 @@ export function buildBridgeReadingsRegion(
   ctx: MarkdownPostProcessorContext,
   navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
-  const { rest: spec, trend } = readingsFlags(rest);
+  const { trend } = readBridgeArg("readings", rest);
   // The live Chart.js instance, so a rebuild disposes the one it is replacing.
   // A chart parented into a LiveWidget's subtree is destroyed with the DOM on
   // the next rebuild; the Chart.js object behind it is not, and it keeps its
@@ -897,7 +1202,7 @@ export function buildBridgeReadingsRegion(
     plugin,
     ctx,
     "readings",
-    spec,
+    rest,
     label,
     (body, plan) => {
       const def = getTracker(plugin, plan.target);

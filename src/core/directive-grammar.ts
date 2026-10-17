@@ -1081,14 +1081,25 @@ export function splitDirective(line: string): DirectiveParts {
 //
 // A region FIELD — `note:`, `list:`, `path:`, `tasks:`, `attach:`, `recall:` —
 // owns a keyed span of the note body and titles itself from the `|Title` after
-// it. Nothing else can title one: none of these keywords is in
-// `SECTION_TITLES`, which is the map answering *what should the bar over this
-// BLOCK say*, and it has nothing to say about a thing that has already said it.
+// it. Nothing else can title one: a field's head is its own label and nothing
+// else has anything to say about a thing that has already said it.
 //
 // SO THE LABEL IS THE WHOLE OF THE QUESTION "IS THIS DRAWN AS A SECTION", for a
 // field and for nothing else. A `bridge-notes` line with its label cut still
-// gets a head from `SECTION_TITLES`; a `note:` line with its label cut renders
-// bare, which is what `fieldHead` does with no label.
+// gets a head — `bridgeHeader` falls back to the target's own label — and a
+// `note:` line with its label cut renders bare, which is what `fieldHead` does
+// with no label.
+//
+// ── THE MAP THIS NAMED IS GONE, AND THE RULE IS NOT (1.0.89 §5.7) ─────
+//
+// Both paragraphs above read "none of these keywords is in `SECTION_TITLES`",
+// which was the map answering *what should the bar over this BLOCK say* until
+// 1.0.22 replaced it with `WIDGETS[k].bar`. Neither bridge keyword is in
+// `WIDGETS` either — they are in `NOT_PAGE_WIDGETS` — so the bridge's head
+// comes from its own renderer rather than from a table, and the behaviour the
+// paragraphs describe is unchanged. What was stale was the evidence, which is
+// worse than no evidence: a reader checking the claim would have found nothing
+// to check it against.
 //
 // HERE RATHER THAN BESIDE `SECTION_TITLES`, WHICH IS ITS SIBLING AND ITS
 // COMPLEMENT. Two readers need it and they are on opposite sides of the tree:
