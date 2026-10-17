@@ -16,7 +16,7 @@ import {
   styleSheets,
 } from "./sources";
 import { proseSpansIn, proseSurfaceSpans } from "../src/journals/journal-sections";
-import { livePreviewSpans, proseMarkFor } from "../src/ui/prose-surface";
+import { proseMarkFor } from "../src/ui/prose-surface";
 
 const OPEN = "<!--chronoanvil-prose-->";
 const SHUT = "<!--/chronoanvil-prose-->";
@@ -33,29 +33,41 @@ describe("what a prose surface covers", () => {
     ]);
   });
 
-  it("takes one blank row at each end, and keeps the rest (1.0.85)", () => {
-    // The composer writes marker / blank / body / blank / marker, so one blank
-    // beside a marker is the gap between the chrome and the writing. Rows
-    // beyond that are the reader's own and are inside the block.
-    const lines = [OPEN, "", "", "Words.", "", "", SHUT];
-    expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 2, to: 4, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
-    ]);
-    // THE COMPOSER'S OWN SHAPE IS UNCHANGED, which is what says this takes one
-    // row and not none: a block as it is written has no blank rows inside it.
+  it("is every row between the markers, and nothing about the writing (1.0.87)", () => {
+    // *"delete the first a and the whole block moves down a line (a line gap
+    // between the banner stack and prose 1)."*
+    //
+    // 1.0.85 absorbed one blank row at each end — the gap the composer writes
+    // between the chrome and the writing — and that was still a question about
+    // the WRITING: whether the row beside a marker is blank is one keystroke
+    // away, so emptying the top row of a block that had no gap to spare moved
+    // the edge onto the next row and took the card with it. The surface is the
+    // whole interior now, and the only numbers in it are the markers' own.
+    const withWord = [OPEN, "a", "", "", "a", SHUT];
+    const emptied = [OPEN, "", "", "", "a", SHUT];
+    expect(proseSurfaceSpans(withWord)[0]).toMatchObject({ from: 1, to: 4 });
+    expect(proseSurfaceSpans(emptied)[0]).toMatchObject({ from: 1, to: 4 });
+    // AND THE SAME FROM THE OTHER END: emptying the last row leaves the bottom
+    // edge where the closing marker put it.
+    expect(proseSurfaceSpans([OPEN, "a", "", "", "", SHUT])[0]).toMatchObject({
+      from: 1,
+      to: 4,
+    });
+    // THE COMPOSER'S BLANK ROW IS INSIDE THE CARD, which is the one thing that
+    // changed on a block nobody has edited: it used to sit above the bar as a
+    // gap and is now the card's own first row, under the head. Same air, other
+    // side of the edge.
     expect(proseSurfaceSpans([OPEN, "", "Words.", "", SHUT])).toEqual([
-      { from: 2, to: 2, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
+      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
-    // *"if I delete that placeholder 'a' so there are only blank lines above
-    // the next 'a', the prose block jumps down to it."* THE MARKERS SAY WHERE
-    // THE BLOCK IS, so deleting a word at the top must not move the card: the
-    // span starts one row under the opener either way, and the blank rows the
-    // reader left are inside it.
-    const withWord = [OPEN, "", "a", "", "", "", "a", "", SHUT];
-    const emptied = [OPEN, "", "", "", "", "", "a", "", SHUT];
-    expect(proseSurfaceSpans(withWord)[0].from).toBe(2);
-    expect(proseSurfaceSpans(emptied)[0].from).toBe(2);
-    expect(proseSurfaceSpans(emptied)[0].to).toBe(6);
+    // AND NOTHING IS ASKED ABOUT A ROW'S CONTENT, as a source shape: a `trim()`
+    // here is a question the reader can answer with one keystroke, which is
+    // what moved the card twice.
+    const body = fnBody("proseSurfaceSpans", "journal-sections");
+    expect(body).toContain("const from = span.open + 1;");
+    expect(body).toContain("const to = span.close - 1;");
+    expect(body).not.toContain("lines[from]");
+    expect(body).not.toContain("lines[to]");
   });
 
   it("keeps an emptied block's head, and gives a bare one nothing (1.0.82)", () => {
@@ -746,9 +758,14 @@ describe("the surface survives Live Preview, where a block is a line", () => {
     expect(own).toContain("--ca-sec-pad-x: 14px");
   });
 
-  it("ends a Live Preview run on a drawn row when a table is at an end (1.0.40)", () => {
+  it("ends a run on a drawn row where a table is at an end (1.0.40, 1.0.87)", () => {
     // A table's rows are replaced by a widget, and a line decoration on a
-    // replaced line is never drawn — a run ending on one had no last line.
+    // replaced line is never drawn — a run ending on one had no last line. The
+    // span used to be trimmed to the last non-blank row, which was the table,
+    // and `livePreviewSpans` stepped it back out onto the blank below. 1.0.87
+    // removed the trim, so the run already ends on the row beside the marker:
+    // the composer's blank, which IS drawn, and the stepping had nothing left
+    // to do. One rule instead of two, and the bug class with it.
     const lines = [
       "<!--chronoanvil-prose-->",
       "",
@@ -758,26 +775,30 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([
+    expect(proseSurfaceSpans(lines)).toEqual([
       { from: 1, to: 5, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
     ]);
-    // Writing at the ends keeps the trimmed span it always had.
+    // Writing at the ends does not move either edge, which is the whole of
+    // 1.0.87: the rows are the markers' and the content is nobody's business.
     const written = [...lines];
     written.splice(2, 0, "Intro.");
     written.splice(6, 0, "Outro.");
-    expect(livePreviewSpans(written)).toEqual([
-      { from: 2, to: 6, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
+    expect(proseSurfaceSpans(written)).toEqual([
+      { from: 1, to: 7, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
     ]);
-    // No blank to take: the span is left alone rather than stepping onto the
-    // bracket.
+    // AND THE SHAPE THAT WAS NEVER FIXED IS STILL NOT FIXED, recorded rather
+    // than claimed: a table pressed against both markers ends the run on a row
+    // Obsidian replaces, and there is no blank beside it to end on instead.
+    // 1.0.40's answer could not reach this either. The composer never writes it.
     const tight = lines.filter((l) => l !== "");
-    expect(livePreviewSpans(tight)).toEqual([
+    expect(proseSurfaceSpans(tight)).toEqual([
       { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
-    // And the painter reads it.
+    // And the painter reads the model directly now — no second span function.
     expect(readCode("ui/prose-surface.ts")).toContain(
-      "for (const span of livePreviewSpans(doc.toString().split(\"\\n\")))"
+      "for (const span of proseSurfaceSpans(doc.toString().split(\"\\n\")))"
     );
+    expect(readCode("ui/prose-surface.ts")).not.toContain("mountedLines");
   });
 
   it("paints display maths as part of the card, not a hole in it (1.0.41)", () => {
@@ -831,11 +852,13 @@ describe("the surface survives Live Preview, where a block is a line", () => {
     }
   });
 
-  it("ends a Live Preview run on a drawn row when maths is at an end (1.0.41)", () => {
+  it("ends a run on a drawn row where maths is at an end (1.0.41, 1.0.87)", () => {
     // Display maths is the second thing Live Preview mounts instead of
-    // drawing, and it arrived at `livePreviewSpans` as the table's bug word
-    // for word: a cheat sheet that ends on an equation had no last line, so
-    // nothing carried `is-prose-last` and the card stopped above the maths.
+    // drawing, and it arrived as the table's bug word for word: a cheat sheet
+    // that ended on an equation had no last line, so nothing carried
+    // `is-prose-last` and the card stopped above the maths. The interior being
+    // the whole surface answers both at once — the run ends on the blank row
+    // beside the closing marker whatever the writing is made of.
     const lines = [
       "<!--chronoanvil-prose-->",
       "",
@@ -845,13 +868,10 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([
+    expect(proseSurfaceSpans(lines)).toEqual([
       { from: 1, to: 5, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
     ]);
-
-    // A one-line `$$ x $$` is the same row: Obsidian mounts that one too, and
-    // where it does not the run merely ends on the blank line below it — the
-    // air the table rule has accepted since 1.0.40.
+    // A one-line `$$ x $$`, which Obsidian mounts too, is the same answer.
     const oneLine = [
       "<!--chronoanvil-prose-->",
       "",
@@ -859,19 +879,17 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(oneLine)).toEqual([
+    expect(proseSurfaceSpans(oneLine)).toEqual([
       { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
-
-    // Writing at the ends keeps the trimmed span it always had — an equation
-    // in the MIDDLE of the writing is reached by the stylesheet, not by this.
+    // Writing around the equation moves nothing — an equation in the MIDDLE of
+    // the writing is reached by the stylesheet, and the ends are the markers'.
     const written = [...lines];
     written.splice(2, 0, "Simplify by the HCF:");
     written.splice(7, 0, "Which is in its lowest terms.");
-    expect(livePreviewSpans(written)).toEqual([
-      { from: 2, to: 7, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
+    expect(proseSurfaceSpans(written)).toEqual([
+      { from: 1, to: 7, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
     ]);
-
     // AND `$$` MID-LINE IS NOT A BLOCK. Obsidian draws it inside the row, the
     // row is a `.cm-line`, and the decoration lands on it as it always did.
     const inline = [
@@ -881,16 +899,17 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(inline)).toEqual([
-      { from: 2, to: 2, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
+    expect(proseSurfaceSpans(inline)).toEqual([
+      { from: 1, to: 3, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
     ]);
   });
 
-  it("leaves a `$$` a reader printed inside a code fence alone (1.0.41)", () => {
-    // `markerLinesIn`'s reason one file over: a reader writing ABOUT LaTeX puts
-    // `$$` in a ```` ``` ```` block, and a code fence's rows are drawn — they
-    // are the `HyperMD-codeblock-bg` rows the stylesheet paints. Counting one
-    // as mounted would step the run's end off a row that was working.
+  it("leaves a `$$` a reader printed inside a code fence alone (1.0.41, 1.0.87)", () => {
+    // A reader writing ABOUT LaTeX puts `$$` in a ```` ``` ```` block. Telling
+    // a fenced `$$` from a real one was `mountedLines`' job and the reason it
+    // was fence-aware; with the ends off the markers there is no row to
+    // misjudge, and the question has stopped being asked rather than being
+    // answered correctly. Pinned because the span is what the card is drawn on.
     const lines = [
       "<!--chronoanvil-prose-->",
       "",
@@ -902,8 +921,8 @@ describe("the surface survives Live Preview, where a block is a line", () => {
       "",
       "<!--/chronoanvil-prose-->",
     ];
-    expect(livePreviewSpans(lines)).toEqual([
-      { from: 2, to: 6, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
+    expect(proseSurfaceSpans(lines)).toEqual([
+      { from: 1, to: 7, head: "Prose 1", nth: 1, title: null, close: 8, open: 0 },
     ]);
   });
 
@@ -1705,18 +1724,17 @@ describe("the block that wears no head (1.0.77)", () => {
   });
 
   it("hands the editor's decoration a head that may be null", () => {
-    // ONE TYPE THROUGH BOTH PAINTERS. `livePreviewSpans` widens the run to the
-    // blank line above a table or a `$$`, so a head declared `string` here
-    // would have been a cast at exactly the place the two shapes meet.
-    expect(livePreviewSpans([BARE, "Words.", SHUT])).toEqual([
+    // ONE TYPE THROUGH BOTH PAINTERS, which is what a `#bare` block is the
+    // test of: the editor's decoration loop reads the same `ProseSurface` the
+    // reading-mode painter does, and a head declared `string` would have been a
+    // cast at exactly the place the two shapes meet.
+    expect(proseSurfaceSpans([BARE, "Words.", SHUT])).toEqual([
       { from: 1, to: 1, head: null, nth: 1, title: null, close: 2, open: 0 },
     ]);
-    // ONE TYPE, NAMED ONCE. `livePreviewSpans` returns the model's own
-    // `ProseSurface`, so a `head` declared `string` would have been a cast at
-    // exactly the place the two shapes meet.
-    expect(readCode("prose-surface")).toContain(
-      "export function livePreviewSpans(lines: readonly string[]): ProseSurface[] {"
-    );
+    // AND ONE SPAN FUNCTION, AS OF 1.0.87. `livePreviewSpans` existed to widen
+    // a run whose ends had been trimmed off the markers; the ends are the
+    // markers' now and it is gone, so the editor reads the model itself.
+    expect(readCode("prose-surface")).not.toContain("livePreviewSpans");
     expect(readSrc("journal-sections")).toContain("head: string | null;");
   });
 });

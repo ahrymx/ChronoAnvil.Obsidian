@@ -729,14 +729,13 @@ no name and no controls on it, an empty one really is a card with nothing in it,
 and it is not drawn until there is something to draw it around.
 
 **And the card's edges are the markers, not your words.** A block holds
-everything between its two markers, blank rows included, so the card starts
-where the block does however much space you have left at the top of it — delete
-the first line and nothing moves but that line. The one blank row the plugin
-writes under the title and above the closing marker is the gap between the head
-and your writing, and sits outside the card; anything beyond that you put there
-yourself, and it stays inside, where you typed it. Reading mode draws it from
-the same two markers, so a block reads as the same card whichever mode you are
-in, however far your writing sits from either end of it.
+everything between its two markers, blank rows and all, so the card starts where
+the block does however much space you have left at the top of it — delete the
+first line and nothing moves but that line. Every empty row you leave is inside
+the card, where you typed it, including the one under the title that a new block
+arrives with. Reading mode draws it from the same two markers, so a block reads
+as the same card whichever mode you are in, however far your writing sits from
+either end of it.
 
 You can also write the list without leaving the change window. The cog on the
 block's own head and the Prose row in **Note: edit sections…** both give you a

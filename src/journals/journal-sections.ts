@@ -996,14 +996,12 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
   // else (`proseIdFor`, `proseSpanIn`, the editor's rows), so it is here too.
   proseSpansIn(lines).forEach((span, i) => {
     const head = span.bare ? null : proseHeadLabel(span.title, i + 1);
-    const first = span.open + 1;
-    const last = span.close - 1;
+    const from = span.open + 1;
+    const to = span.close - 1;
     // A BLOCK WITH NO ROW BETWEEN ITS MARKERS has no surface: there is nothing
     // to paint and nothing to type into. `protectedRanges` is what stops a
     // reader reaching that state with the backspace key.
-    if (first > last) return;
-    let from = first;
-    let to = last;
+    if (from > to) return;
     // ── AN EMPTIED BLOCK KEEPS ITS HEAD (1.0.82) ───────────────────────
     //
     // *"backspacing all the text removes the prose block — it disappears
@@ -1016,39 +1014,40 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
     // block's NAME on that band, then a cog, then a chevron. So what vanishes
     // when the last character goes is no longer decoration — it is the block's
     // only visible identity and its only control, and a section disappearing
-    // under the backspace key reads as having been deleted. An emptied block
-    // takes its whole interior: the blank row the reader is sitting on becomes
-    // the writing, which is where `marker-lines.ts`' landings were already
-    // sending the cursor (1.0.39).
+    // under the backspace key reads as having been deleted.
     //
     // AND `#bare` IS STILL SKIPPED, which is 1.0.36's argument kept exactly
     // where it was right. A block whose head the reader turned off has no name,
     // no cog and no chevron on it, so an empty one really is a band of colour
     // with nothing in it, and still gets nothing.
-    if (lines.slice(first, last + 1).every((line) => line.trim() === "")) {
-      if (head === null) return;
-    } else {
-      // ── AND ONE BLANK ROW AT EACH END IS THE COMPOSER'S (1.0.85) ─────
-      //
-      // *"if I delete that placeholder 'a' so there are only blank lines above
-      // the next 'a', the prose block jumps down to it."*
-      //
-      // 1.0.36 ATE EVERY BLANK ROW AT BOTH ENDS, so the card began at the first
-      // word rather than at the top of the block — and a reader who deleted
-      // that word watched the whole card, head and all, leap down the page to
-      // the next one. The rows it stepped over are INSIDE the markers. The
-      // markers are what say where the block is, and no edit to the writing
-      // should be able to move the block's own edges.
-      //
-      // ONE ROW AT EACH END, WHICH IS WHAT WE WROTE. `journal-plan.ts` composes
-      // a block as marker / blank / body / blank / marker, so one blank beside
-      // a marker is the gap between the chrome and the writing rather than
-      // anything the reader put there — and it is also what a reader leaves
-      // without thinking. Two or more is a deliberate space and belongs inside
-      // the card, where they typed it.
-      if (lines[from].trim() === "") from++;
-      if (lines[to].trim() === "") to--;
+    if (head === null && lines.slice(from, to + 1).every((l) => l.trim() === "")) {
+      return;
     }
+    // ── AND THE INTERIOR IS THE WHOLE OF IT, ALWAYS (1.0.87) ───────────
+    //
+    // *"delete the first a and the whole block moves down a line (a line gap
+    // between the banner stack and prose 1)."*
+    //
+    // 1.0.85 STOPPED THE CARD BEGINNING AT THE FIRST WORD and absorbed one
+    // blank row at each end — the gap `journal-plan.ts` composes between the
+    // chrome and the writing. That rule was still a question ABOUT THE WRITING:
+    // whether the row beside a marker is blank is a thing the reader can change
+    // with one keystroke, so emptying the top row of a block that had none to
+    // spare moved the edge down onto the next one, and the card went with it.
+    // The same bug one row smaller, which is how it was found.
+    //
+    // SO NOTHING IS TRIMMED. The surface is every row between the two markers,
+    // and the only numbers in it are the markers' own — there is no edit to the
+    // writing that can move either end, because no edit to the writing is read.
+    // That is 1.0.86's reading-mode answer stated for the editor as well, and
+    // the two painters now draw the same card: reading mode hangs the edges on
+    // the markers' rendered blocks, Live Preview paints the rows between them.
+    //
+    // THE COMPOSER'S BLANK ROW DOES NOT DISAPPEAR, IT MOVES INSIDE. It used to
+    // sit above the bar as a gap between the block before and the card; it is
+    // now the card's own first row, under the head. No note gains or loses a
+    // line — the air changes sides — and reading mode is unaffected either way,
+    // because a blank line renders nothing there at all.
     out.push({
       from,
       to,

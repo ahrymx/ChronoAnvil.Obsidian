@@ -74,7 +74,7 @@ import {
 } from "@codemirror/view";
 
 import type ChronoAnvilPlugin from "../main";
-import { proseSurfaceSpans, type ProseSurface } from "../journals/journal-sections";
+import { proseSurfaceSpans } from "../journals/journal-sections";
 import {
   buildProseBar,
   clearProseBar,
@@ -384,106 +384,35 @@ export const proseFoldEffect = StateEffect.define<null>();
 // from the same document at the same moment, and one of them being a frame
 // behind the other is exactly the kind of flicker that gets reported as
 // "sometimes the background is one line short".
-// ── A TABLE AT EITHER END TAKES THE BLANK BESIDE IT (1.0.40) ────────────
+// ── A TABLE AT EITHER END TOOK THE BLANK BESIDE IT, AND NEED NOT (1.0.40,
+// 1.0.41, REMOVED IN 1.0.87) ────────────────────────────────────────────
 //
 // *"if a table is at the bottom of the prose block no surface exists until a
-// new line with text is created below it."* The span stops at its last
-// non-blank line, and in Live Preview that line is a table row — which
-// Obsidian replaces with a widget, and a line decoration on a replaced line is
-// never drawn. So the run had no last line at all: nothing carried
-// `is-prose-last`, and the stylesheet's "painted prose after me" half, which
-// is how a table is reached, had nothing to find either.
+// new line with text is created below it."* — and the same report again for
+// display maths one round later, word for word.
 //
-// The answer is to end the run on a row that IS drawn: the blank line between
-// the table and the closer, which the composer writes and the select-all guard
-// keeps. It is inside the bracket by construction — the span was trimmed to
-// the last non-blank line, so the next line is either blank or the closer.
-// The top is the same case upside down. Reading mode is untouched: there a
-// table is a block of its own and carries the classes itself.
+// BOTH WERE THE TRIM'S BUG. The span used to stop at its last non-blank line;
+// in Live Preview that line was a table row or a `$$`, which Obsidian replaces
+// with a widget, and A LINE DECORATION ON A REPLACED LINE IS NEVER DRAWN. So
+// the run had no last line at all: nothing carried `is-prose-last`, and the
+// stylesheet's "painted prose after me" half, which is how a table is reached,
+// had nothing to find either. `livePreviewSpans` fixed it by stepping the run's
+// end OUTWARD onto the blank line between the table and the closer, which was
+// inside the bracket by construction precisely because the span had been
+// trimmed inward past it.
 //
-// ── AND A `$$` BLOCK IS THE SAME ROW (1.0.41) ───────────────────────────
+// 1.0.87 TOOK THE TRIM OUT, so the run already ends on `close - 1` — the row
+// beside the marker, which is the composer's own blank and is drawn. There is
+// no blank left outside the run to step onto, and `lines[from - 1]` and
+// `lines[to + 1]` are now the two markers, which are never blank: every branch
+// of that function had become unreachable. Unreachable code carrying this much
+// reasoning reads as a live safeguard, so it is gone and the reasoning is here.
 //
-// *"ChronoAnvil's Prose blocks need to support LaTeX."* Display maths is the
-// second thing Live Preview mounts instead of drawing, and it arrived at this
-// function as the table's bug word for word: a cheat sheet that ends on an
-// equation had no last line, so nothing carried `is-prose-last` and the card
-// stopped above the maths. So the rule is not "a table row" any more, it is
-// A ROW LIVE PREVIEW DOES NOT DRAW — one predicate, two shapes, and the next
-// one Obsidian mounts is a line in `mountedLines` rather than a third arm on
-// an expression.
-//
-// EVERY LINE OF THE BLOCK, whether or not Obsidian replaces a one-line
-// `$$ x $$` (it draws that one inside the row, and the multi-line form as a
-// widget). Both answers are safe: where the row is replaced this is the fix,
-// and where it is drawn the run merely ends on the blank line below it — the
-// same pixel of air the table rule has already accepted since 1.0.40. Guessing
-// which of the two Obsidian will do next release is what is not safe.
-const TABLE_ROW = /^\s*\|/;
-const MATH_EDGE = /^\s*\$\$/;
-const FENCE = /^\s*(`{3,}|~{3,})/;
-
-// Which lines of a prose block Live Preview mounts a block into rather than
-// drawing as a `.cm-line`.
-//
-// FENCE-AWARE, for `marker-linesIn`'s reason one file over: a reader writing
-// about LaTeX puts `$$` inside a ```` ``` ```` block, and a code fence's rows
-// ARE drawn — they are the `HyperMD-codeblock-bg` rows the stylesheet paints.
-// Counting one as mounted would step the run's end off a row that was working.
-function mountedLines(lines: readonly string[]): Set<number> {
-  const out = new Set<number>();
-  let fence = "";
-  let math = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (fence) {
-      if (line.startsWith(fence)) fence = "";
-      continue;
-    }
-    const opens = math === -1 ? line.match(FENCE) : null;
-    if (opens) {
-      fence = opens[1];
-      continue;
-    }
-    if (TABLE_ROW.test(lines[i])) out.add(i);
-    if (math === -1) {
-      // An opener that also closes on its own row — `$$ x $$` — is one line of
-      // maths and not the start of a block. `$$` alone is an opener.
-      if (!MATH_EDGE.test(lines[i])) continue;
-      out.add(i);
-      if (!/\$\$\s*$/.test(line) || line === "$$") math = i;
-      continue;
-    }
-    out.add(i);
-    // AN UNCLOSED `$$` NEVER ENDS THE FILE'S WORTH OF LINES, which is the same
-    // conservative half `proseSpansIn` states: the block is bounded by the
-    // bracket the caller sliced, so a missing closer costs the run its rounding
-    // and nothing else.
-    if (/\$\$\s*$/.test(line)) math = -1;
-  }
-  return out;
-}
-
-export function livePreviewSpans(lines: readonly string[]): ProseSurface[] {
-  const mounted = mountedLines(lines);
-  return proseSurfaceSpans(lines).map((span) => ({
-    ...span,
-    from:
-      mounted.has(span.from) && lines[span.from - 1]?.trim() === ""
-        ? span.from - 1
-        : span.from,
-    to:
-      mounted.has(span.to) && lines[span.to + 1]?.trim() === ""
-        ? span.to + 1
-        : span.to,
-    // THE HEAD AND THE ORDINAL RIDE THROUGH UNCHANGED, which is what `...span`
-    // says: this function moves the ENDS of a run and nothing else. The bar
-    // goes above whichever row the run now starts on — a block opening on a
-    // table or a `$$` has already stepped its start up onto the blank line
-    // above it, because a replaced row draws no line decoration, and a bar
-    // anchored to a row that is never drawn is a bar nobody sees.
-  }));
-}
-
+// WHAT IS NOT FIXED, AND WAS NOT FIXED BEFORE EITHER: a block written with a
+// table or an equation PRESSED AGAINST a marker, no blank row between them. The
+// run's end row is that mounted row, nothing is drawn on it, and there was
+// never a blank beside it to step to — the 1.0.40 answer could not reach that
+// shape and neither can this one. The composer never writes it; a reader can.
 // The bar, as a row of the editor that is not a row of the file.
 //
 // `eq` COMPARES WHAT IS DRAWN, which is the whole of why this is cheap: the
@@ -635,7 +564,7 @@ function proseIn(doc: Text, plugin: ChronoAnvilPlugin, path: string | null): Pro
   const out: Range<Decoration>[] = [];
   const shut: LineSpan[] = [];
   const hidden: { from: number; to: number }[] = [];
-  for (const span of livePreviewSpans(doc.toString().split("\n"))) {
+  for (const span of proseSurfaceSpans(doc.toString().split("\n"))) {
     // A BLOCK WITH NO HEAD HAS NO CHEVRON AND THEREFORE NO FOLD (1.0.79). The
     // control lives on the title row, so a `#bare` block cannot be folded and
     // a note written before the markers existed has no block to fold at all.

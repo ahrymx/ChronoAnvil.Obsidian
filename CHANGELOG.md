@@ -5,6 +5,32 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.87] - 2026-10-17
+
+### Fixed
+
+- **Emptying the top row of a prose block still moved the whole card down a
+  line.** *"delete the first a and the whole block moves down a line (a line gap
+  between the banner stack and prose 1)."* 1.0.85 stopped the card beginning at
+  the first word and absorbed one blank row at each end — the gap a new block is
+  written with, between its head and your writing. That was still a question
+  about the writing: whether the row beside a marker is blank is one keystroke
+  away, so a block with no gap to spare lost its top row to the rule the moment
+  that row was emptied, and the card followed it down the page.
+  - **The card is every row between the two markers now, and nothing is
+    trimmed.** No edit to the writing can move either edge, because no edit to
+    the writing is read — the only numbers in the answer are the markers' own.
+    That is 1.0.86's reading-mode rule stated for the editor as well, and the
+    two modes now draw the same card.
+  - **The blank row a new block arrives with moves inside the card** rather than
+    sitting above its head as a gap. No note gains or loses a line; the air
+    changes sides. Reading mode is unaffected either way — a blank line renders
+    nothing there at all.
+  - The separate span function Live Preview used is gone with the trim. It
+    existed to step a run's end back out onto the blank row beside a table or an
+    equation, which a trimmed run had moved off; an untrimmed run ends there to
+    begin with, so every branch of it had become unreachable (1.0.40, 1.0.41).
+
 ## [1.0.86] - 2026-10-17
 
 ### Fixed
