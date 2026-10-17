@@ -32,14 +32,29 @@ describe("what a prose surface covers", () => {
     ]);
   });
 
-  it("trims the blank lines the composer leaves at each end", () => {
-    // The template writes a blank after the opener and before the closer, and a
-    // reader who presses Enter twice under their last paragraph leaves more.
-    // Blank rows are not rows of prose.
+  it("takes one blank row at each end, and keeps the rest (1.0.85)", () => {
+    // The composer writes marker / blank / body / blank / marker, so one blank
+    // beside a marker is the gap between the chrome and the writing. Rows
+    // beyond that are the reader's own and are inside the block.
     const lines = [OPEN, "", "", "Words.", "", "", SHUT];
     expect(proseSurfaceSpans(lines)).toEqual([
-      { from: 3, to: 3, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
+      { from: 2, to: 4, head: "Prose 1", nth: 1, title: null, close: 6, open: 0 },
     ]);
+    // THE COMPOSER'S OWN SHAPE IS UNCHANGED, which is what says this takes one
+    // row and not none: a block as it is written has no blank rows inside it.
+    expect(proseSurfaceSpans([OPEN, "", "Words.", "", SHUT])).toEqual([
+      { from: 2, to: 2, head: "Prose 1", nth: 1, title: null, close: 4, open: 0 },
+    ]);
+    // *"if I delete that placeholder 'a' so there are only blank lines above
+    // the next 'a', the prose block jumps down to it."* THE MARKERS SAY WHERE
+    // THE BLOCK IS, so deleting a word at the top must not move the card: the
+    // span starts one row under the opener either way, and the blank rows the
+    // reader left are inside it.
+    const withWord = [OPEN, "", "a", "", "", "", "a", "", SHUT];
+    const emptied = [OPEN, "", "", "", "", "", "a", "", SHUT];
+    expect(proseSurfaceSpans(withWord)[0].from).toBe(2);
+    expect(proseSurfaceSpans(emptied)[0].from).toBe(2);
+    expect(proseSurfaceSpans(emptied)[0].to).toBe(6);
   });
 
   it("keeps an emptied block's head, and gives a bare one nothing (1.0.82)", () => {

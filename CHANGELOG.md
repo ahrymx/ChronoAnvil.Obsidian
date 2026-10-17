@@ -5,6 +5,25 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.85] - 2026-10-17
+
+### Fixed
+
+- **A prose block's card began at the first word, not at the top of the block.**
+  *"if I delete that placeholder 'a' so there are only blank lines above the next
+  'a', the prose block jumps down to it."* The surface had eaten every blank row
+  at both ends since 1.0.36, so the card — head, cog and chevron with it —
+  started wherever the writing happened to start, and deleting a word at the top
+  of a block sent the whole thing leaping down the page to the next one.
+  - **The markers say where the block is**, and no edit to the writing can move
+    its edges now. One blank row at each end is still taken: that is the gap the
+    composer writes between the chrome and the writing (`marker / blank / body /
+    blank / marker`), and it is what a reader leaves there without thinking. Two
+    or more is a deliberate space and stays inside the card, where it was typed.
+  - A block as the composer writes it is unchanged — no note gains or loses a
+    row of air — and an emptied block still takes its whole interior, which is
+    now a stated clause rather than a rescue after the trim.
+
 ## [1.0.84] - 2026-10-17
 
 ### Fixed

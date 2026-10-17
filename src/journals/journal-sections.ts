@@ -996,10 +996,14 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
   // else (`proseIdFor`, `proseSpanIn`, the editor's rows), so it is here too.
   proseSpansIn(lines).forEach((span, i) => {
     const head = span.bare ? null : proseHeadLabel(span.title, i + 1);
-    let from = span.open + 1;
-    let to = span.close - 1;
-    while (from <= to && lines[from].trim() === "") from++;
-    while (to >= from && lines[to].trim() === "") to--;
+    const first = span.open + 1;
+    const last = span.close - 1;
+    // A BLOCK WITH NO ROW BETWEEN ITS MARKERS has no surface: there is nothing
+    // to paint and nothing to type into. `protectedRanges` is what stops a
+    // reader reaching that state with the backspace key.
+    if (first > last) return;
+    let from = first;
+    let to = last;
     // ── AN EMPTIED BLOCK KEEPS ITS HEAD (1.0.82) ───────────────────────
     //
     // *"backspacing all the text removes the prose block — it disappears
@@ -1012,22 +1016,38 @@ export function proseSurfaceSpans(lines: readonly string[]): ProseSurface[] {
     // block's NAME on that band, then a cog, then a chevron. So what vanishes
     // when the last character goes is no longer decoration — it is the block's
     // only visible identity and its only control, and a section disappearing
-    // under the backspace key reads as having been deleted.
-    //
-    // SO THE TRIM FALLS BACK TO THE UNTRIMMED INTERIOR rather than to nothing.
-    // The blank row the reader is sitting on becomes the writing: the card
-    // stays, the head stays, and there is a row inside it to type into — which
-    // is where `marker-lines.ts`' landings were already sending the cursor
-    // (1.0.39), and is why typing a line below brought the block back.
+    // under the backspace key reads as having been deleted. An emptied block
+    // takes its whole interior: the blank row the reader is sitting on becomes
+    // the writing, which is where `marker-lines.ts`' landings were already
+    // sending the cursor (1.0.39).
     //
     // AND `#bare` IS STILL SKIPPED, which is 1.0.36's argument kept exactly
     // where it was right. A block whose head the reader turned off has no name,
     // no cog and no chevron on it, so an empty one really is a band of colour
     // with nothing in it, and still gets nothing.
-    if (from > to) {
-      if (head === null || span.close <= span.open + 1) return;
-      from = span.open + 1;
-      to = span.close - 1;
+    if (lines.slice(first, last + 1).every((line) => line.trim() === "")) {
+      if (head === null) return;
+    } else {
+      // ── AND ONE BLANK ROW AT EACH END IS THE COMPOSER'S (1.0.85) ─────
+      //
+      // *"if I delete that placeholder 'a' so there are only blank lines above
+      // the next 'a', the prose block jumps down to it."*
+      //
+      // 1.0.36 ATE EVERY BLANK ROW AT BOTH ENDS, so the card began at the first
+      // word rather than at the top of the block — and a reader who deleted
+      // that word watched the whole card, head and all, leap down the page to
+      // the next one. The rows it stepped over are INSIDE the markers. The
+      // markers are what say where the block is, and no edit to the writing
+      // should be able to move the block's own edges.
+      //
+      // ONE ROW AT EACH END, WHICH IS WHAT WE WROTE. `journal-plan.ts` composes
+      // a block as marker / blank / body / blank / marker, so one blank beside
+      // a marker is the gap between the chrome and the writing rather than
+      // anything the reader put there — and it is also what a reader leaves
+      // without thinking. Two or more is a deliberate space and belongs inside
+      // the card, where they typed it.
+      if (lines[from].trim() === "") from++;
+      if (lines[to].trim() === "") to--;
     }
     out.push({
       from,
