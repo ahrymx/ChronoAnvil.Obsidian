@@ -5,6 +5,49 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.91] - 2026-10-17
+
+### Changed
+
+- **A bridge's date picker is on the bridge's own title row.** The journal
+  catalogue composes `period-nav:month` and `bridge-readings:` into one fence,
+  and two directives in one fence are two blocks on the note's background — so
+  the control that chose the period sat above the card the period labels, while
+  the bar four pixels below it printed the same month as a muted phrase. The
+  period is stated once now, by the copy that can be pressed: `bridgeHeader`
+  builds the navigator into the frame's note slot and the dispatcher withholds
+  the standalone block. The `period-nav:` line is untouched — it is still what
+  says which grain, and still what the bridge window's *Over* question writes.
+  A frozen block keeps the phrase and gets no stepper: a snapshot is a record of
+  one period.
+- **One opener on a bridge's bar, and it is the cog.** 1.0.89 added a cog
+  straight to the settings window and left the ⋯ beside it, whose first row was
+  that same window. They are merged through `settingsButton`, which is the ⋯
+  with 4.20's glyph on it, so the menu is still built on click and reached by
+  the same long-press. The cog is now drawn on a frozen block too, where it is
+  the only way back to live — the *Bridge settings…* row is what stands down
+  there, not the button.
+- **A bridge's chevron leads its title row.** It was on the right with every
+  other section's since 5.10; it is on the left of this one bar now.
+
+### Fixed
+
+- **A bridge's chevron was stranded half way along its own bar.** 4.13 §1b
+  gives a level-2 head's one auto margin to the actions strip and resets the
+  chevron's — and it names only `HeaderBar`'s chevron, not
+  `foldableSection`'s. A bridge's bar is the second kind, so it kept its
+  `margin-left: auto` beside the actions' own, and flexbox splits free space
+  equally between every auto margin on a line rather than letting one win. The
+  bridge is the only level-2 foldable section in the tree, which is why this was
+  the only bar it showed on.
+- **A bridge did not follow its navigator.** The period came from one
+  frontmatter read taken when the block was postprocessed, outside the live
+  widget — so pressing *next* repainted the rows and the header from the period
+  the block was first drawn with. The window is resolved per paint now. The
+  watch list and the snapshot key stay the first resolve's: neither depends on
+  the period, and recomputing them would be a different list handed to a widget
+  that has already registered one.
+
 ## [1.0.90] - 2026-10-17
 
 ### Fixed

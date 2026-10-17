@@ -1316,6 +1316,17 @@ export class Widgets implements
           .map((line) => periodNavUnit(line.slice(line.indexOf(":") + 1)))[0] ??
         null;
 
+      // Whether this fence holds something that draws its own section frame —
+      // a bridge — read through the set 1.0.90 named for exactly this question.
+      //
+      // ONE PASS UP FRONT for the reason `navUnit` above is: the two lines
+      // answer each other and either may come first. `journal-sections.ts`
+      // writes the navigator above the bridge; a reader rearranging their own
+      // fence is not wrong to put it below the thing it scopes.
+      const selfFramed = lines.some((line) =>
+        SELF_FRAMED_KEYWORDS.has(line.split("|")[0].split(":")[0].trim())
+      );
+
       const headerOwning = (keyword: string, atLevel?: number): number => {
         let seen = -1;
         let owner = -1;
@@ -1521,6 +1532,31 @@ export class Widgets implements
       for (const [n, line] of lines.entries()) {
         drawn.push({ at: container.childElementCount, line: lineAt[n] });
         const kind = line.split("|")[0].split(":")[0].trim();
+
+        // ── ONE NAVIGATOR PER FENCE, AND A BRIDGE OWNS IT (1.0.91) ──────
+        //
+        //   "date picker is being rendered outside the surface"
+        //
+        // It was, and it was outside BECAUSE it is a block of its own: the
+        // journal catalogue composes `period-nav:month` and `bridge-readings:`
+        // into one fence, and two directives in one fence are two blocks on the
+        // note's own background unless something adopts one. The `header:` case
+        // below has adopted the navigator into a bar since 2.x for exactly this
+        // reason — *"they read as the header's own controls"* — and a bridge
+        // has a bar; it just draws it itself, which is why it was never
+        // reached. So `bridgeHeader` builds the strip in its note slot and this
+        // arm withholds the block, which is the same trade with the same
+        // argument one surface over.
+        //
+        // UNCONDITIONAL ON THE FENCE HOLDING A BRIDGE, rather than conditional
+        // on there being no `header:` to adopt it instead. A fence with a
+        // header AND a navigator AND a bridge is not a shape this plugin
+        // composes, and the two readings of it disagree about which bar the
+        // strip lands on — so one rule decides, and a bridge's bar is a surface
+        // whichever way the lines are ordered. The `period-nav:` LINE is
+        // untouched: it is what `navUnit` is read from, what `bridgeHostFacts`
+        // anchors on, and what the bridge window's *Over* question writes.
+        if (kind === "period-nav" && selfFramed) continue;
 
         // The cell delimiter draws nothing and dispatches nothing — it records
         // a position and steps aside. Taken before every other arm so it can

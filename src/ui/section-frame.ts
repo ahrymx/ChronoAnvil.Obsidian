@@ -214,6 +214,25 @@ export interface SectionFrameOptions {
   // quantity, and a pill around "2 of 5 met" reads as a badge saying something
   // it is not.
   note?: string;
+  // The same slot, DRAWN by the caller — `titleRender`'s rule one slot over.
+  //
+  // WHAT IT IS FOR, AND IT IS ONE THING (1.0.91). A bridge's note slot held the
+  // period its rows covered, as a muted phrase, while the navigator that chose
+  // that period sat in its own block above the card printing the same string.
+  // The period was stated twice and only one copy could be pressed, which is
+  // `periodnav.ts`'s own argument for making its trigger the headline, read one
+  // level up: the fix for a label printed twice is to keep the copy that is a
+  // control.
+  //
+  // THE SLOT TAKES `ca-journal-header-note-live` WHEN IT IS DRAWN, and that is
+  // not decoration — `foldableSection`'s fold excludes it from the click that
+  // folds the section, the same exemption the actions strip has. A phrase is
+  // part of the bar and folds with it; a control acts.
+  noteRender?: (slot: HTMLElement) => void;
+  // Which end of the title row the fold chevron sits on. Read by
+  // `foldableSection` alone — a `sectionFrame` has no chevron to place.
+  // Defaults to the right, which is where 4.13 §1b put every one of them.
+  toggleSide?: "left" | "right";
   // A bar with no title of its own, anchoring buttons under a real markdown
   // heading that is a structural boundary (Study and the custom journals).
   // It draws no title, no glyph and no count — it is a control strip.
@@ -325,7 +344,13 @@ export function sectionFrame(
     });
   }
 
-  if (opts.note) {
+  if (opts.noteRender) {
+    opts.noteRender(
+      root.createSpan({
+        cls: "ca-journal-header-note ca-journal-header-note-live",
+      })
+    );
+  } else if (opts.note) {
     root.createSpan({ cls: "ca-journal-header-note", text: opts.note });
   }
 
@@ -423,9 +448,31 @@ export function foldableSection(
   // them, for the reason `headerbar.ts` gives at its own toggle: at level 1 the
   // actions slot is a full-width second row, so appending would wrap the chevron
   // onto a third one. `margin-left: auto` in the stylesheet is what moves it.
+  //
+  // ── UNLESS THE CALLER ASKS FOR THE OTHER END (1.0.91) ───────────────
+  //
+  //   "The chevron should be on the far left."
+  //
+  // FIRST CHILD, NOT `order: -1`. The declaration would have been one line and
+  // it would have left the DOM order and the reading order disagreeing — tab
+  // and screen-reader order follow the document, so a chevron moved by `order`
+  // is announced after the title it opens and reached last by keyboard. 4.13
+  // §1b's own `order: 1` is sound for the opposite reason: there the chevron is
+  // ALREADY the last thing before the actions, so the swap it makes is with one
+  // sibling a reader meets in either order.
+  //
+  // `has-left-toggle` rather than a modifier on the chevron itself, because
+  // what the stylesheet has to cancel is the `margin-left: auto` 4.13 §1b put
+  // on the class — and a rule cancelling a declaration on its own selector is
+  // the specificity tie the parent class breaks.
   const chevron = createDiv({ cls: "ca-journal-sec-fold-toggle" });
   setIcon(chevron, "chevron-down");
-  frame.root.insertBefore(chevron, frame.actions);
+  if (opts.toggleSide === "left") {
+    frame.root.insertBefore(chevron, frame.root.firstChild);
+    frame.root.addClass("has-left-toggle");
+  } else {
+    frame.root.insertBefore(chevron, frame.actions);
+  }
   frame.root.addClass("is-foldable");
 
   const apply = (collapsed: boolean): void => {
@@ -439,7 +486,11 @@ export function foldableSection(
     // button in a section's actions strip — *Add category*, a chart's edit
     // control — is not a fold target.
     const target = evt.target as HTMLElement;
-    if (target.closest(".ca-journal-header-widgets, a, button, input, select")) {
+    if (
+      target.closest(
+        ".ca-journal-header-widgets, .ca-journal-header-note-live, a, button, input, select"
+      )
+    ) {
       return;
     }
     evt.preventDefault();

@@ -137,38 +137,62 @@ describe("the cog sits on the bridge's own title row", () => {
     //   "the editor window should be a cog wheel on the sections title row
     //   (next to the chevron).."
     //
-    // `foldableSection` owns the bar and puts the chevron at the right-hand
-    // end; `frame.actions` is the slot before it, which the view-mode button
-    // already uses. A cog drawn anywhere else would be a second opinion about a
-    // decision the frame has taken — the whole argument 5.10 made when this
-    // block stopped drawing its own chevron.
-    expect(head()).toContain('cls: "clickable-icon ca-bridge-cog"');
-    expect(head()).toContain('setIcon(cog, "settings")');
-    const at = head().indexOf('"clickable-icon ca-bridge-cog"');
-    expect(at).toBeGreaterThan(0);
-    expect(at).toBeLessThan(head().indexOf("overflowButton(frame.actions"));
-  });
-
-  it("is `clickable-icon`, so the row does not grow by 10px", () => {
-    // `obsidian-button-height`: app.css gives every `<button>`
-    // `height: var(--input-height)` — 30px — which no padding or font-size
-    // reaches, and the signature of getting it wrong is "no visual change"
-    // everywhere except the one row it inflates. The view-mode button beside it
-    // is the proof that this class is the answer here.
-    expect(head()).toContain('cls: "clickable-icon ca-bridge-cog"');
-  });
-
-  it("is not drawn on a frozen block", () => {
-    // Reconfiguring a snapshot edits a RECORD: change the tracker and the block
-    // names one thing while holding the readings of another. Unfreeze in the ⋯
-    // menu is the way back, which is §2.6's "never automatic, never silent"
-    // applied to the door rather than to the write.
-    // ANCHORED ON THE COG'S OWN BRANCH. The ⋯ menu carries the same condition
-    // one screen down, so a bare `toContain` of the clause passes with the
-    // button's half of it deleted.
+    // `frame.actions` is the slot the view-mode button already uses. A cog
+    // drawn anywhere else would be a second opinion about a decision the frame
+    // has taken — the whole argument 5.10 made when this block stopped drawing
+    // its own chevron.
+    //
+    // ── AND IT IS THE ONLY OPENER THERE NOW (1.0.91) ─────────────────
+    //
+    //   "The 'More' elipsis menu can be merged into the cog (settings window)."
+    //
+    // 1.0.89 drew a cog straight to the window AND left the ⋯ beside it, whose
+    // first row was that same window: two buttons onto one subject.
+    // `settingsButton` is the merge already written — `overflowButton` with
+    // 4.20's glyph — so the menu is still built on click and the window is
+    // still its first row.
     expect(head()).toContain(
-      "if (actions.configure && !snap.frozen) {\n    const cog"
+      'settingsButton(frame.actions, "ca-bridge-cog", buildMenu)'
     );
+    expect(head()).not.toContain("overflowButton");
+  });
+
+  it("names itself after the section rather than the page", () => {
+    // `settingsButton` writes "Page settings", which is 4.20's wording for a
+    // banner. This cog acts on one SECTION of the page, and there can be a
+    // second bridge in the vault's other direction on a note that has both.
+    expect(head()).toContain('cog.setAttr("aria-label", "Bridge settings")');
+    expect(head()).toContain('cog.setAttr("title", "Bridge settings")');
+  });
+
+  it("opens the menu rather than the window, so the acting rows have a home", () => {
+    // Freeze, Refresh and Unfreeze are immediate writes to a stored region.
+    // `BridgeWindow` is an `EditorModal`: it stages every answer until Save and
+    // refuses to commit when the note changed while it was open — so an action
+    // button inside it would trip that guard against its own press. The rows
+    // that ACT stay rows, and the window is the first of them.
+    expect(head()).toContain("const buildMenu = (menu: Menu): void => {");
+    const menu = head().slice(head().indexOf("const buildMenu"));
+    expect(menu.indexOf('i.setTitle("Bridge settings…")')).toBeGreaterThan(0);
+    expect(menu.indexOf('i.setTitle("Bridge settings…")')).toBeLessThan(
+      menu.indexOf('setTitle("Freeze this view")')
+    );
+  });
+
+  it("is drawn on a frozen block, where it is the only way back", () => {
+    // THE DEFECT THE MERGE WOULD OTHERWISE HAVE SHIPPED. 1.0.89 withheld the
+    // cog on a frozen block on purpose — reconfiguring a snapshot edits a
+    // RECORD — and the ⋯ was then the only route to Unfreeze. Delete the ⋯ with
+    // that condition standing and a frozen bridge has no control at all.
+    //
+    // SO THE RULE MOVED ONE LEVEL IN RATHER THAN BEING DROPPED: the BUTTON is
+    // unconditional and the *Bridge settings…* ROW is not. The record is still
+    // not editable, and the way back is still one press.
+    expect(head()).not.toContain("if (actions.configure && !snap.frozen) {\n    const cog");
+    const menu = head().slice(head().indexOf("const buildMenu"));
+    expect(menu).toContain("if (actions.configure && !snap.frozen) {");
+    expect(menu).toContain('i.setTitle("Refresh snapshot")');
+    expect(menu).toContain('i.setTitle("Unfreeze (go live)")');
   });
 
   it("is not drawn on a refusal, and cannot be", () => {

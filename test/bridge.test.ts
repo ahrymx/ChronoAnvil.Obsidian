@@ -471,7 +471,7 @@ describe("both directives are routed and neither skips the guard", () => {
     // 2. Threaded into the per-line builder, last of the fence facts.
     expect(src).toContain("noteTextNow,\n          navUnit\n        );");
     // 3. And into the host facts, which is what `bridgeWindow` reads.
-    expect(bridge()).toContain("bridgeHostFacts(plugin, ctx.sourcePath, navUnit)");
+    expect(bridge()).toContain("bridgeHostFacts(plugin, path, navUnit)");
     expect(fnBody("bridgeHostFacts", "bridge-widgets")).toContain("navUnit,");
   });
 
@@ -571,11 +571,160 @@ describe("every bridge names the period it covered", () => {
   it("puts it in the frame's note slot, not a second muted span", () => {
     // `note` is "a short muted phrase after the title", which is what a window
     // is. Two muted spans competing beside a title read as two headings.
+    //
+    // AND SINCE 1.0.91 THE SLOT MAY HOLD THE NAVIGATOR INSTEAD, which is the
+    // same rule rather than an exception to it: the period is stated once, and
+    // where there is a stepper the stepper is the statement. One slot either
+    // way, so this still asserts there is no second span.
     const src = readSrc("bridge-widgets");
     const at = src.indexOf("const section = foldableSection(");
     const call = src.slice(at, src.indexOf("fold.store", at));
-    expect(call).toContain("note:");
-    expect(call).toContain("plan.window.label");
+    expect(call).toContain("note: stepper ? undefined : phrase,");
+    expect(call).toContain("noteRender: stepper");
+    // The phrase itself, computed just above the call — frozen appends when the
+    // snapshot was taken, and that is one phrase rather than two spans.
+    const lead = src.slice(src.indexOf("const stepper = "), at);
+    expect(lead).toContain("plan.window.label");
+    expect(lead).toContain("frozen ${snap.takenIso}");
+  });
+
+  it("gives a frozen block the phrase and never the stepper", () => {
+    // A snapshot is a record of ONE period. A stepper on its bar is an
+    // invitation to make the header name a period the rows are not of — §8's
+    // decay, which `isRescopingNote` refuses freezing for in the first place.
+    // So the control stands down where the phrase is load-bearing.
+    expect(fnBody("bridgeHeader", "bridge-widgets")).toContain(
+      "const stepper = snap.frozen ? null : nav;"
+    );
+  });
+
+  it("leads the bar with the chevron so the stepper has the other end", () => {
+    //   "The chevron should be on the far left."
+    //
+    // 5.10 moved it to the right "with every other section's", and that is
+    // overtaken rather than reversed: this bar is now the one section head in
+    // the plugin whose row holds a control a reader drags their eye along, and
+    // the fold leading rather than trailing is what stops the two competing for
+    // the same corner. It is also the only level-2 foldable section in the
+    // tree, so nothing else moves — see `test/section-frame.test.ts` for the
+    // auto-margin fix underneath it.
+    const src = readSrc("bridge-widgets");
+    const at = src.indexOf("const section = foldableSection(");
+    expect(src.slice(at, src.indexOf("fold.store", at))).toContain(
+      'toggleSide: "left"'
+    );
+  });
+
+  it("re-resolves the window on every paint, not once per postprocess", () => {
+    // THE STALENESS PUTTING THE STEPPER ON THE BAR TURNS INTO A BROKEN CONTROL.
+    // `bridgeHostFacts` captures one frontmatter read and `planBridge` turns it
+    // into `plan.window` — the period the bar names and `fill` lists. That
+    // chain used to run once, OUTSIDE the live widget, while the navigator
+    // writes `month-start` into this very note and `liveScopedWidget`'s scope
+    // begins `path === ctx.sourcePath`. So pressing next repainted the block
+    // from the period it was first drawn with.
+    const body = fnBody("buildBridge", "bridge-widgets");
+    expect(body).toContain("const resolve = () => {");
+    // THE RE-RESOLVE IS INSIDE THE BUILD CLOSURE. Outside it is the same bug
+    // with an extra function in it.
+    const live = body.indexOf("liveScopedWidget(");
+    expect(live).toBeGreaterThan(0);
+    expect(body.indexOf("const again = resolve();")).toBeGreaterThan(live);
+    expect(body).toContain("const plan = again.value;");
+    // AND THE SCOPE IS STILL THE FIRST RESOLVE'S: a watch list recomputed per
+    // paint is a different list handed to a `LiveWidget` that has already
+    // registered one. Same for the snapshot key, which is built from the target
+    // and would otherwise be a key that could stop finding its own region.
+    expect(body).toContain("liveScopedWidget(plugin, ctx, scope(planned.value)");
+    expect(body).toContain("snapshotKeyFor(direction, planned.value.target)");
+
+    // THE FRONTMATTER READ IS INSIDE `resolve`, WHICH IS THE WHOLE POINT. A
+    // mutant that kept the per-paint call and hoisted `bridgeHostFacts` out of
+    // it survived every assertion above: `plan` was fresh, and it was computed
+    // from one captured cache object. So this asks where the READ is, not where
+    // the call is — `bridgeHostFacts` appears exactly once in this function and
+    // it is between `resolve`'s braces.
+    const open = body.indexOf("const resolve = () => {");
+    const close = body.indexOf("  };", open);
+    const inside = body.slice(open, close);
+    expect(inside).toContain("bridgeHostFacts(plugin, path, navUnit)");
+    expect(inside).toContain("bridgeCatalogue(plugin, otherSurface(host.surface))");
+    expect(body.split("bridgeHostFacts(").length - 1).toBe(1);
+    expect(body.split("bridgeCatalogue(").length - 1).toBe(1);
+  });
+
+  it("sizes the stepper against the bar rather than the entry header", () => {
+    // `buildPeriodNav` builds ONE strip for every host and its base
+    // measurements are the entry header's: `2em` pills, a trigger at
+    // `--ca-text-sm`. Dropped onto a level-2 section bar whose own type is
+    // `--ca-bar-text`, that is a 25px control on a 26px row — which makes the
+    // bar as tall as the strip instead of the strip as small as the bar. The
+    // overview banner solves the same problem the other way round
+    // (`--jpn-headline`): there the strip IS the headline.
+    //
+    // THE TRIGGER NEEDS ITS OWN LINE and that is not redundancy: every other
+    // box in the strip is sized in `em` and inherits, and the trigger is the
+    // one element that declares a font-size of its own.
+    const css = readFileSync(
+      resolve(__dirname, "..", "styles", "76-bridges.css"),
+      "utf8"
+    );
+    for (const sel of [
+      ".ca-bridge .ca-journal-header-note-live .ca-jeh-nav.ca-jeh-seg",
+      ".ca-bridge .ca-journal-header-note-live .ca-jeh-datenav-trigger",
+    ]) {
+      const at = css.indexOf(`\n${sel} {`);
+      expect(at, sel).toBeGreaterThan(-1);
+      expect(css.slice(at, css.indexOf("}", at)), sel).toContain(
+        "font-size: var(--ca-bar-text)"
+      );
+    }
+    // AND IT IS A ROW. `.ca-journal-period-nav-stack` is a column because it
+    // was built to carry the standalone *This Month* button underneath — a
+    // button `buildNowButton` puts in an overview card's footer and that no
+    // bridge has.
+    const at = css.indexOf(
+      "\n.ca-bridge .ca-journal-header-note-live .ca-journal-period-nav-stack {"
+    );
+    expect(at).toBeGreaterThan(-1);
+    expect(css.slice(at, css.indexOf("}", at))).toContain("flex-direction: row");
+  });
+
+  it("owns the navigator, so the fence draws no second one", () => {
+    //   "date picker is being rendered outside the surface"
+    //
+    // It was, and it was outside BECAUSE it is a block of its own: the journal
+    // catalogue composes `period-nav:month` and `bridge-readings:` into one
+    // fence, and two directives in one fence are two blocks on the note's own
+    // background unless something adopts one. The `header:` case has adopted
+    // the navigator into a bar for years — "they read as the header's own
+    // controls" — and a bridge has a bar; it just draws it itself, which is why
+    // that arm was never reached.
+    const src = readSrc("widgets");
+    expect(src).toContain('if (kind === "period-nav" && selfFramed) continue;');
+    // READ THROUGH THE SET 1.0.90 NAMED FOR THIS QUESTION, rather than a second
+    // list of the two keywords.
+    expect(src).toContain("SELF_FRAMED_KEYWORDS.has(");
+    // ONE PASS UP FRONT, because the two lines answer each other and either may
+    // come first — `navUnit` above it is computed the same way for the same
+    // reason.
+    expect(src).toContain("const selfFramed = lines.some((line) =>");
+    // AND THE LINE ITSELF IS UNTOUCHED: it is what `navUnit` is read from and
+    // what the window's *Over* question writes.
+    expect(src).toContain("const navUnit =");
+  });
+
+  it("builds the stepper rather than being handed one", () => {
+    // `periodnav.ts`' own scar, read from the other side: "a button parented
+    // here and re-parented into the bar would be recreated on every rebuild and
+    // appended to a bar that is never cleared. One per metadata change,
+    // stacking forever." `redrawHeader` replaces this frame on every view
+    // toggle, so the strip has to be built by whoever builds the bar.
+    const head = fnBody("bridgeHeader", "bridge-widgets");
+    expect(head).toContain("nav: (() => HTMLElement) | null");
+    expect(fnBody("buildBridge", "bridge-widgets")).toContain(
+      "navUnit ? () => buildPeriodNav(plugin, ctx, navUnit) : null"
+    );
   });
 
   it("declares no header styling of its own", () => {
@@ -969,8 +1118,16 @@ describe("the freeze control is reachable on every supported platform", () => {
     expect(css()).not.toContain("@media (hover: hover)");
   });
 
-  it("uses the shared overflow slot rather than a bespoke one", () => {
-    expect(readSrc("bridge-widgets")).toContain('"journal-widget-more"');
+  it("uses the shared opener rather than a bespoke one", () => {
+    // ONE BUTTON SINCE 1.0.91, and it is `settingsButton` — which is
+    // `overflowButton` with 4.20's glyph on it, so the menu is still built ON
+    // CLICK and still reached by the same long-press. What changed is that the
+    // bar stopped carrying two openers onto one subject.
+    expect(readSrc("bridge-widgets")).toContain(
+      'settingsButton(frame.actions, "ca-bridge-cog", buildMenu)'
+    );
+    expect(readSrc("bridge-widgets")).not.toContain('"journal-widget-more"');
+    expect(readSrc("bridge-widgets")).not.toContain("overflowButton");
   });
 
   it("stays a desktop-only plugin nowhere in the manifest", () => {

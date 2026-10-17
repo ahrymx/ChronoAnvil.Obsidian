@@ -212,3 +212,43 @@
    file used to declare for them is gone rather than corrected, including the
    hover rule that made freeze unreachable on touch. A second mechanism for a
    solved problem is not fixed by making it work; it is fixed by deleting it. */
+
+/* ── THE NAVIGATOR, ON THE BAR (1.0.91) ─────────────────────────────────
+ *
+ *   "date picker is being rendered outside the surface"
+ *
+ * `bridgeHeader` draws the stepper into the frame's note slot now, so the
+ * control that chooses this bridge's period is inside the card the period
+ * labels — see `noteRender` in section-frame.ts for the slot and
+ * `index.ts`'s `period-nav` arm for why the standalone block stands down.
+ *
+ * WHAT THESE RULES DO IS RESIZE IT, AND NOTHING ELSE. `buildPeriodNav` builds
+ * one strip for every host, and its base measurements are the entry header's:
+ * `2em` pills, a trigger at `--ca-text-sm`. Dropped onto a level-2 section bar
+ * whose own type is `--ca-bar-text` that is a 25px control on a 26px row,
+ * which makes the bar as tall as the strip rather than the strip as small as
+ * the bar. The overview banner solves the same problem the other way round
+ * (93-calendars.css, `--jpn-headline`) — there the strip IS the headline. Here
+ * it is a note beside a title, so it takes the bar's scale.
+ *
+ * ONE FONT SIZE AND THE REST FOLLOWS, which is why there are so few rules: the
+ * pills are `2em` square and the trigger `2em` tall, so declaring the strip's
+ * size settles every box in it. The trigger restates it because it sets its own
+ * (`--ca-text-sm`, at 50-entry-header.css:177) and would not inherit.
+ *
+ * ROW, NOT COLUMN. `.ca-journal-period-nav-stack` is a column because it was
+ * built to carry the standalone *This Month* button underneath — a button
+ * `buildNowButton` puts in an overview card's footer and that no bridge has.
+ * `syncNowButton` already handles its absence by doing nothing, and says so. */
+.ca-bridge .ca-journal-header-note-live .ca-journal-period-nav-stack {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+}
+.ca-bridge .ca-journal-header-note-live .ca-jeh-nav.ca-jeh-seg {
+  font-size: var(--ca-bar-text);
+}
+.ca-bridge .ca-journal-header-note-live .ca-jeh-datenav-trigger {
+  padding: 0 6px;
+  font-size: var(--ca-bar-text);
+}

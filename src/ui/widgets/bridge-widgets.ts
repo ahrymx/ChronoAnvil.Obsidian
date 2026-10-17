@@ -78,13 +78,13 @@ import type { ChartTeardown } from "../../charts/chart-render";
 import { readNoteRegion, writeNoteRegion } from "../../core/notestore";
 import { confirmAction } from "../modals";
 import { notify } from "../../core/notify";
-import { foldableSection, overflowButton } from "../section-frame";
+import { foldableSection, settingsButton } from "../section-frame";
 import type { FoldableSection, FoldStore } from "../section-frame";
 import { getFile, today } from "../../core/util";
 import { emptyLine } from "../empty";
 import { liveScopedWidget } from "./live-widgets";
 import { fenceBlocks } from "../../core/reload-loss";
-import { periodNavUnit } from "../../diary/periodnav";
+import { buildPeriodNav, periodNavUnit } from "../../diary/periodnav";
 import { openBridgeWindow } from "../bridge-window";
 
 // ── the vault half of the facts ───────────────────────────────────────
@@ -397,7 +397,13 @@ function bridgeHeader(
     // the same slot and no chart to offer.
     trend?: { on: boolean; toggle: () => void };
   },
-  fold: { store: FoldStore; key: string }
+  fold: { store: FoldStore; key: string },
+  // The period navigator this bridge stands beside, as a BUILDER rather than an
+  // element — `redrawHeader` replaces this whole frame, so a strip handed in
+  // once would be a node the second paint has already thrown away. Null where
+  // the fence carries no `period-nav:` line, which is every bridge on a dated
+  // entry.
+  nav: (() => HTMLElement) | null
 ): FoldableSection {
   // A BRIDGE IS A SECTION. That is what it is to a reader — a titled band with
   // a count and a menu, holding a list — so it is built from the same frame as
@@ -433,6 +439,14 @@ function bridgeHeader(
   // the plugin, so a caller with its own persistence — this one writes through
   // `setBridgeFold`, under its own key namespace — supplies two methods instead
   // of a fold.
+  //
+  // The stepper, or nothing at all — the note slot below is where both of those
+  // are argued.
+  const stepper = snap.frozen ? null : nav;
+  const phrase =
+    snap.frozen && snap.takenIso
+      ? `${plan.window.label} · frozen ${snap.takenIso}`
+      : plan.window.label;
   const section = foldableSection(
     host,
     {
@@ -446,10 +460,43 @@ function bridgeHeader(
       // after the title", not a quantity. A frozen block appends when it was
       // taken — one phrase, because two muted spans competing beside a title
       // read as two headings.
-      note:
-        snap.frozen && snap.takenIso
-          ? `${plan.window.label} · frozen ${snap.takenIso}`
-          : plan.window.label,
+      //
+      // ── OR THE NAVIGATOR ITSELF, WHERE THERE IS ONE (1.0.91) ────────
+      //
+      //   "date picker is being rendered outside the surface"
+      //
+      // It was, and the phrase in this slot is the other half of why that read
+      // wrong: `journal-sections.ts` composes `period-nav:month` beside every
+      // bridge it offers, so the note printed "October 2026" four pixels under
+      // a pill printing "October 2026". The period was stated twice, on two
+      // surfaces, and only one copy could be pressed — which is the duplication
+      // `buildPicker` already names and already decided, one level down: *"the
+      // fix for a label printed twice is to keep the copy that can be
+      // pressed."*
+      //
+      // NOT ON A FROZEN BLOCK. A snapshot is a record of one period, and a
+      // stepper on its bar is an invitation to make the header name a period
+      // the rows are not of — §8's decay, which `isRescopingNote` refuses
+      // freezing for in the first place. There the phrase is the whole point:
+      // the window, and when it was taken.
+      note: stepper ? undefined : phrase,
+      noteRender: stepper
+        ? (slot) => {
+            slot.appendChild(stepper());
+          }
+        : undefined,
+      // ── AND THE CHEVRON LEADS THE ROW (1.0.91) ──────────────────────
+      //
+      //   "The chevron should be on the far left."
+      //
+      // Which 5.10 moved to the right "with every other section's", and that
+      // reasoning is not reversed so much as overtaken: this bar is the one
+      // section head in the plugin whose row now holds a control a reader
+      // drags their eye along — the stepper above — and the fold being the
+      // first thing rather than the last is what stops the two competing for
+      // the same corner. It is also the only level-2 foldable section in the
+      // tree, so nothing else moves.
+      toggleSide: "left",
     },
     fold.store,
     fold.key
@@ -493,47 +540,6 @@ function bridgeHeader(
     trendBtn.addEventListener("click", (evt) => {
       evt.stopPropagation();
       actions.trend?.toggle();
-    });
-  }
-
-  // ── AND THE COG, WHICH IS WHAT THE READER ASKED FOR (1.0.89) ────────
-  //
-  //   "the editor window should be a cog wheel on the sections title row
-  //   (next to the chevron).."
-  //
-  // The fourth section to get one, after Attachments (1.0.49 §3), What's below
-  // (1.0.69) and Prose (1.0.78), and drawn the way those three are: a
-  // `clickable-icon` `<button>` with `setIcon(btn, "settings")`, in the frame's
-  // action slot so the chevron keeps the end of the row. `clickable-icon`
-  // rather than a bare button, or the 30px chip-shaped default would make the
-  // row taller than the one beside it — the trap `obsidian-button-height`
-  // records and the view-mode button above is the proof against.
-  //
-  // THE OPENER IS SOMEBODY ELSE'S (1.0.49 §3's rule). This function draws a
-  // button and calls a closure; `bridge-window.ts` resolves the model, reads
-  // the note and writes it, and nothing about chrome reaches that file.
-  //
-  // NOT ON A FROZEN BLOCK. Reconfiguring a snapshot would edit a RECORD —
-  // change the tracker and the block names one thing and holds the readings of
-  // another — and the way back is Unfreeze in the menu below, which is §2.6's
-  // "never automatic, never silent" applied to the door rather than the write.
-  //
-  // NOT ON A REFUSAL EITHER, and that one needs no test here: `buildBridge`
-  // returns `refusalEl` before this frame is built, so a refused bridge has no
-  // bar for a cog to sit on. The door onto a refused bridge is *Edit
-  // sections…*, which lists the section whatever its directive says.
-  if (actions.configure && !snap.frozen) {
-    const cog = frame.actions.createEl("button", {
-      cls: "clickable-icon ca-bridge-cog",
-      attr: {
-        "aria-label": "Bridge settings",
-        title: "Bridge settings",
-      },
-    });
-    setIcon(cog, "settings");
-    cog.addEventListener("click", (evt) => {
-      evt.stopPropagation();
-      actions.configure?.();
     });
   }
 
@@ -584,7 +590,41 @@ function bridgeHeader(
     );
   };
 
-  overflowButton(frame.actions, "journal-widget-more", buildMenu);
+  // ── ONE BUTTON, AND IT IS THE COG (1.0.91) ──────────────────────────
+  //
+  //   "The 'More' elipsis menu can be merged into the cog (settings window)."
+  //
+  // 1.0.89 put a cog on this bar and left the ⋯ beside it, so the bar carried
+  // two openers onto one subject: a cog straight to the window, and a ⋯ whose
+  // FIRST ROW was that same window. They merge, and `settingsButton` is the
+  // merge already written — 4.20's rule, in its own words: *"the control acts
+  // on the PAGE — its name, its sections — where a ⋯ elsewhere in this plugin
+  // means 'more things about this row'."* A bridge's bar is a section's, not a
+  // row's, so the cog is the right glyph and the menu is the right behaviour.
+  //
+  // THE MENU RATHER THAN THE WINDOW DIRECTLY, which is the half worth stating.
+  // Freeze, Refresh and Unfreeze are immediate writes to a stored region;
+  // `BridgeWindow` is an `EditorModal` that stages every answer until Save and
+  // refuses to commit if the note changed while it was open. An action button
+  // inside it would trip that guard against its own press — so the rows that
+  // ACT stay rows, and the window stays the first of them.
+  //
+  // AND IT IS DRAWN ON A FROZEN BLOCK NOW, which is the defect the merge would
+  // otherwise have shipped. The cog was withheld there on purpose — 1.0.89:
+  // *"reconfiguring a snapshot would edit a RECORD"* — and the ⋯ was the only
+  // route to Unfreeze. Delete the ⋯ with that rule standing and a frozen bridge
+  // has no control at all. The rule is kept where it belongs instead, one level
+  // in: `buildMenu` withholds the *Bridge settings…* ROW on a frozen block and
+  // offers Refresh and Unfreeze in its place, so the record is still not
+  // editable and the way back is still one press.
+  //
+  // NOT ON A REFUSAL, and that needs no test: `buildBridge` returns `refusalEl`
+  // before this frame is built, so a refused bridge has no bar to carry one.
+  // Its door is *Edit sections…*, which lists the section whatever its
+  // directive says.
+  const cog = settingsButton(frame.actions, "ca-bridge-cog", buildMenu);
+  cog.setAttr("aria-label", "Bridge settings");
+  cog.setAttr("title", "Bridge settings");
 
   // Long-press, which is what Obsidian mobile turns into `contextmenu` — the
   // route calendar.ts, tracker-controls.ts and attachment-widgets.ts already
@@ -863,17 +903,47 @@ function buildBridge(
   // The unit of a `period-nav:` sharing this fence — see `BridgeHostFacts`.
   navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
-  const host = bridgeHostFacts(plugin, ctx.sourcePath, navUnit);
-  const catalogue = bridgeCatalogue(plugin, otherSurface(host.surface));
-
   // `bridge-<direction>:<target>[#trend] <filters>`, read by the one function
   // that also WRITES it (1.0.89). The split used to be here and the flag strip
   // one function below, so three readers of one grammar agreed by inspection;
   // `readBridgeArg` is the body they now share, which is the rule
   // `directive-grammar.ts` was extracted to keep.
   const { target, filters, trend } = readBridgeArg(direction, rest);
+  const path = ctx.sourcePath;
 
-  const planned = planBridge({ direction, target, filters, host, catalogue });
+  // ── RESOLVED PER PAINT, NOT ONCE PER POSTPROCESS (1.0.91) ────────────
+  //
+  // THE WINDOW IS READ OUT OF FRONTMATTER AND FRONTMATTER CHANGES UNDER THE
+  // BLOCK. `bridgeHostFacts` captures `frontmatterOf(...)` — one cache object,
+  // read once — and `planBridge` turns it into `plan.window`, the period the
+  // bar names and `fill` lists. This whole chain used to run ONCE, outside the
+  // live widget, while the navigator beside it writes `month-start` into this
+  // very note and `liveScopedWidget`'s scope begins `path === ctx.sourcePath`.
+  // So pressing next repainted the block — from the period it was first drawn
+  // with. The rows and the header agreed with each other and with nothing else.
+  //
+  // IT MATTERED LESS WHILE THE NAVIGATOR WAS A SEPARATE BLOCK, which is why it
+  // survived 1.0.88: the pill moved, the pill's own label advanced, and the
+  // card below it was the thing a reader had to notice had not. Putting the
+  // stepper ON the bar makes the two one control, so this stops being a latent
+  // staleness and becomes the control not working.
+  //
+  // THE FIRST RESOLVE STILL DECIDES TWO THINGS, and they are both period-free:
+  // whether the directive can be drawn at all, and which FOLDERS the live
+  // widget watches. A scope recomputed per paint would be a different watch
+  // list handed to a `LiveWidget` that has already registered one.
+  const resolve = () => {
+    const host = bridgeHostFacts(plugin, path, navUnit);
+    return planBridge({
+      direction,
+      target,
+      filters,
+      host,
+      catalogue: bridgeCatalogue(plugin, otherSurface(host.surface)),
+    });
+  };
+
+  const planned = resolve();
 
   // Refused at render as well as in the editor — §2.3. A hand-written
   // directive, or one whose target lost its date property after it was written,
@@ -881,9 +951,11 @@ function buildBridge(
   // configured it.
   if (!planned.ok) return refusalEl(planned.refusal.message);
 
-  const plan = planned.value;
-  const key = snapshotKeyFor(direction, plan.target);
-  const path = ctx.sourcePath;
+  // THE SNAPSHOT KEY IS THE FIRST RESOLVE'S, DELIBERATELY. It is built from the
+  // direction and the TARGET, neither of which a period step can change, and a
+  // key recomputed per paint is a key that could stop finding the region it
+  // wrote.
+  const key = snapshotKeyFor(direction, planned.value.target);
 
   const act = (run: () => Promise<boolean>, done: string) => () => {
     void run().then((ok) => {
@@ -891,9 +963,16 @@ function buildBridge(
     });
   };
 
-  return liveScopedWidget(plugin, ctx, scope(plan), () => {
+  return liveScopedWidget(plugin, ctx, scope(planned.value), () => {
     const el = createDiv({ cls: "ca-bridge" });
     const body = el.createDiv({ cls: "ca-bridge-body" });
+
+    // The period as it is NOW — see `resolve` above. A directive that has
+    // become unresolvable since the first paint says so rather than drawing the
+    // period it used to have.
+    const again = resolve();
+    if (!again.ok) return refusalEl(again.refusal.message);
+    const plan = again.value;
 
     // The fold's memory, in the two methods `foldableSection` asks for. The
     // KEY is this module's — `bridgeFoldKey` namespaces it under `bridge:` so a
@@ -1022,7 +1101,23 @@ function buildBridge(
                   redrawHeader(mode);
                 }
               : undefined,
-        }, { store: foldStore, key });
+        }, { store: foldStore, key },
+        // ── THE STEPPER, BUILT HERE AND REBUILT WITH THE BAR (1.0.91) ──
+        //
+        // A BUILDER AND NOT AN ELEMENT, and `periodnav.ts` paid for that rule
+        // already: *"a button parented here and re-parented into the bar would
+        // be recreated on every rebuild and appended to a bar that is never
+        // cleared. One per metadata change, stacking forever."* The same hazard
+        // read from the other side — `redrawHeader` replaces this frame on
+        // every view toggle and takes the previous wrapper out with it, so the
+        // strip has to be built by whoever builds the bar.
+        //
+        // IT IS THE DISPATCHER'S WIDGET, DRAWN HERE. `index.ts` withholds the
+        // standalone `period-nav` block when the fence also holds a bridge, so
+        // there is exactly one navigator on the note and it is this one. The
+        // `period-nav:` LINE is untouched either way: it is what `navUnit` is
+        // read from and what the window's *Over* question writes.
+        navUnit ? () => buildPeriodNav(plugin, ctx, navUnit) : null);
         // The body was drawn before the header could be — the frozen read is
         // async and the header must not flash the wrong state — so it MOVES
         // into the frame's body rather than the frame being built around it.

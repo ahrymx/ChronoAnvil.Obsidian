@@ -687,7 +687,16 @@ describe("the section's actions sit on a strip of their own", () => {
     // would have had to be added to both, and a button that folded its own section
     // is the bug that would have shipped.
     expect(readSrc("section-frame")).toContain(
-      '".ca-journal-header-widgets, a, button, input, select"'
+      '".ca-journal-header-widgets, .ca-journal-header-note-live, a, button, input, select"'
+    );
+    // AND THE NOTE SLOT JOINED THE LIST IN 1.0.91, for the same reason the
+    // actions strip is in it: `noteRender` lets a caller DRAW that slot instead
+    // of handing it a phrase, and a bridge draws its period navigator there. A
+    // phrase is part of the bar and folds with it; the gaps between a stepper's
+    // three segments are not, and a reader pressing ‹ and hitting the card's
+    // hairline instead would have folded the section.
+    expect(readSrc("section-frame")).toContain(
+      'cls: "ca-journal-header-note ca-journal-header-note-live"'
     );
     expect(readSrc("headerbar")).toContain(".ca-journal-header-widgets");
     // The slot is still built by the frame, in place, with both its classes.
@@ -1451,6 +1460,41 @@ describe("one bar, at one scale (4.13 §1)", () => {
       expect(rule, sel).toContain("width:");
     }
     expect(body(".ca-journal-sec-l2 > .ca-journal-header-toggle {")).toContain("order: 1");
+  });
+
+  it("lets a caller lead the row with the chevron instead (1.0.91)", () => {
+    //   "The chevron should be on the far left."
+    //
+    // WHICH WAS ALSO A FIX. The level-2 corrective above names ONE of the two
+    // chevrons — `-header-toggle`, a `HeaderBar`'s — and a bridge's bar is a
+    // `foldableSection` at level 2, whose chevron is `-sec-fold-toggle` and so
+    // kept its auto margin beside the actions' own. Two auto margins split the
+    // free space, and the chevron sat half way along the bar with a gap on both
+    // sides: the failure the comment above describes in those words, reached by
+    // the one caller its selector did not cover.
+    const code = readCode("section-frame");
+    expect(code).toContain('toggleSide?: "left" | "right"');
+    expect(code).toContain('if (opts.toggleSide === "left") {');
+    // FIRST CHILD, NOT `order: -1`. Tab and screen-reader order follow the
+    // document, so a chevron moved by `order` alone is announced after the
+    // title it opens and reached last by keyboard.
+    expect(code).toContain("frame.root.insertBefore(chevron, frame.root.firstChild)");
+    expect(code).toContain('frame.root.addClass("has-left-toggle")');
+
+    const left = body(
+      ".ca-journal-sec.has-left-toggle > .ca-journal-sec-fold-toggle {"
+    );
+    expect(left).toContain("margin-left: 0");
+    // No `order` here, because the DOM has already said where it goes — and an
+    // `order` on one child of a flex row is the thing that would put it back.
+    expect(left).not.toContain("order:");
+    // ONE AUTO MARGIN PER ROW, WHICH IS WHAT THIS BUYS: the actions keep the
+    // push and the chevron leads from a standing start, so the free space has
+    // exactly one claimant.
+    expect(body(".ca-journal-sec-fold-toggle {")).toContain("margin-left: auto");
+    expect(
+      body(".ca-journal-header-widgets.ca-journal-widget-bar {")
+    ).toContain("margin-left: auto");
   });
 
   it("points the chevron down when closed and up when open", () => {
