@@ -40,6 +40,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   equally between every auto margin on a line rather than letting one win. The
   bridge is the only level-2 foldable section in the tree, which is why this was
   the only bar it showed on.
+- **The date picker had a blank box under it, on every navigator in the
+  plugin.** Measured from two screenshots: on a diary entry the strip's border
+  box is 34px and the trigger's ground 26px, at the top of it with five empty
+  rows beneath; on a bridge's bar, 24px against 15px with seven. The segmented
+  strip is `align-items: stretch` and its row is set by the chevron pills'
+  `height: 2em`, measured against the STRIP's font-size — while the trigger
+  sized itself `height: 2em` against its own, which it declares one line down as
+  `--ca-text-sm`. 0.85 of the number beside it, in every context neither
+  overrode; and `stretch` applies only to an `auto` cross-size, so a definite
+  height was not stretched and the alignment fell back to flex-start, putting
+  the whole shortfall below the text. The trigger declares no height now and
+  stretches into the row the pills set, which changes no height anywhere — its
+  content was never the tallest thing in the strip. The overview banner had
+  already arrived at this once for its own reason; what it could not do from
+  inside one context was stop the other three re-deriving the mismatch.
 - **A bridge did not follow its navigator.** The period came from one
   frontmatter read taken when the block was postprocessed, outside the live
   widget — so pressing *next* repainted the rows and the header from the period

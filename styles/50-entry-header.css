@@ -161,11 +161,44 @@
 .ca-jeh-datenav {
   display: inline-flex;
 }
+/* ── THE TRIGGER DECLARES NO HEIGHT, AND THAT IS THE FIX (1.0.91) ───────
+ *
+ *   "there is a standing issue with the way the data selector is rendering,
+ *   it seems like a blank box is drawn under it, which pushes the date up and
+ *   squashes it."
+ *
+ * MEASURED, FROM TWO SCREENSHOTS. On a diary entry the strip's border box is
+ * 34px and the trigger's hover ground is 26px, sitting at the TOP of it with
+ * five empty rows beneath. On a bridge's bar the strip is 24px and the trigger
+ * 15px, with seven. The "blank box" is the shortfall, and it is all below the
+ * text because of the next paragraph.
+ *
+ * TWO EMS, ONE ROW. `.ca-jeh-nav.ca-jeh-seg` is `align-items: stretch`, and
+ * what sets the row is `.ca-jeh-navpill`'s `height: 2em` — measured against the
+ * STRIP's font-size. This rule then sized the trigger `height: 2em` against its
+ * OWN, which it declares one line down as `--ca-text-sm`. 0.85 of the number
+ * beside it, forever, in every context neither overrides.
+ *
+ * AND A DEFINITE CROSS-SIZE IS NOT STRETCHED. `stretch` applies only to an item
+ * whose cross-size is `auto`, so the trigger kept its 0.85 and the used
+ * alignment fell back to flex-start — which is why none of the shortfall landed
+ * above the text and all of it read as a box drawn underneath.
+ *
+ * SO THE HEIGHT COMES OFF, AND NOTHING REPLACES IT. The pills still set the row
+ * and the trigger now stretches into it; its own `align-items: center` centres
+ * the label in whatever it gets. The row's height is unchanged everywhere —
+ * the trigger's content was never the tallest thing in it.
+ *
+ * THE OVERVIEW BANNER HAD ALREADY ARRIVED HERE ONCE, for its own reason, and
+ * its words are the argument for making it the base: *"the segments stop
+ * declaring heights and stretch, so the strip is as tall as its tallest
+ * content"* (93-calendars.css, 3.6 patch 8). What that patch could not do from
+ * inside one context is stop the other three re-deriving the mismatch — and two
+ * of them did, each with a hand-tuned height beside a restated font-size. */
 .ca-jeh-datenav-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 2em;
   padding: 0 10px;
   border: none;
   border-radius: 0;

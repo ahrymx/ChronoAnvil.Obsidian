@@ -669,16 +669,27 @@ describe("every bridge names the period it covered", () => {
       resolve(__dirname, "..", "styles", "76-bridges.css"),
       "utf8"
     );
-    for (const sel of [
-      ".ca-bridge .ca-journal-header-note-live .ca-jeh-nav.ca-jeh-seg",
-      ".ca-bridge .ca-journal-header-note-live .ca-jeh-datenav-trigger",
-    ]) {
+    const rule = (sel: string): string => {
       const at = css.indexOf(`\n${sel} {`);
       expect(at, sel).toBeGreaterThan(-1);
-      expect(css.slice(at, css.indexOf("}", at)), sel).toContain(
-        "font-size: var(--ca-bar-text)"
-      );
-    }
+      return css.slice(at, css.indexOf("}", at));
+    };
+    expect(
+      rule(".ca-bridge .ca-journal-header-note-live .ca-jeh-nav.ca-jeh-seg")
+    ).toContain("font-size: var(--ca-bar-text)");
+
+    // ONE DECLARATION OF THE TOKEN PER CHAIN, which is the bar's half of the
+    // blank box `test/appearance.test.ts` measures. `--ca-bar-text` is
+    // `--ca-text-2xs`, which is `0.7em` — a RELATIVE value, so declaring it on
+    // the strip AND on a descendant of the strip MULTIPLIES it. The trigger came
+    // out at 0.7 × 0.7 = 7.8px and its `height: 2em` at 15px against the pills'
+    // 22px. It only has to stop declaring the `--ca-text-sm` its base gives it.
+    const trigger = rule(
+      ".ca-bridge .ca-journal-header-note-live .ca-jeh-datenav-trigger"
+    );
+    expect(trigger).toContain("font-size: inherit");
+    expect(trigger).not.toContain("var(--ca-bar-text)");
+    expect(trigger).not.toContain("\n  height:");
     // AND IT IS A ROW. `.ca-journal-period-nav-stack` is a column because it
     // was built to carry the standalone *This Month* button underneath — a
     // button `buildNowButton` puts in an overview card's footer and that no

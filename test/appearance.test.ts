@@ -1231,6 +1231,46 @@ describe("the banner is one material, and the minimal one is quiet", () => {
     expect(readCss()).not.toContain(".journal-tracker-head");
   });
 
+  it("lets the date trigger stretch into the row the pills set (1.0.91)", () => {
+    //   "there is a standing issue with the way the data selector is
+    //   rendering, it seems like a blank box is drawn under it, which pushes
+    //   the date up and squashes it."
+    //
+    // MEASURED FROM TWO SCREENSHOTS: on a diary entry the strip's border box is
+    // 34px and the trigger's hover ground 26px, at the TOP of it with five empty
+    // rows under; on a bridge's bar, 24px against 15px with seven.
+    //
+    // TWO EMS, ONE ROW. `.ca-jeh-nav.ca-jeh-seg` is `align-items: stretch`, and
+    // the row is set by `.ca-jeh-navpill`'s `height: 2em` — measured against the
+    // STRIP's font-size. The trigger sized itself `height: 2em` against its own,
+    // which it declares as `--ca-text-sm`: 0.85 of the number beside it, in
+    // every context neither overrides.
+    //
+    // AND `stretch` APPLIES ONLY TO AN `auto` CROSS-SIZE, so a definite height
+    // was not stretched and the used alignment fell back to flex-start — which
+    // is why the whole shortfall read as a box drawn underneath rather than as
+    // air on both sides.
+    // `\n  height:` and not `height:` — the rule still carries `line-height: 1`,
+    // and a bare substring match passes for the wrong reason either way round.
+    const base = body(".ca-jeh-datenav-trigger");
+    expect(base).not.toContain("\n  height:");
+    // THE PILLS STILL SET THE ROW, which is why removing the one declaration
+    // changes no height anywhere: the trigger's content was never the tallest
+    // thing in the strip.
+    expect(body(".ca-jeh-navpill")).toContain("height: 2em");
+    expect(body(".ca-jeh-nav.ca-jeh-seg")).toContain("align-items: stretch");
+    // AND NO OVERRIDE RE-DERIVES IT. Two of the three restated a hand-tuned
+    // height beside a restated font-size; the stack's is the one that was the
+    // same bug rather than its own shape, so it stretches now too. The
+    // standalone pill on a tracker card keeps its `2.2em` — it draws its own
+    // border and is not a segment of the strip at all.
+    expect(
+      body(
+        ".ca-journal-widget-block.ca-journal-stack\n  > .ca-journal-entry-context.ca-jec-nav-only\n  .ca-jeh-datenav-trigger"
+      )
+    ).not.toContain("\n  height:");
+  });
+
   it("rules under the top strip, dividing it from the tracker cells", () => {
     // The top strip carries the bottom rule separating navigation from the grid
     const css = readCss();

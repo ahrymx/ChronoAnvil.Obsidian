@@ -248,7 +248,14 @@
 .ca-bridge .ca-journal-header-note-live .ca-jeh-nav.ca-jeh-seg {
   font-size: var(--ca-bar-text);
 }
+/* `inherit`, NOT THE TOKEN AGAIN — and this is the bar's half of the blank box
+ * 50-entry-header.css measures. `--ca-bar-text` is `--ca-text-2xs`, which is
+ * `0.7em`: a RELATIVE value, so applying it to the strip AND to a descendant of
+ * the strip multiplies it. The trigger came out at 0.7 × 0.7 = 7.8px, its
+ * `height: 2em` at 15px against the pills' 22px, and the label was half the
+ * size of the title beside it. One declaration of the token per chain; the
+ * trigger only has to stop declaring the `--ca-text-sm` its base gives it. */
 .ca-bridge .ca-journal-header-note-live .ca-jeh-datenav-trigger {
   padding: 0 6px;
-  font-size: var(--ca-bar-text);
+  font-size: inherit;
 }
