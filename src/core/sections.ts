@@ -138,9 +138,11 @@ export type SectionBlock =
       // VISIBLE MARKDOWN BETWEEN TWO INVISIBLE MARKERS — the prose skeleton,
       // and today only that. 5.6.
       //
-      // NAMED FOR THE MECHANISM RATHER THAN THE CONTENT, because `prose` is
-      // already a section id on this same catalogue (the Notes field) and a
-      // comment about "the prose block" would have two referents.
+      // NAMED FOR THE MECHANISM RATHER THAN THE CONTENT, because a comment
+      // about "the prose block" would have two referents. It was the *Notes
+      // field* section's id until 1.0.96 removed it; it is still `PROSE_KEY`,
+      // the word in the markers this kind writes, so the clash the name avoids
+      // outlived the section that caused it.
       //
       // WHY THIS IS NOT `markdown`, AND WHY IT IS NOT A `region` EITHER.
       //

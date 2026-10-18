@@ -5,6 +5,27 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.96] - 2026-10-18
+
+### Removed
+
+- **The *Notes field* section is gone from the journal catalogues.** The row in
+  *Edit sections…* that composed a `note:` box into a leaf note or one of its
+  pages is removed on every surface. It was never ticked by default, and the
+  comment that kept it unticked was the argument against keeping it at all: the
+  shipped templates write their prose as ordinary markdown headings, which stay
+  editable in any editor and survive the plugin being uninstalled. The one case
+  left for it — prose you want to *look* like a field — is what the **Prose**
+  section became over 1.0.75–1.0.87, and that one is composed by default, so the
+  box with a name on it was being offered twice.
+- **Nothing on your notes changes and nothing is migrated.** `note:` and `list:`
+  are the diary's own field directives and are still read and still rendered, so
+  a `note:` block already written on a journal note draws exactly as it did —
+  what it loses is its row in *Edit sections…*, which means it is now a fence of
+  your own, left alone rather than removed, and edited in the note. A saved
+  journal layout that still names the section composes nothing instead of
+  failing, so no settings migration is owed either.
+
 ## [1.0.95] - 2026-10-18
 
 ### Added

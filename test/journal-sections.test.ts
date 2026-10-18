@@ -40,6 +40,7 @@ import {
 import { templateTargets } from "../src/journals/journal-sections";
 import { kindTableProperties } from "../src/ui/tables";
 import { MODIFIER_KEYWORDS } from "../src/core/directive-grammar";
+import { readAsset } from "./sources";
 import { studyConfigFor } from "./study-template";
 
 const asset = studyFile;
@@ -307,7 +308,7 @@ describe("the section catalogue", () => {
     });
 
     it("offers a both-surface section on either", () => {
-      for (const id of ["banner", "nav", "prose", "resources"]) {
+      for (const id of ["banner", "nav", "resources"]) {
         expect(sectionApplies(findSection(id)!, subject), id).toBe(true);
         expect(sectionApplies(findSection(id)!, lesson), id).toBe(true);
       }
@@ -397,18 +398,50 @@ describe("the section catalogue", () => {
       );
     });
 
-    it("leaves prose and nav unticked everywhere", () => {
-      // Both are offered, neither is assumed: no shipped template carries a
-      // `links:` row (the banner already has crumbs) and the shipped prose is
-      // ordinary markdown headings that outlive the plugin.
+    it("leaves nav unticked everywhere", () => {
+      // Offered and not assumed: no shipped template carries a `links:` row,
+      // because the banner already has crumbs.
       for (const ctx of [
         indexCtx(cooking, 0),
         indexCtx(cooking, 1),
         kindCtx(cooking, "recipe"),
       ]) {
-        expect(defaultSectionIds(ctx)).not.toContain("prose");
         expect(defaultSectionIds(ctx)).not.toContain("nav");
       }
+    });
+
+    it("no longer offers the Notes field on any surface (1.0.96)", () => {
+      // IT WENT FROM THE CATALOGUE, not from the note. The row that composed
+      // a `note:` fence is removed; the directive is still the diary's and is
+      // still rendered, so a block a reader already has keeps working while
+      // *Edit sections…* stops listing one to add. Asserted on all three
+      // surfaces the catalogue serves, and by LABEL as well as by id — the
+      // word a reader searched the picker for must be gone too.
+      for (const ctx of [
+        indexCtx(cooking, 0),
+        indexCtx(cooking, 1),
+        kindCtx(cooking, "recipe"),
+      ]) {
+        const ids = sectionsFor(ctx).map((s) => s.id);
+        expect(ids).not.toContain("prose");
+        expect(sectionsFor(ctx).map((s) => s.label)).not.toContain(
+          "Notes field"
+        );
+        expect(
+          sectionsFor(ctx).flatMap((s) => s.claims ?? [])
+        ).not.toContain("note");
+      }
+
+      // AND THE SHIPPED DOCS STOP LISTING IT. The *Edit sections…* paragraph
+      // enumerates the catalogue in prose and nothing in the tree reads that
+      // enumeration back — measured by restoring the phrase with this line
+      // deleted and running `npm test`: 7814 passed. (Run through `vitest`
+      // directly the bundled-asset parity tests do fail, but only because the
+      // generated bundle is stale against the edited asset — `pretest`
+      // regenerates it, so that is the harness and not a reader of the
+      // sentence.) A reader who searches the picker for a word the handbook
+      // taught them finds nothing.
+      expect(readAsset("documentation.md")).not.toContain("a Notes field");
     });
   });
 

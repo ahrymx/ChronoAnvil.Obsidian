@@ -562,11 +562,14 @@ export const LEGACY_PROSE_KEY = "skeleton";
 // The row is called *Prose* now. Its id is not, and must not become `prose`,
 // for two reasons that both bite:
 //
-// 1. `prose` IS ALREADY TAKEN, by the `note:`/`list:` field section a reader
-//    sees as *Notes field*. Two sections cannot share an id — `sectionsFor`
-//    returns them in one array and every lookup in this file is `find(s.id
-//    === …)`. Swapping the two ids to tidy the mismatch would move the
-//    collision rather than remove it.
+// 1. `prose` WAS ALREADY TAKEN until 1.0.96, by the `note:`/`list:` field
+//    section a reader saw as *Notes field*. Two sections cannot share an id —
+//    `sectionsFor` returns them in one array and every lookup in this file is
+//    `find(s.id === …)`. That section is removed as of 1.0.96 — its note sits
+//    directly above the Prose entry in `JOURNAL_SECTIONS` — so the collision
+//    is gone and this reason has expired. It is written down rather than
+//    deleted because the id did NOT change when the collision did, and the
+//    next reason is why.
 // 2. AN ID IS STORED AND A LABEL IS NOT. A saved layout's `sections` list is a
 //    list of these ids, living in the reader's plugin settings; so is every key
 //    of `SectionOverrides`. Renaming the id turns every saved journal layout in
@@ -3180,31 +3183,41 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // `tasksDensityQuestion` was, in `core/note-sections.ts`.
   },
 
-  {
-    id: "prose",
-    icon: "📝",
-    category: "writing",
-    label: "Notes field",
-    blurb: "A free-text box that saves into the note body.",
-    surface: "both",
-    locked: false,
-    // Off by default: the shipped templates write their prose as ordinary
-    // markdown headings, which stay editable in any editor and survive the
-    // plugin being uninstalled. The widget is for a field you want to look
-    // like a field.
-    default: never,
-    claims: ["note", "list"],
-    locate: (t) => probe(t, /^(note|list):/m),
-    render: (_ctx, opts) => {
-      const fields = opts?.fields ?? [
-        { key: "notes", label: "Notes and reflections…|Notes" },
-      ];
-      return [
-        fence(fields.map((f) => `note:${f.key}:${f.label}`)),
-        ...fields.map((f) => region(f.key)),
-      ];
-    },
-  },
+  //
+  // ── THE NOTES FIELD IS GONE, AND ITS GRAVE IS HERE (1.0.96) ───────────
+  //
+  // *"remove notes field section from the journal section catalogues"*.
+  //
+  // WHAT IT WAS: a `note:` fence and one region per field, offered as *Notes
+  // field* on a journal leaf and on its pages — "a free-text box that saves
+  // into the note body", `default: never` from the day it shipped. The comment
+  // that kept it unticked is the argument against keeping it at all: the
+  // shipped templates write their prose as ordinary markdown headings, which
+  // stay editable in any editor and survive the plugin being uninstalled, so
+  // the only case left for the field was prose you want to LOOK like a field.
+  // The Prose section is that case now — 1.0.75 through 1.0.87 gave it a head,
+  // a title, a cog, a chevron and a second copy — and it is composed by
+  // default, so the box with a name on it was being offered twice, once as the
+  // block every leaf opens with and once as a row nobody ticked.
+  //
+  // THE DIRECTIVES ARE NOT RETIRED AND NOTHING IS MIGRATED. `note:` and
+  // `list:` are the diary's own field keywords — declared in
+  // `trackers/fields.ts`, dispatched in `ui/widgets/index.ts` — so a block
+  // already written on a journal note renders exactly as it did yesterday.
+  // This is 1.0.72's remove-the-writer-keep-the-read rule: what goes is the
+  // row in *Edit sections…* that composed the fence, not the fence.
+  //
+  // WHAT A READER LOSES is that row: a `note:` block they already have is a
+  // fence of their own now, which `applySections` leaves alone rather than
+  // removing, and which they edit in the note. A saved journal layout that
+  // still names `prose` composes nothing instead of failing —
+  // `composeTemplate` filters its sections by `ids.has(s.id)` — so no
+  // settings migration is owed for it either.
+  //
+  // AND THE ID IS FREE, which expires reason 1 of the note above
+  // `PROSE_SECTION_ID`. Reason 2 is the one that was always load-bearing: an
+  // id is stored and a label is not.
+
 
   // LAST IN THIS ARRAY, AND THAT IS THE POINT (5.20). Composition walks the
   // catalogue in order, so a section's index IS its position on the page, and
@@ -3264,10 +3277,12 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
     // were composed — which meant a custom journal's leaf note arrived with a
     // banner and nothing else, and nobody reading the code would notice.
     //
-    // Headings rather than `note:` fields (the `prose` section ABOVE — it moved
-    // when this entry did) because they survive the plugin being uninstalled and
-    // stay editable in any editor. A field is for prose you want to look like a
-    // field; this is for the shape of the document.
+    // Headings rather than `note:` fields because they survive the plugin being
+    // uninstalled and stay editable in any editor. A field was for prose you
+    // want to look like a field; this is for the shape of the document. The
+    // field section itself is removed as of 1.0.96 — see the note directly
+    // above this entry — which leaves this the only way the catalogue writes a
+    // place to write at all.
     //
     // ONE OF THE FOUR (5.20). Every section in this catalogue is now
     // `default: never` except `banner`, `trackers`, the two "what is below"
