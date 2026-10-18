@@ -77,6 +77,61 @@
 // head is an element now, so the sweep is spent; the module stays a painter
 // anyway, because what a bar is made of and what the cog opens are a different
 // question from where the bar goes.
+//
+// ── AND NO GRIP ON IT, WHICH WAS ASKED AND MEASURED (1.0.96) ─────────────
+//
+// *"the prose blocks can be moved from the section editor just fine, but they
+// do not have any draggable interface like most other sections. Worth
+// implementing?"* — and, on the shape: *"the editor is enough. The position
+// highlighting would also be required (the boxes drawn over sections that
+// indicate which side the move lands on). If implementation is too complicated
+// we can skip this feature."*
+//
+// IT IS NOT A POLICY AND IT IS WORTH SAYING SO. 4.7 made a whole block
+// draggable, 4.8.1 removed it at a vault's request — *"a block should only be
+// moved from the section editor menu"* — and 4.8.5 GAVE IT BACK under a drag
+// type of its own. Every fence block draws a grip and two slots today. So prose
+// is not excluded on 4.8.1's argument; it simply fell out of what prose is, and
+// the next reader to notice should find the measurement rather than the gap.
+//
+// THE HALF THAT IS CHEAP IS THE HANDLE. This bar is one builder for both
+// painters with the per-mode differences already thunks (`path`, `redraw`,
+// `nth`), so a control added here appears in both modes once. Locating the
+// block is EASIER than for a fence: `proseSpansIn(lines)` plus `nth` answers
+// from the file, where `boundsOf` has to ask `getSectionInfo` and gets null in
+// an embed or an export. And `segment` already returns a prose span as a `raw`
+// segment that round-trips verbatim, which `rebuild` already splices in SEGMENT
+// space. The arithmetic for the move exists.
+//
+// THE HALF THAT IS NOT IS THE DROP, AND THE READER NAMED IT. The boxes that say
+// which side a move lands on are the slots `attachBlockHead` hangs on every
+// fence block, and they speak the FENCE index — `fencesOf`'s `at[]`, which
+// skips raw runs. "Above fence 2" and "below fence 1" are the same fence index
+// and different segment positions the moment a prose span sits between them. So
+// either every slot learns to hand out a second coordinate, or `fencesOf`
+// widens to count prose — which changes the number `blockIndexAt` returns, and
+// that number is the stamp `moveCell` reads. `block-move.ts` states that risk
+// about itself: ONE answer to "which segments are fences, and where", because
+// two copies is how two files come to disagree about what block 2 is. A
+// highlight that is right about the fences and wrong about the gaps between
+// them is the "accept it and then explain yourself" failure, drawn.
+//
+// AND LIVE PREVIEW IS A SECOND IMPLEMENTATION, NOT A SECOND BRANCH. In the
+// editor this bar IS a replace decoration inside `.cm-content`, so the drag
+// would start inside CodeMirror's own text drag, and 1.0.79 and 1.0.80 are two
+// consecutive rounds of a control inside that replacement going wrong — the
+// first one folded its own chevron away. Reading-mode-only is the alternative,
+// and a handle that appears and disappears with the mode, on one section type,
+// is the asymmetry this round was asked about in the first place.
+//
+// SO THE EDITOR STAYS THE DOOR, and what a reader loses is measured too: the
+// window opened FROM this block (`prose-window.ts`) carries a title, the line
+// count, the `#bare` tick and Remove — and no move. Moving one prose block
+// therefore means *Edit sections…*, the whole-note window. That is the friction
+// behind the question. If it is worth closing later, the small shape is a move
+// pair in THAT window — it already knows `nth`, already re-reads before it
+// writes and already presses the same `apply` — and not a grip, which is the
+// one shape that cannot be built without the coordinate change above.
 
 import { setIcon } from "obsidian";
 
