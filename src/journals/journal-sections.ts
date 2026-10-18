@@ -263,6 +263,19 @@ export interface SectionOverrides {
   // Which period a bridge's navigator opens on — one of `periodNavUnit`'s four.
   // `BRIDGE_NAV_GRAIN` is what an unanswered section composes.
   grain?: string;
+  // Whether a readings bridge lists every entry in its period or only the days
+  // that carry a reading — `FLAG_ON` or `FLAG_OFF`, 1.0.94.
+  //
+  // A FIELD HERE DESPITE BEING `derived`, on the rule the three fields above
+  // are here for: the key IS the question key, and `withAnswers` and the
+  // catalogue's own writer both read an answer out of `options[q.key]`. What
+  // `derived` changes is WHO writes it — `withAnswers` steps over this one and
+  // `withBridgeFlagAnswer` writes it through `writeBridgeDirective` instead.
+  //
+  // NOT CARRIED BY A LAYOUT, like `filters` and `grain` beside it and unlike
+  // `tracker`: `portableOverrides` copies per field, and which days a bridge
+  // lists is a fact about one note rather than about a journal type.
+  entries?: string;
   // WHICH TRACKERS A NOTE OF THIS TEMPLATE STARTS WITH. 4.35 §1.5.
   //
   // Ids into the registry, exactly as `rating` is. `trackerSeeds` seeds only
@@ -3002,6 +3015,57 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
         // needs it.
         empty: "Every period this navigator can show is listed.",
         emptyLabel: BRIDGE_NAV_GRAIN,
+      },
+      {
+        // ── EVERY DAY IN THE PERIOD, NOT ONLY THE ONES WITH A READING ───
+        //
+        // The list form draws one row per READING, so a week logged on two days
+        // is a two-row block under a bar reading **Week 42** — the same
+        // misreading 1.0.93 fixed on the trend's axis, in the one view that has
+        // no axis to pin. `#entries` widens the rows to every diary entry the
+        // period holds, each with its reading or a dash, so an empty day is
+        // visibly an empty day rather than absent.
+        //
+        // A FLAG AND NOT A SECOND VALUE OF `#trend`. All four combinations mean
+        // something — see `BridgeDirective.entries`, where the grammar says so.
+        //
+        // ── WHY IT IS `derived` AND MEASURED, NOT ASSUMED (1.0.94) ───────
+        //
+        // The generic routes are `withFlagLine` (a modifier line in the fence)
+        // and `withFlagToken`/`hasToken` (a `#token` on the directive). The
+        // second is the right shape and both its halves are broken here,
+        // because they are built on `splitArgHead`, which cuts an argument at
+        // its FIRST colon — and a bridge's filters are colon-separated:
+        //
+        //   withToken("bridge-readings:Mood tag:revision|…", "entries", true)
+        //     → "bridge-readings:Mood tag#entries:revision|…"
+        //   hasToken("bridge-readings:Mood#trend#entries tag:revision|…",
+        //            "entries")                            → false
+        //
+        // A corrupted line on the write, and a tick that reads unticked on the
+        // read. `readBridgeArg`/`writeBridgeArg` are the one pair in the tree
+        // that knows this grammar whole, so the catalogue owns both halves:
+        // `answeredIn` reads it through `readBridgeDirective` and
+        // `BridgeWindow` writes it through `withBridgeFlag`. That is the same
+        // division `setBridgeTrend` states one directive along.
+        //
+        // `directive` IS WHAT MAKES IT FINDABLE. `answeredIn` finds this
+        // question without knowing its key — the contract every read in
+        // `journal-plan.ts` holds to — and the shape that tells it apart from
+        // the prose tick beside it is that a derived flag on a DIRECTIVE names
+        // one, where a derived flag on a bracket cannot.
+        kind: "flag",
+        key: "entries",
+        label: "which days it lists",
+        directive: "bridge-readings",
+        derived: true,
+        // `""`, ON `FlagQuestion.derived`'s RULE AND FOR ITS REASON: nothing
+        // generic writes this answer, so the two fields that say where a
+        // generic write would put it have nothing to hold.
+        line: "",
+        after: "",
+        on: "Every entry in the period, with its reading or a dash",
+        off: "Only the days that carry a reading",
       },
     ],
 

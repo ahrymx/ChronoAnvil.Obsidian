@@ -147,7 +147,9 @@ describe("patch 3: the trend is a flag on the directive that already exists", ()
     expect(b).toContain("export function writeBridgeArg(");
     // Stripped before the target is split off, or the tracker is called
     // "Mood#trend" everywhere below.
-    expect(src()).toContain('const { trend } = readBridgeArg("readings", rest);');
+    expect(src()).toContain(
+      'const { trend, entries } = readBridgeArg("readings", rest);'
+    );
     expect(src()).not.toContain("readingsFlags");
   });
 

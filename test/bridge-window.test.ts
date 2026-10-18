@@ -25,9 +25,11 @@ import {
   bridgeRefusal,
   readBridgeArg,
   readBridgeDirective,
+  withBridgeFlag,
   writeBridgeArg,
   writeBridgeDirective,
 } from "../src/core/bridge";
+import { hasToken, withToken } from "../src/core/directive-grammar";
 import {
   BRIDGE_NAV_GRAIN,
   BRIDGE_SECTION_ID,
@@ -41,7 +43,12 @@ import { defaultSectionIds, templateTargets } from "../src/journals/journal-sect
 import { composeTemplate } from "../src/journals/custom-journal";
 import { journalSectionModel } from "../src/journals/journal-plan";
 import { STUDY_JOURNAL } from "../src/journals/journal";
-import { describeAnswers, questionIsRequired } from "../src/core/section-model";
+import {
+  FLAG_OFF,
+  FLAG_ON,
+  describeAnswers,
+  questionIsRequired,
+} from "../src/core/section-model";
 
 // ── the grammar, read and written by one pair ─────────────────────────
 
@@ -60,6 +67,13 @@ describe("one directive grammar, with a reader and a writer", () => {
       "bridge-readings:Mood",
       "bridge-readings:Mood#trend",
       "bridge-readings:Mood#trend is:lesson from:2026-02-10|From the diary",
+      // AND THE SECOND FLAG (1.0.94), alone, with the first, and with a
+      // colon-separated filter behind both — which is the shape the generic
+      // `#token` helpers cannot read or write. See the entries question.
+      "bridge-readings:Mood#entries",
+      "bridge-readings:Mood#trend#entries",
+      "bridge-readings:Mood#entries tag:revision|From the diary",
+      "bridge-readings:Mood#trend#entries is:lesson from:2026-02-10|From the diary",
     ];
     for (const line of shapes) {
       const read = readBridgeDirective(line);
@@ -103,17 +117,113 @@ describe("one directive grammar, with a reader and a writer", () => {
 
   it("drops the flag when it is off and never writes an empty tail", () => {
     expect(
-      writeBridgeArg({ direction: "readings", target: "Mood", trend: false, filters: "" })
+      writeBridgeArg({
+        direction: "readings",
+        target: "Mood",
+        trend: false,
+        entries: false,
+        filters: "",
+      })
     ).toBe("Mood");
     expect(
-      writeBridgeArg({ direction: "readings", target: "Mood", trend: true, filters: "  " })
+      writeBridgeArg({
+        direction: "readings",
+        target: "Mood",
+        trend: true,
+        entries: false,
+        filters: "  ",
+      })
     ).toBe("Mood#trend");
     // AND A NOTES BRIDGE NEVER CARRIES ONE, whatever it is handed: the flag is
     // a readings view and a `bridge-notes:meal#trend` is a note type nobody
     // has.
     expect(
-      writeBridgeArg({ direction: "notes", target: "meal", trend: true, filters: "" })
+      writeBridgeArg({
+        direction: "notes",
+        target: "meal",
+        trend: true,
+        entries: true,
+        filters: "",
+      })
     ).toBe("meal");
+  });
+
+  it("reads two flags off one head, in either order", () => {
+    // ── THE SECOND FLAG (1.0.94) ───────────────────────────────────────
+    //
+    // The split was always multi-flag — `head.slice(hash + 1).split("#")` —
+    // and nothing but `trend` ever read it. These are the four combinations,
+    // and they are four because the two are not alternatives: a trend draws
+    // the SHAPE of the readings and this widens WHICH DAYS get a row.
+    const read = (arg: string) => readBridgeArg("readings", arg);
+    expect(read("Mood")).toMatchObject({ trend: false, entries: false });
+    expect(read("Mood#trend")).toMatchObject({ trend: true, entries: false });
+    expect(read("Mood#entries")).toMatchObject({ trend: false, entries: true });
+    expect(read("Mood#trend#entries")).toMatchObject({
+      trend: true,
+      entries: true,
+    });
+    // ORDER-FREE, so a hand-written line is read for what it says and
+    // normalised to the writer's order the first time either toggle is pressed.
+    expect(read("Mood#entries#trend")).toMatchObject({
+      trend: true,
+      entries: true,
+    });
+    // AND THE TARGET AND FILTERS SURVIVE BOTH, which is the whole reason this
+    // read exists rather than `hasToken` — measured below.
+    expect(read("Mood#trend#entries tag:revision")).toMatchObject({
+      target: "Mood",
+      filters: "tag:revision",
+      trend: true,
+      entries: true,
+    });
+    // THE DIRECTION STILL DECIDES. A note type called `meal#entries` is a typo
+    // and the refusal naming it is how the reader finds that out.
+    expect(readBridgeArg("notes", "meal#entries")).toMatchObject({
+      target: "meal#entries",
+      entries: false,
+    });
+  });
+
+  it("writes trend before entries, which is not arbitrary", () => {
+    // `withToken` APPENDS, so a reader who presses the trend button on a line
+    // that already carries `#entries` gets `#entries#trend` from one writer and
+    // `#trend#entries` from the other — two spellings of one answer, and a
+    // golden note that depends on which door was used last. One order, stated
+    // once, in the only function that composes a bridge argument.
+    const arg = (trend: boolean, entries: boolean) =>
+      writeBridgeArg({
+        direction: "readings",
+        target: "Mood",
+        trend,
+        entries,
+        filters: "",
+      });
+    expect(arg(true, true)).toBe("Mood#trend#entries");
+    expect(arg(false, true)).toBe("Mood#entries");
+    expect(arg(true, false)).toBe("Mood#trend");
+    expect(arg(false, false)).toBe("Mood");
+    // AND A HAND-WRITTEN REVERSE IS NORMALISED RATHER THAN REFUSED.
+    const read = readBridgeArg("readings", "Mood#entries#trend tag:revision");
+    expect(writeBridgeArg({ direction: "readings", ...read })).toBe(
+      "Mood#trend#entries tag:revision"
+    );
+  });
+
+  it("is why the generic `#token` helpers cannot be used here", () => {
+    // MEASURED, NOT ASSUMED, and both halves are broken. `hasToken` and
+    // `withToken` are built on `splitArgHead`, which cuts an argument at its
+    // FIRST colon — and a bridge's filters are colon-separated, so the token
+    // list comes back holding "entries tag" and the write puts the flag inside
+    // the filter. This is the fact that made the entries question `derived`.
+    const filtered = "bridge-readings:Mood#trend#entries tag:revision|From the diary";
+    expect(hasToken(filtered, "entries")).toBe(false);
+    expect(readBridgeArg("readings", "Mood#trend#entries tag:revision").entries).toBe(
+      true
+    );
+    expect(withToken("bridge-readings:Mood tag:revision|From the diary", "entries", true)).toBe(
+      "bridge-readings:Mood tag#entries:revision|From the diary"
+    );
   });
 
   it("is not in `directive-grammar.ts`, and says why where it is", () => {
@@ -124,6 +234,113 @@ describe("one directive grammar, with a reader and a writer", () => {
     const src = readSrc("core/bridge");
     expect(src).toContain("splitArgHead");
     expect(readCode("core/bridge")).not.toContain("splitArgHead(");
+  });
+});
+
+// ── the one write both doors make ────────────────────────────────────
+
+describe("one flag, written onto the line the reader is looking at", () => {
+  const fence = (line: string): string[] => [
+    "```chronoanvil",
+    "period-nav:month",
+    line,
+    "```",
+  ];
+
+  it("writes the flag and leaves everything else alone", () => {
+    const out = withBridgeFlag(
+      fence("bridge-readings:Mood tag:revision|From the diary"),
+      "readings",
+      "Mood",
+      "entries",
+      true
+    );
+    expect(out).toEqual(
+      fence("bridge-readings:Mood#entries tag:revision|From the diary")
+    );
+  });
+
+  it("takes it off again, and the two are each other's inverse", () => {
+    const on = "bridge-readings:Mood#entries tag:revision|From the diary";
+    const off = "bridge-readings:Mood tag:revision|From the diary";
+    expect(
+      withBridgeFlag(fence(on), "readings", "Mood", "entries", false)
+    ).toEqual(fence(off));
+    expect(
+      withBridgeFlag(fence(off), "readings", "Mood", "entries", true)
+    ).toEqual(fence(on));
+  });
+
+  it("leaves the other flag where it found it", () => {
+    // The two are independent, so neither write may be the other's reset.
+    expect(
+      withBridgeFlag(
+        fence("bridge-readings:Mood#trend|From the diary"),
+        "readings",
+        "Mood",
+        "entries",
+        true
+      )
+    ).toEqual(fence("bridge-readings:Mood#trend#entries|From the diary"));
+    expect(
+      withBridgeFlag(
+        fence("bridge-readings:Mood#trend#entries|From the diary"),
+        "readings",
+        "Mood",
+        "trend",
+        false
+      )
+    ).toEqual(fence("bridge-readings:Mood#entries|From the diary"));
+  });
+
+  it("keeps the line's own indentation", () => {
+    // A bridge inside a list item or a callout is indented, and
+    // `writeBridgeDirective` composes a line from the directive's parts with no
+    // idea where it sat.
+    const out = withBridgeFlag(
+      ["  bridge-readings:Mood|From the diary"],
+      "readings",
+      "Mood",
+      "entries",
+      true
+    );
+    expect(out).toEqual(["  bridge-readings:Mood#entries|From the diary"]);
+  });
+
+  it("answers null for a note with two bridges to that tracker", () => {
+    // SOLE OR NOTHING — `soleArgSpanIn`'s rule applied to a write. The section
+    // machinery cannot compose this shape, so it guards a hand-written note.
+    const two = [
+      "bridge-readings:Mood|One",
+      "bridge-readings:Mood|Two",
+    ];
+    expect(withBridgeFlag(two, "readings", "Mood", "entries", true)).toBeNull();
+  });
+
+  it("answers null when there is no such bridge, by target or direction", () => {
+    const lines = ["bridge-readings:Mood|From the diary"];
+    expect(withBridgeFlag(lines, "readings", "Energy", "entries", true)).toBeNull();
+    expect(withBridgeFlag(lines, "notes", "Mood", "entries", true)).toBeNull();
+    expect(withBridgeFlag([], "readings", "Mood", "entries", true)).toBeNull();
+  });
+
+  it("tells `null` from an unchanged string, which the callers depend on", () => {
+    // A missing or doubled line is something to say out loud; a flag already as
+    // asked is a write that must not happen. The toggle reports the first as an
+    // ambiguity and the second not at all.
+    const lines = ["bridge-readings:Mood#entries|From the diary"];
+    const out = withBridgeFlag(lines, "readings", "Mood", "entries", true);
+    expect(out).not.toBeNull();
+    expect(out).toEqual(lines);
+  });
+
+  it("does not write through the array it was handed", () => {
+    // `applySections` keeps its own `lines` and pushes them into a chunk
+    // afterwards; mutating the argument would write the flag into a note whose
+    // save was then refused.
+    const lines = ["bridge-readings:Mood|From the diary"];
+    withBridgeFlag(lines, "readings", "Mood", "entries", true);
+    expect(lines).toEqual(["bridge-readings:Mood|From the diary"]);
   });
 });
 
@@ -405,13 +622,41 @@ describe("the journal side asks what it composes", () => {
   const bridge = () =>
     JOURNAL_SECTIONS.find((s) => s.id === BRIDGE_SECTION_ID)!;
 
-  it("asked nothing for six releases and asks three things now", () => {
+  it("asked nothing for six releases and asks four things now", () => {
     // `entry-sections.ts` calls its own bridge "THE ONE SECTION IN EITHER DIARY
     // CATALOGUE THAT ASKS THE READER ANYTHING", and that comment was the
     // argument for why this one had to. The premise it stood on — "it cannot
     // read the tracker registry" — expired when `ctx.vault` arrived in 5.26.
+    //
+    // AND THE FOURTH IS THE ENTRY LIST (1.0.94), asked for as "an option to
+    // enable in bridge settings window".
     const keys = (bridge().questions?.(ctx()) ?? []).map((q) => q.key);
-    expect(keys).toEqual(["tracker", "filters", "grain"]);
+    expect(keys).toEqual(["tracker", "filters", "grain", "entries"]);
+  });
+
+  it("asks which days it lists as a derived flag on the directive", () => {
+    // THE GENERIC ROUTES ARE BOTH BROKEN HERE AND THAT WAS MEASURED, not
+    // assumed: `withToken` and `hasToken` are built on `splitArgHead`, which
+    // cuts an argument at its FIRST colon, and a bridge's filters are
+    // colon-separated. The write corrupts the line —
+    // `bridge-readings:Mood tag#entries:revision|…` — and the read answers
+    // `false` for a `#entries` that is plainly there. So the catalogue owns
+    // both halves, which is what `derived` means.
+    const q = bridge().questions!(ctx())[3];
+    expect(q.kind).toBe("flag");
+    expect(q.derived).toBe(true);
+    // NAMING A DIRECTIVE IS WHAT MAKES IT FINDABLE. `answeredIn` and
+    // `withBridgeFlagAnswer` both look for a derived flag that names one,
+    // which is the shape that tells it apart from the prose tick — a bracketed
+    // section has no directive to name.
+    expect(q.directive).toBe("bridge-readings");
+    // `line` AND `after` ARE REQUIRED AND UNREACHABLE — `FlagQuestion.derived`'s
+    // own rule. A non-empty `line` would have `withFlagLine` writing a modifier
+    // into the bridge's fence.
+    expect(q.line).toBe("");
+    expect(q.after).toBe("");
+    expect(q.token).toBeUndefined();
+    expect(q.marker).toBeUndefined();
   });
 
   it("offers the vault's trackers, with the old default as the empty state", () => {
@@ -710,19 +955,32 @@ describe("a control is drawn where it acts (5.5)", () => {
 });
 
 describe("the trend flag is reachable at last", () => {
+  // THE ARITHMETIC MOVED TO `core/bridge.ts` IN 1.0.94 and these assertions
+  // followed it, because the entries flag needed the same write from a second
+  // door — `applySections`, where there is no file to process. What is asserted
+  // of the toggle is now the file half alone; the write itself is pinned on
+  // `withBridgeFlag` below, once for both flags.
   const body = () => fnBody("setBridgeTrend", "bridge-widgets");
+  const pure = () => fnBody("withBridgeFlag", "core/bridge");
 
   it("writes through the pure writer rather than patching the string", () => {
     // `withToken` would have been the shared route and it cannot be: it builds
     // on `splitArgHead`, which cuts the argument at its first colon, so
     // `bridge-readings:Mood is:lesson` would come back
-    // `bridge-readings:Mood is#trend:lesson`.
-    expect(body()).toContain("writeBridgeDirective({ ...directive, trend: on })");
-    expect(body()).toContain("readBridgeDirective(");
+    // `bridge-readings:Mood is#trend:lesson`. MEASURED IN 1.0.94, both ways:
+    // `hasToken("bridge-readings:Mood#trend#entries tag:revision|…", "entries")`
+    // is `false`, so the generic READ is broken on the same line.
+    expect(pure()).toContain(
+      "writeBridgeDirective({ ...directive, [flag]: on })"
+    );
+    expect(pure()).toContain("readBridgeDirective(");
   });
 
   it("goes through vault.process, like every other body write here", () => {
     expect(body()).toContain("plugin.app.vault.process(file,");
+    // AND THE TOGGLE ASKS THE PURE WRITER RATHER THAN HOLDING A SECOND COPY.
+    expect(body()).toContain('withBridgeFlag(\n      text.split("\\n"),');
+    expect(body()).toContain('"trend"');
   });
 
   it("declines an ambiguous note rather than rewriting the first line", () => {
@@ -730,7 +988,12 @@ describe("the trend flag is reachable at last", () => {
     // apart from another section's is one nothing may claim to have read. The
     // section machinery cannot compose two bridges on one note, so this guards
     // a hand-written file.
-    expect(body()).toContain("if (at.length !== 1) return text;");
+    //
+    // `null` AND NOT THE TEXT BACK, as of 1.0.94: the window must tell "there
+    // is no single line" from "the flag was already as asked", because the
+    // first is worth saying out loud and the second must write no bytes.
+    expect(pure()).toContain("if (at.length !== 1) return null;");
+    expect(body()).toContain("if (next === null) return text;");
   });
 
   it("keeps the line's own indentation", () => {
@@ -739,10 +1002,17 @@ describe("the trend flag is reachable at last", () => {
     // ask to move.
     // THE WHOLE WRITE, because `const indent` computed and not used is the
     // shape this mutant wears.
-    expect(body()).toContain(
-      "lines[at[0]] = indent + writeBridgeDirective({ ...directive, trend: on });"
+    expect(pure()).toContain(
+      "out[i] = indent + writeBridgeDirective({ ...directive, [flag]: on });"
     );
-    expect(body()).toContain("const indent = /^\\s*/.exec(lines[at[0]])![0];");
+    expect(pure()).toContain("const indent = /^\\s*/.exec(lines[i])![0];");
+  });
+
+  it("copies the lines rather than writing through the caller's array", () => {
+    // Handed a chunk of the reader's file by `applySections`, which keeps its
+    // own `lines` and pushes them into a chunk afterwards. Mutating the
+    // argument would write the flag into a note whose save was then refused.
+    expect(pure()).toContain("const out = [...lines];");
   });
 });
 
@@ -772,6 +1042,44 @@ describe("both directives are documented at last", () => {
   it("says what the trend flag and the snapshot do", () => {
     expect(doc()).toContain("#trend");
     expect(doc()).toMatch(/freeze/i);
+  });
+});
+
+// ── the control the reader presses ────────────────────────────────────
+
+describe("the window draws the entry-list tick", () => {
+  const win = () => readCode("ui/bridge-window");
+
+  it("renders a flag question, which it used to drop on the floor", () => {
+    //   "option to enable in bridge settings window"
+    //
+    // `renderBody` handled `choice` and `text` and nothing else, so a flag
+    // question added to the catalogue would have drawn its label and no
+    // control — a row saying "which days it lists" with nothing beside it.
+    expect(win()).toContain('else if (q.kind === "flag") this.renderFlag(field(q), q);');
+    expect(win()).toContain("private renderFlag(host: HTMLElement, q: FlagQuestion): void {");
+  });
+
+  it("is a checkbox, with the prose window's classes and wording rule", () => {
+    // The reader meets all three flag controls in one vault an hour apart, so
+    // ticked means on and the label says what ticking DOES.
+    expect(win()).toContain('cls: "ca-tpl-form-box",');
+    expect(win()).toContain('cls: "ca-tpl-form-label",');
+    expect(win()).toContain("text: q.on,");
+    expect(win()).toContain("box.title = box.checked ? q.off : q.on;");
+  });
+
+  it("comes up UNTICKED where the prose tick comes up ticked", () => {
+    // `prose-window.ts` reads `!== FLAG_OFF`, because `#bare`'s ABSENCE means
+    // the head is drawn. Here the flag's absence is every bridge written before
+    // this release, which lists the days that carry a reading — so reading it
+    // the prose way would show every bridge in every vault as already widened.
+    expect(win()).toContain("box.checked = this.shown(q) === FLAG_ON;");
+    expect(win()).not.toContain("this.shown(q) !== FLAG_OFF");
+  });
+
+  it("writes the answer the model reads, in the strings it reads", () => {
+    expect(win()).toContain("this.answer(q.key, box.checked ? FLAG_ON : FLAG_OFF);");
   });
 });
 
@@ -873,6 +1181,198 @@ describe("answering one piece leaves the other as the reader left it", () => {
     expect(next).not.toContain("period-nav:month");
     // And the bridge's own line is untouched by it.
     expect(directiveIn(next)).toBe(directiveIn(text));
+  });
+
+  // ── AND THE DERIVED FLAG RIDES THE SAME PASS (1.0.94) ──────────────
+  //
+  //   "Implement a entry list (option to enable in bridge settings window)."
+  //
+  // `withAnswers` steps over a derived flag, so this answer is written by the
+  // catalogue's own half — `withBridgeFlagAnswer`, beside the two prose writes
+  // in `applySections`. Going through `apply` is what makes it ONE vault write
+  // with everything else the window was given, which is what `commit` promises
+  // and what `bridgeTextRefusal` validates.
+
+  it("writes the entries flag the reader ticked", () => {
+    const { text, model } = composed();
+    expect(directiveIn(want(model, text, { entries: FLAG_ON }))).toBe(
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#entries|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("takes it off again when the box is unticked", () => {
+    const { text, model } = composed();
+    const on = want(model, text, { entries: FLAG_ON });
+    expect(directiveIn(want(model, on, { entries: FLAG_OFF }))).toBe(
+      directiveIn(text)
+    );
+  });
+
+  it("lands in the same write as the tracker and the filters", () => {
+    // The window saves once. A second write for the flag would be a note that
+    // `commit`'s own "this changed while the window was open" check would
+    // refuse on the next save, and a snapshot taken between the two would hold
+    // half an answer.
+    const { text, model } = composed();
+    const next = want(model, text, {
+      tracker: "Energy",
+      filters: "tag:revision",
+      entries: FLAG_ON,
+    });
+    expect(directiveIn(next)).toBe(
+      `bridge-readings:Energy#entries tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("keeps a hand-written filter and the trend flag beside it", () => {
+    // THE SHAPE THE GENERIC WRITER CORRUPTS. `withToken` would have produced
+    // `bridge-readings:Mood#trend tag#entries:revision|…` — a flag inside a
+    // filter — which is the measurement that made this question `derived`.
+    const { text, model } = composed();
+    const busy = text.replace(
+      directiveIn(text),
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#trend tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(directiveIn(want(model, busy, { entries: FLAG_ON }))).toBe(
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#trend#entries tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("leaves the flag alone when the window never asked about it", () => {
+    // UNANSWERED IS NOT `FLAG_OFF`. The editor sends back only what it drew, so
+    // a save from a window that never showed this row must not widen or narrow
+    // the list the reader is looking at.
+    const { text, model } = composed();
+    const on = want(model, text, { entries: FLAG_ON });
+    expect(directiveIn(want(model, on, { tracker: "Energy" }))).toBe(
+      `bridge-readings:Energy#entries|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("keeps the trend flag when the tracker changes (the 1.0.89 defect)", () => {
+    // MEASURED BY 1.0.94's TEST ABOVE, AND OLDER THAN IT. A flag is glued to
+    // the target and the target is PIECE 0 of a compound argument, so
+    // `withAnswers` splicing "Energy" over the piece `Mood#trend` wrote a line
+    // with no flag on it: changing the tracker in the window silently turned
+    // the trend off. It went unnoticed because the trend has a button of its
+    // own to turn back on; the entries flag has no such consolation.
+    const { text, model } = composed();
+    const trending = text.replace(
+      directiveIn(text),
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#trend|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(directiveIn(want(model, trending, { tracker: "Energy" }))).toBe(
+      `bridge-readings:Energy#trend|${BRIDGE_SECTION_TITLE}`
+    );
+    // AND BOTH SURVIVE TOGETHER, with a filter behind them.
+    const busy = text.replace(
+      directiveIn(text),
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#trend#entries tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(directiveIn(want(model, busy, { tracker: "Energy" }))).toBe(
+      `bridge-readings:Energy#trend#entries tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("does not invent a flag on a bridge that had none", () => {
+    // The restore is a restore. A chunk whose line carried no flag must come
+    // out carrying none, whatever else the answer changed — otherwise every
+    // bridge in every vault grows a `#trend` the first time its filters are
+    // edited.
+    const { text, model } = composed();
+    const next = want(model, text, { filters: "tag:revision" });
+    expect(directiveIn(next)).toBe(
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER} tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("reads the flag back off the line, which `flagAt` could not", () => {
+    // `answersOn` reads a flag with `flagAt`, which looks for a modifier LINE
+    // in the fence — so it answered `FLAG_OFF` for every bridge in every vault
+    // and the box would have come up unticked over a widened list.
+    // `answeredIn` supplies the catalogue's own read instead.
+    const { text, model } = composed();
+    const answered = (t: string) =>
+      model.sections(t).find((v) => v.id === BRIDGE_SECTION_ID)?.answered;
+    expect(answered(text)?.entries).toBe(FLAG_OFF);
+    expect(answered(want(model, text, { entries: FLAG_ON }))?.entries).toBe(
+      FLAG_ON
+    );
+    // AND THROUGH A FILTER, which is the line `hasToken` reads as unticked.
+    const filtered = text.replace(
+      directiveIn(text),
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#entries tag:revision|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(answered(filtered)?.entries).toBe(FLAG_ON);
+  });
+
+  it("writes the flag onto a section added with the box already ticked", () => {
+    // `render` composes the directive and knows nothing about the flags —
+    // they are a derived answer, so no generic writer touches them — which
+    // meant ticking the section on and the entry-list box in one save got the
+    // section and not the answer. Measured, then fixed on the add path.
+    const t = leaf();
+    const ids = [...defaultSectionIds(t.ctx)].filter(
+      (id) => id !== BRIDGE_SECTION_ID
+    );
+    const bare = composeTemplate(t.ctx, ids, STUDY_JOURNAL.layout?.[t.key]);
+    const model = journalSectionModel(t.ctx);
+    const next = model.apply(bare, [
+      ...model.present(bare),
+      { id: BRIDGE_SECTION_ID, options: { entries: FLAG_ON } },
+    ]);
+    expect(next).not.toBeNull();
+    expect(directiveIn(next!)).toBe(
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#entries|${BRIDGE_SECTION_TITLE}`
+    );
+    // AND A SECTION ADDED WITH THE BOX ALONE COMES OUT BARE, so no reader gets
+    // a flag they did not ask for.
+    //
+    // WHAT A SWEEP COULD NOT MEASURE HERE, recorded so it is not chased again:
+    // handing the add path the composed block as its `before` behaves
+    // identically, because a freshly composed bridge carries no flags. The call
+    // passes `undefined` to say so rather than to rely on it.
+    const plain = model.apply(bare, [...model.present(bare), BRIDGE_SECTION_ID]);
+    expect(directiveIn(plain!)).toBe(
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("leaves nothing standing for a note with no bridge in it", () => {
+    // `rowFor` builds a row for every entry in the catalogue, so this read runs
+    // over notes that have not ticked the section — and `answersOn`'s `flagAt`
+    // has already put a wrong `FLAG_OFF` there. An answer left standing draws
+    // the tick over a line that does not exist; absent draws the inert
+    // `settled` wording instead, which is the rule the marker-flag branch
+    // beside this one states.
+    const t = leaf();
+    const ids = [...defaultSectionIds(t.ctx)].filter(
+      (id) => id !== BRIDGE_SECTION_ID
+    );
+    const bare = composeTemplate(t.ctx, ids, STUDY_JOURNAL.layout?.[t.key]);
+    expect(bare).not.toContain("bridge-readings:");
+    const view = journalSectionModel(t.ctx)
+      .sections(bare)
+      .find((v) => v.id === BRIDGE_SECTION_ID);
+    expect(view, "the catalogue still offers the row").toBeTruthy();
+    expect(view!.answered?.entries).toBeUndefined();
+  });
+
+  it("tells its own derived flag from the prose tick by shape", () => {
+    // Two derived flags reach this file and they are told apart WITHOUT either
+    // key being spelled out — `answeredIn`'s contract. A bracketed section has
+    // no directive to name, so naming one is the whole of the test; dropping
+    // that clause would have the bridge's read deleting the prose tick's answer
+    // on any note whose block has no headings to re-derive it from.
+    const plan = readCode("journals/journal-plan");
+    expect(plan).toContain(
+      '(q) => q.kind === "flag" && q.derived && q.directive'
+    );
+    // AND THE SCAN IS FOR THE DIRECTIVE THE QUESTION NAMED, so a `bridge-notes`
+    // line on the same note is not mistaken for this answer.
+    expect(plan).toContain(
+      "(x) => x !== null && `bridge-${x.direction}` === onDirective.directive"
+    );
   });
 
   it("answers null when nothing moved, which is what stops a no-op write", () => {

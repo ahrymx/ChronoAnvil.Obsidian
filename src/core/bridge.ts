@@ -199,6 +199,15 @@ export interface BridgeDirective {
   target: string;
   // `#trend`, readings only. See `writeBridgeArg` for why the direction decides.
   trend: boolean;
+  // `#entries`, readings only. Whether the rows are every diary entry in the
+  // window rather than only the days that carry a reading. 1.0.94.
+  //
+  // A SECOND FLAG RATHER THAN A SECOND VALUE OF THE FIRST, because the two are
+  // not alternatives: a trend draws the shape of the readings and this lists the
+  // days they were logged on, so all four combinations mean something. Neither
+  // is today's readings list; `#trend` alone is the chart; this alone widens the
+  // list to every entry; both draws the chart over the full entry list.
+  entries: boolean;
   // The raw selector text after the target, untouched.
   filters: string;
   // The reader's own title, after the `|`, or null where the line carries none.
@@ -216,14 +225,22 @@ export interface BridgeDirective {
 export function readBridgeArg(
   direction: BridgeDirection,
   arg: string
-): { target: string; trend: boolean; filters: string } {
+): { target: string; trend: boolean; entries: boolean; filters: string } {
   const trimmed = arg.trim();
   const cut = trimmed.search(/\s/);
   const head = cut === -1 ? trimmed : trimmed.slice(0, cut);
   const filters = cut === -1 ? "" : trimmed.slice(cut + 1).trim();
-  if (direction === "notes") return { target: head, trend: false, filters };
+  if (direction === "notes") {
+    return { target: head, trend: false, entries: false, filters };
+  }
   const hash = head.indexOf("#");
-  if (hash === -1) return { target: head, trend: false, filters };
+  if (hash === -1) {
+    return { target: head, trend: false, entries: false, filters };
+  }
+  // THE SPLIT WAS ALWAYS MULTI-FLAG AND NOW SOMETHING ELSE READS IT. `#trend`
+  // was the only token for three releases and this list has been built the same
+  // way the whole time, which is what makes a second flag a line here rather
+  // than a grammar change.
   const flags = head
     .slice(hash + 1)
     .split("#")
@@ -231,6 +248,7 @@ export function readBridgeArg(
   return {
     target: head.slice(0, hash),
     trend: flags.includes("trend"),
+    entries: flags.includes("entries"),
     filters,
   };
 }
@@ -239,11 +257,78 @@ export function writeBridgeArg(d: {
   direction: BridgeDirection;
   target: string;
   trend: boolean;
+  entries: boolean;
   filters: string;
 }): string {
-  const flag = d.direction === "readings" && d.trend ? "#trend" : "";
+  // TREND FIRST, ENTRIES SECOND, AND THE ORDER IS NOT ARBITRARY. `withToken`
+  // APPENDS — the section window writes `#entries` through it onto a line that
+  // may already carry `#trend` — so writing them in the other order here would
+  // mean the window and this function produce different bytes for the same two
+  // answers, and a reader who used both doors would see the line rewritten by
+  // whichever they touched last.
+  //
+  // `readBridgeArg` is order-free, so a hand-written `#entries#trend` renders
+  // identically and is normalised to this order the first time either toggle is
+  // pressed. That is the one byte this function will change without being asked
+  // to, and it is the same normalisation `withToken` would have applied.
+  const flags =
+    d.direction === "readings"
+      ? `${d.trend ? "#trend" : ""}${d.entries ? "#entries" : ""}`
+      : "";
   const tail = d.filters.trim();
-  return `${d.target.trim()}${flag}${tail ? ` ${tail}` : ""}`;
+  return `${d.target.trim()}${flags}${tail ? ` ${tail}` : ""}`;
+}
+
+// ── ONE FLAG, WRITTEN ONTO THE LINE THE READER IS LOOKING AT (1.0.94) ────
+//
+// Pure, and that is what it is for. `setBridgeTrend` held this arithmetic inside
+// a `vault.process` callback, which made it reachable only by writing a file —
+// and 1.0.94 needs the same write from a second door, `applySections`, where
+// the entries flag has to land in the same pass as every other answer the
+// bridge window was given. One write on lines serves both: the toggle wraps it
+// in `process`, the planner hands it the section's own chunk.
+//
+// LINES RATHER THAN TEXT, because the second caller has lines and no text — a
+// chunk is a slice of the reader's file — and a function that joined and re-split
+// around that caller would be the only thing deciding where the newlines went.
+//
+// SOLE OR NOTHING, which is `setBridgeTrend`'s rule carried over verbatim and
+// still the ambiguity rule `soleArgSpanIn` states for every other answer in the
+// plugin: a note with two readings bridges on one tracker has two lines this
+// could mean, and rewriting the first is an answer nothing may claim to have
+// read. The section machinery cannot compose that shape, so this guards a
+// hand-written note rather than a case the plugin produces — and it comes back
+// `null` rather than throwing.
+//
+// `null` AND AN UNCHANGED STRING ARE DIFFERENT ANSWERS, which is why the return
+// is nullable rather than just "the text, possibly the same". A missing or
+// doubled line is something to say out loud; a flag already as asked is a write
+// that must not happen. Both callers need them apart: the toggle reports the
+// first as an ambiguity and the second not at all, and the window must not
+// rewrite a note because a box was already ticked.
+//
+// THE INDENT IS KEPT. A bridge inside a list item or a callout is indented, and
+// `writeBridgeDirective` composes a line from the directive's own parts with no
+// idea where it sat.
+export function withBridgeFlag(
+  lines: readonly string[],
+  direction: BridgeDirection,
+  target: string,
+  flag: "trend" | "entries",
+  on: boolean
+): string[] | null {
+  const at: number[] = [];
+  lines.forEach((line, i) => {
+    const d = readBridgeDirective(line);
+    if (d && d.direction === direction && d.target === target) at.push(i);
+  });
+  if (at.length !== 1) return null;
+  const i = at[0];
+  const indent = /^\s*/.exec(lines[i])![0];
+  const directive = readBridgeDirective(lines[i])!;
+  const out = [...lines];
+  out[i] = indent + writeBridgeDirective({ ...directive, [flag]: on });
+  return out;
 }
 
 const DIRECTIVE_RE = /^bridge-(notes|readings):([^|]*)(?:\|(.*))?$/;

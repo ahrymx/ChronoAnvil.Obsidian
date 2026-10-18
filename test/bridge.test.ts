@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fnBody, readCode, readSrc } from "./sources";
+import { fnBody, readCode, readCss, readSrc } from "./sources";
 import { computeSectionRuns } from "../src/ui/headerbar";
 import { OBSIDIAN_DOM } from "../src/core/constants";
 import {
@@ -1032,7 +1032,7 @@ describe("a snapshot is plain markdown", () => {
     expect(bridge).toContain(
       'locateEntry(plugin.app, plugin.settings.paths, "daily", iso)?.path ?? null'
     );
-    expect(bridge).toContain("path: dayOf(pt.date),");
+    expect(bridge).toContain("path: dayOf(iso),");
     expect(bridge).not.toContain("path: null, label: pt.date");
     const point = readCode("charts");
     expect(point).toContain(
@@ -1047,7 +1047,77 @@ describe("a snapshot is plain markdown", () => {
     expect(bridge).toContain('cls: "internal-link ca-bridge-date",');
     // The orphan path keeps the span, so a reading outliving its entry stays a
     // row rather than becoming a link to nothing.
-    expect(bridge).toContain('row.createSpan({ cls: "ca-bridge-date", text: p.date });');
+    expect(bridge).toContain('row.createSpan({ cls: "ca-bridge-date", text: iso });');
+  });
+
+  it("lists every entry in the period when the flag is on", () => {
+    //   "It should show all known entries for the bridges period."
+    //
+    // One row per READING misreads the same way 1.0.93's axis did: a week
+    // logged on two days drew two rows under a bar saying **Week 42**. The
+    // spine is `datesInWindow`, the SAME function the trend's axis uses, so the
+    // list and the chart above it cannot disagree about where the period ends.
+    const bridge = readCode("bridge-widgets");
+    // COUNTED, NOT FOUND, AND A SWEEP IS WHY. The live rows and the frozen
+    // rows are built by the same three expressions — one so the snapshot is
+    // "the block as it stood" — so a `toContain` is satisfied by either site
+    // and four mutants that deleted one of them measured zero. Two of each, or
+    // one of the two halves has quietly stopped widening.
+    const twice = (what: string) =>
+      expect(bridge.split(what).length - 1, what).toBe(2);
+    twice("const days = entries");
+    twice("? datesInWindow(plan.window.start, plan.window.end).filter(");
+    // AN ENTRY IS A NOTE THAT EXISTS, so the rows are the days the reader
+    // journalled rather than every date in the period — and `dayOf` is the one
+    // lookup the dates, the trend's clicks and the frozen rows all share.
+    twice("(iso) => dayOf(iso) !== null");
+    // AND THE NARROW FORM IS UNCHANGED, which is the other half of the opt-in.
+    twice(": points.map((p) => p.date);");
+  });
+
+  it("moves the empty state behind the rows, not in front of them", () => {
+    // `points.length === 0` returned before the rows were built, so a period
+    // with entries and no readings would have drawn the readings empty state
+    // over a list the flag had just asked for.
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain("if (days.length === 0) {");
+    expect(bridge).not.toContain("if (points.length === 0) {");
+    // TWO SENTENCES, BECAUSE THE TWO ABSENCES ARE DIFFERENT. "No readings" is
+    // wrong for a period with no entries at all.
+    expect(bridge).toContain("`No diary entries inside ${plan.window.label}. `");
+  });
+
+  it("draws a dash for a day that carries no reading", () => {
+    // The row exists to make an empty day visible, and a blank cell where every
+    // other row has a number reads as a rendering fault. `is-blank` is a state
+    // on the same class, so the cell keeps the list's tabular alignment.
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain('cls: value === undefined ? "ca-bridge-value is-blank" : "ca-bridge-value",');
+    expect(bridge).toContain('text: value === undefined ? "—" : String(value),');
+    expect(readCss()).toContain(".ca-bridge-value.is-blank");
+  });
+
+  it("keeps the list under the trend when both flags are on", () => {
+    // Four combinations, four things to ask for: neither is the plain readings
+    // list, `#trend` alone is the chart instead of it, `#entries` alone widens
+    // it, and both is the chart above the full list.
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain("if (!entries) return;");
+  });
+
+  it("freezes what the block was drawing, rows and all", () => {
+    // The snapshot callback's whole contract is "the block as it stood — not a
+    // second query that could answer differently", so a widened block freezes
+    // widened. Same spine, same `dayOf`, same order.
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain('detail: valueOf.has(iso) ? String(valueOf.get(iso)) : "",');
+    // THE SAME SPINE AS THE LIVE ROWS, counted in the test above so that
+    // neither half can stop widening while the other still does.
+    expect(bridge).toContain("return days.map((iso) => ({");
+    // NO DETAIL RATHER THAN A DASH. `serializeSnapshot` writes the link alone
+    // for a row with no detail and `parseSnapshotLine` reads it back; `— —`
+    // would put a separator in the reader's note with nothing after it.
+    expect(bridge).not.toContain('detail: "—"');
   });
 
   it("says why it is not the charts section, in the docs and at the source", () => {

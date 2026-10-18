@@ -5,6 +5,43 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.94] - 2026-10-18
+
+### Added
+
+- **A readings bridge can list every entry in its period.** The cog's new
+  *which days it lists* tick widens the rows from "the days that carry a
+  reading" to **every diary entry in the window**, each with its reading or an
+  em dash — so a week you journalled on five days and logged the tracker on two
+  is five rows rather than two. It is written onto the directive as `#entries`,
+  beside `#trend`, so the note remembers it; the two are independent, and all
+  four combinations mean something (neither is the plain list, `#trend` alone is
+  the chart, `#entries` alone is the full list, both is the chart above the full
+  list). The rows come off the same window spine the trend's axis uses, so the
+  chart and the list cannot disagree about where the period ends, and a frozen
+  bridge freezes what it was drawing — widened rows included.
+
+### Fixed
+
+- **Changing a bridge's tracker no longer turns its trend off.** A flag is glued
+  to the target and the target is the first piece of a compound argument, so
+  answering the tracker dropdown spliced `Energy` over the piece `Mood#trend`
+  and wrote a line with no flag on it. It has been that way since the window got
+  a tracker dropdown in 1.0.89 and went unnoticed because the trend had a button
+  of its own to turn back on. Both flags are now restored onto the line the
+  splice produces.
+
+### Changed
+
+- **The bridge window draws flag questions.** It handled dropdowns and text
+  boxes only, so a tick added to the catalogue would have drawn its label and no
+  control. It comes up unticked by default, where the prose window's tick comes
+  up ticked — an absent `#entries` is every bridge written before this release.
+- The directive write that `#trend`'s button made is now a pure text transform
+  in `core/bridge.ts`, shared by the button and by the window's Save, so a flag
+  still lands in exactly one vault write with everything else the window
+  changed.
+
 ## [1.0.93] - 2026-10-18
 
 ### Added

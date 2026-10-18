@@ -91,6 +91,7 @@ import {
 } from "../core/note-sections";
 import type { FlatSection } from "../core/note-sections";
 import { stripPluginMarkup } from "../core/plain-markdown";
+import { readBridgeDirective, withBridgeFlag } from "../core/bridge";
 import { isPageWidgetId } from "../core/widget-sections";
 import {
   addOps,
@@ -2198,6 +2199,23 @@ export function applySections(
               optionsFor(requested, id),
               nth
             );
+            // ── AND THE DERIVED FLAG ON A DIRECTIVE (1.0.94) ───────────
+            //
+            // The third write that `withAnswers` cannot make, beside the two
+            // above it and for the same reason: the answer is derived, so
+            // nothing generic writes it and the catalogue that declared it
+            // owns both halves. What is different here is that the answer is
+            // a `#` on a line inside a FENCE — so it rides this chunk rather
+            // than a bracket, and lands in the same pass as every other
+            // answer the bridge window was given. One vault write, which is
+            // what `BridgeWindow.commit` promises.
+            out = withBridgeFlagAnswer(
+              out,
+              lines,
+              listedSection,
+              ctx,
+              optionsFor(requested, id)
+            );
           }
         }
         const section = byId.get(id);
@@ -2484,7 +2502,28 @@ export function applySections(
     // the one a reader reaches by ticking Open tasks onto a page whose Review
     // queue is not there: without it the add path hands back exactly the
     // headless fence the other two doors exist to stop.
-    const alone = soloBar(markdown.split("\n"), soloBarOf(section, ctx));
+    // AND A DERIVED FLAG IS WRITTEN ONTO THE BLOCK THAT WAS JUST COMPOSED
+    // (1.0.94). `render` composes a bridge directive and knows nothing about
+    // the flags — they are a derived answer, so no generic writer touches them
+    // — which meant a reader who ticked *Edit sections…* on and the entry-list
+    // box in the same save got the section and not the answer. The same
+    // function the reconfigure path uses, handed NO `before`: a block being
+    // composed had nothing to restore, so the only flag it can come out with is
+    // the one that was asked for.
+    //
+    // AND `before` IS OMITTED RATHER THAN HANDED THE BLOCK, which a sweep
+    // measured: passing the composed lines behaves identically, because a
+    // freshly composed bridge carries no flags and reading them off it yields
+    // the same two falses. Omitting it says "there is no before" in the call
+    // instead of depending on that, which is the fact a later compose change
+    // could quietly take away.
+    const alone = withBridgeFlagAnswer(
+      soloBar(markdown.split("\n"), soloBarOf(section, ctx)),
+      undefined,
+      section,
+      ctx,
+      renderOptionsFor(section, ctx, requested, id)
+    );
     const at = insertionPoint(chunks, order, id);
     chunks.splice(at, 0, {
       ids: [id],
@@ -3617,6 +3656,43 @@ function answeredIn(
   for (const q of questions) {
     if (q.kind === "flag" && q.marker) delete out[q.key];
   }
+  // ── AND A DERIVED FLAG THAT NAMES A DIRECTIVE (1.0.94) ──────────────
+  //
+  // `answersOn` read this one off the fence with `flagAt`, which looks for a
+  // modifier LINE and so answers `FLAG_OFF` for every bridge in every vault.
+  // The answer is a `#` on the directive instead — see the entries question in
+  // `journal-sections.ts`, where the measurement that rules out the generic
+  // `token` route is written down — and `readBridgeArg` is the only read that
+  // survives a filtered line, so the catalogue's own reader supplies it.
+  //
+  // FOUND BY SHAPE, NOT BY KEY, which is the contract every read in this file
+  // holds to. The prose tick beside it is derived and names NO directive,
+  // because a bracketed section has none; naming one is the whole of the test.
+  //
+  // ABSENT WHERE THERE IS NO DIRECTIVE TO READ, which is reached on every note
+  // that has not ticked this section: `rowFor` builds a row for every entry in
+  // the catalogue, so a tick left standing here would be a control with nowhere
+  // to write — and `answersOn`'s `flagAt` has already put a wrong `FLAG_OFF`
+  // there, so it is deleted rather than left to be overwritten. The marker-flag
+  // branch above does the same thing for the same reason.
+  //
+  // FOUND BY SCANNING FOR THE DIRECTIVE, NOT BY `locate`'s OFFSET. An earlier
+  // draft turned the anchor into a line index and guarded `at < 0` — and a
+  // mutation sweep could not tell that guard's presence from its absence,
+  // because `locate` probes for this very keyword: no anchor means no line to
+  // misread. Asking the lines directly has no unreachable branch in it, and it
+  // reads an INDENTED bridge, which a `^`-anchored probe does not.
+  const onDirective = questions.find(
+    (q) => q.kind === "flag" && q.derived && q.directive
+  );
+  if (onDirective) {
+    const d = text
+      .split("\n")
+      .map((l) => readBridgeDirective(l))
+      .find((x) => x !== null && `bridge-${x.direction}` === onDirective.directive);
+    if (d) out[onDirective.key] = d.entries ? FLAG_ON : FLAG_OFF;
+    else delete out[onDirective.key];
+  }
   // THE KEY IS READ OFF THE QUESTION, not written here. This file knows that a
   // bracketed section's prose answers a `lines` question; it does not need to
   // know that the journal catalogue happens to call the answer "headings".
@@ -3682,6 +3758,72 @@ function answeredIn(
     out[flag.key] = proseDefaultsOn(titles, defaultProseTitles(section, ctx))
       ? FLAG_ON
       : FLAG_OFF;
+  }
+  return out;
+}
+
+// A bridge's flags, after an answer has been spliced over the span they sit in.
+//
+// THE WRITE HALF OF `answeredIn`'s LAST BRANCH, found by the same shape — a
+// derived flag that names a directive — so neither half spells the key out and
+// the two cannot come to disagree about which question this is.
+//
+// THROUGH `withBridgeFlag`, WHICH IS WHERE THE GRAMMAR LIVES. `withToken` is
+// the generic writer and it corrupts this line: it cuts the argument at its
+// first colon, so a bridge with filters comes back
+// `bridge-readings:Mood tag#entries:revision|…`. The measurement is written out
+// in the entries question's own comment.
+//
+// ── AND IT RESTORES THE FLAGS THE TRACKER ANSWER ATE (1.0.94) ───────────
+//
+// This is the second thing it does and the reason it is handed `before`. A flag
+// is glued to the target, and the target is PIECE 0 of a compound argument — so
+// `withAnswers` splicing `Energy` over the piece `Mood#trend` writes a line with
+// no flag on it. That has been true since 1.0.89 gave the window a tracker
+// dropdown: changing the tracker silently turned the trend off, and the only
+// reason nobody reported it is that the trend had a button of its own to turn
+// back on. 1.0.94's test for the entries flag is what measured it.
+//
+// So the flags are read off the chunk AS THE READER'S FILE HAD IT and written
+// back onto the line the splice produced, whose target is the NEW one. Both
+// flags, not just the answered one: the other is not this question's business
+// and restoring only one would be the same bug wearing the other flag.
+//
+// UNANSWERED IS NOT `FLAG_OFF`. The editor sends back only what it drew, so a
+// window that never showed this row leaves the flag exactly as it found it —
+// which is what makes "restore" the right word for both halves of this.
+//
+// AND THE CHUNK IS THE SCOPE, which is tighter than `setBridgeTrend`'s file and
+// right for the same reason: these lines are the section's own, so "exactly one
+// bridge to that tracker" is a question about the block the reader is editing.
+function withBridgeFlagAnswer(
+  lines: string[],
+  before: readonly string[] | undefined,
+  section: JournalSection,
+  ctx: SectionContext,
+  options?: SectionOverrides
+): string[] {
+  const q = questionsOf(section, ctx).find(
+    (x) => x.kind === "flag" && x.derived && x.directive
+  );
+  if (!q) return lines;
+  const bridgeIn = (rows: readonly string[]) =>
+    rows
+      .map((l) => readBridgeDirective(l))
+      .find((d): d is NonNullable<typeof d> => d !== null);
+  const here = bridgeIn(lines);
+  if (!here) return lines;
+  const had = before ? bridgeIn(before) : undefined;
+  const asked = options?.[q.key as keyof SectionOverrides];
+  const entries =
+    typeof asked === "string" ? asked === FLAG_ON : (had?.entries ?? false);
+  const flags = [
+    ["trend", had?.trend ?? false],
+    ["entries", entries],
+  ] as const;
+  let out = lines;
+  for (const [flag, on] of flags) {
+    out = withBridgeFlag(out, here.direction, here.target, flag, on) ?? out;
   }
   return out;
 }

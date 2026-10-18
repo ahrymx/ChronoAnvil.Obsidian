@@ -34,12 +34,12 @@ import {
   planBridge,
   readBridgeArg,
   readBridgeDirective,
-  writeBridgeDirective,
   serializeSnapshot,
   serializeSnapshotMeta,
   snapshotKeyFor,
   snapshotMetaKeyFor,
   snapshotState,
+  withBridgeFlag,
 } from "../../core/bridge";
 import type {
   BridgeCatalogue,
@@ -72,7 +72,7 @@ import { JOURNAL_DATE_PROPERTY } from "../../core/constants";
 import { CLASS_DEFS, getTracker, TRACKER_CLASSES } from "../../trackers/trackers";
 import { isChartable } from "../../charts/charts";
 import type { PeriodBounds } from "../../charts/charts";
-import { pointsInWindow } from "../../charts/charts";
+import { datesInWindow, pointsInWindow } from "../../charts/charts";
 import { collectPoints, renderTrackerChart } from "../../charts/chart-render";
 import type { ChartTeardown } from "../../charts/chart-render";
 import { readNoteRegion, writeNoteRegion } from "../../core/notestore";
@@ -908,12 +908,11 @@ export function bridgeTextRefusal(
 // THROUGH `vault.process`, which serialises against every other body write —
 // `writeSnapshot`'s rule and the same reason.
 //
-// SOLE OR NOTHING. A note with two readings bridges on one tracker has two
-// lines this could mean, and rewriting the first is the ambiguity rule
-// `soleArgSpanIn` states for every other answer in the plugin: an answer that
-// cannot be told apart from another section's is one nothing may claim to have
-// read. The section machinery cannot compose that shape, so this is a guard
-// against a hand-written note rather than a case the plugin produces.
+// SOLE OR NOTHING, AND THE ARITHMETIC IS NOT HERE ANY MORE (1.0.94). The rule
+// and its reasoning moved to `withBridgeFlag` in `core/bridge.ts` when the
+// entries flag needed the same write from the bridge window, where there is no
+// file to process — only staged text. What is left here is the file half: find
+// it, process it, say whether a sole line was found.
 async function setBridgeTrend(
   plugin: ChronoAnvilPlugin,
   path: string,
@@ -923,20 +922,18 @@ async function setBridgeTrend(
 ): Promise<boolean> {
   const file = plugin.app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile)) return false;
-  const matches = (line: string): boolean => {
-    const d = readBridgeDirective(line);
-    return d !== null && d.direction === direction && d.target === target;
-  };
   let wrote = false;
   await plugin.app.vault.process(file, (text) => {
-    const lines = text.split("\n");
-    const at = lines.map((l, i) => (matches(l) ? i : -1)).filter((i) => i >= 0);
-    if (at.length !== 1) return text;
-    const indent = /^\s*/.exec(lines[at[0]])![0];
-    const directive = readBridgeDirective(lines[at[0]])!;
-    lines[at[0]] = indent + writeBridgeDirective({ ...directive, trend: on });
+    const next = withBridgeFlag(
+      text.split("\n"),
+      direction,
+      target,
+      "trend",
+      on
+    );
+    if (next === null) return text;
     wrote = true;
-    return lines.join("\n");
+    return next.join("\n");
   });
   return wrote;
 }
@@ -1410,7 +1407,7 @@ export function buildBridgeNotesRegion(
 
 // ── §4: bridge-readings — reads the tracker series ────────────────────
 
-// `bridge-readings:<tracker>[#trend] [filters]`.
+// `bridge-readings:<tracker>[#trend][#entries] [filters]`.
 //
 // A FLAG, NOT A THIRD DIRECTIVE, and 2.57 §4 already wrote the test for that
 // decision: `bridge-notes` and `bridge-readings` are two directives because
@@ -1469,7 +1466,7 @@ export function buildBridgeReadingsRegion(
   ctx: MarkdownPostProcessorContext,
   navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
-  const { trend } = readBridgeArg("readings", rest);
+  const { trend, entries } = readBridgeArg("readings", rest);
   // The live Chart.js instance, so a rebuild disposes the one it is replacing.
   // A chart parented into a LiveWidget's subtree is destroyed with the DOM on
   // the next rebuild; the Chart.js object behind it is not, and it keeps its
@@ -1528,11 +1525,43 @@ export function buildBridgeReadingsRegion(
         collectPoints(plugin.app, plugin, def),
         { start: plan.window.start, end: plan.window.end }
       );
-      if (points.length === 0) {
+      // ── WHICH DAYS GET A ROW (1.0.94) ───────────────────────────────
+      //
+      //   "It should show all known entries for the bridges period."
+      //
+      // One row per READING is the narrow answer and it misreads the same way
+      // 1.0.93's axis did: a week logged on two days drew two rows under a bar
+      // saying **Week 42**, and five empty days were not absent from the data,
+      // they were invisible. `#entries` widens the rows to every day in the
+      // window that HAS a diary entry, each with its reading or nothing.
+      //
+      // `datesInWindow` IS THE SAME SPINE THE TREND'S AXIS USES, so the list
+      // and the chart above it cover the same days in the same order and
+      // cannot disagree about where the period ends.
+      //
+      // AN ENTRY IS A NOTE THAT EXISTS, which is `dayOf` answering — so this
+      // lists the days the reader actually journalled rather than every date
+      // in the period, and it asks Obsidian's in-memory path map once per day
+      // and reads no files. See `dayOf` above for why that cost is settled.
+      const valueOf = new Map(points.map((p) => [p.date, p.value]));
+      const days = entries
+        ? datesInWindow(plan.window.start, plan.window.end).filter(
+            (iso) => dayOf(iso) !== null
+          )
+        : points.map((p) => p.date);
+      // THE EMPTY STATE MOVED BEHIND THE ROWS, because with `#entries` on, a
+      // period with entries and no readings is not empty — it is a list of
+      // days waiting for a value, which is the whole point of the flag. The
+      // narrow form is unchanged: `days` is the readings' own dates, so this
+      // is still `points.length === 0` there.
+      if (days.length === 0) {
         emptyLine(
           body,
-          `No ${plan.targetLabel} readings logged inside ${plan.window.label}. ` +
-            `Log one on a diary entry and it appears here.`
+          entries
+            ? `No diary entries inside ${plan.window.label}. ` +
+                `Write one and it appears here, with its ${plan.targetLabel}.`
+            : `No ${plan.targetLabel} readings logged inside ${plan.window.label}. ` +
+              `Log one on a diary entry and it appears here.`
         );
         return;
       }
@@ -1564,12 +1593,17 @@ export function buildBridgeReadingsRegion(
           },
           body: chart,
         });
-        return;
+        // AND THE LIST STAYS WHEN BOTH FLAGS ARE ON. The four combinations are
+        // four things a reader can ask for — see `BridgeDirective.entries` —
+        // and this is the one that is both: the shape of the readings, over the
+        // days they were logged on. `#trend` alone is still the chart instead
+        // of the list, which is what it has meant since 2.57.
+        if (!entries) return;
       }
       const list = body.createEl("ul", { cls: "ca-bridge-list" });
-      for (const p of points) {
+      for (const iso of days) {
         const row = list.createEl("li", { cls: "ca-bridge-row" });
-        const at = dayOf(p.date);
+        const at = dayOf(iso);
         // The same two classes either way, so the row's type, colour and
         // tabular alignment are the list's and not the anchor's — which is
         // what keeps a linked row and an orphaned one the same shape. The
@@ -1577,13 +1611,22 @@ export function buildBridgeReadingsRegion(
         if (at) {
           row.createEl("a", {
             cls: "internal-link ca-bridge-date",
-            text: p.date,
+            text: iso,
             href: at,
           });
         } else {
-          row.createSpan({ cls: "ca-bridge-date", text: p.date });
+          row.createSpan({ cls: "ca-bridge-date", text: iso });
         }
-        row.createSpan({ cls: "ca-bridge-value", text: String(p.value) });
+        // A DASH RATHER THAN AN EMPTY CELL, for the reason the row exists at
+        // all: a day with no reading is the thing `#entries` was asked to make
+        // visible, and a blank where every other row has a number reads as a
+        // rendering fault. `is-blank` is a state on the same class, so the
+        // cell keeps the list's alignment and loses only its weight.
+        const value = valueOf.get(iso);
+        row.createSpan({
+          cls: value === undefined ? "ca-bridge-value is-blank" : "ca-bridge-value",
+          text: value === undefined ? "—" : String(value),
+        });
       }
     },
     () => diaryFolders(plugin),
@@ -1596,13 +1639,30 @@ export function buildBridgeReadingsRegion(
       // form were dead for readings for the same reason. A snapshot taken now
       // is `- [[Diary/…/2026-07-22|2026-07-22]] — 7`, and an undated-file row
       // still writes the plain form the parser already round-trips.
-      return pointsInWindow(collectPoints(plugin.app, plugin, def), {
+      const points = pointsInWindow(collectPoints(plugin.app, plugin, def), {
         start: plan.window.start,
         end: plan.window.end,
-      }).map((pt) => ({
-        path: dayOf(pt.date),
-        label: pt.date,
-        detail: String(pt.value),
+      });
+      // AND THE SNAPSHOT WIDENS WITH THE BLOCK (1.0.94). This callback's whole
+      // contract is that freezing writes "the block as it stood — not a second
+      // query that could answer differently", so a bridge drawing every entry
+      // must freeze every entry. Same spine, same `dayOf`, same order.
+      //
+      // NO DETAIL RATHER THAN A DASH for a day with no reading. The dash is a
+      // rendering affordance; in markdown the honest line is the link alone,
+      // which `serializeSnapshot` already writes for a row with no detail and
+      // `parseSnapshotLine` already reads back. Writing `— —` would put a
+      // separator in the reader's note with nothing after it.
+      const valueOf = new Map(points.map((p) => [p.date, p.value]));
+      const days = entries
+        ? datesInWindow(plan.window.start, plan.window.end).filter(
+            (iso) => dayOf(iso) !== null
+          )
+        : points.map((p) => p.date);
+      return days.map((iso) => ({
+        path: dayOf(iso),
+        label: iso,
+        detail: valueOf.has(iso) ? String(valueOf.get(iso)) : "",
       }));
     },
     () => {

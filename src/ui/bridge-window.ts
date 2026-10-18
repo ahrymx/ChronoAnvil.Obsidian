@@ -60,9 +60,12 @@ import type ChronoAnvilPlugin from "../main";
 import { getFile } from "../core/util";
 import { notify } from "../core/notify";
 import {
+  FLAG_OFF,
+  FLAG_ON,
   fieldLabelOf,
   questionIsRequired,
   type ChoiceQuestion,
+  type FlagQuestion,
   type SectionModel,
   type SectionQuestion,
   type SectionView,
@@ -176,7 +179,40 @@ class BridgeWindow extends EditorModal {
     for (const q of this.questions) {
       if (q.kind === "choice") this.renderChoice(field(q), q);
       else if (q.kind === "text") this.renderText(field(q), q);
+      else if (q.kind === "flag") this.renderFlag(field(q), q);
     }
+  }
+
+  // Which days the list shows, as a tick. 1.0.94.
+  //
+  // TICKED MEANS ON AND THE LABEL SAYS WHAT TICKING DOES, which is
+  // `prose-window.ts::renderFlag`'s rule and `renderFlagQuestion`'s before it:
+  // the reader meets all three in one vault an hour apart.
+  //
+  // UNTICKED IS THE DEFAULT, AND THAT IS WHERE THIS DIFFERS FROM THE PROSE
+  // TICK. There the absent answer is `FLAG_ON` — `#bare`'s absence means the
+  // head is drawn — so it reads `!== FLAG_OFF`. Here the flag's absence is a
+  // bridge written before this release, which lists the days that carry a
+  // reading, so only `FLAG_ON` ticks the box. Reading it the other way would
+  // show every bridge in every vault as already widened.
+  private renderFlag(host: HTMLElement, q: FlagQuestion): void {
+    const wrap = host.createDiv({ cls: "ca-tpl-form" });
+    const box = wrap.createEl("input", {
+      type: "checkbox",
+      cls: "ca-tpl-form-box",
+    });
+    box.id = `ca-bridge-flag-${q.key}`;
+    const label = wrap.createEl("label", {
+      cls: "ca-tpl-form-label",
+      text: q.on,
+    });
+    label.htmlFor = box.id;
+    box.checked = this.shown(q) === FLAG_ON;
+    box.title = box.checked ? q.off : q.on;
+    box.setAttribute("aria-label", q.on);
+    box.addEventListener("change", () => {
+      this.answer(q.key, box.checked ? FLAG_ON : FLAG_OFF);
+    });
   }
 
   // NOTHING TO CHOOSE FROM IS A SENTENCE, NOT AN EMPTY MENU — the section

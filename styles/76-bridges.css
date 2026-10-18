@@ -182,6 +182,19 @@
   color: var(--text-normal);
 }
 
+/* ── 1.0.94: a day with no reading ───────────────────────────────────────
+   `bridge-readings:<tracker>#entries` lists every diary entry in the period,
+   so a day the reader journalled without logging this tracker gets a row and
+   an em dash.
+
+   THE SAME CLASS WITH A STATE ON IT, NOT A SECOND CLASS, because the cell has
+   to keep the list's width, nowrap and tabular alignment — a dash that sat a
+   pixel off from the numbers above it would read as a broken row rather than
+   an empty one. All this takes away is the weight. */
+.ca-bridge-value.is-blank {
+  color: var(--text-faint);
+}
+
 /* ── 3.8: a readings bridge drawn as a trend ─────────────────────────────
    `bridge-readings:<tracker>#trend`. The same Chart.js canvas the diary's chart
    tiles draw, over the window the host note declares.
