@@ -627,6 +627,40 @@ describe("a readings bridge on a diary host is refused (5.3)", () => {
     expect(body).toContain("filter(isChartable)");
     expect(readCode("bridge-widgets")).not.toContain("chartableType");
   });
+
+  it("offers a page as a DATED target, which Settings already promised (1.0.93)", () => {
+    // `bridge-notes:page` refused on `dated: false` before the index was ever
+    // consulted, while three things in the shipped tree said otherwise: the
+    // *Link to diary* blurb a reader keeps the button on ("so it turns up in
+    // search, on-this-day and the bridge … Dates the note where it has no date
+    // of its own"), `diary-link.ts`'s own header, and `IndexedEntry.iso`, which
+    // is nullable for this note type BY NAME so a dated page is indexed with
+    // its date. The flag was the only refusal left.
+    // OVER THE FILE, NOT `fnBody("bridgeCatalogue")`. `kindIsDated` is declared
+    // INSIDE this function and written at column 0, so `fnBody` slices the
+    // catalogue short at it and sees neither the pages block nor the dedupe —
+    // which the test above has been quietly true of as well. The literals below
+    // are unique in the file, and the `dated:` sweep is the whole file, which
+    // is the stronger claim rather than the looser one.
+    const src = readCode("bridge-widgets");
+    expect(src).toContain('[{ id: "page", label: PAGE, dated: true }]');
+    expect(src).not.toContain("dated: false");
+    // STILL LISTED. Omitting it refuses with "no note type called page", which
+    // names a typo the reader did not make — the one half of the old paragraph
+    // that survives its conclusion.
+    expect(src).toContain("registeredJournalTypes(plugin).length");
+  });
+
+  it("writes the date it claims a page can carry", () => {
+    // The flag above is only true because something writes the property. It is
+    // *Link to diary*, it writes `JOURNAL_DATE_PROPERTY`, and it is offered on
+    // every note that is not a diary entry — pages included.
+    const link = readCode("diary-link");
+    expect(link).toContain("front[JOURNAL_DATE_PROPERTY] = startIso;");
+    const actions = readSrc("core/page-actions");
+    expect(actions).toContain("on-this-day and the bridge");
+    expect(actions).toContain('when: (ctx) => ctx.surface !== "entry"');
+  });
 });
 
 describe("freeze is refused on any note that re-scopes in place (5.4)", () => {

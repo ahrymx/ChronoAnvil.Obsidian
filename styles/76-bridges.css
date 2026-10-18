@@ -207,6 +207,19 @@
   min-height: 0;
 }
 
+/* ── AND ITS POINTS OPEN THEIR DAYS (1.0.93) ─────────────────────────────
+   `renderLineOrBar` takes an `onPointClick` and the bridge passes one, so the
+   canvas is a control now and has to say so. Scoped to `.ca-bridge-trend`
+   rather than to `.ca-chart-canvas`, because a chart tile has no handler and a
+   pointer cursor over an inert chart is a promise nothing keeps.
+
+   ON THE CANVAS, NOT THE WRAPPER. The wrapper is padding around the plot and
+   clicking it hits nothing; the canvas is the whole hit area Chart.js tests,
+   which since this release is the column rather than the 3px dot. */
+.ca-bridge-trend canvas {
+  cursor: pointer;
+}
+
 /* The title bar, the count pill, the muted window phrase and the overflow are
    ALL the section frame's as of 2.57.7 — see `bridgeHeader`. Everything this
    file used to declare for them is gone rather than corrected, including the

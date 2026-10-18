@@ -701,6 +701,74 @@ export function alignSeries(
   };
 }
 
+// ── A WINDOW AS THE AXIS, NOT THE DATA'S OWN DATES (1.0.93) ──────────────
+//
+// `alignSeries` above builds the category spine from the readings themselves,
+// and for a chart that chose its own range that is right: the range exists to
+// hold the data, so the data may define it.
+//
+// A BRIDGE IS THE OTHER WAY ROUND. Its window is the period its host note is
+// about — `core/bridge.ts` resolved it, refused on it, and the bar above the
+// chart NAMES it — so a spine taken from the readings draws a different period
+// from the one the block says it covers. Two readings inside Week 42 came out
+// edge to edge across the whole card, and five empty days of the week were not
+// merely unlabelled but invisible: the card read as a full week of data.
+//
+// The chart system's own mitigation for a thin week, `widenForTrend`, is the
+// opposite move and the bridge correctly declines it — widening would draw days
+// OUTSIDE the period the header claims. So the fix is to spread the readings
+// over the window rather than to stretch the window over the readings.
+//
+// DAY RESOLUTION ONLY, which is a fact about the one caller rather than a check
+// here: a bridge passes no scope, so it collects at `"daily"`. A spine of days
+// under `monthly` or `daily-by-month` points would label every bucket with the
+// 1st and leave the rest null, so `axisWindow` is set for the bridge and for
+// nothing else (chart-render.ts::renderTrackerChart).
+export function datesInWindow(start: string, end: string): string[] {
+  const out: string[] = [];
+  let cursor = moment(start);
+  if (!cursor.isValid() || !moment(end).isValid()) return out;
+  // NO `end < start` CLAUSE, AND THAT IS MEASURED RATHER THAN OVERLOOKED. One
+  // stood here and a mutation sweep could not tell its presence from its
+  // absence: the loop's own bound rejects an inverted pair on the first pass,
+  // because `day` is already `start` and `start > end`. A guard whose removal
+  // changes no behaviour is a second answer to a question the loop answers, and
+  // the next reader would have to work out which of the two was load-bearing.
+  // A STRING COMPARE FOR THE BOUND AND A MOMENT STEP FOR THE INCREMENT, which
+  // is the pairing `pointInWindow` and `resolveChartWindow` already use between
+  // them: the comparison cannot be moved by a timezone and the increment cannot
+  // drift across a DST boundary.
+  //
+  // The counter is a stop, not a window size. An inverted pair is caught above,
+  // but a hand-written `period-nav` or a `date:` typo can still reach here with
+  // bounds a decade apart, and a chart is not the place to find that out by
+  // spinning. Ten years of days is far past anything a period means.
+  for (let i = 0; i < 3660; i += 1) {
+    const day = cursor.format("YYYY-MM-DD");
+    if (day > end) break;
+    out.push(day);
+    // REASSIGNED, NOT CALLED FOR EFFECT. Real moment mutates and returns
+    // `this`, so `cursor.add(...)` alone works in a vault and is a loop that
+    // never advances anywhere that does not — which is exactly what the suite's
+    // own moment does, and what caught this before it shipped. Taking the
+    // return value is correct against both.
+    cursor = cursor.add(1, "day");
+  }
+  return out;
+}
+
+// One series laid onto a spine of dates. `null` where the day has no reading,
+// for the reason `alignSeries` states: Chart.js reads a `null` in a `data`
+// array as "no value here" and leaves the gap, and two arrays against one label
+// list is the shape a category axis wants.
+export function spreadToDates(
+  dates: string[],
+  points: ChartPoint[]
+): (number | null)[] {
+  const byDate = new Map(points.map((p) => [p.date, p.value]));
+  return dates.map((d) => byDate.get(d) ?? null);
+}
+
 // ── Scatter clustering ────────────────────────────────────────────────────
 //
 // A scatter of two self-reported daily trackers is mostly COINCIDENT POINTS,

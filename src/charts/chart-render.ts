@@ -38,6 +38,8 @@ import {
   ScatterPoint,
   isChartable,
   alignSeries,
+  datesInWindow,
+  spreadToDates,
   hourAxisBounds,
   journalTrendShowsAverage,
   clusterPairs,
@@ -195,8 +197,27 @@ interface RenderArgs {
   body: HTMLElement;
   // line-only: draw the rolling-average overlay.
   avg?: boolean;
-  // scatter-only: the Y-axis tracker (def is X).
+  // The Y-axis tracker on a scatter (`def` is X); the SECOND SERIES on a line
+  // since 4.45. The "scatter-only" this said until 1.0.93 was true when it was
+  // written and has been false since — `renderLineOrBar` has read it for three
+  // releases, which is the whole of the second-tracker answer in the
+  // readings-bridge plan.
   def2?: TrackerDef;
+  // line/bar only: lay the category axis over THESE days rather than over the
+  // dates the readings happen to carry. Set by `renderTrackerChart` when its
+  // caller supplied a window of its own — the readings bridge, and nothing
+  // else. See charts.ts::datesInWindow for why a bridge needs the opposite of
+  // `widenForTrend`, and why this is opt-in rather than taken from the resolved
+  // window every chart already has.
+  axisWindow?: { start: string; end: string };
+  // line/bar only: what to do when a reader clicks a point. Called with the ISO
+  // date under it, which is `dates[index]` — the same array the tooltip titles
+  // itself from, so a click and a hover can never name different days.
+  //
+  // A CALLBACK RATHER THAN A PATH OR A FILE, because this layer has no business
+  // knowing what a date means. The readings bridge hands in a lookup that
+  // resolves the diary entry; the chart knows only that the point was clicked.
+  onPointClick?: (iso: string) => void;
 }
 
 // Teardown for a rendered chart: a function that releases anything outliving
@@ -465,8 +486,29 @@ function renderLineOrBar(
   // reusing the scatter's pairing here would have silently plotted only the
   // days on which both trackers were logged.
   const aligned = other ? alignSeries(points, other.points) : null;
-  const dates = aligned ? aligned.dates : points.map((p) => p.date);
-  const values = aligned ? aligned.a : points.map((p) => p.value);
+  // AND THE UNION STANDS DOWN FOR A DECLARED WINDOW (1.0.93). `axisWindow` is
+  // the period the caller's own header names, so it outranks both the union and
+  // a single series' own dates — those describe what was logged, and this
+  // describes what the block says it covers. The empty days arrive as `null`,
+  // which is the gap Chart.js draws and the same shape the union produces.
+  const spine = args.axisWindow
+    ? datesInWindow(args.axisWindow.start, args.axisWindow.end)
+    : null;
+  const axis = spine && spine.length > 0 ? spine : null;
+  const dates = axis ?? (aligned ? aligned.dates : points.map((p) => p.date));
+  const values = axis
+    ? spreadToDates(axis, points)
+    : aligned
+      ? aligned.a
+      : points.map((p) => p.value);
+  // The second series follows the first onto whichever spine won, so the two
+  // `data` arrays and the one label list stay index-aligned however `dates` was
+  // built. `aligned` is non-null whenever `other` is.
+  const otherValues = other
+    ? axis
+      ? spreadToDates(axis, other.points)
+      : aligned!.b
+    : null;
 
   const yScale: NonNullable<ChartConfiguration["options"]>["scales"] = {
     y: valueAxis(def, points.map((p) => p.value), other ? { tint: accent } : {}),
@@ -495,8 +537,15 @@ function renderLineOrBar(
   // The editor withholds the toggle when a second tracker is set; this ignores
   // the flag as well, so a hand-written directive carrying both gets the same
   // chart the editor would have produced.
+  // AND NOT OVER A DECLARED WINDOW EITHER (1.0.93), which is an index argument
+  // rather than the visual one above: `rollingMean` is computed over `points`,
+  // so its array is as long as the READINGS while every other dataset here is
+  // as long as the spine. Drawing both would slide the mean off the days it is
+  // a mean of. No caller asks for both — `axisWindow` is the bridge's and the
+  // bridge sets no `avg` — so this is a guard against the combination existing,
+  // not a feature being withheld.
   const overlay =
-    !isBar && args.avg && !other && points.length >= 2
+    !isBar && args.avg && !other && !axis && points.length >= 2
       ? [
           {
             label: "Rolling avg",
@@ -546,13 +595,18 @@ function renderLineOrBar(
           // unconnected dots. Bridged only where the union created the gap;
           // a single series has none by construction and says nothing here, so
           // its configuration is unchanged.
-          ...(other ? { spanGaps: true } : {}),
+          //
+          // A DECLARED WINDOW MAKES THE SAME HOLES (1.0.93), and for the same
+          // reason: the gap is in the spine, not in the readings. A bridge's
+          // trend over a week holding two readings is one line across the week,
+          // not two unconnected dots.
+          ...(other || axis ? { spanGaps: true } : {}),
         },
         ...(other
           ? [
               {
                 label: other.def.label,
-                data: aligned!.b,
+                data: otherValues!,
                 yAxisID: "y1",
                 borderColor: accent2,
                 // NO AREA FILL ON THE SECOND LINE. Two translucent fills at two
@@ -579,6 +633,43 @@ function renderLineOrBar(
       animation: false,
       color: textColor,
       scales: yScale,
+      // ── A POINT OPENS ITS DAY (1.0.93) ──────────────────────────────────
+      //
+      // THE FIRST CLICK TARGET ON A Chart.js CANVAS IN THIS PLUGIN. Three
+      // charts already open an entry from a dated cell — the month heatmap,
+      // the activity heatmap and the quarter band — and all three are plain
+      // DOM holding a resolved `TFile`, so none of them is a precedent for
+      // this one. What makes it safe to add here is that the index Chart.js
+      // reports is the index into `dates`, which the tooltip above already
+      // trusts for its title.
+      //
+      // THE COLUMN IS THE TARGET, NOT THE DOT. Chart.js's default hit test for
+      // a line is `nearest` with `intersect: true`, which means a click has to
+      // land inside a 3px marker — unhittable on a phone and barely hittable
+      // with a mouse. `index` with `intersect: false` makes the whole vertical
+      // band clickable, which is what a reader is aiming at anyway.
+      //
+      // AND IT MOVES THE TOOLTIP WITH IT, DELIBERATELY. `interaction` is shared
+      // between hover and click; splitting them would need a second hit test in
+      // the handler, and two hit tests is how a chart comes to highlight one day
+      // and open another. Set only where there is something to click, so every
+      // chart that was not given a handler keeps the hover it has always had.
+      ...(args.onPointClick
+        ? { interaction: { mode: "index" as const, intersect: false } }
+        : {}),
+      // A NULL DAY IS NOT A CLICK. A declared window spreads the axis over days
+      // that may hold no reading (charts.ts::datesInWindow), and the bridge's
+      // own lookup answers null for a day whose entry has been removed — in
+      // both cases the right behaviour is nothing at all, which is the caller's
+      // business and not this layer's.
+      onClick: args.onPointClick
+        ? (_event, elements) => {
+            const at = elements[0]?.index;
+            if (at == null) return;
+            const iso = dates[at];
+            if (iso) args.onPointClick?.(iso);
+          }
+        : undefined,
       plugins: {
         legend: {
           // Off for a single series (the tile's caption already names it), on
@@ -1143,6 +1234,12 @@ export interface RenderChartOptions {
   // period the reader's note declares, and widening it would draw days outside
   // the period the block's own header says it covers.
   window?: { start: string | null; end: string | null };
+  // line/bar only: a reader clicked the point over this ISO date. The readings
+  // bridge passes a handler that opens the diary entry the reading came from;
+  // every other caller passes nothing and its chart stays inert, which is what
+  // every chart in the plugin was before 1.0.93. See `renderLineOrBar` for the
+  // hit test it turns on.
+  onPointClick?: (iso: string) => void;
   body: HTMLElement;
   today?: string;
   // Absent means daily — see ChartSpec.scope.
@@ -1296,6 +1393,19 @@ export function renderTrackerChart(args: RenderChartOptions): ChartTeardown {
     body,
     avg: args.avg,
     def2: args.def2,
+    // THE WINDOW BECOMES THE AXIS ONLY WHEN THE CALLER BROUGHT ONE (1.0.93).
+    // `win` above is non-null for every chart in the plugin, so keying this off
+    // `win` would relabel every axis in the tree — and for a chart that chose
+    // its own range that would be wrong, because the range exists to hold the
+    // data. `args.window` is the readings bridge's and nobody else's: a period
+    // the host note declares, which `core/bridge.ts` guarantees both bounds of
+    // and which the bar above the chart names out loud. See
+    // charts.ts::datesInWindow.
+    axisWindow:
+      args.window && args.window.start && args.window.end
+        ? { start: args.window.start, end: args.window.end }
+        : undefined,
+    onPointClick: args.onPointClick,
   };
   switch (type) {
     case "line": {

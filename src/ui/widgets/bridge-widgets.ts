@@ -86,6 +86,7 @@ import { liveScopedWidget } from "./live-widgets";
 import { fenceBlocks } from "../../core/reload-loss";
 import { buildPeriodNav, periodNavUnit } from "../../diary/periodnav";
 import { openBridgeWindow } from "../bridge-window";
+import { locateEntry } from "../../diary/lineage";
 
 // ── the vault half of the facts ───────────────────────────────────────
 
@@ -291,20 +292,58 @@ function kindIsDated(
   return !sawTemplate;
 }
 
-// A page is indexed with `kind: "page"` and carries no date, deliberately:
-  // the standing rule is that index notes hold state and leaf notes hold
-  // series, and a page is a slice of a leaf rather than a leaf. So it is the
-  // one thing in a shipped vault that `bridge-notes:` can name and must be
-  // refused for — which is why it is listed rather than omitted. Omitting it
-  // would refuse with "no note type called page", naming a typo the reader did
-  // not make instead of the reason.
+// ── AND A PAGE IS DATED AFTER ALL (1.0.93) ───────────────────────────────
+  //
+  // THE PARAGRAPH THAT STOOD HERE WAS ARGUING THE WRONG FACT. It said a page
+  // "carries no date, deliberately: the standing rule is that index notes hold
+  // state and leaf notes hold series, and a page is a slice of a leaf rather
+  // than a leaf", and concluded that `bridge-notes:page` is "the one thing in a
+  // shipped vault that can be named and must be refused for".
+  //
+  // The rule it cites is about what a page's TEMPLATE writes, and that is still
+  // true: no page is born with a date. What it does not establish is that a page
+  // cannot acquire one — and *Link to diary* writes exactly this property onto
+  // exactly these notes (`diary-link.ts`, `front[JOURNAL_DATE_PROPERTY]`), is
+  // offered on every note that is not a diary entry, and says so in Settings:
+  // *"files this note under the ones you tick, so it turns up in search,
+  // on-this-day and the bridge … Dates the note where it has no date of its
+  // own."* That sentence has been false for the bridge since 1.0.51, and it was
+  // false here rather than there.
+  //
+  // IT IS `kindIsDated`'S OWN RULE, APPLIED. That function answers this question
+  // for every other kind and states it as a CAN — *"the kind is dated if a note
+  // of it CAN carry a date, because the picker's question is whether this kind
+  // can be joined at all"*. A page can. 1.0.89 deferred this as a model change
+  // on the grounds that "`dated` is a fact about a KIND and a page's date is a
+  // fact about a NOTE", which is the distinction `kindIsDated` had already
+  // decided the other way for Meals and Lessons: their templates may vary too,
+  // and the per-note refusal is what catches the ones that did not.
+  //
+  // SO WHY IS IT A LITERAL AND NOT A `kindIsDated` CALL? Because a page has no
+  // template to read. It is made by a control rather than scaffolded from a
+  // note in `templatesFolder`, so the evidence `kindIsDated` consults does not
+  // exist for it, and "a missing template is dated" would reach the same answer
+  // by an argument that happens not to apply. The answer is declared here, with
+  // the writer named.
+  //
+  // THE INDEX WAS ALWAYS READY. `IndexedEntry.iso` is nullable *for this note
+  // type by name* — *"neither does a page, which is the note type item 1 created
+  // and item 4 exists to make findable"* — so a dated page has been indexed with
+  // its date all along; only this flag refused it.
+  //
+  // STILL LISTED RATHER THAN OMITTED, and the old paragraph's reason for that
+  // survives its conclusion: omitting it would refuse an undated page with "no
+  // note type called page", naming a typo the reader did not make. What refuses
+  // now is the ordinary empty state — *"One appears here as soon as its date
+  // falls in this period"* — which for a page is an instruction rather than a
+  // dead end, because *Link to diary* is the thing that makes it true.
   //
   // OFFERED WHEREVER A JOURNAL IS, SINCE 1.0.23. This was conditional on some
   // registered journal having a paged kind; every kind of every journal holds
   // pages now, so the condition was "is there a journal at all", which the empty
   // `kinds` list beside it already answers.
   const pages = registeredJournalTypes(plugin).length
-    ? [{ id: "page", label: PAGE, dated: false }]
+    ? [{ id: "page", label: PAGE, dated: true }]
     : [];
 
   // Deduped by id: two journals may both define "lesson", and a catalogue
@@ -1387,6 +1426,41 @@ export function buildBridgeNotesRegion(
 // left of it. `readBridgeArg` strips the flag on its way to the target, so the
 // line is read once rather than once here and once inside `buildBridge`, and
 // the window that writes `#trend` writes it with the inverse of this read.
+//
+// ── AND IT IS NOT THE CHARTS SECTION, WHICH 1.0.93 WAS ASKED TO DECIDE ────
+//
+//   "why would a user use this over the charts section?"
+//
+// Asked as a real question, with retiring `#trend` on the table, because the
+// drawing IS the charts section's: `collectPoints` is exported for this caller
+// and `renderTrackerChart` draws it. The answer is that they do not overlap at
+// all, and the tree enforces it in four places rather than by convention.
+//
+// NO CATALOGUE COMPOSES A CHART SECTION ON A JOURNAL LEAF. `chronoanvil-charts`
+// has four hosts and all four are dashboards (the diary's period overviews, the
+// diary and journals dashboards, the homepage); `entry-sections.ts` has none
+// either. A chart there could not read a diary tracker if it were offered —
+// `journalSurfaceRefusal` declines it in words, *"its readings live in the
+// diary, not under this folder"*, and `scopesFor` returns `[]` for a journal
+// surface, which gates `isChartable` before that. And it could not be scoped to
+// the right period even then: `rangesAvailable` withholds `"period"` from a note
+// that declares none, because on such a note the resolver *"silently falls back
+// to a trailing 30 days, so the option is a label that lies"*. A journal leaf
+// declares none until this section's own navigator writes one.
+//
+// SO THE DISTINCTION IS THE ANCHOR, NOT THE SHAPE, which is why it reads
+// differently from the Habits rollup's version of this paragraph (*"a chart
+// draws a line over time; this draws a rate"*). Here the line is the same line.
+// A chart plots a tracker over a range IT chooses, and offers only ranges it
+// can resolve alone; a bridge plots one over the period its HOST NOTE is about,
+// names that period on its bar, and ships the stepper that sets it —
+// `journal-sections.ts` states the pairing as *"THE ANCHOR SHIPS WITH THE
+// BRIDGE, and that pairing is the whole section."*
+//
+// `bridge-readings:` is therefore the only thing in the tree that puts a diary
+// tracker's series on a journal note, and retiring `#trend` would have deleted
+// the only door onto that surface. Written down here and in
+// `assets/documentation.md` rather than left to be re-derived.
 
 export function buildBridgeReadingsRegion(
   plugin: ChronoAnvilPlugin,
@@ -1402,6 +1476,40 @@ export function buildBridgeReadingsRegion(
   // resize listener. `onCleanup` is the channel LiveWidget already provides for
   // exactly this — see `chart-grid.ts`, which holds its teardowns the same way.
   let teardown: ChartTeardown = null;
+  // THE DAY A READING CAME FROM (1.0.93), resolved rather than carried.
+  //
+  // Every row below had a date and a value and nothing to click, while
+  // `buildBridgeNotesRegion` two hundred lines up builds an `internal-link` for
+  // every row it draws — one block, one bar, one side clickable. And the frozen
+  // half was worse than cosmetic: `rowsFor` passed `path: null` for every row,
+  // so a snapshot came out as `- 2026-07-22 — 7` and failed even the narrow
+  // promise `linkSafe` still makes, that a frozen bridge is *"a list of links
+  // the reader can open and edit"*.
+  //
+  // WHY NOT A FIELD ON `ChartPoint`. `collectPoints` holds the `TFile` it reads
+  // each value off and throws it away, so the field is one line — and three
+  // things rule it out. Its shape is deliberately minimal *"so the
+  // windowing/stats are unit-testable"*; the point↔file relation does not
+  // survive the pipeline, because `bucketByMonth` collapses N files into one
+  // synthetic point dated to the 1st and `pointDate` dates a coarse grain at its
+  // first day, so the field would have to be nullable and explicitly dropped in
+  // two places to express something no chart reads; and the lookup is already
+  // in the tree with its cost measured. `habitWeekReadings` does this walk
+  // SEVEN TIMES PER PAINT and says why that is fine — *"seven cache lookups and
+  // no file reads, and it costs the same on a vault of ten entries as on one of
+  // ten thousand"* — because `locateEntry` probes two names against Obsidian's
+  // in-memory path map and never touches disk.
+  //
+  // DAILY, AND THAT IS THE COLLECTOR'S ANSWER RATHER THAN AN ASSUMPTION. The
+  // `collectPoints` call below passes no scope, so it collects at `"daily"` —
+  // the one grain where a point is one entry. A coarser scope would make this
+  // wrong, and the two would have to change together.
+  //
+  // NULL IS AN ORDINARY ANSWER. A reading outlives the note it was logged on: a
+  // removed or renamed entry leaves the value in no file, and that row keeps the
+  // span it has always had rather than becoming a link to nothing.
+  const dayOf = (iso: string): string | null =>
+    locateEntry(plugin.app, plugin.settings.paths, "daily", iso)?.path ?? null;
   return buildBridge(
     plugin,
     ctx,
@@ -1445,6 +1553,15 @@ export function buildBridgeReadingsRegion(
           range: "period",
           period: null,
           window: { start: plan.window.start, end: plan.window.end },
+          // AND A POINT OPENS ITS DAY, the same answer the list form's rows
+          // give. `dayOf` is the one lookup, so a reader who clicks Oct 12 on
+          // the trend and a reader who clicks Oct 12 in the list land on the
+          // same note — and a day whose entry has gone resolves to null here
+          // exactly as it does there, where the row keeps its span.
+          onPointClick: (iso) => {
+            const at = dayOf(iso);
+            if (at) void plugin.app.workspace.openLinkText(at, "");
+          },
           body: chart,
         });
         return;
@@ -1452,7 +1569,20 @@ export function buildBridgeReadingsRegion(
       const list = body.createEl("ul", { cls: "ca-bridge-list" });
       for (const p of points) {
         const row = list.createEl("li", { cls: "ca-bridge-row" });
-        row.createSpan({ cls: "ca-bridge-date", text: p.date });
+        const at = dayOf(p.date);
+        // The same two classes either way, so the row's type, colour and
+        // tabular alignment are the list's and not the anchor's — which is
+        // what keeps a linked row and an orphaned one the same shape. The
+        // notes side pairs `internal-link` with its own class the same way.
+        if (at) {
+          row.createEl("a", {
+            cls: "internal-link ca-bridge-date",
+            text: p.date,
+            href: at,
+          });
+        } else {
+          row.createSpan({ cls: "ca-bridge-date", text: p.date });
+        }
         row.createSpan({ cls: "ca-bridge-value", text: String(p.value) });
       }
     },
@@ -1460,10 +1590,20 @@ export function buildBridgeReadingsRegion(
     async (plan) => {
       const def = getTracker(plugin, plan.target);
       if (!def) return [];
+      // AND THE FROZEN ROWS CARRY THE SAME LINK (1.0.93). `serializeSnapshot`
+      // has had a `path != null` branch all along and this callback could never
+      // reach it; `renderFrozen`'s anchor and `parseSnapshotLine`'s wikilink
+      // form were dead for readings for the same reason. A snapshot taken now
+      // is `- [[Diary/…/2026-07-22|2026-07-22]] — 7`, and an undated-file row
+      // still writes the plain form the parser already round-trips.
       return pointsInWindow(collectPoints(plugin.app, plugin, def), {
         start: plan.window.start,
         end: plan.window.end,
-      }).map((pt) => ({ path: null, label: pt.date, detail: String(pt.value) }));
+      }).map((pt) => ({
+        path: dayOf(pt.date),
+        label: pt.date,
+        detail: String(pt.value),
+      }));
     },
     () => {
       teardown?.();

@@ -986,10 +986,11 @@ describe("the period property stays scoped to the bridge", () => {
 
 describe("a snapshot is plain markdown", () => {
   it("writes wikilinks and values, not the plugin's markup", () => {
-    // §3.2. The snapshot has to survive the plugin being uninstalled and stay
-    // editable as text — which is the point, since the reader asked to edit and
-    // revisit it. A block that renders as raw HTML comments once ChronoAnvil is
-    // gone is not something anyone can revisit.
+    // §3.2, narrowed by `serializeSnapshot`'s own retraction in 1.0.89: these
+    // lines go inside `<!--chronoanvil:…-->`, so the uninstall half of the
+    // claim is withdrawn and the bracket form is deferred. What is asserted is
+    // the half that stands — the rows themselves are links and values a reader
+    // can open and edit, not the plugin's markup.
     const out = serializeSnapshot([
       { path: "Study/Algebra/Lesson 1.md", label: "Lesson 1", detail: "2026-07-21" },
       { path: null, label: "2026-07-22", detail: "7" },
@@ -997,6 +998,105 @@ describe("a snapshot is plain markdown", () => {
     expect(out).toContain("[[Study/Algebra/Lesson 1.md|Lesson 1]]");
     expect(out).toContain("- 2026-07-22 — 7");
     expect(out).not.toContain("<!--");
+  });
+
+  it("carries a reading's own entry link, and round-trips it (1.0.93)", () => {
+    // THE READINGS HALF WAS A LIST OF VALUES. `rowsFor` passed `path: null` for
+    // every row, so this branch of the serializer, `renderFrozen`'s anchor and
+    // `parseSnapshotLine`'s wikilink form were all unreachable for readings —
+    // and a frozen readings bridge failed even the narrow promise above while a
+    // frozen notes bridge kept it. The `path: null` row stays asserted directly
+    // beneath, because a day whose entry has been removed still takes it.
+    const rows: SnapshotRow[] = [
+      { path: "Diary/2026/10/2026-10-12.md", label: "2026-10-12", detail: "2" },
+      { path: null, label: "2026-10-13", detail: "5" },
+    ];
+    const out = serializeSnapshot(rows);
+    expect(out).toContain("- [[Diary/2026/10/2026-10-12.md|2026-10-12]] — 2");
+    expect(out).toContain("- 2026-10-13 — 5");
+    // And the reader gets both shapes back, which is the property that makes a
+    // thaw-and-refreeze idempotent rather than lossy.
+    const back = out
+      .split("\n")
+      .map((line) => parseSnapshotLine(line))
+      .filter((r): r is SnapshotRow => r != null);
+    expect(back).toEqual(rows);
+  });
+
+  it("resolves a reading's day rather than carrying it on the point", () => {
+    // The lookup is `locateEntry`, whose cost `habitWeekReadings` has already
+    // measured at seven of these per paint; the alternative was a field on
+    // `ChartPoint`, which `bucketByMonth` and a coarse `pointDate` would have
+    // had to drop. Asserted so a later round does not quietly add it.
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain(
+      'locateEntry(plugin.app, plugin.settings.paths, "daily", iso)?.path ?? null'
+    );
+    expect(bridge).toContain("path: dayOf(pt.date),");
+    expect(bridge).not.toContain("path: null, label: pt.date");
+    const point = readCode("charts");
+    expect(point).toContain(
+      "export interface ChartPoint {\n  date: string;\n  value: number;\n}"
+    );
+  });
+
+  it("gives a readings row the same link the notes side has", () => {
+    // One block, one bar, and until 1.0.93 one side clickable: the notes region
+    // built `internal-link` for every row it drew and this one built two spans.
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain('cls: "internal-link ca-bridge-date",');
+    // The orphan path keeps the span, so a reading outliving its entry stays a
+    // row rather than becoming a link to nothing.
+    expect(bridge).toContain('row.createSpan({ cls: "ca-bridge-date", text: p.date });');
+  });
+
+  it("says why it is not the charts section, in the docs and at the source", () => {
+    // 1.0.93 was asked to decide the overlap with retiring `#trend` on the
+    // table, and decided there is none. The decision is only durable if it is
+    // written where the next reader of either file will find it — and only
+    // true while the four enforcement points it rests on still hold, which is
+    // what the rest of this test pins.
+    const docs = readFileSync(
+      resolve(__dirname, "../assets/documentation.md"),
+      "utf8"
+    );
+    expect(docs).toContain("**Why this and not a chart?**");
+    const bridge = readSrc("bridge-widgets");
+    expect(bridge).toContain("AND IT IS NOT THE CHARTS SECTION");
+
+    // The claim: no catalogue composes a charts section on a journal leaf or a
+    // diary entry. Asserted off the catalogues rather than off a written list.
+    // Comment-stripped: `journal-sections.ts` DISCUSSES the charts fence (why
+    // it could never share a block with a `chronoanvil` one) without composing
+    // it, and the raw file cannot tell the two apart.
+    for (const mod of ["journals/journal-sections", "diary/entry-sections"]) {
+      expect(readCode(mod)).not.toContain("chronoanvil-charts");
+    }
+    // And a chart could not read a diary tracker there if it were offered, nor
+    // be scoped to a period the note does not declare.
+    const charts = readCode("charts");
+    expect(charts).toContain("its readings live in the diary, not under this folder");
+    expect(charts).toContain("function rangesAvailable");
+  });
+
+  it("opens the same day from a point on the trend", () => {
+    const bridge = readCode("bridge-widgets");
+    expect(bridge).toContain("onPointClick: (iso) => {");
+    expect(bridge).toContain("const at = dayOf(iso);");
+    const render = readCode("chart-render");
+    // The index Chart.js reports indexes `dates`, which is the array the
+    // tooltip already titles itself from — so a click and a hover cannot name
+    // different days.
+    // THE POINT INDEX, NOT THE DATASET'S. A mutant reading `datasetIndex` here
+    // survived every other assertion in this test and would have opened the
+    // first day of the window on every click, because dataset 0 is the only
+    // dataset a single-series trend has.
+    expect(render).toContain("const at = elements[0]?.index;");
+    expect(render).toContain("const iso = dates[at];");
+    // And the column is the target, not the 3px dot — set only where there is
+    // something to click.
+    expect(render).toContain('{ interaction: { mode: "index" as const, intersect: false } }');
+    expect(render).toContain("args.onPointClick");
   });
 
   it("derives its region key rather than making the reader type one", () => {

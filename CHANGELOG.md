@@ -5,6 +5,53 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.93] - 2026-10-18
+
+### Added
+
+- **A reading on a bridge opens the day it was logged on.** A `bridge-readings:`
+  list drew a date and a value with nothing to click, while the notes bridge in
+  the same block built a link for every row — one bar, one block, one side
+  clickable. Each date is now a link to its diary entry, and so is each point on
+  a `#trend`: the first click target on a chart canvas in the plugin, with the
+  whole column as the hit area rather than a 3px dot.
+- **A frozen readings bridge is a list of links.** Freezing wrote
+  `- 2026-07-22 — 7` for every row, because the snapshot writer was handed no
+  path — so the serializer's link branch, the renderer's anchor and the parser's
+  wikilink form were all unreachable for readings. A snapshot taken now holds
+  the entries it came from, and thawing and re-freezing gives the same lines.
+- **A page can be bridged to.** `bridge-notes:page` refused before the index was
+  consulted, on a flag that said a page carries no date — while *Link to diary*
+  writes exactly that property onto exactly those notes, the note index records
+  it, and the blurb a reader keeps that button on promises the note "turns up in
+  search, on-this-day and the bridge". It does now. **Page** also joins the
+  *Which* dropdown in a diary entry's bridge window.
+
+### Fixed
+
+- **A bridge's trend drew the wrong period.** The chart's axis came from the
+  readings' own dates, so a block whose bar read *Week 42* and whose body held
+  two readings drew them edge to edge across the whole card: five empty days of
+  the window were not merely unlabelled but invisible, and the card read as a
+  full week of data. The axis is now the window the bar names. Charts elsewhere
+  are untouched — the axis follows a window only where the caller brought one,
+  which is the readings bridge and nothing else.
+
+### Changed
+
+- **Why a readings bridge is not the charts section, written down.** Asked as an
+  open question, with retiring `#trend` on the table. It stays: no catalogue
+  offers a charts section on a journal note, a chart there could not read a
+  diary tracker if it did, and no chart can be scoped to a period the note does
+  not declare — which a lesson does not, until the bridge's own stepper writes
+  one. The drawing is the same drawing; the difference is the anchor, and a
+  readings bridge is the only thing in the plugin that brings a diary tracker's
+  series to a journal note. Said in the documentation and at both sources.
+- A second tracker on a readings bridge is answered in the same round and
+  deliberately not shipped: two series, one directive line, `+y=` — the chart
+  renderer already draws them, and the cost is the directive grammar and the
+  write path behind the window. Recorded so the answer is not re-derived.
+
 ## [1.0.92] - 2026-10-17
 
 ### Fixed

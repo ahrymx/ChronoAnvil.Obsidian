@@ -27,12 +27,14 @@ import { describe, expect, it } from "vitest";
 import {
   alignSeries,
   chartTitle,
+  datesInWindow,
   decodeChartDrag,
   encodeChartDrag,
   pairPoints,
   parseChartDirectives,
   reorderCharts,
   serializeChartSpec,
+  spreadToDates,
 } from "../src/charts/charts";
 import type { ChartPoint, ChartSpec } from "../src/charts/charts";
 import { readCode, readCss, readSrc, cssRule } from "./sources";
@@ -341,8 +343,128 @@ describe("what draws two series, and what withholds the average", () => {
     expect(render).toContain("seriesDefs[item.datasetIndex]");
   });
 
-  it("bridges the holes the union created, and only those", () => {
-    expect(render).toContain("...(other ? { spanGaps: true } : {})");
+  it("bridges the holes the union created, and the ones a window created", () => {
+    // Widened in 1.0.93 rather than relaxed: a declared axis window spreads a
+    // series over days it has no reading for, which is the same hole arriving
+    // by a second route. A single series on its own dates still says nothing.
+    expect(render).toContain("...(other || axis ? { spanGaps: true } : {})");
+  });
+});
+
+// ── A DECLARED WINDOW IS THE AXIS (1.0.93) ─────────────────────────────────
+//
+// The readings bridge's trend drew its category axis from the readings' own
+// dates, so a block whose bar said "Week 42" and whose body held two readings
+// drew them edge to edge across the whole card — five empty days of the window
+// invisible, and the card reading as a full week of data. The bar names the
+// period; the chart under it must not contradict it.
+//
+// The arithmetic is pure and is RUN here. The wiring is source-asserted, which
+// is this file's standing split.
+describe("a caller's own window becomes the axis", () => {
+  // Comment-stripped, because the paragraphs in `renderLineOrBar` quote the
+  // expressions this round replaced — `data: aligned!.b` among them — and a
+  // negative assertion over the raw file would read its own epitaph as code.
+  const render = readCode("chart-render");
+
+  it("spreads a window over its days, inclusive of both bounds", () => {
+    expect(datesInWindow("2026-10-12", "2026-10-18")).toEqual([
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+      "2026-10-15",
+      "2026-10-16",
+      "2026-10-17",
+      "2026-10-18",
+    ]);
+    expect(datesInWindow("2026-10-12", "2026-10-12")).toEqual(["2026-10-12"]);
+  });
+
+  it("steps across a month and a year boundary without drifting", () => {
+    expect(datesInWindow("2026-10-30", "2026-11-02")).toEqual([
+      "2026-10-30",
+      "2026-10-31",
+      "2026-11-01",
+      "2026-11-02",
+    ]);
+    expect(datesInWindow("2026-12-31", "2027-01-01")).toEqual([
+      "2026-12-31",
+      "2027-01-01",
+    ]);
+  });
+
+  it("answers nothing for an inverted or unparseable pair", () => {
+    // A hand-written period-nav or a `date:` typo reaches here, and a chart is
+    // not the place to find that out by spinning.
+    // An inverted pair is rejected by the loop's own bound rather than by a
+    // guard above it — see `datesInWindow`, where the guard that used to be
+    // there was removed because a sweep could not distinguish it from nothing.
+    expect(datesInWindow("2026-10-18", "2026-10-12")).toEqual([]);
+    expect(datesInWindow("not-a-date", "2026-10-12")).toEqual([]);
+    expect(datesInWindow("2026-10-12", "nonsense")).toEqual([]);
+  });
+
+  it("stops rather than spinning on bounds a decade apart", () => {
+    const out = datesInWindow("2000-01-01", "2099-12-31");
+    expect(out.length).toBe(3660);
+    expect(out[0]).toBe("2000-01-01");
+  });
+
+  it("lays a series onto the spine, with a null for every empty day", () => {
+    const spine = datesInWindow("2026-10-12", "2026-10-18");
+    expect(
+      spreadToDates(spine, [
+        { date: "2026-10-12", value: 2 },
+        { date: "2026-10-13", value: 5 },
+      ])
+    ).toEqual([2, 5, null, null, null, null, null]);
+  });
+
+  it("drops a reading the spine has no day for", () => {
+    // Not reachable through the bridge, which filters to the window first —
+    // asserted so the helper cannot be reused somewhere it would smear a
+    // stray point onto the wrong column.
+    expect(
+      spreadToDates(["2026-10-12"], [
+        { date: "2026-10-12", value: 2 },
+        { date: "2026-11-01", value: 9 },
+      ])
+    ).toEqual([2]);
+  });
+
+  it("takes the axis from the window, and the window from the caller only", () => {
+    // The union and the series' own dates both stand down for a spine; and the
+    // spine comes from `args.window`, NEVER from the resolved `win` — which is
+    // non-null for every chart in the plugin and would relabel every axis.
+    // THE BINDING, NOT JUST THE USE. A mutant that declared `axis` as a flat
+    // `null` passed every assertion here: the spine was still computed, still
+    // named, and reached nothing. So the chain from `args.axisWindow` to the
+    // array the labels come from is asserted link by link.
+    expect(render).toContain("const axis = spine && spine.length > 0 ? spine : null;");
+    expect(render).toContain("const dates = axis ?? (aligned ? aligned.dates");
+    expect(render).toContain("? spreadToDates(axis, points)");
+    expect(render).toContain("const spine = args.axisWindow");
+    expect(render).toContain(
+      "? datesInWindow(args.axisWindow.start, args.axisWindow.end)"
+    );
+    expect(render).toContain(
+      "args.window && args.window.start && args.window.end"
+    );
+    expect(render).not.toContain("start: win.start");
+  });
+
+  it("puts the second series on whichever spine won", () => {
+    // Two `data` arrays and one label list, index-aligned however `dates` was
+    // built — the property `alignSeries` exists to hold.
+    expect(render).toContain("? spreadToDates(axis, other.points)");
+    expect(render).toContain("data: otherValues!,");
+    expect(render).not.toContain("data: aligned!.b,");
+  });
+
+  it("withholds the rolling average over a declared window", () => {
+    // An index argument, not a visual one: `rollingMean` is as long as the
+    // readings and every other dataset is as long as the spine.
+    expect(render).toContain("args.avg && !other && !axis");
   });
 });
 
