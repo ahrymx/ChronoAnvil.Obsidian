@@ -1234,6 +1234,55 @@ export function splitArgHead(argument: string): ArgHead {
 // agree on rather than a dependency — the model passes this constant.
 export const WIDGET_TOKEN = "widget";
 
+// THE BYTE BETWEEN THE PICKS OF A MULTI-ANSWER CHOICE. 1.0.95.
+//
+// `ChoiceQuestion.multi` is answered with several of its own `values`, joined
+// with this — and the one question that is multi writes its answer into a
+// bridge directive's target piece, where `readBridgeArg` splits it apart again.
+//
+// HERE FOR `WIDGET_TOKEN`'S REASON, WORD FOR WORD. Both ends need it and only
+// one of them may import `section-model.ts`: the model composes the answer and
+// `core/bridge.ts` reads it back out of the line. The grammar is what they
+// already share, so the separator is declared once rather than agreed on by
+// inspection — which is the mistake that file's own header says it exists to
+// have stopped making.
+//
+// `+` AND NOT A COMMA OR A SPACE. A space ends the bridge's target and begins
+// its filter tail, so `bridge-readings:Mood Energy` already parses — as one
+// tracker and a free-text search for the word "Energy" — which makes it the one
+// separator that cannot be used; `#` is the flag suffix and `|` the label bar.
+// A comma is legal in a frontmatter property name and therefore in a tracker id.
+//
+// `+` is also the byte `chart:` already joins its own tokens with — `+y=<id>`,
+// `+avg`, `+sum`, `+size=` — so a reader meeting both directives meets one
+// separator. It is NOT the same grammar: there each `+` introduces a KEYED
+// token modifying one target, here each introduces another peer in a list. The
+// byte is shared on purpose; the meaning is this file's to state, and that is
+// what this comment is.
+export const PICK_JOIN = "+";
+
+// A multi-answer, taken apart: the picks in the order they were given.
+//
+// THE DEDUPLICATION AND THE TRIMMING ARE PART OF THE SPLIT, not a tidy-up a
+// caller may forget. An empty piece is a stray keystroke rather than a value
+// with no name (`Mood++Energy`), and a repeated one is a list that would make
+// whatever consumes it stutter — the bridge's stepper would step from a
+// tracker to itself. Both normalise to the list the reader obviously meant, and
+// the write path puts the normalised form back the first time either door is
+// used.
+//
+// ONE SPLITTER FOR BOTH ENDS. The control composes an answer with this
+// separator and `core/bridge.ts` reads one back out of a directive; a second
+// copy of three lines is a second place for the dedup to be missing.
+export function splitPicks(answer: string): string[] {
+  const out: string[] = [];
+  for (const raw of answer.split(PICK_JOIN)) {
+    const id = raw.trim();
+    if (id !== "" && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 // Whether this directive's line carries the flag.
 export function hasToken(line: string, token: string): boolean {
   return splitArgHead(splitDirective(line).argument).tokens.includes(token);

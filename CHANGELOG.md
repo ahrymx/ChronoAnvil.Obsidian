@@ -5,6 +5,41 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.95] - 2026-10-18
+
+### Added
+
+- **A readings bridge can carry several trackers, and a row that steps through
+  them.** The cog's *the trackers to pull across* question is a tick list now,
+  and a bridge that names more than one grows a `[<] Mood [>]` row above its
+  chart. The trackers are joined with `+` on the directive —
+  `bridge-readings:Mood+Energy+Sleep` — with the first one being the one on
+  screen, so **a step rewrites the line**: reopen the note later and it is still
+  on the tracker you left it on, and the cog agrees with it. Stepping is a
+  rotation, so the cycle you ticked survives intact and only where it starts
+  moves. A bridge with one tracker draws no row and its line does not change a
+  byte, which is every bridge written before this release.
+- The row is drawn **above the empty state**, so stepping onto a tracker you
+  have not logged this period leaves the arrows that step away from it; and a
+  frozen bridge has no row at all, by the same structure that withholds its
+  period stepper.
+
+### Fixed
+
+- **The cog's tracker question had been handed `Mood#trend` since 1.0.89.** The
+  answer is piece 0 of a compound argument split on whitespace, which cannot see
+  the flag suffix — so on every trend bridge in every vault the dropdown matched
+  no option and drew *Mood (default)* over a line that said Mood. The target is
+  now read through the bridge's own reader, the only thing that knows what else
+  shares its piece.
+
+### Changed
+
+- `ChoiceQuestion` can be answered with several of its values (`multi`), drawn
+  as a tick per row by both the bridge's cog and *Edit sections…*. The answer is
+  still one or more of a closed set the vault defines, so it reads and writes
+  through the same splice every other choice does — what changes is the control.
+
 ## [1.0.94] - 2026-10-18
 
 ### Added

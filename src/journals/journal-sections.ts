@@ -2941,8 +2941,29 @@ export const JOURNAL_SECTIONS: JournalSection[] = [
       {
         kind: "choice",
         key: "tracker",
-        label: "a tracker to pull across",
+        label: "the trackers to pull across",
         directive: "bridge-readings",
+        // SEVERAL, AS OF 1.0.95, AND THE FIRST ONE IS THE ONE IT DRAWS.
+        //
+        //   "a row above the chart to cycle through enabled trackers
+        //    (enabled/choosen in the settings window)"
+        //
+        // The answer is a `PICK_JOIN` list and the block's stepper rotates it,
+        // so this one question still answers the question it always answered —
+        // which tracker is on screen — and now also says what else the reader
+        // may step to without reopening this window.
+        //
+        // ONE QUESTION AND NOT TWO (a current plus a set), for the reason
+        // `BridgeDirective.cycle` gives in full: two fields would mean two
+        // things on the line saying which tracker the block is about, and
+        // `snapshotKeyFor`, `planBridge`, `targetLabel` and the catalogue all
+        // read the one that is there today.
+        //
+        // AND IT STILL WRITES PIECE 0 — see `part` below, unchanged. The list
+        // IS the target piece, so nothing about the splice changes: a reader
+        // who picks one tracker writes the byte this question has written since
+        // 1.0.89, which is why no vault is rewritten by this release.
+        multi: true,
         // THE TARGET IS THE FIRST PIECE OF THE ARGUMENT, NOT THE WHOLE OF IT
         // (1.0.89), and declaring that is what stops this question eating the
         // filter question's answer. `argSpanIn` ends an argument at the label

@@ -39,6 +39,7 @@ import {
   snapshotKeyFor,
   snapshotMetaKeyFor,
   snapshotState,
+  withBridgeCycle,
   withBridgeFlag,
 } from "../../core/bridge";
 import type {
@@ -938,6 +939,41 @@ async function setBridgeTrend(
   return wrote;
 }
 
+// One tracker forward or back, written onto the directive the reader is
+// looking at. 1.0.95.
+//
+// `setBridgeTrend`'S FILE HALF, WITH A DIFFERENT CHANGE IN IT, and the two are
+// deliberately not merged into one `(plugin, path, …, patch)` writer: the
+// arithmetic they differ by is the whole of each function, and it already lives
+// once in `core/bridge.ts` where both of them get it from. What is duplicated
+// here is finding the file and processing it — four lines that say nothing
+// about bridges.
+//
+// THROUGH `vault.process`, which serialises against every other body write —
+// `writeSnapshot`'s rule and the same reason.
+//
+// NOTHING REDRAWS THE BLOCK FROM HERE. The write changes the note's own lines,
+// so Obsidian re-renders the fence and the region is rebuilt from the directive
+// it now says — which is what makes the step survive the reader closing the
+// note, and what `setBridgeTrend` has relied on since 1.0.89.
+async function stepBridgeTracker(
+  plugin: ChronoAnvilPlugin,
+  path: string,
+  target: string,
+  step: number
+): Promise<boolean> {
+  const file = plugin.app.vault.getAbstractFileByPath(path);
+  if (!(file instanceof TFile)) return false;
+  let wrote = false;
+  await plugin.app.vault.process(file, (text) => {
+    const next = withBridgeCycle(text.split("\n"), "readings", target, step);
+    if (next === null) return text;
+    wrote = true;
+    return next.join("\n");
+  });
+  return wrote;
+}
+
 export function bridgeFoldKey(sourcePath: string, key: string): string {
   return `${sourcePath}::bridge:${key}`;
 }
@@ -1405,6 +1441,81 @@ export function buildBridgeNotesRegion(
   );
 }
 
+// ── THE ROW THAT CYCLES THE TRACKERS (1.0.95) ─────────────────────────
+//
+//   "[<]     [tracker name]     [>]"
+//
+// Drawn exactly as asked, and the middle is a LABEL rather than a third
+// control. `buildPeriodNav`'s middle segment is a picker because a period has
+// unboundedly many values and a reader jumping three months back wants a list;
+// a cycle is two to a handful of trackers the reader themselves ticked, so the
+// list is already in the cog and a dropdown here would be a second door onto
+// one answer. The name says where you are; the arrows are how you move.
+//
+// NOTHING IS DRAWN FOR A CYCLE OF ONE, which is every bridge in every vault
+// before this release. A row carrying two dead arrows around a name the bar
+// above it already prints would be the *"control that draws, flips, saves and
+// changes nothing"* this file names as a defect two hundred lines up.
+//
+// AN ELEMENT AND NOT A BUILDER, which is where it differs from the period
+// stepper beside it. That one is handed to `bridgeHeader` as a function
+// because `redrawHeader` rebuilds the bar on every view toggle and would
+// re-parent a live element into a bar it never clears. This row is in the
+// BODY, which `fill` owns and which is rebuilt whole or not at all.
+//
+// AND IT DOES NOT RE-RENDER ITSELF. `buildPeriodNav` tracks its own `cur` and
+// calls `render()` after each write, because `processFrontMatter` resolves
+// before the metadata cache's event lands and a re-read would show the
+// pre-write value. This writes the note's BODY, so Obsidian re-renders the
+// fence and the whole region is rebuilt from the line it now holds — one
+// source of truth, and no tracked copy of it to go stale.
+function buildTrackerCycle(
+  plugin: ChronoAnvilPlugin,
+  body: HTMLElement,
+  path: string,
+  plan: BridgePlan,
+  cycle: readonly string[]
+): void {
+  if (cycle.length === 0) return;
+  const row = body.createDiv({ cls: "ca-bridge-cycle" });
+  // A tracker that has left the registry keeps its id in the tooltip rather
+  // than reading "Next tracker: undefined" — the same fallback the window's
+  // own answer line makes, and an ordinary state for a cycle written before a
+  // tracker was removed.
+  const labelOf = (id: string): string => getTracker(plugin, id)?.label ?? id;
+  const arrow = (by: 1 | -1, to: string): void => {
+    const pill = row.createEl("button", { cls: "ca-bridge-cycle-step" });
+    setIcon(pill, by < 0 ? "chevron-left" : "chevron-right");
+    // THE DESTINATION IS NAMED, not the direction alone. "Next tracker" on a
+    // cycle of four says nothing a reader could act on; "Next tracker: Sleep"
+    // is the whole answer, and on a screen reader it is the only one.
+    const says = `${by < 0 ? "Previous" : "Next"} tracker: ${to}`;
+    pill.setAttribute("aria-label", says);
+    pill.title = says;
+    pill.addEventListener("click", () => {
+      void stepBridgeTracker(plugin, path, plan.target, by).then((ok) => {
+        if (!ok) {
+          // THE TREND TOGGLE'S SENTENCE, because it is the same ambiguity and
+          // the reader has the same fix: a note with two readings bridges on
+          // one tracker has two lines this could mean.
+          notify.info(
+            "ChronoAnvil: this note has more than one bridge to that " +
+              "tracker, so there is no single line to change. Edit the " +
+              "directive you mean."
+          );
+        }
+      });
+    });
+  };
+  arrow(-1, labelOf(cycle[cycle.length - 1]));
+  // `plan.targetLabel` AND NOT THE DIRECTIVE'S ID. The plan resolved the target
+  // against the catalogue already and refused if it could not, so this is the
+  // tracker's own label — the same string the bar above prints, which is what
+  // keeps the two from naming one tracker two ways.
+  row.createSpan({ cls: "ca-bridge-cycle-name", text: plan.targetLabel });
+  arrow(1, labelOf(cycle[0]));
+}
+
 // ── §4: bridge-readings — reads the tracker series ────────────────────
 
 // `bridge-readings:<tracker>[#trend][#entries] [filters]`.
@@ -1466,7 +1577,7 @@ export function buildBridgeReadingsRegion(
   ctx: MarkdownPostProcessorContext,
   navUnit: PeriodBounds["unit"] | null
 ): HTMLElement | null {
-  const { trend, entries } = readBridgeArg("readings", rest);
+  const { trend, entries, cycle } = readBridgeArg("readings", rest);
   // The live Chart.js instance, so a rebuild disposes the one it is replacing.
   // A chart parented into a LiveWidget's subtree is destroyed with the DOM on
   // the next rebuild; the Chart.js object behind it is not, and it keeps its
@@ -1516,6 +1627,27 @@ export function buildBridgeReadingsRegion(
     (body, plan) => {
       const def = getTracker(plugin, plan.target);
       if (!def) return;
+      // ── THE TRACKER STEPPER, ABOVE EVERYTHING ELSE (1.0.95) ─────────
+      //
+      //   "I think it would be great to have a row above the chart to cycle
+      //    through enabled trackers (enabled/choosen in the settings window).
+      //    It could look like: [<]     [tracker name]     [>]."
+      //
+      // DRAWN BEFORE THE EMPTY STATE, WHICH IS NOT A LAYOUT DETAIL. Step onto a
+      // tracker the reader has not logged this period and the body is one
+      // sentence; if the row were built after that `return`, the gesture would
+      // have removed the only control that could step away from it. 1.0.92
+      // names that shape in its own words — *"a refusal that replaces the bar
+      // takes away the control that would fix it"* — and this is the same
+      // mistake one level down.
+      //
+      // AND A FROZEN BRIDGE NEVER REACHES IT, with no guard here: the frozen
+      // branch renders stored rows instead of calling this body at all. That is
+      // the same answer `bridgeHeader` gives the period stepper
+      // (`snap.frozen ? null : nav`), arrived at by the structure rather than
+      // repeated — a frozen block is a record, and a record whose tracker could
+      // be stepped would be a record of nothing in particular.
+      buildTrackerCycle(plugin, body, ctx.sourcePath, plan, cycle);
       // Through the chart stack's own reader, not a second walk of the diary
       // folders — §8, one level down. This is also the whole reason §4 keeps
       // two directives rather than one with a mode flag: the series lives in a

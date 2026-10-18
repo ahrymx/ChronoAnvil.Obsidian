@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fnBody, readCode, readCss, readSrc } from "./sources";
+import { cssRule, fnBody, readCode, readCss, readSrc } from "./sources";
 import { computeSectionRuns } from "../src/ui/headerbar";
 import { OBSIDIAN_DOM } from "../src/core/constants";
 import {
@@ -1095,6 +1095,33 @@ describe("a snapshot is plain markdown", () => {
     expect(bridge).toContain('cls: value === undefined ? "ca-bridge-value is-blank" : "ca-bridge-value",');
     expect(bridge).toContain('text: value === undefined ? "—" : String(value),');
     expect(readCss()).toContain(".ca-bridge-value.is-blank");
+  });
+
+  it("styles the cycle row as a declared box, not as a deleted height", () => {
+    // `obsidian-button-height`: a chip-shaped `<button>` is 30px tall with its
+    // own padding until a rule says otherwise, and 1.0.91 measured that as the
+    // "blank box" under every date selector on this very section's bar. The fix
+    // is to DECLARE the box — removing a height here hands the control straight
+    // back to the 30px it came from.
+    const css = readCss();
+    expect(css).toContain(".ca-bridge-cycle");
+    expect(css).toContain(".ca-bridge-cycle-step");
+    expect(css).toContain(".ca-bridge-cycle-name");
+    const step = cssRule(".ca-bridge-cycle-step");
+    expect(step).toContain("height: 2em");
+    expect(step).toContain("width: 2em");
+    expect(step).toContain("padding: 0");
+    // CENTRED WITH A GAP, NOT SPREAD TO THE EDGES — the reader drew
+    // `[<]     [name]     [>]`, and `space-between` would put the arrows at a
+    // card's two edges instead, so a lesson note and a dashboard column would
+    // draw two different controls.
+    const strip = cssRule(".ca-bridge-cycle");
+    expect(strip).toContain("justify-content: center");
+    expect(strip).not.toContain("space-between");
+    // AND THE TICK COLUMN THE WINDOWS DRAW, which is the other half of the
+    // round: `.ca-tpl-form` rows stacked, with the box's own size declared once
+    // where that class lives.
+    expect(cssRule(".ca-tpl-picks")).toContain("flex-direction: column");
   });
 
   it("keeps the list under the trend when both flags are on", () => {

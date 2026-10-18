@@ -25,11 +25,17 @@ import {
   bridgeRefusal,
   readBridgeArg,
   readBridgeDirective,
+  withBridgeCycle,
   withBridgeFlag,
   writeBridgeArg,
   writeBridgeDirective,
 } from "../src/core/bridge";
-import { hasToken, withToken } from "../src/core/directive-grammar";
+import {
+  PICK_JOIN,
+  hasToken,
+  splitPicks,
+  withToken,
+} from "../src/core/directive-grammar";
 import {
   BRIDGE_NAV_GRAIN,
   BRIDGE_SECTION_ID,
@@ -74,6 +80,14 @@ describe("one directive grammar, with a reader and a writer", () => {
       "bridge-readings:Mood#trend#entries",
       "bridge-readings:Mood#entries tag:revision|From the diary",
       "bridge-readings:Mood#trend#entries is:lesson from:2026-02-10|From the diary",
+      // AND THE TRACKER LIST (1.0.95) — the shape the stepper rotates, on its
+      // own and under both flags and a filter tail, because the `+` list and
+      // the `#` suffix share one piece of the argument and the writer has to
+      // put them back in that order.
+      "bridge-readings:Mood+Energy",
+      "bridge-readings:Mood+Energy+Sleep",
+      "bridge-readings:Energy+Sleep+Mood#trend",
+      "bridge-readings:Sleep+Mood+Energy#trend#entries is:lesson|From the diary",
     ];
     for (const line of shapes) {
       const read = readBridgeDirective(line);
@@ -234,6 +248,214 @@ describe("one directive grammar, with a reader and a writer", () => {
     const src = readSrc("core/bridge");
     expect(src).toContain("splitArgHead");
     expect(readCode("core/bridge")).not.toContain("splitArgHead(");
+  });
+});
+
+// ── the tracker list, which is one piece of the argument ─────────────
+
+describe("a readings bridge may name several trackers", () => {
+  it("reads the head as the target and the rest as the cycle", () => {
+    //   "a row above the chart to cycle through enabled trackers"
+    //
+    // THE HEAD IS `target` AND THAT IS THE WHOLE DESIGN. `snapshotKeyFor`,
+    // `planBridge`, `targetLabel` and the catalogue all read `target` today, so
+    // a cycle stored as a set plus a pointer would have given every one of them
+    // two fields to choose between.
+    const d = readBridgeArg("readings", "Mood+Energy+Sleep");
+    expect(d.target).toBe("Mood");
+    expect(d.cycle).toEqual(["Energy", "Sleep"]);
+  });
+
+  it("is a list only on the readings side", () => {
+    // THE DIRECTION DECIDES WHETHER A `+` IS A LIST, the same way it decides
+    // whether a `#` is a flag: a notes bridge's target is a note TYPE, so
+    // `meal+dinner` keeps its plus and earns the refusal that names it rather
+    // than quietly becoming two types.
+    const d = readBridgeArg("notes", "meal+dinner tag:x");
+    expect(d.target).toBe("meal+dinner");
+    expect(d.cycle).toEqual([]);
+    expect(d.filters).toBe("tag:x");
+    // And the writer drops a cycle it is handed on that side rather than
+    // joining two ids into one word.
+    expect(
+      writeBridgeArg({
+        direction: "notes",
+        target: "meal",
+        cycle: ["dinner"],
+        trend: false,
+        entries: false,
+        filters: "",
+      })
+    ).toBe("meal");
+  });
+
+  it("keeps the flags behind the whole list, not behind the head", () => {
+    // The flags belong to the BLOCK and not to any one tracker in it, and this
+    // is also the only place a reader could put them: behind the head, `ring`
+    // would read `trend` as a tracker id.
+    const d = readBridgeArg("readings", "Mood+Energy#trend#entries tag:x");
+    expect(d.target).toBe("Mood");
+    expect(d.cycle).toEqual(["Energy"]);
+    expect(d.trend).toBe(true);
+    expect(d.entries).toBe(true);
+    expect(d.filters).toBe("tag:x");
+  });
+
+  it("writes the byte it always wrote for one tracker", () => {
+    // NO VAULT IS REWRITTEN BY THIS RELEASE EXISTING, which is the omitted-
+    // default discipline every token in `serializeChartSpec` keeps. A bridge
+    // with no cycle serialises to the line it has had since 2.57 — and
+    // `cycle` is optional on the writer's argument so a caller composing one
+    // from scratch cannot accidentally produce a different one.
+    expect(
+      writeBridgeArg({
+        direction: "readings",
+        target: "Mood",
+        trend: false,
+        entries: false,
+        filters: "",
+      })
+    ).toBe("Mood");
+    expect(writeBridgeDirective(readBridgeDirective("bridge-readings:Mood")!)).toBe(
+      "bridge-readings:Mood"
+    );
+  });
+
+  it("normalises a stray plus and a repeated id through one splitter", () => {
+    // `splitPicks` holds the trimming and the dedup, and holds them for BOTH
+    // ends — the control composes with this separator and the grammar reads one
+    // back. A repeated id would make the stepper step from a tracker to itself.
+    expect(splitPicks("Mood++Energy")).toEqual(["Mood", "Energy"]);
+    expect(splitPicks("Mood+Mood+Energy")).toEqual(["Mood", "Energy"]);
+    expect(splitPicks(" Mood + Energy ")).toEqual(["Mood", "Energy"]);
+    expect(splitPicks("")).toEqual([]);
+    expect(readBridgeArg("readings", "Mood+Mood+Energy").cycle).toEqual(["Energy"]);
+    expect(PICK_JOIN).toBe("+");
+  });
+
+  it("still answers an empty target, which is an unconfigured bridge", () => {
+    // The ordinary first state since 3.8, not a typo — `planBridge` refuses it
+    // by naming the alternatives, and this read must reach that refusal rather
+    // than inventing a tracker.
+    const d = readBridgeArg("readings", "");
+    expect(d.target).toBe("");
+    expect(d.cycle).toEqual([]);
+  });
+});
+
+// ── and the step that rotates it ─────────────────────────────────────
+
+describe("one step forward or back, written onto the same line", () => {
+  const fence = (line: string): string[] => [
+    "```chronoanvil",
+    "period-nav:month",
+    line,
+    "```",
+  ];
+  // Through a real fence, addressed by the target the line itself names — which
+  // is how the toggle addresses it too, since what the renderer holds is
+  // `plan.target`.
+  const stepped = (line: string, by: number): string | null => {
+    const next = withBridgeCycle(
+      fence(line),
+      "readings",
+      readBridgeDirective(line)!.target,
+      by
+    );
+    return next === null ? null : next[2];
+  };
+
+  it("moves the head to the back, so the cycle survives the step", () => {
+    //   "click [>]  →  bridge-readings:Energy#entries|From the diary"
+    //
+    // A ROTATION AND NOT A MOVING INDEX. The reader's order is a cycle, and a
+    // rotation changes only where it starts — which is what lets the answer
+    // stay one field with `target` at its head.
+    expect(stepped("bridge-readings:Mood+Energy+Sleep", 1)).toBe(
+      "bridge-readings:Energy+Sleep+Mood"
+    );
+  });
+
+  it("steps backwards onto the last, not off the front", () => {
+    // THE ONE PIECE OF ARITHMETIC HERE WORTH A TEST. JavaScript's `%` returns a
+    // negative remainder for a negative operand, so `-1 % 3` is `-1` and a
+    // naive slice would come back empty.
+    expect(stepped("bridge-readings:Mood+Energy+Sleep", -1)).toBe(
+      "bridge-readings:Sleep+Mood+Energy"
+    );
+  });
+
+  it("carries the flags, the filters and the reader's title with it", () => {
+    // The step changes WHICH tracker, and nothing else about the block. A step
+    // that dropped `#trend` would turn the chart the reader was looking at into
+    // a list — which is the defect 1.0.94 found on the tracker splice, in the
+    // one other place a target is rewritten.
+    expect(
+      stepped("bridge-readings:Mood+Energy#trend#entries tag:x|From the diary", 1)
+    ).toBe("bridge-readings:Energy+Mood#trend#entries tag:x|From the diary");
+  });
+
+  it("keeps the line's own indentation", () => {
+    // `rewriteSoleBridge`'s rule, reached through the second writer: a bridge
+    // inside a list item or a callout is indented, and `writeBridgeDirective`
+    // composes a line with no idea where it sat.
+    const next = withBridgeCycle(
+      ["  bridge-readings:Mood+Energy"],
+      "readings",
+      "Mood",
+      1
+    );
+    expect(next![0]).toBe("  bridge-readings:Energy+Mood");
+  });
+
+  it("declines a cycle of one rather than writing the same line back", () => {
+    // NOTHING TO STEP TO IS NOT AN ERROR AND IS NOT A WRITE. The row is not
+    // drawn for a one-tracker bridge at all, so this is the second guard — and
+    // it must come back `null`, because `stepBridgeTracker` returns the text
+    // unchanged for `null` and a `process` callback that returns the same
+    // string writes no bytes.
+    expect(
+      withBridgeCycle(["bridge-readings:Mood"], "readings", "Mood", 1)
+    ).toBeNull();
+  });
+
+  it("declines an ambiguous note, which is the sole-or-nothing rule", () => {
+    // Two readings bridges on one tracker are two lines a step could mean, and
+    // rewriting the first is an answer nothing may claim to have read. Shared
+    // with the flag writer through `rewriteSoleBridge` rather than stated twice.
+    expect(
+      withBridgeCycle(
+        ["bridge-readings:Mood+Energy", "bridge-readings:Mood+Sleep"],
+        "readings",
+        "Mood",
+        1
+      )
+    ).toBeNull();
+  });
+
+  it("declines a target that is not on the note", () => {
+    expect(
+      withBridgeCycle(["bridge-readings:Mood+Energy"], "readings", "Sleep", 1)
+    ).toBeNull();
+    // And a notes bridge is not this write's business.
+    expect(
+      withBridgeCycle(["bridge-notes:meal"], "readings", "meal", 1)
+    ).toBeNull();
+  });
+
+  it("copies the lines rather than writing through the caller's array", () => {
+    const lines = ["bridge-readings:Mood+Energy"];
+    withBridgeCycle(lines, "readings", "Mood", 1);
+    expect(lines[0]).toBe("bridge-readings:Mood+Energy");
+  });
+
+  it("goes round the ring and comes back, which is what a cycle means", () => {
+    // Three steps on a three-tracker cycle is the line it started on, byte for
+    // byte — the property that makes the rotation safe to leave in a reader's
+    // note indefinitely.
+    let line = "bridge-readings:Mood+Energy+Sleep";
+    for (let i = 0; i < 3; i++) line = stepped(line, 1)!;
+    expect(line).toBe("bridge-readings:Mood+Energy+Sleep");
   });
 });
 
@@ -960,8 +1182,15 @@ describe("the trend flag is reachable at last", () => {
   // door — `applySections`, where there is no file to process. What is asserted
   // of the toggle is now the file half alone; the write itself is pinned on
   // `withBridgeFlag` below, once for both flags.
+  //
+  // AND THE FIND-AND-SPLICE MOVED AGAIN IN 1.0.95, to `rewriteSoleBridge`,
+  // where the tracker stepper's write needed the same lookup. So there are
+  // three bodies here and they divide cleanly: the toggle finds the FILE, the
+  // flag writer states the CHANGE, and the splice holds the sole-or-nothing
+  // rule and the indent for both writers.
   const body = () => fnBody("setBridgeTrend", "bridge-widgets");
   const pure = () => fnBody("withBridgeFlag", "core/bridge");
+  const sole = () => fnBody("rewriteSoleBridge", "core/bridge");
 
   it("writes through the pure writer rather than patching the string", () => {
     // `withToken` would have been the shared route and it cannot be: it builds
@@ -970,10 +1199,12 @@ describe("the trend flag is reachable at last", () => {
     // `bridge-readings:Mood is#trend:lesson`. MEASURED IN 1.0.94, both ways:
     // `hasToken("bridge-readings:Mood#trend#entries tag:revision|…", "entries")`
     // is `false`, so the generic READ is broken on the same line.
-    expect(pure()).toContain(
-      "writeBridgeDirective({ ...directive, [flag]: on })"
-    );
-    expect(pure()).toContain("readBridgeDirective(");
+    expect(pure()).toContain("[flag]: on,");
+    expect(sole()).toContain("writeBridgeDirective(next)");
+    expect(sole()).toContain("readBridgeDirective(");
+    // AND THE FLAG WRITER IS THE CHANGE AND NOTHING ELSE (1.0.95) — it holds no
+    // second copy of the lookup, which is the mutant this line kills.
+    expect(pure()).toContain("return rewriteSoleBridge(lines, direction, target,");
   });
 
   it("goes through vault.process, like every other body write here", () => {
@@ -992,7 +1223,7 @@ describe("the trend flag is reachable at last", () => {
     // `null` AND NOT THE TEXT BACK, as of 1.0.94: the window must tell "there
     // is no single line" from "the flag was already as asked", because the
     // first is worth saying out loud and the second must write no bytes.
-    expect(pure()).toContain("if (at.length !== 1) return null;");
+    expect(sole()).toContain("if (at.length !== 1) return null;");
     expect(body()).toContain("if (next === null) return text;");
   });
 
@@ -1002,17 +1233,15 @@ describe("the trend flag is reachable at last", () => {
     // ask to move.
     // THE WHOLE WRITE, because `const indent` computed and not used is the
     // shape this mutant wears.
-    expect(pure()).toContain(
-      "out[i] = indent + writeBridgeDirective({ ...directive, [flag]: on });"
-    );
-    expect(pure()).toContain("const indent = /^\\s*/.exec(lines[i])![0];");
+    expect(sole()).toContain("out[i] = indent + writeBridgeDirective(next);");
+    expect(sole()).toContain("const indent = /^\\s*/.exec(lines[i])![0];");
   });
 
   it("copies the lines rather than writing through the caller's array", () => {
     // Handed a chunk of the reader's file by `applySections`, which keeps its
     // own `lines` and pushes them into a chunk afterwards. Mutating the
     // argument would write the flag into a note whose save was then refused.
-    expect(pure()).toContain("const out = [...lines];");
+    expect(sole()).toContain("const out = [...lines];");
   });
 });
 
@@ -1080,6 +1309,174 @@ describe("the window draws the entry-list tick", () => {
 
   it("writes the answer the model reads, in the strings it reads", () => {
     expect(win()).toContain("this.answer(q.key, box.checked ? FLAG_ON : FLAG_OFF);");
+  });
+});
+
+// ── the control that picks the set ───────────────────────────────────
+
+describe("the windows draw the tracker list as ticks", () => {
+  const win = () => readCode("ui/bridge-window");
+  const editor = () => readCode("ui/section-editor");
+  const ctx = (): SectionContext =>
+    ({
+      noteKind: "leaf",
+      vault: {
+        trackers: [
+          { value: "Mood", label: "Mood" },
+          { value: "Energy", label: "Energy" },
+        ],
+      },
+    }) as unknown as SectionContext;
+  const bridge = () =>
+    JOURNAL_SECTIONS.find((s) => s.id === BRIDGE_SECTION_ID)!;
+
+  it("is asked as one multi choice and not as an eighth question kind", () => {
+    //   "A set picked in the bridge window"
+    //
+    // The ANSWER is still "one or more of a closed set the vault defines",
+    // which is exactly `values` — so what changes is the control, and a control
+    // is a renderer's business. It reads back through the same `part` splice and
+    // stores in the same `SectionOverrides.tracker`.
+    const q = bridge().questions!(ctx())[0];
+    expect(q.kind).toBe("choice");
+    expect((q as { multi?: true }).multi).toBe(true);
+    // AND IT IS STILL PIECE 0 OF THE COMPOUND ARGUMENT. The list IS the target
+    // piece, so 1.0.89's splice is untouched by the list existing.
+    expect((q as { part?: unknown }).part).toEqual({ at: 0, of: 2, join: " " });
+  });
+
+  it("draws a tick per value in both windows, not a `select multiple`", () => {
+    // The native control needs a ctrl-click to ADD a value and a ctrl-click to
+    // KEEP the first, and gets it wrong by clearing the reader's whole answer.
+    // AND EACH WINDOW DISPATCHES TO IT. A `renderPicks` that exists and is
+    // never called draws the single dropdown over a list answer — measured as a
+    // survivor on the first sweep of this round, because asserting the method's
+    // CONTENTS says nothing about whether anything reaches it.
+    expect(win()).toContain(
+      'if (q.kind === "choice" && q.multi) this.renderPicks(field(q), q);'
+    );
+    expect(editor()).toContain("this.renderPicksQuestion(field(q), section, q);");
+    for (const [name, src] of [["cog", win()], ["editor", editor()]] as const) {
+      expect(src, name).toContain('cls: "ca-tpl-picks"');
+      expect(src, name).toContain('type: "checkbox",');
+      expect(src, name).toContain('cls: "ca-tpl-form-box",');
+      expect(src, name).toContain("text: v.label,");
+      expect(src, name).not.toContain("select.multiple");
+    }
+  });
+
+  it("appends a new tick rather than recomposing from the value list", () => {
+    // THE ORDER IS THE READER'S CYCLE AND MUST NOT BE RECOMPUTED. Sweeping
+    // `q.values` and collecting the ticked ones is one line shorter and would
+    // reorder the list — and so change WHICH TRACKER the block draws, since the
+    // head is the one on screen — every time the window was opened and
+    // anything was changed.
+    //
+    // COUNTED, NOT FOUND. The expression is in two files and one `toContain`
+    // would be satisfied by either of them — the two-call-site trap 1.0.57
+    // recorded and 1.0.94 fell into again.
+    const both = win() + editor();
+    const twice = (what: string) =>
+      expect(both.split(what).length - 1, what).toBe(2);
+    twice("? [...now, v.value]");
+    twice(": now.filter((x) => x !== v.value);");
+    twice("const now = splitPicks(");
+  });
+
+  it("answers nothing when the last tick comes off, not an empty list", () => {
+    // An empty STRING would be an answer of no trackers and `planBridge` would
+    // refuse the line the save produced. `undefined` is the dropdown's own
+    // empty row, which composes the section's `emptyLabel` default.
+    expect(win()).toContain(
+      "this.answer(q.key, next.length ? next.join(PICK_JOIN) : undefined);"
+    );
+    expect(editor()).toContain("next.length ? next.join(PICK_JOIN) : undefined");
+  });
+
+  it("says the sentence rather than drawing a column of nothing", () => {
+    // NOTHING TO CHOOSE FROM IS A SENTENCE, and the empty guard is asked BEFORE
+    // the multi branch — a column of no checkboxes looks every bit as broken as
+    // an empty menu, and the catalogue wrote wording that answers both.
+    const order = editor();
+    expect(order.indexOf("ca-tpl-choice-empty")).toBeLessThan(
+      order.indexOf("renderPicksQuestion(field(q), section, q)")
+    );
+    expect(win()).toContain('host.createSpan({ cls: "ca-tpl-choice-empty", text: q.empty });');
+  });
+
+  it("names the answer piece by piece when it is read back out", () => {
+    // `describeAnswers` is the line a reader confirms, and `Mood+Energy` is a
+    // byte they never typed. An id with no label left in the registry keeps its
+    // id, which is the fallback the single form already makes.
+    const q = bridge().questions!(ctx())[0];
+    const said = describeAnswers([q], { tracker: "Mood+Energy" });
+    expect(said).toContain("Mood");
+    expect(said).not.toContain("Mood+Energy");
+  });
+});
+
+// ── and the row that steps through it ────────────────────────────────
+
+describe("the block grows a row that cycles the trackers", () => {
+  const src = () => readCode("ui/widgets/bridge-widgets");
+  const row = () => fnBody("buildTrackerCycle", "ui/widgets/bridge-widgets");
+
+  it("is `[<] name [>]`, drawn as the reader drew it", () => {
+    //   "It could look like: [<]     [tracker name]     [>]."
+    expect(row()).toContain('cls: "ca-bridge-cycle"');
+    expect(row()).toContain('setIcon(pill, by < 0 ? "chevron-left" : "chevron-right");');
+    expect(row()).toContain('row.createSpan({ cls: "ca-bridge-cycle-name", text: plan.targetLabel });');
+    // The order of the three, which is the whole of the drawing.
+    const body = row();
+    expect(body.indexOf("arrow(-1,")).toBeLessThan(body.indexOf("createSpan"));
+    expect(body.indexOf("createSpan")).toBeLessThan(body.indexOf("arrow(1,"));
+  });
+
+  it("is not drawn at all for a bridge with one tracker", () => {
+    // Which is every bridge written before this release. Two dead arrows around
+    // a name the bar above already prints is the "control that draws, flips,
+    // saves and changes nothing" this file names as a defect.
+    expect(row()).toContain("if (cycle.length === 0) return;");
+  });
+
+  it("goes above the empty state and not below it", () => {
+    // NOT A LAYOUT DETAIL. Step onto a tracker with no readings this period and
+    // the body is one sentence; built after that `return`, the gesture would
+    // have removed the only control that could step away from it — 1.0.92's
+    // *"a refusal that replaces the bar takes away the control that would fix
+    // it"*, one level down.
+    const whole = src();
+    const at = whole.indexOf("buildTrackerCycle(plugin, body, ctx.sourcePath, plan, cycle);");
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(whole.indexOf("if (days.length === 0) {"));
+    expect(at).toBeLessThan(whole.indexOf('cls: "ca-bridge-trend"'));
+  });
+
+  it("names the destination on each arrow, not just the direction", () => {
+    // "Next tracker" on a cycle of four says nothing a reader could act on, and
+    // on a screen reader the label is the only answer there is.
+    expect(row()).toContain('const says = `${by < 0 ? "Previous" : "Next"} tracker: ${to}`;');
+    expect(row()).toContain('pill.setAttribute("aria-label", says);');
+    expect(row()).toContain("arrow(-1, labelOf(cycle[cycle.length - 1]));");
+    expect(row()).toContain("arrow(1, labelOf(cycle[0]));");
+  });
+
+  it("writes the step through the pure rotation, in one vault.process", () => {
+    const write = fnBody("stepBridgeTracker", "ui/widgets/bridge-widgets");
+    expect(write).toContain("plugin.app.vault.process(file,");
+    expect(write).toContain('withBridgeCycle(text.split("\\n"), "readings", target, step)');
+    expect(write).toContain("if (next === null) return text;");
+  });
+
+  it("reaches no frozen bridge, by the structure rather than by a guard", () => {
+    // The frozen branch renders stored rows instead of calling this body at
+    // all, which is the same answer `bridgeHeader` gives the period stepper —
+    // a frozen block is a record, and a record whose tracker could be stepped
+    // would be a record of nothing in particular.
+    expect(src()).toContain(
+      "if (snap.frozen && region.trim()) renderFrozen(body, region);"
+    );
+    expect(row()).not.toContain("frozen");
   });
 });
 
@@ -1369,10 +1766,78 @@ describe("answering one piece leaves the other as the reader left it", () => {
       '(q) => q.kind === "flag" && q.derived && q.directive'
     );
     // AND THE SCAN IS FOR THE DIRECTIVE THE QUESTION NAMED, so a `bridge-notes`
-    // line on the same note is not mistaken for this answer.
+    // line on the same note is not mistaken for this answer. Shared with the
+    // target read beside it as of 1.0.95, so the name is the helper's argument.
     expect(plan).toContain(
-      "(x) => x !== null && `bridge-${x.direction}` === onDirective.directive"
+      "(x) => x !== null && `bridge-${x.direction}` === name"
     );
+    expect(plan).toContain("bridgeNamed(onDirective.directive)");
+  });
+
+  // ── AND THE TRACKER LIST RIDES IT TOO (1.0.95) ─────────────────────
+
+  it("writes the set the reader ticked, head first", () => {
+    const { text, model } = composed();
+    expect(
+      directiveIn(want(model, text, { tracker: "Mood+Energy+Sleep" }))
+    ).toBe(`bridge-readings:Mood+Energy+Sleep|${BRIDGE_SECTION_TITLE}`);
+  });
+
+  it("keeps the flags when the set changes, which is the 1.0.94 defect's shape", () => {
+    // The list is piece 0 of the compound argument and the flags are glued to
+    // it, so answering the trackers splices over `Mood#trend#entries` — the
+    // same way answering ONE tracker did before this release, which is what
+    // `withBridgeFlagAnswer` was written for.
+    const { text, model } = composed();
+    const flagged = text.replace(
+      directiveIn(text),
+      `bridge-readings:${DEFAULT_BRIDGE_TRACKER}#trend#entries tag:x|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(directiveIn(want(model, flagged, { tracker: "Mood+Energy" }))).toBe(
+      `bridge-readings:Mood+Energy#trend#entries tag:x|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("leaves a rotated list exactly where the stepper left it", () => {
+    // The reader stepped to Energy and then typed a filter. Nothing about the
+    // cycle may move: the head is which tracker is on screen, so re-seeding
+    // piece 0 from the registry's order would step the block for them.
+    const { text, model } = composed();
+    const rotated = text.replace(
+      directiveIn(text),
+      `bridge-readings:Energy+Sleep+Mood|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(directiveIn(want(model, rotated, { filters: "tag:x" }))).toBe(
+      `bridge-readings:Energy+Sleep+Mood tag:x|${BRIDGE_SECTION_TITLE}`
+    );
+    expect(directiveIn(want(model, rotated, { entries: FLAG_ON }))).toBe(
+      `bridge-readings:Energy+Sleep+Mood#entries|${BRIDGE_SECTION_TITLE}`
+    );
+  });
+
+  it("hands the window the target without the flag stuck to it", () => {
+    // A DEFECT 1.0.95 FOUND AND 1.0.89 SHIPPED. `answerInText` splits a
+    // compound argument on WHITESPACE, so piece 0 of
+    // `bridge-readings:Mood#trend tag:x` is `Mood#trend` — an answer matching
+    // no option, which the dropdown degraded into "Mood (default)" on every
+    // trend bridge in every vault.
+    //
+    // WHAT MAKES IT FATAL RATHER THAN COSMETIC NOW: a tick list has no
+    // placeholder to fall back to. Every box would be clear, and the first tick
+    // would compose `Mood#trend+Energy` — a target with a flag inside it.
+    const { text, model } = composed();
+    const answered = (line: string): string | undefined => {
+      const t = text.replace(directiveIn(text), line);
+      return model.sections(t).find((s) => s.id === BRIDGE_SECTION_ID)!
+        .answered?.tracker;
+    };
+    expect(
+      answered(`bridge-readings:Mood#trend|${BRIDGE_SECTION_TITLE}`)
+    ).toBe("Mood");
+    expect(
+      answered(`bridge-readings:Mood+Energy#trend#entries tag:x|${BRIDGE_SECTION_TITLE}`)
+    ).toBe("Mood+Energy");
+    expect(answered(`bridge-readings:Mood|${BRIDGE_SECTION_TITLE}`)).toBe("Mood");
   });
 
   it("answers null when nothing moved, which is what stops a no-op write", () => {

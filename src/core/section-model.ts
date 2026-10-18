@@ -61,6 +61,7 @@ import {
   withFlagLine,
   withLabel,
   withToken,
+  PICK_JOIN,
   WIDGET_TOKEN,
 } from "./directive-grammar";
 
@@ -472,6 +473,31 @@ export interface ChoiceQuestion extends SectionQuestionCommon {
   // demanding an answer the plugin already has. The field is how a catalogue
   // says so, and the derivation now reads the fact instead of the proxy.
   emptyLabel?: string;
+  // SEVERAL OF `values`, NOT ONE OF THEM. 1.0.95.
+  //
+  //   "a row above the chart to cycle through enabled trackers
+  //    (enabled/choosen in the settings window)"
+  //
+  // The bridge's tracker is the one question in the tree that is answered with
+  // a LIST, and this field is how the catalogue says so. The answer is the
+  // picked values joined with `PICK_JOIN`, in the order they are to be used.
+  //
+  // A FIELD ON `choice` RATHER THAN AN EIGHTH KIND, and the test is what the
+  // ANSWER is rather than what the control looks like. Every other question
+  // kind here exists because its answer has a different shape — a folder path,
+  // a title, a `lines` block, a flag's on/off — and this one's is still "one or
+  // more of a closed set the vault defines", which is exactly `values`. It
+  // reads back through the same `part` splice, stores in the same
+  // `SectionOverrides` field, and `questionIsRequired` asks it the same
+  // question. What changes is the control, and a control is a renderer's
+  // business: `<select>` for one, a tick per row for several.
+  //
+  // THE ORDER IS THE ANSWER'S, NOT `values`'. A cycle is a sequence, so the
+  // renderer must compose the answer from what is already there plus what was
+  // ticked — never by sweeping `values` and collecting the ticked ones, which
+  // would silently reorder the reader's cycle every time they opened the
+  // window. See `renderPicks`.
+  multi?: true;
 }
 
 // A question answered with a folder path, drawn as a text field with
@@ -1801,7 +1827,19 @@ export function describeAnswers(
         ? q.keywords?.find((k) => k.value === answer.trim())?.label
         : q.kind === "title" || q.kind === "text"
           ? undefined
-          : q.values.find((v) => v.value === answer.trim())?.label;
+          : q.multi
+            // A LIST IS NAMED PIECE BY PIECE, so the line a reader confirms
+            // reads "the trackers to cycle → Mood, Energy" rather than the raw
+            // `Mood+Energy` they never typed. An id with no label left in the
+            // registry keeps its id, which is the same fallback the single
+            // form's `?? shown` makes one line down.
+            ? answer
+                .split(PICK_JOIN)
+                .map((v) => v.trim())
+                .filter(Boolean)
+                .map((v) => q.values.find((o) => o.value === v)?.label ?? v)
+                .join(", ") || undefined
+            : q.values.find((v) => v.value === answer.trim())?.label;
     parts.push(`${q.label} → ${named ?? shown}`);
   }
   return parts.length ? parts.join(", ") : "answer changed";

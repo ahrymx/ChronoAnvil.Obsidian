@@ -57,6 +57,7 @@ import { App, TFile } from "obsidian";
 
 import { EditorModal } from "./editor-modal";
 import type ChronoAnvilPlugin from "../main";
+import { PICK_JOIN, splitPicks } from "../core/directive-grammar";
 import { getFile } from "../core/util";
 import { notify } from "../core/notify";
 import {
@@ -177,7 +178,11 @@ class BridgeWindow extends EditorModal {
     };
 
     for (const q of this.questions) {
-      if (q.kind === "choice") this.renderChoice(field(q), q);
+      // A MULTI CHOICE IS A DIFFERENT CONTROL AND THE SAME ANSWER (1.0.95) —
+      // see `ChoiceQuestion.multi`, which is why the branch is here and not a
+      // kind of its own.
+      if (q.kind === "choice" && q.multi) this.renderPicks(field(q), q);
+      else if (q.kind === "choice") this.renderChoice(field(q), q);
       else if (q.kind === "text") this.renderText(field(q), q);
       else if (q.kind === "flag") this.renderFlag(field(q), q);
     }
@@ -212,6 +217,64 @@ class BridgeWindow extends EditorModal {
     box.setAttribute("aria-label", q.on);
     box.addEventListener("change", () => {
       this.answer(q.key, box.checked ? FLAG_ON : FLAG_OFF);
+    });
+  }
+
+  // Several of a closed set, as a tick per row. 1.0.95.
+  //
+  //   "cycle through enabled trackers (enabled/choosen in the settings window)"
+  //
+  // TICKS AND NOT `<select multiple>`. The native control needs a ctrl-click to
+  // add a second value and a ctrl-click to keep the first, which is a gesture
+  // nothing else in this plugin asks for and which silently clears the reader's
+  // whole answer when they get it wrong. A column of checkboxes says what is in
+  // and what is out at a glance and costs one click per change — and it is the
+  // `renderFlag` row above, drawn once per value, so the two controls in this
+  // window are made of the same parts.
+  //
+  // THE ORDER IS THE READER'S AND IS NOT RECOMPUTED (see `ChoiceQuestion.multi`).
+  // A newly ticked value is APPENDED to the answer that is already there, and
+  // unticking removes one and leaves the rest where they were. Sweeping
+  // `q.values` and collecting the ticked ones would be one line shorter and
+  // would reorder the cycle — and so move which tracker the block draws — every
+  // time the reader opened this window and changed anything.
+  //
+  // AN INDEX IN THE `id`, NOT THE VALUE. A tracker id is a frontmatter property
+  // name, so it may hold a space; `label.htmlFor` has to match the box exactly,
+  // and an `id` with a space in it is one the label cannot address.
+  private renderPicks(host: HTMLElement, q: ChoiceQuestion): void {
+    if (!q.values.length) {
+      host.createSpan({ cls: "ca-tpl-choice-empty", text: q.empty });
+      return;
+    }
+    const picks = host.createDiv({ cls: "ca-tpl-picks" });
+    q.values.forEach((v, i) => {
+      const row = picks.createDiv({ cls: "ca-tpl-form" });
+      const box = row.createEl("input", {
+        type: "checkbox",
+        cls: "ca-tpl-form-box",
+      });
+      box.id = `ca-bridge-pick-${q.key}-${i}`;
+      const label = row.createEl("label", {
+        cls: "ca-tpl-form-label",
+        text: v.label,
+      });
+      label.htmlFor = box.id;
+      box.checked = splitPicks(this.shown(q)).includes(v.value);
+      box.setAttribute("aria-label", v.label);
+      box.addEventListener("change", () => {
+        const now = splitPicks(this.shown(q));
+        const next = box.checked
+          ? [...now, v.value]
+          : now.filter((x) => x !== v.value);
+        // UNDEFINED WHEN NOTHING IS LEFT, which is the empty row of the
+        // dropdown this replaces and means the same thing: no answer, so the
+        // section composes its `emptyLabel` default. An empty STRING would be
+        // an answer of no trackers, and `planBridge` would refuse the line the
+        // save produced — correctly, and for a question the reader thought they
+        // had cleared rather than broken.
+        this.answer(q.key, next.length ? next.join(PICK_JOIN) : undefined);
+      });
     });
   }
 

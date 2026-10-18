@@ -151,6 +151,7 @@ import { Segment, keywordOf, segment } from "../core/layout";
 import { isTrackerMarkEnd, isTrackerMarkStart } from "../core/constants";
 import {
   MODIFIER_KEYWORDS,
+  PICK_JOIN,
   ROW_KEYWORD,
   STACK_KEYWORD,
   cutFromFence,
@@ -3682,16 +3683,49 @@ function answeredIn(
   // because `locate` probes for this very keyword: no anchor means no line to
   // misread. Asking the lines directly has no unreachable branch in it, and it
   // reads an INDENTED bridge, which a `^`-anchored probe does not.
+  const bridgeNamed = (
+    name: string | undefined
+  ): ReturnType<typeof readBridgeDirective> =>
+    text
+      .split("\n")
+      .map((l) => readBridgeDirective(l))
+      .find((x) => x !== null && `bridge-${x.direction}` === name) ?? null;
   const onDirective = questions.find(
     (q) => q.kind === "flag" && q.derived && q.directive
   );
   if (onDirective) {
-    const d = text
-      .split("\n")
-      .map((l) => readBridgeDirective(l))
-      .find((x) => x !== null && `bridge-${x.direction}` === onDirective.directive);
+    const d = bridgeNamed(onDirective.directive);
     if (d) out[onDirective.key] = d.entries ? FLAG_ON : FLAG_OFF;
     else delete out[onDirective.key];
+  }
+  // ── AND THE TARGET ITSELF, FOR THE SAME REASON (1.0.95) ─────────────
+  //
+  // A DEFECT THIS FEATURE FOUND RATHER THAN A PIECE OF IT, and it has been
+  // there since 1.0.89. `answerInText` splits a compound argument on
+  // WHITESPACE, which is right for the filter tail and cannot see the flag
+  // suffix: the span over `bridge-readings:Mood#trend tag:x` has piece 0
+  // `Mood#trend`, so the window's TRACKER dropdown has been handed an answer
+  // matching no option on every trend bridge in every vault, and has drawn
+  // "Mood (default)" over a line that says Mood.
+  //
+  // WHAT MADE IT WORTH FIXING NOW. A dropdown with no match falls back to its
+  // placeholder and the reader's next save writes the right thing anyway. A
+  // TICK LIST cannot degrade like that: an unmatched `Mood#trend` leaves every
+  // box clear, and the first tick would compose `Mood#trend+Energy` — a target
+  // with a flag inside it, which is precisely the corruption `withToken` was
+  // measured and rejected for in 1.0.94.
+  //
+  // `multi` AND A DIRECTIVE IS THE TEST, and it is narrow on purpose. The one
+  // question in the tree whose answer is a bridge's TARGET is the one that is
+  // multi; the notes side's target carries no flag, so the generic read is
+  // right there and is left alone. What this branch states is that a target
+  // must be read by the reader that knows what else shares its piece.
+  const picks = questions.find(
+    (q) => q.kind === "choice" && q.multi && q.directive
+  );
+  if (picks) {
+    const d = bridgeNamed(picks.directive);
+    if (d) out[picks.key] = [d.target, ...d.cycle].join(PICK_JOIN);
   }
   // THE KEY IS READ OFF THE QUESTION, not written here. This file knows that a
   // bracketed section's prose answers a `lines` question; it does not need to

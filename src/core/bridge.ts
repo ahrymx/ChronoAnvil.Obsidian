@@ -43,6 +43,7 @@ import {
 import type { PeriodBounds } from "../charts/charts";
 import { parseQuery, tokenize } from "../diary/diary-index";
 import type { DiaryQuery, IndexSurface } from "../diary/diary-index";
+import { PICK_JOIN, splitPicks } from "./directive-grammar";
 import { isoDate, moment } from "./util";
 
 // ── model ─────────────────────────────────────────────────────────────
@@ -208,6 +209,30 @@ export interface BridgeDirective {
   // is today's readings list; `#trend` alone is the chart; this alone widens the
   // list to every entry; both draws the chart over the full entry list.
   entries: boolean;
+  // THE REST OF THE CYCLE, readings only: the other trackers this one block can
+  // be stepped to, in the order it steps through them. 1.0.95.
+  //
+  //   "a row above the chart to cycle through enabled trackers"
+  //
+  // `target` IS THE HEAD OF THIS LIST AND NOT A FIELD BESIDE IT, which is the
+  // decision the whole feature rests on. A cycle could have been stored as a
+  // set plus a pointer into it, and then two things would say which tracker the
+  // block is about — the plugin has `snapshotKeyFor`, `planBridge`, the
+  // catalogue, `targetLabel` and the window's own TRACKER answer all reading
+  // `target` today, and every one of them would have had to learn which of the
+  // two to believe. So the list is stored head-first: `target` keeps meaning
+  // exactly what it has meant since 2.57 — the tracker this block draws — and
+  // this is what it may be stepped to next.
+  //
+  // STEPPING IS THEREFORE A ROTATION, not a moving index. `[>]` on
+  // `Mood+Energy+Sleep` writes `Energy+Sleep+Mood`: the reader's cycle ORDER
+  // survives intact, because a rotation preserves a cycle exactly and only
+  // moves where it starts. See `withBridgeCycle`.
+  //
+  // EMPTY IS THE ORDINARY CASE and is every bridge written before this release:
+  // one tracker, no list, no stepper, and `writeBridgeArg` emits the same byte
+  // it always has.
+  cycle: string[];
   // The raw selector text after the target, untouched.
   filters: string;
   // The reader's own title, after the `|`, or null where the line carries none.
@@ -225,17 +250,23 @@ export interface BridgeDirective {
 export function readBridgeArg(
   direction: BridgeDirection,
   arg: string
-): { target: string; trend: boolean; entries: boolean; filters: string } {
+): {
+  target: string;
+  cycle: string[];
+  trend: boolean;
+  entries: boolean;
+  filters: string;
+} {
   const trimmed = arg.trim();
   const cut = trimmed.search(/\s/);
   const head = cut === -1 ? trimmed : trimmed.slice(0, cut);
   const filters = cut === -1 ? "" : trimmed.slice(cut + 1).trim();
   if (direction === "notes") {
-    return { target: head, trend: false, entries: false, filters };
+    return { target: head, cycle: [], trend: false, entries: false, filters };
   }
   const hash = head.indexOf("#");
   if (hash === -1) {
-    return { target: head, trend: false, entries: false, filters };
+    return { ...ring(head), trend: false, entries: false, filters };
   }
   // THE SPLIT WAS ALWAYS MULTI-FLAG AND NOW SOMETHING ELSE READS IT. `#trend`
   // was the only token for three releases and this list has been built the same
@@ -246,16 +277,38 @@ export function readBridgeArg(
     .split("#")
     .map((f) => f.trim().toLowerCase());
   return {
-    target: head.slice(0, hash),
+    ...ring(head.slice(0, hash)),
     trend: flags.includes("trend"),
     entries: flags.includes("entries"),
     filters,
   };
 }
 
+// The target piece, taken apart into the tracker shown and the rest of its
+// cycle. 1.0.95.
+//
+// READINGS ONLY, AND THE SAME RULE `#` FOLLOWS. A notes bridge's target is a
+// note TYPE, so `bridge-notes:meal+dinner` keeps its `+` and earns
+// `No note type called "meal+dinner"` — the message a typo deserves. Splitting
+// a list the directive does not have would render a working block for a line
+// that asked for something impossible, which is the argument `readBridgeArg`
+// already makes about `#trend` one paragraph up.
+//
+// EMPTY PIECES AND DUPLICATES GO, in `splitPicks` rather than here — it is the
+// one splitter the control at the other end composes with, and it states why.
+//
+// AN EMPTY HEAD IS STILL AN ANSWER — a bridge the reader has added and not yet
+// configured, the ordinary first state since 3.8 — so this returns `""` rather
+// than refusing, exactly as the unsplit read did.
+function ring(piece: string): { target: string; cycle: string[] } {
+  const parts = splitPicks(piece);
+  return { target: parts[0] ?? "", cycle: parts.slice(1) };
+}
+
 export function writeBridgeArg(d: {
   direction: BridgeDirection;
   target: string;
+  cycle?: string[];
   trend: boolean;
   entries: boolean;
   filters: string;
@@ -275,8 +328,26 @@ export function writeBridgeArg(d: {
     d.direction === "readings"
       ? `${d.trend ? "#trend" : ""}${d.entries ? "#entries" : ""}`
       : "";
+  // AND THE CYCLE JOINS THE HEAD, BEFORE THE FLAGS (1.0.95). The flags belong
+  // to the BLOCK rather than to any one tracker in it — `#trend` is how the
+  // block is drawn and `#entries` is which days it rows — so they sit after the
+  // whole list, which is also the only place a reader could put them without
+  // `ring` reading `trend` as a tracker id.
+  //
+  // A ONE-TRACKER BRIDGE WRITES THE BYTE IT ALWAYS WROTE. `cycle` is optional
+  // here and empty on every line in every vault before this release, so
+  // nothing on disk is rewritten by this release existing — the same
+  // omitted-default discipline `serializeChartSpec` keeps for its own tokens.
+  // THE DIRECTION DECIDES WHETHER A `+` IS A LIST, the same way it decides
+  // whether a `#` is a flag: a notes bridge's cycle is dropped here rather than
+  // joined, so this cannot quietly concatenate two note-type ids into one.
+  const ids = d.direction === "readings" ? [d.target, ...(d.cycle ?? [])] : [d.target];
+  const list = ids
+    .map((t) => t.trim())
+    .filter((t) => t !== "")
+    .join(PICK_JOIN);
   const tail = d.filters.trim();
-  return `${d.target.trim()}${flags}${tail ? ` ${tail}` : ""}`;
+  return `${list}${flags}${tail ? ` ${tail}` : ""}`;
 }
 
 // ── ONE FLAG, WRITTEN ONTO THE LINE THE READER IS LOOKING AT (1.0.94) ────
@@ -310,12 +381,95 @@ export function writeBridgeArg(d: {
 // THE INDENT IS KEPT. A bridge inside a list item or a callout is indented, and
 // `writeBridgeDirective` composes a line from the directive's own parts with no
 // idea where it sat.
+//
+// AND THE LAST THREE PARAGRAPHS NOW DESCRIBE `rewriteSoleBridge` (1.0.95),
+// where they moved when the tracker stepper needed the same find-and-splice.
+// What is left here is the change itself, which is one field.
 export function withBridgeFlag(
   lines: readonly string[],
   direction: BridgeDirection,
   target: string,
   flag: "trend" | "entries",
   on: boolean
+): string[] | null {
+  return rewriteSoleBridge(lines, direction, target, (d) => ({
+    ...d,
+    [flag]: on,
+  }));
+}
+
+// ── ONE TRACKER FORWARD OR BACK, ON THE SAME LINE (1.0.95) ──────────────
+//
+//   "a row above the chart to cycle through enabled trackers"
+//
+// A ROTATION, WHICH IS WHAT KEEPS THE ANSWER ONE FIELD. `target` is the head of
+// the cycle and the rest follows it, so stepping forward moves the head to the
+// back: `Mood+Energy+Sleep` becomes `Energy+Sleep+Mood`. The reader's cycle is
+// preserved exactly — a rotation changes where a cycle starts and nothing else
+// — and the tracker the block is about stays the one thing on the line that
+// says so. See `BridgeDirective.cycle` for why it is not a set plus a pointer.
+//
+// AND THE STEP IS WRITTEN, which is the reader's own call: *"Reopen the note
+// later: still Energy."* A view mode held in the render closure would be
+// forgotten on the next paint, and `setBridgeTrend` already states the rule
+// this follows — a control that is part of the note writes to the note, or the
+// next render undoes it.
+//
+// A ONE-TRACKER BRIDGE COMES BACK `null` AND THAT IS NOT AN ERROR. There is
+// nothing to step to, so there is no write to make; the stepper is not drawn in
+// that case at all, and this is the second guard rather than the first. It
+// shares `null` with the sole-or-nothing refusal deliberately: both mean "no
+// single unambiguous rotation to perform", and neither caller distinguishes
+// them because neither has anything different to say.
+//
+// ANY INTEGER STEPS. `+1` and `-1` are the two the row draws, and the modulo
+// below is written so that `-1` on a three-tracker cycle lands on the last
+// rather than off the front — the arithmetic JavaScript's `%` gets wrong for
+// negative operands, which is the one thing in this function worth a test.
+export function withBridgeCycle(
+  lines: readonly string[],
+  direction: BridgeDirection,
+  target: string,
+  step: number
+): string[] | null {
+  return rewriteSoleBridge(lines, direction, target, (d) => {
+    const ring = [d.target, ...d.cycle];
+    if (ring.length < 2) return null;
+    const n = ring.length;
+    const k = ((step % n) + n) % n;
+    // AN INDEX MAP AND NOT TWO SLICES, WHICH IS A MUTANT'S DOING. The slice
+    // form — `[...ring.slice(k), ...ring.slice(0, k)]` — gives the right answer
+    // for a NEGATIVE `k` as well, because a negative slice index counts from the
+    // end: `slice(-1)` is the last element and `slice(0, -1)` is the rest, which
+    // is exactly the backward rotation. So the `+ n` above was unreachable, and
+    // a sweep could not tell its presence from its absence. Measured, not
+    // assumed.
+    //
+    // Written this way the normalisation is load-bearing: `ring[(j + k) % n]`
+    // with a negative `k` indexes off the front of the array and comes back
+    // `undefined`, so the arithmetic that keeps `k` non-negative is the thing
+    // the backward step is now testing.
+    const next = ring.map((_, j) => ring[(j + k) % n]);
+    return { ...d, target: next[0], cycle: next.slice(1) };
+  });
+}
+
+// The sole-or-nothing lookup and the splice, shared by both writers above.
+//
+// EXTRACTED RATHER THAN COPIED (1.0.95), because the rule it carries is one
+// rule: a note with two readings bridges on one tracker has two lines a write
+// could mean, and rewriting the first is an answer nothing may claim to have
+// read. Two copies of that would be two chances to fix it in one place.
+//
+// THE CHANGE IS A FUNCTION AND MAY DECLINE. `withBridgeCycle` has a second
+// reason to write nothing — a cycle of one — which is a fact about the
+// DIRECTIVE rather than about the lines, so it is answered where the directive
+// is in hand instead of being probed for twice.
+function rewriteSoleBridge(
+  lines: readonly string[],
+  direction: BridgeDirection,
+  target: string,
+  change: (d: BridgeDirective) => BridgeDirective | null
 ): string[] | null {
   const at: number[] = [];
   lines.forEach((line, i) => {
@@ -325,9 +479,10 @@ export function withBridgeFlag(
   if (at.length !== 1) return null;
   const i = at[0];
   const indent = /^\s*/.exec(lines[i])![0];
-  const directive = readBridgeDirective(lines[i])!;
+  const next = change(readBridgeDirective(lines[i])!);
+  if (next === null) return null;
   const out = [...lines];
-  out[i] = indent + writeBridgeDirective({ ...directive, [flag]: on });
+  out[i] = indent + writeBridgeDirective(next);
   return out;
 }
 

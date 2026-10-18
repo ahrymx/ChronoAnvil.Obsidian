@@ -195,6 +195,84 @@
   color: var(--text-faint);
 }
 
+/* ── 1.0.95: the row that cycles the trackers ────────────────────────────
+ *
+ *   "a row above the chart to cycle through enabled trackers ...
+ *    It could look like: [<]     [tracker name]     [>]."
+ *
+ * `bridge-readings:Mood+Energy+Sleep`. Drawn at the top of the block's body,
+ * above the trend and above the list, and absent entirely for a bridge with one
+ * tracker — which is every bridge written before this release.
+ *
+ * CENTRED, WITH THE NAME BETWEEN THE ARROWS AND NOT BESIDE THEM. The reader
+ * drew the control they wanted and the spacing is the drawing: the arrows sit
+ * at a fixed distance from the name rather than at the block's two edges, so a
+ * card the width of a lesson note and one the width of a dashboard column read
+ * the same. `justify-content: center` plus a gap, not `space-between`.
+ *
+ * ITS OWN STRIP AND NOT `.ca-jeh-seg`. The period stepper on the bar is a
+ * welded three-segment pill because it IS the bar's headline — one control with
+ * a hairline through it. This is a label with two buttons either side of it
+ * inside a card body, where a pill would read as a second title bar under the
+ * first. Same gesture, different furniture, and the two sit three pixels apart
+ * on screen: making them identical would say they do the same thing. */
+.ca-bridge-cycle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-4-3);
+  margin-bottom: var(--size-4-1);
+}
+
+/* AN EXPLICIT 2em SQUARE, AND THE `padding: 0` IS NOT TIDYING. A chip-shaped
+ * `<button>` in Obsidian is 30px tall with its own padding until a rule says
+ * otherwise — 1.0.91 measured that as the "blank box" under every date selector
+ * — and the fix is to DECLARE the box, not to delete a declaration: removing a
+ * height here hands the control straight back to the 30px it came from.
+ *
+ * `--ca-text-sm` rather than inheriting the body's type, so the two arrows stay
+ * the size of a control beside a name rather than growing with the note. The
+ * icon is sized off it, which is what keeps one declaration per chain — the
+ * multiplication trap 1.0.91 paid for on the bar's own strip. */
+.ca-bridge-cycle-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+  padding: 0;
+  font-size: var(--ca-text-sm);
+  color: var(--text-muted);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--ca-radius-pill);
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s, color 0.12s;
+}
+.ca-bridge-cycle-step:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.ca-bridge-cycle-step svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* The tracker's own label, which is the same string the bar above prints. Given
+   the normal text colour and a little weight because it is the answer to the
+   question the arrows ask — the bar's copy names the SECTION, this one names
+   what is on screen inside it. */
+.ca-bridge-cycle-name {
+  font-size: var(--ca-text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── 3.8: a readings bridge drawn as a trend ─────────────────────────────
    `bridge-readings:<tracker>#trend`. The same Chart.js canvas the diary's chart
    tiles draw, over the window the host note declares.

@@ -102,6 +102,7 @@ import {
 import type { Arrangement, MoveUnit, NextArrangement } from "../core/row-order";
 import { categoryLabel, categoryRank } from "../core/sections";
 import type {
+  ChoiceQuestion,
   FlagQuestion,
   FolderQuestion,
   FormQuestion,
@@ -115,6 +116,7 @@ import type {
   SectionWant,
 } from "../core/section-model";
 import { FLAG_OFF, FLAG_ON, SECTION_FORM, WIDGET_FORM } from "../core/section-model";
+import { PICK_JOIN, splitPicks } from "../core/directive-grammar";
 import { ArgSuggest } from "./arg-suggest";
 import { notify } from "../core/notify";
 
@@ -2201,8 +2203,23 @@ export class SectionEditorModal extends EditorModal {
       // with no entries is a control that looks broken; the catalogue supplied
       // wording for this case precisely so the reader is told what is missing
       // and where to get it.
+      //
+      // AND IT IS ASKED BEFORE THE MULTI BRANCH BELOW, because a column of no
+      // checkboxes looks every bit as broken as an empty menu and the sentence
+      // the catalogue wrote answers both.
       if (!q.values.length) {
         host.createSpan({ cls: "ca-tpl-choice-empty", text: q.empty });
+        continue;
+      }
+      // SEVERAL OF THE SET, AS TICKS (1.0.95). `ChoiceQuestion.multi` is a
+      // different control for the same answer, and this window draws it for the
+      // reason it draws every other question in the catalogue: the bridge's cog
+      // is one door onto one block, and *Edit sections…* is the door onto all of
+      // them. A reader who reaches the bridge from here must be able to answer
+      // the same question, or the two windows disagree about what the section
+      // can be configured with.
+      if (q.multi) {
+        this.renderPicksQuestion(field(q), section, q);
         continue;
       }
       const select = field(q).createEl("select", { cls: "ca-tpl-choice" });
@@ -2481,6 +2498,61 @@ export class SectionEditorModal extends EditorModal {
   // which is why this draws no empty state and has no `settled` wording to fall
   // back to. Where the model could NOT locate the section, `readable` has
   // already replaced this control with that wording before it is called.
+  // A closed set, answered with several of it. 1.0.95.
+  //
+  // THE SAME CONTROL `bridge-window.ts::renderPicks` DRAWS, parts and all,
+  // because the reader meets the two windows in one vault an hour apart — the
+  // rule `renderFlag` is already duplicated under, stated there. What differs
+  // is only what this window has to carry: a section id, because two sections
+  // in one editor may ask the same question and may not share one `id`.
+  //
+  // THE ORDER IS THE READER'S. A tick appends and an untick removes; nothing
+  // here sweeps `q.values` to recompose the answer, which would reorder the
+  // bridge's cycle — and so change which tracker it draws — on any edit.
+  private renderPicksQuestion(
+    host: HTMLElement,
+    section: SectionView,
+    q: ChoiceQuestion
+  ): void {
+    const picks = host.createDiv({ cls: "ca-tpl-picks" });
+    const safe = section.id.replace(/[^a-z0-9]+/gi, "-");
+    q.values.forEach((v, i) => {
+      const row = picks.createDiv({ cls: "ca-tpl-form" });
+      const box = row.createEl("input", {
+        type: "checkbox",
+        cls: "ca-tpl-form-box",
+      });
+      // AN INDEX AND NOT THE VALUE, for `renderFlagQuestion`'s reason one
+      // function down and one more: a tracker id is a frontmatter property name
+      // and may hold a space, which is an `id` no label can address.
+      box.id = `ca-pick-${q.key}-${safe}-${i}`;
+      const label = row.createEl("label", {
+        cls: "ca-tpl-form-label",
+        text: v.label,
+      });
+      label.htmlFor = box.id;
+      box.checked = splitPicks(this.shownAnswer(section, q)).includes(v.value);
+      box.setAttribute("aria-label", v.label);
+      box.addEventListener("change", () => {
+        const now = splitPicks(this.shownAnswer(section, q));
+        const next = box.checked
+          ? [...now, v.value]
+          : now.filter((x) => x !== v.value);
+        this.answer(
+          section.id,
+          q.key,
+          next.length ? next.join(PICK_JOIN) : undefined
+        );
+        // THE SAME REPAINT THE DROPDOWN DOES, for the same reason: the pill,
+        // the footer count, the Changes tab and the Markdown pane all move with
+        // an answer. Safe here where it would not be in a text box — a repaint
+        // under a cursor moves the field being typed into, and a checkbox has
+        // no cursor in it.
+        this.refreshFrame();
+      });
+    });
+  }
+
   private renderFlagQuestion(
     host: HTMLElement,
     section: SectionView,

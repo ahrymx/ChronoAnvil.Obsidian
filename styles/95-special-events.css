@@ -2734,6 +2734,27 @@ body.is-mobile .ca-journal-capture-actions > button.ca-journal-capture-btn {
   cursor: pointer;
   min-width: 0;
 }
+/* ── 1.0.95: a choice answered with several of its values ────────────────
+   `ChoiceQuestion.multi`, drawn as a tick per row by both the section editor
+   and the bridge's cog. The rows ARE `.ca-tpl-form` — one box, one label — so
+   everything about a tick's size, colour and wrapping is declared once above
+   and this rule only stacks them.
+
+   A COLUMN AND NOT A WRAPPED ROW. The labels are tracker names of unequal
+   length, so a wrapped row puts a different number of ticks on each line and
+   the reader has to scan for them. A column has one box per line in a fixed
+   place, which is what makes a set of five readable at a glance.
+
+   NO MAX HEIGHT AND NO SCROLL. A vault's chartable trackers are a handful, the
+   window this sits in scrolls already, and an inner scroller inside a modal
+   body is two scrollbars for one gesture. */
+.ca-tpl-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .ca-tpl-form.is-disabled {
   opacity: 0.5;
   cursor: not-allowed;

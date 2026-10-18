@@ -1142,6 +1142,13 @@ export class SectionInserter {
         new Notice(`ChronoAnvil: ${q.empty}`);
         return;
       }
+      // AND A MULTI CHOICE IS ANSWERED WITH ONE OF ITS VALUES HERE (1.0.95),
+      // which is a real answer and not a degradation. `promptChoice` returns one
+      // id, one id is a list of one, and that is the state every bridge in every
+      // vault was in before this release — the section is about to be ADDED, and
+      // a reader who has not seen the block yet has nothing to cycle through.
+      // The tick list is in the cog on the block's own bar, one gesture away the
+      // moment it is there, which is the same argument the four skips above make.
       // `promptChoice` rather than the suggester above it, because two
       // journals may label a kind identically while defining different ids —
       // this is the `items[labels.indexOf(chosen)]` failure that helper was
