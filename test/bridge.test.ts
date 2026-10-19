@@ -468,8 +468,10 @@ describe("both directives are routed and neither skips the guard", () => {
     // 1. The fence's own pass, matching the directive by keyword.
     expect(src).toContain('line.split(":")[0].trim() === "period-nav"');
     expect(src).toContain("periodNavUnit(line.slice(line.indexOf(\":\") + 1))");
-    // 2. Threaded into the per-line builder, last of the fence facts.
-    expect(src).toContain("noteTextNow,\n          navUnit\n        );");
+    // 2. Threaded into the per-line builder, among the fence facts. It was
+    //    LAST of them until 1.0.98 put the habits cogs' `hosted` flag after
+    //    it, so the shape asserted is the pair rather than the end of the call.
+    expect(src).toContain("noteTextNow,\n          navUnit,");
     // 3. And into the host facts, which is what `bridgeWindow` reads.
     expect(bridge()).toContain("bridgeHostFacts(plugin, path, navUnit)");
     expect(fnBody("bridgeHostFacts", "bridge-widgets")).toContain("navUnit,");

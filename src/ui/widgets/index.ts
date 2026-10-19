@@ -14,7 +14,7 @@ import type ChronoAnvilPlugin from "../../main";
 import { buildYearSummary } from "../../review/year-view";
 import { buildQuarterSummary } from "../../review/quarter-view";
 import { buildPeriodRecap } from "../../review/recap-view";
-import { buildHabitRollup } from "./habit-rollup-view";
+import { buildHabitRollup, buildHabitRollupCog } from "./habit-rollup-view";
 import {
   buildEntryRollup,
   ROLLUP_FOLDER,
@@ -153,7 +153,7 @@ import {
   noteHasHabitsSection,
   type HabitEntry,
 } from "../../trackers/habits";
-import { buildHabitsSection } from "./habits-section";
+import { buildHabitsCog, buildHabitsSection } from "./habits-section";
 import { diaryEntryFolders } from "../../diary/lineage";
 import { buildTrackerStat } from "../../trackers/tracker-stat";
 import {
@@ -1360,6 +1360,43 @@ export class Widgets implements
       // what the unfiltered walk returns and what 1.0.69 shipped: the cog sat
       // inside the card beside 📖 Lessons' chevron, reading as that type's.
       const belowHeader = headerOwning("kind-table", 1);
+      // ── AND THE TWO HABITS CARDS' BARS (1.0.98) ─────────────────────
+      //
+      // *"move 'Manage habits' and 'choose habits' into the sections title row
+      // next to the chevron as a the cog icon used in many other sections with
+      // a settings window"*. The same walk as the two above, at level 1 for
+      // `belowHeader`'s reason: the bar a reader points at when they name the
+      // section is the card's own, never a group head inside it.
+      //
+      // -1 IS THE CASE BOTH REFUSALS WERE WRITTEN ABOUT. A rollup drawn with
+      // *Show as widget* has no bar at all, and a bare `habits` fence outside a
+      // band has only `buildHead`'s label, which carries no chevron and no
+      // tools slot. Then the card keeps the row at its own foot, which is the
+      // answer 1.0.49 §1 reached for the Categories door and the half of
+      // 1.0.55's refusal that was right.
+      const rollupHeader = headerOwning("habit-rollup", 1);
+      const habitsHeader = headerOwning("habits", 1);
+      // The `habit-rollup` line's own argument, which is what its cog writes
+      // back to. Off the FENCE because the cog is built at the `header:` line,
+      // before the directive it belongs to is reached — `firstShelf`'s idiom.
+      const rollupArg =
+        lines
+          .find((l) => keywordOf(l) === "habit-rollup")
+          ?.trim()
+          .replace(/^habit-rollup:?/, "") ?? "";
+      // ── WHO HOSTS THE HABITS SECTION'S COG (1.0.98) ─────────────────
+      //
+      // A BAND IS A HOST AND IS NOT A BAR. Every named widget in a band gets a
+      // `fieldFrame` of its own after the loop — that is `fieldBand`'s other
+      // half — and the frame has the same title row, chevron and `headTools`
+      // slot a `header:` bar has. So the section's cog has somewhere to go on a
+      // diary entry, which is the one surface this section is composed on, and
+      // `habitsHeader` covers the reader who gave it a fence and a bar.
+      //
+      // EXCLUSIVE BY CONSTRUCTION, which is the Categories pair's own rule: the
+      // band hosts only where no level-1 header owns the line, so one section
+      // can never grow two cogs onto one window.
+      const habitsBanded = fieldBand(lines) && habitsHeader === -1;
       const belowType = journalTypeAtPath(this.plugin, ctx.sourcePath);
       // The fence's first `attach:` line, verbatim, or null for a fence with
       // none. Compared by line rather than counted with a mutable flag because
@@ -1451,6 +1488,14 @@ export class Widgets implements
         // something that drew its own, which is the defect 5.14 removed and
         // 5.26.1 removed again by the other door.
         selfTitled?: true;
+        // ── AND WHICH DIRECTIVE IT WAS (1.0.98) ───────────────────────
+        //
+        // THE BAND'S FRAME IS THE ONLY HOST A BANDED SECTION HAS, and the
+        // Habits section's cog goes in it. The frame is built from this list,
+        // after the loop — so the keyword has to travel with the element, for
+        // the same reason the title does: this is where both halves are in
+        // hand. Undefined for a field, which names itself and gets no frame.
+        kind?: string;
       }[] = [];
 
       // The live hosts that drew a journal's note rows, for the foot's edit mode.
@@ -1768,6 +1813,32 @@ export class Widgets implements
               )
             );
           }
+          // ── AND THE TWO HABITS CARDS' COGS, SAME SLOT (1.0.98) ─────────
+          //
+          // *"move 'Manage habits' and 'choose habits' into the sections title
+          // row next to the chevron as a the cog icon used in many other
+          // sections with a settings window"*. "Many other sections" is the two
+          // blocks above plus the Prose head's — this makes five, and the
+          // stylesheet lists all five on one rule.
+          //
+          // BUILT HERE AND NOT INSIDE THE CARD, which is the live-widget rule
+          // `buildNoteTypesCog` states: both of these sections are
+          // `liveScopedWidget`s that rebuild their own subtree, so a control
+          // appended to an external bar from inside a build duplicates on every
+          // repaint. The dispatcher builds the cog once with the frame, and the
+          // cog resolves the card's state ON CLICK — `rollupCardState` and
+          // `habitEntriesOn` exist for exactly that, so the window and the card
+          // still read one answer rather than a captured one.
+          if (title && rollupHeader === headerIndex - 1) {
+            headTools(frame.root).appendChild(
+              buildHabitRollupCog(this.plugin, ctx, rollupArg)
+            );
+          }
+          if (title && habitsHeader === headerIndex - 1) {
+            headTools(frame.root).appendChild(
+              buildHabitsCog(this, ctx, noteTextNow)
+            );
+          }
           // A SECOND HOSTED CONTROL SAT HERE AND IS GONE (5.21) — the task
           // table's scope button, moved onto the bar in 3.19.2 on exactly the
           // reasoning above. It is removed rather than moved back: see the
@@ -1890,7 +1961,17 @@ export class Widgets implements
           shelfHeader === -1 && line.trim() === firstShelf,
           nestInto,
           noteTextNow,
-          navUnit
+          navUnit,
+          // ── AND WHO IS CARRYING THIS SECTION'S COG (1.0.98) ───────────
+          //
+          // One flag for both sections because `buildFromSpec` dispatches one
+          // keyword per call: the arm reads it for whichever of the two it is.
+          // The rollup asks only whether a bar owns it — a band never hosts it,
+          // since the rollup is composed on period dashboards and not on a
+          // diary entry — and the Habits section asks about both hosts.
+          kind === "habit-rollup"
+            ? rollupHeader !== -1
+            : habitsHeader !== -1 || habitsBanded
         );
 
         if (!widget) {
@@ -2030,18 +2111,18 @@ export class Widgets implements
               });
               overviewHost.appendChild(widget);
               if (SECTION_TITLES[kind]) {
-                named.push({ el: overviewHost, title: SECTION_TITLES[kind] });
+                named.push({ el: overviewHost, title: SECTION_TITLES[kind], kind });
               }
             } else {
               container.appendChild(widget);
               if (SECTION_TITLES[kind]) {
-                named.push({ el: widget, title: SECTION_TITLES[kind] });
+                named.push({ el: widget, title: SECTION_TITLES[kind], kind });
               }
             }
           } else {
             container.appendChild(widget);
             if (SECTION_TITLES[kind]) {
-              named.push({ el: widget, title: SECTION_TITLES[kind] });
+              named.push({ el: widget, title: SECTION_TITLES[kind], kind });
             } else if (FIELD_KINDS.has(kind)) {
               // A FIELD'S NAME IS ITS OWN `|Title` — see `selfTitled` above and
               // `fieldBand` for why there is nowhere else to read it from. Off
@@ -2427,7 +2508,7 @@ export class Widgets implements
         // the stamp is taken against the children as they stand, and this moves
         // one into a wrapper. The stamp goes with it, so the block still knows
         // which line the thing a reader is looking at came from.
-        for (const { el, title, selfTitled } of named) {
+        for (const { el, title, selfTitled, kind } of named) {
           // A FIELD HAS ITS OWN FRAME ALREADY — see `selfTitled`. It is in this
           // list for the group's caption and for nothing else.
           if (selfTitled) continue;
@@ -2446,6 +2527,17 @@ export class Widgets implements
           container.insertBefore(built.wrapper, el);
           carryStamp(el, built.wrapper);
           built.body.appendChild(el);
+          // AND THE BAND FRAME HOSTS THE HABITS COG (1.0.98), which is the
+          // whole reason `kind` joined this list: the frame built two lines up
+          // is the only title row a banded section has, and a diary entry is
+          // the one surface the Habits section is composed on. `habitsBanded`
+          // is false the moment a level-1 `header:` owns the line, so the two
+          // hosts cannot both fire.
+          if (kind === "habits" && habitsBanded) {
+            headTools(built.frame.root).appendChild(
+              buildHabitsCog(this, ctx, noteTextNow)
+            );
+          }
         }
       }
 
@@ -3226,7 +3318,15 @@ export class Widgets implements
     // threaded rather than met in the loop for `wearsActions`' reason: the
     // answer is a fact about the FENCE, and the line that supplies it may be
     // drawn before or after the line that needs it.
-    navUnit: PeriodGrain | null = null
+    navUnit: PeriodGrain | null = null,
+    // Whether a title row outside this widget is already carrying its cog
+    // (1.0.98). Only the two habits sections ask, and the answer is a fact
+    // about the FENCE rather than about the widget: `rollupHeader` /
+    // `habitsHeader` / `habitsBanded` at the call site decide it, exactly as
+    // `ownsCategories` is decided there. True means the card draws no door row
+    // at its foot; false means it keeps the one 1.0.54 and 1.0.55 gave it,
+    // which is still the only door a widget-form rollup has.
+    hosted = false
   ): HTMLElement | null {
     const barIdx = spec.indexOf("|");
     const title = barIdx === -1 ? null : spec.slice(barIdx + 1).trim();
@@ -3451,7 +3551,7 @@ export class Widgets implements
           this.plugin,
           ctx,
           this.plugin.settings.paths.diaryDaily,
-          () => buildHabitsSection(this, ctx, noteText())
+          () => buildHabitsSection(this, ctx, noteText(), hosted)
         );
       // EVERY DIARY GRAIN IS A SOURCE, so the scope is the diary root rather than
       // the daily folder: `scopesFor` decides which folder a tracker's readings
@@ -3665,7 +3765,7 @@ export class Widgets implements
           this.plugin,
           ctx,
           diaryEntryFolders(this.plugin.settings.paths),
-          () => buildHabitRollup(this.plugin, ctx, rest)
+          () => buildHabitRollup(this.plugin, ctx, rest, hosted)
         );
       // ONE QUESTION, ONE WIDGET, TWO SPELLINGS (4.16 §1). `level-index` asks
       // what is below a folder and draws whichever answer it gets; `topics-table`

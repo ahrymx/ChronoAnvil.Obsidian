@@ -5,6 +5,24 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.98] - 2026-10-19
+
+### Changed
+
+- **Both habits cards open from a cog on their title row.** *Manage habits* on a
+  diary entry's Habits section and *Choose habits…* at the foot of a period
+  dashboard's habit rollup were dashed rows under the content; they are now the
+  same settings cog the Attachments, What's below and Prose sections already
+  carry, beside the section's chevron. The windows behind them are unchanged.
+- **The foot row is the fallback, not the door.** A section drawn with no title
+  row of its own — a rollup shown as a widget, a bare `habits` fence with no
+  header — keeps the row it has always had, which is the only control it can
+  have. Where a bar or a diary entry's band hosts the cog, the row is not drawn
+  at all, so a card does not grow two doors onto one window.
+- **An empty card points at the control it actually has.** *"choose some
+  below"* was written when the row was the only door; on a card whose bar
+  carries the cog the sentence now names the cog instead.
+
 ## [1.0.97] - 2026-10-19
 
 ### Changed

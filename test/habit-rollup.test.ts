@@ -1971,8 +1971,11 @@ describe("the card's shape", () => {
     expect(index).not.toMatch(
       /case "habit-rollup":[\s\S]{0,200}paths\.diaryDaily/
     );
+    // `hosted` joined the call in 1.0.98 — the fence's answer to whether a
+    // section bar is carrying this card's cog, threaded through
+    // `buildFromSpec` the way `ownsCategories` is.
     expect(index).toMatch(
-      /case "habit-rollup":[\s\S]{0,240}buildHabitRollup\(this\.plugin, ctx, rest\)/
+      /case "habit-rollup":[\s\S]{0,240}buildHabitRollup\(this\.plugin, ctx, rest, hosted\)/
     );
   });
 
@@ -2012,41 +2015,194 @@ describe("the card's shape", () => {
   });
 
   it("refuses a surface with no period, in a sentence", () => {
+    // THE PERIOD IS RESOLVED IN `rollupCardState` SINCE 1.0.98, which is the
+    // whole of that extraction: the cog on the bar has to answer the same
+    // question the card does, and it is built before the card exists. So the
+    // builder asks for the STATE and the refusal is the null it can get back.
     const build = fnBody("buildHabitRollup", "habit-rollup-view");
-    expect(build).toContain("resolvePeriodBounds");
+    expect(build).toContain("rollupCardState(plugin, ctx, rest)");
+    expect(fnBody("rollupCardState", "habit-rollup-view")).toContain(
+      "resolvePeriodBounds"
+    );
     // THE BRANCH AND THE SENTENCE TOGETHER. A refusal nothing reaches reads
     // exactly like a refusal, and the whole point is the widget declining
     // rather than drawing a plausible, unrelated set of days.
     expect(readCode("habit-rollup-view")).toMatch(
-      /if \(!period\) \{[\s\S]{0,300}habit-rollup needs a dashboard period\.[\s\S]{0,200}return root;/
+      /if \(!state\) \{[\s\S]{0,300}habit-rollup needs a dashboard period\.[\s\S]{0,200}return root;/
+    );
+    // AND THE NULL IS THE PERIOD'S, which is the one thing the extraction must
+    // not have changed: `rollupCardState` returns null for exactly the surface
+    // the callout describes and for nothing else.
+    expect(fnBody("rollupCardState", "habit-rollup-view")).toContain(
+      "if (!period) return null;"
     );
   });
 
-  it("hangs the door inside the card and not on the bar", () => {
-    // 1.0.49 §1's defect, avoided: the Categories control was hosted by the
-    // `header:` line above its fence, and a fence written without one had no
-    // door. *Show as widget* takes this section's bar off, so a control living
-    // there would come and go with it.
-    const door = fnBody("drawDoor", "habit-rollup-view");
+  it("hangs the door at the card's own foot, where no bar holds the cog", () => {
+    // ── 1.0.55's REFUSAL, HALF REVERSED (1.0.98) ───────────────────────
+    //
+    // It read: *"A TRAILING ROW, NOT A COG ON THE BAR … This section's bar is
+    // removable — *Show as widget* takes it off"*. The FACT is still true and
+    // is still what this test pins; the conclusion was the half that was
+    // wrong, because 1.0.49 §1 had already settled the general case: the bar
+    // hosts the door where there IS a bar, and where there is none the card
+    // hosts it itself. `hosted` is that question asked once, by the fence.
+    const foot = fnBody("drawFoot", "habit-rollup-view");
     // THE EXACT CALL, because `ca-hrollup-foot` is a PREFIX of
     // `ca-hrollup-foot-note` and a `toContain` on the bare class passes on the
     // sentence two lines below it — which is a mutant renaming the container
     // surviving a test that reads like it names it.
-    expect(door).toContain('createDiv({ cls: "ca-hrollup-foot" })');
-    expect(door).toContain("ca-habits-door");
-    expect(door).not.toContain("headTools");
-    expect(door).toContain("isManagedTemplate");
+    expect(foot).toContain('createDiv({ cls: "ca-hrollup-foot" })');
+    expect(foot).toContain("ca-habits-door");
+    expect(foot).not.toContain("headTools");
+    expect(foot).toContain("isManagedTemplate");
+    // AND THE DOOR IS BEHIND `hosted`, so the two controls are never both on
+    // one card. The guard is a `if (!hosted) {` around the whole door, not a
+    // class on it: a hidden door is still in the tab order.
+    expect(foot).toContain("if (!hosted) {");
+    const guard = foot.indexOf("if (!hosted) {");
+    const door = foot.indexOf("ca-habits-door");
+    expect(guard).toBeGreaterThan(-1);
+    expect(door).toBeGreaterThan(guard);
+  });
+
+  it("draws no foot at all when the bar has the cog and there is nothing to say", () => {
+    // A box with no children and `--ca-space-2` of margin over it is a gap
+    // under the strip that reads as a layout bug, which is the one thing a
+    // hosted card must not gain for losing its door.
+    const foot = fnBody("drawFoot", "habit-rollup-view");
+    const bail = foot.indexOf("if (hosted && !note) return;");
+    const create = foot.indexOf('createDiv({ cls: "ca-hrollup-foot" })');
+    expect(bail).toBeGreaterThan(-1);
+    expect(create).toBeGreaterThan(bail);
+  });
+
+  it("puts the cog on the bar, built outside the card it reports on", () => {
+    // ── WHY THE DISPATCHER BUILDS IT (1.0.98) ──────────────────────────
+    //
+    // Both habits sections are `liveScopedWidget`s: they rebuild their own
+    // subtree on every write to the folders they watch. A control appended to
+    // an EXTERNAL bar from inside such a build is appended again on every
+    // repaint, so the bar grows a cog per tick — `buildNoteTypesCog`'s stated
+    // rule, and the reason this function is exported rather than called from
+    // `buildHabitRollup`.
+    const cog = fnBody("buildHabitRollupCog", "habit-rollup-view");
+    expect(cog).toContain('cls: "ca-habits-cog"');
+    expect(cog).toContain('setIcon(cog, "settings")');
+    // AND IT RESOLVES THE CARD ON CLICK, never at build time. The period, the
+    // rows and the seeds are all facts about the note as it stands when the
+    // reader presses the cog, and the card may have repainted a hundred times
+    // since this button was made. One function called twice is what keeps the
+    // window and the card showing one answer.
+    const click = cog.indexOf('addEventListener("click"');
+    const resolve = cog.indexOf("rollupCardState(plugin, ctx, rest)");
+    expect(click).toBeGreaterThan(-1);
+    expect(resolve).toBeGreaterThan(click);
+    // AND THE BAR MUST NOT FOLD ON THE PRESS. The title row's own click
+    // toggles the section; a reader who pressed the cog asked for the window,
+    // which is the separation every hosted control in a head makes.
+    expect(cog).toContain("evt.preventDefault();");
+    expect(cog).toContain("evt.stopPropagation();");
+    expect(cog).toContain("new HabitRollupEditor(");
+    // The same refusal the door carries, for the same note.
+    expect(cog).toContain("isManagedTemplate(plugin, ctx.sourcePath)");
+    expect(cog).toContain("TEMPLATE_REFUSAL");
+    // AND THE SAME REFUSAL THE CARD GIVES a note with no period — the cog is
+    // on a bar that exists whether or not the card could be drawn, so it has
+    // to be able to say so.
+    expect(cog).toContain("notify.fail");
+  });
+
+  it("hangs both habits cogs on the section's own title row (1.0.98)", () => {
+    // *"move 'Manage habits' and 'choose habits' into the sections title row
+    // next to the chevron as a the cog icon used in many other sections with a
+    // settings window"*. `headTools` IS "next to the chevron": it finds the
+    // bar's own fold toggle and inserts in front of it, which is where the
+    // Attachments and What's-below cogs have sat since 1.0.49 and 1.0.70.
+    const index = readCode("widgets");
+    expect(index).toContain(
+      "headTools(frame.root).appendChild(\n              buildHabitRollupCog(this.plugin, ctx, rollupArg)"
+    );
+    expect(index).toContain(
+      "headTools(frame.root).appendChild(\n              buildHabitsCog(this, ctx, noteTextNow)"
+    );
+    // ON THE CARD'S OWN BAR AND NOT ON A GROUP HEAD INSIDE IT, which is
+    // 1.0.69's defect and the reason `belowHeader` asks for level 1. Both of
+    // these ask the same way.
+    expect(index).toContain('const rollupHeader = headerOwning("habit-rollup", 1);');
+    expect(index).toContain('const habitsHeader = headerOwning("habits", 1);');
+    expect(index).toContain("title && rollupHeader === headerIndex - 1");
+    expect(index).toContain("title && habitsHeader === headerIndex - 1");
+    // AND THE ARGUMENT THE COG WRITES BACK TO comes off the fence, because the
+    // cog is built at the `header:` line — before the directive it belongs to
+    // has been reached. `firstShelf`'s idiom.
+    expect(index).toContain('keywordOf(l) === "habit-rollup"');
+    // ── AND THE CARD IS TOLD, IN THE SAME DIRECTION (1.0.98) ───────────
+    //
+    // The flag threaded into `buildFromSpec` has to agree with the branch that
+    // placed the cog: a bar owning the line means the card does NOT draw its
+    // foot door. Inverted, both controls appear on a barred card and neither
+    // on a widget — and both halves of that read as working code.
+    expect(index).toContain(
+      'kind === "habit-rollup"\n            ? rollupHeader !== -1'
+    );
+  });
+
+  it("gives a banded habits section the band frame as its host (1.0.98)", () => {
+    // A DIARY ENTRY HAS NO `header:` LINE ANYWHERE — one shared fence, seven
+    // fields — so `habitsHeader` is -1 there and the bar-hosted branch above
+    // never fires. What the band DOES give every named widget in it is a
+    // `fieldFrame`, which has the same title row, chevron and `headTools` slot
+    // a `header:` bar has. So the cog has somewhere to go on the one surface
+    // this section is actually composed on.
+    const index = readCode("widgets");
+    expect(index).toContain(
+      "const habitsBanded = fieldBand(lines) && habitsHeader === -1;"
+    );
+    expect(index).toContain('if (kind === "habits" && habitsBanded) {');
+    expect(index).toContain("headTools(built.frame.root).appendChild(");
+    // EXCLUSIVE BY CONSTRUCTION, which is the Categories pair's own rule: the
+    // band hosts only where no level-1 header owns the line, so one section
+    // can never grow two cogs onto one window.
+    expect(index).toContain(
+      "habitsHeader !== -1 || habitsBanded"
+    );
+  });
+
+  it("documents the cog as the door, and the foot row as the fallback (1.0.98)", () => {
+    // NOTHING READ THE DOCS BACK until 1.0.97's mutation sweep found that a
+    // reverted sentence measured as a surviving mutant. Both passages that
+    // name this control are read here.
+    const docs = readAsset("documentation.md");
+    expect(docs).toContain(
+      "the **cog on the section's title row**, beside its chevron, opens a window to pick which of them"
+    );
+    expect(docs).toContain(
+      "keeps a **Choose habits…** row at its foot that opens the same window"
+    );
+    // The long passage further down says it once more, for a reader who got
+    // there from the trackers chapter rather than the directive list.
+    expect(docs).toContain(
+      "The **cog on the section's\ntitle row** opens a window to pick which habits it reports"
+    );
+    // AND THE OLD SENTENCE IS GONE from both, which is the half a `toContain`
+    // pair cannot measure on its own: the row is no longer "at the foot of the
+    // card" on a card that has a bar.
+    expect(docs).not.toContain(
+      "the **Choose habits…** row at the foot of the card opens a window"
+    );
+    expect(docs).not.toContain("The **Choose habits…** row\nat the foot opens");
   });
 
   it("keeps the coverage sentence out from behind the template refusal", () => {
     // The branch used to `return` before the note was appended, which would have
     // taken the one fact on that row with nothing to do with editing the line.
-    const door = fnBody("drawDoor", "habit-rollup-view");
-    const refusal = door.indexOf("isManagedTemplate");
-    const note = door.indexOf("ca-hrollup-foot-note");
+    const foot = fnBody("drawFoot", "habit-rollup-view");
+    const refusal = foot.indexOf("isManagedTemplate");
+    const note = foot.indexOf("ca-hrollup-foot-note");
     expect(refusal).toBeGreaterThan(-1);
     expect(note).toBeGreaterThan(refusal);
-    expect(door.slice(refusal, note)).not.toMatch(/\n {4}return;/);
+    expect(foot.slice(refusal, note)).not.toMatch(/\n {4}return;/);
   });
 
   it("shows the reader what they are choosing between", () => {
@@ -2316,19 +2472,40 @@ describe("the card's shape", () => {
     // ONE ANSWER, NOT TWO. The card's count and the window's trailing group are
     // the same array filtered the same way — a second function returning the
     // same number is the shape that stays consistent until somebody edits one.
-    const build = fnBody("buildHabitRollup", "habit-rollup-view");
+    // COMPUTED IN `rollupCardState` SINCE 1.0.98, and that move is what makes
+    // the claim above hold across the door: the cog calls the same function
+    // the card does rather than closing over a value the card worked out.
+    const build = fnBody("rollupCardState", "habit-rollup-view");
     expect(build).toContain("const seeds = rollupSeeds(habits, all, answer, dash)");
     expect(build).toContain("seeds.filter((s) => s.grain == null).length");
     expect(build).toContain("const dash = grainOfUnit(period.unit)");
     // The dashboard's grain reaches the read as a fallback, not as a filter.
     expect(build).toContain("answer.grains,");
+    // ONE COMPUTATION, TWO CALLERS, and no third way in: the card's builder and
+    // the bar's cog, which is what "one answer" means now that the window can
+    // be opened from a control the card does not own.
+    expect(
+      readCode("habit-rollup-view").match(/rollupCardState\(plugin, ctx, rest\)/g)
+    ).toHaveLength(2);
   });
 
   it("says which of the two reasons an empty card has", () => {
     // Until 1.0.56 a multi-grain habit vanished with no sentence anywhere.
     const build = fnBody("buildHabitRollup", "habit-rollup-view");
-    expect(build).toContain("before it can be read — choose one below.");
+    expect(build).toContain("before it can be read — ${doorHint(hosted, \"one\")}.");
     expect(build).toContain("no longer in the vault");
+    // ── AND THE HINT NAMES THE PLACE THE DOOR ACTUALLY IS (1.0.98) ─────
+    //
+    // "choose some below" was written when the door was always the row under
+    // this callout. On a card whose bar carries the cog it points at nothing,
+    // which is worse than saying nothing — so the sentence asks `hosted`, and
+    // the noun stays the caller's because the two refusals want different
+    // things (one grain, or some habits).
+    const hint = fnBody("doorHint", "habit-rollup-view");
+    expect(hint).toContain("choose ${what} with the cog on this section's bar");
+    expect(hint).toContain("choose ${what} below");
+    expect(hint).toContain("hosted");
+    expect(build).toContain('doorHint(hosted, "some")');
   });
 
   // ── THE WINDOW'S GROUPS (1.0.56) ───────────────────────────────────────

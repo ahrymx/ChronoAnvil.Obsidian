@@ -74,7 +74,15 @@ import {
   normalizeTrackers,
   type TrackerDef,
 } from "../src/trackers/trackers";
-import { readCode, readSrc, readCss, cssRule, cssRules } from "./sources";
+import {
+  readCode,
+  readSrc,
+  readCss,
+  readAsset,
+  cssRule,
+  cssRules,
+  fnBody,
+} from "./sources";
 
 // A habit definition, as the registry holds one.
 const habit = (id: string, over: Partial<TrackerDef> = {}): TrackerDef => ({
@@ -1716,7 +1724,9 @@ describe("the grid lets the type go", () => {
     expect(fn).toContain("return lastNoteText ?? \"\";");
     // A THUNK AND NOT A STRING, because the section's builder runs again on
     // every repaint, long after the handler that made it returned.
-    expect(code).toContain("() => buildHabitsSection(this, ctx, noteText())");
+    expect(code).toContain(
+      "() => buildHabitsSection(this, ctx, noteText(), hosted)"
+    );
     expect(code).toContain("noteText: () => string");
   });
 
@@ -2228,6 +2238,88 @@ describe("the section itself", () => {
     expect(code).toContain("No habits on this entry yet.");
     // "remove", never the other word (1.0.43), and no retired vocabulary.
     expect(src).not.toMatch(/\bdelete a habit\b/i);
+  });
+
+  // ── THE COG ON THE SECTION'S BAR (1.0.98) ────────────────────────────
+  //
+  // *"move 'Manage habits' and 'choose habits' into the sections title row next
+  // to the chevron as a the cog icon used in many other sections with a
+  // settings window"*.
+  it("opens the same window from the title row, and leaves the door as the fallback", () => {
+    const cog = fnBody("buildHabitsCog", "habits-section");
+    expect(cog).toContain('cls: "ca-habits-cog"');
+    expect(cog).toContain('setIcon(cog, "settings")');
+    expect(cog).toContain("openHabitsWindow(deps, habitEntriesOn(deps, ctx, noteText()), ctx)");
+    // THE SAME REFUSAL THE DOOR CARRIES, for the same note and the same reason.
+    expect(cog).toContain("isManagedTemplate(deps.plugin, ctx.sourcePath)");
+    expect(cog).toContain("cog.disabled = true;");
+    // AND THE BAR MUST NOT FOLD ON THE PRESS. The title row's click toggles the
+    // section; a reader who pressed the cog asked for the window.
+    expect(cog).toContain("evt.stopPropagation();");
+    // ONE READ, TWO CALLERS. The section's own build and the cog both ask
+    // `habitEntriesOn`, so the window lists exactly the rows the card drew —
+    // which is what stops the two drifting the way two copies of four lines do.
+    expect(
+      code.match(/habitEntriesOn\(deps, ctx, noteText\(\)\)/g)
+    ).toHaveLength(1);
+    expect(code).toContain("habitEntriesOn(deps, ctx, noteText)");
+    // THE DOOR IS STILL THERE, behind `hosted`: a bare `habits` fence with no
+    // bar and no band has no title row to put a cog on, which is the case
+    // 1.0.54's trailing row was written for and still the only door it has.
+    const build = fnBody("buildHabitsSection", "habits-section");
+    // BOTH OF THEM, COUNTED. The section returns early on an empty entry, so
+    // the door is drawn from two places — and a `toContain` on one spelling
+    // passes with the other left unguarded, which is the two-call-site trap
+    // this suite has now been bitten by three times (memory
+    // `chart-reduction-1-0-57`).
+    expect(
+      build.match(/if \(!hosted\) drawDoor\(root, deps, entries, ctx\);/g)
+    ).toHaveLength(2);
+    expect(code).toContain("hosted = false");
+    // AND THE EMPTY-STATE HINT POINTS AT WHICHEVER CONTROL IS THERE, which is
+    // the rollup's `doorHint` decision made inline: "below" named a row that a
+    // hosted section does not draw.
+    expect(build).toContain(
+      "Add one with the cog on this section's bar, or in Settings"
+    );
+    expect(build).toContain("Add one below, or in Settings");
+  });
+
+  it("documents the title-row cog, and the foot row as its fallback (1.0.98)", () => {
+    const docs = readAsset("documentation.md");
+    expect(docs).toContain(
+      "The **cog on the section's title row**, beside its chevron, opens\nthe same Habits window the cell's **+** does"
+    );
+    expect(docs).toContain(
+      "where the section is drawn\nwith no title row of its own, the row at the foot of the card opens it instead"
+    );
+    // The sentence it replaces, which said the row was the only door.
+    expect(docs).not.toContain(
+      "The row at the foot of the card opens the same Habits window"
+    );
+  });
+
+  it("gives the cog the same twelve declarations as the other four (1.0.98)", () => {
+    // ONE LIST, NOT A FIFTH BLOCK OF IT. The rule is in 30-header-bars.css and
+    // `.ca-habits-cog` is a selector on it — which is also the only way the
+    // 30px `<button>` reset cannot be forgotten here (`obsidian-button-height`).
+    const cog = cssRule(".ca-habits-cog");
+    expect(cog).toBe(cssRule(".ca-journal-note-types-cog"));
+    expect(cog).toContain("height: 1.4em");
+    expect(cog).toContain("min-height: 0");
+    expect(cssRule(".ca-habits-cog .svg-icon")).toBe(
+      cssRule(".ca-prose-bar-cog .svg-icon")
+    );
+    expect(cssRule(".ca-habits-cog:hover")).toBe(
+      cssRule(".ca-journal-field-cats:hover")
+    );
+    // AND THE REFUSED STATE IS THE TWO DECLARATIONS THE OTHER FOUR DO NOT
+    // NEED, because none of them has one. The second rule is not redundant:
+    // `:hover` matches a disabled button, so without it a refused cog would
+    // brighten under the pointer.
+    expect(cssRule(".ca-habits-cog:disabled")).toContain("opacity: 0.35");
+    expect(cssRule(".ca-habits-cog:disabled")).toContain("cursor: default");
+    expect(cssRule(".ca-habits-cog:disabled:hover")).toContain("background: none");
   });
 
   it("tells a logged number row from an unanswered one, which its name follows", () => {

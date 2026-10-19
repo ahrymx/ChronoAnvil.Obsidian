@@ -988,6 +988,26 @@
   cursor: default;
 }
 
+/* AND THE COG IS REFUSED THE SAME WAY (1.0.98), on the same note for the same
+   reason — a stored template has no entry and no dashboard period, so there is
+   nothing for either window to write to. The cog's twelve shared declarations
+   are in 30-header-bars.css with the other four; these two are the only ones
+   not shared, because the other four cogs have no refused state to draw.
+
+   THE SECOND RULE IS NOT REDUNDANT. The shared `:hover` lights the cog with a
+   background and `--text-normal`, and `:hover` matches a disabled button — so
+   a refused cog would brighten under the pointer while announcing itself as
+   unavailable to a screen reader. Specificity and order both put this after
+   it. */
+.ca-habits-cog:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ca-habits-cog:disabled:hover {
+  background: none;
+  color: var(--text-muted);
+}
+
 /* THE NAME GOES FIRST, AND THE WEEK NEVER DOES. On a phone-width card there is
    not room for a long habit name and seven columns; the name is already in the
    box's tooltip and in the window, while the week is the thing this section

@@ -86,6 +86,80 @@ import {
 } from "../habit-reading-window";
 import type { EntryControlHost } from "./controls";
 
+// The habits this note logs, read from the note as it is now.
+//
+// ONE READ FOR THE SECTION AND FOR ITS COG (1.0.98). `buildHabitsSection` takes
+// it at paint; `buildHabitsCog` takes it when the cog is PRESSED, because the
+// cog is built outside the live widget and the list it would have captured goes
+// stale the moment a habit is added. Two spellings of "which habits are on this
+// note" is how the window and the card come to disagree about what is on it.
+export function habitEntriesOn(
+  deps: EntryControlHost,
+  ctx: MarkdownPostProcessorContext,
+  noteText: string
+): HabitEntry[] {
+  const plugin = deps.plugin;
+  const surface = noteSurfaceOf(plugin.app, plugin, ctx.sourcePath);
+  return habitsOnNote(plugin.settings.trackers, noteText, surface);
+}
+
+// ── THE COG ON THE SECTION'S BAR (1.0.98) ────────────────────────────────
+//
+// *"move 'Manage habits' and 'choose habits' into the sections title row next
+// to the chevron as a the cog icon used in many other sections with a settings
+// window"*. The same slot, glyph and kind of window as Attachments' (1.0.49
+// §3), What's below's (1.0.69) and a prose block's (1.0.78) — and as the Habits
+// rollup's, which moved in the same round.
+//
+// ── IT REVERSES THIS SECTION'S OWN REFUSAL, WHICH WAS ABOUT A CORNER ──────
+//
+// 1.0.54 wrote: *"A ROW AT THE END, NOT A ＋ IN THE CORNER … The corner of a
+// full-width card is where the week's last column head sits, so a pinned button
+// would land on top of Sunday."* That is still true of the CARD's corner and
+// says nothing about the bar above it: the title row is the section's, not the
+// week grid's, and Sunday's head is inside the body the chevron folds. The
+// refusal was about the only place a control could go when the section had no
+// head of its own to put one on; a band gives every named widget one.
+//
+// BUILT OUTSIDE THE LIVE WIDGET, so it reads at the click rather than at the
+// draw — see `habitEntriesOn`, and `overflowButton`'s rule for every hosted
+// control in a head.
+export function buildHabitsCog(
+  deps: EntryControlHost,
+  ctx: MarkdownPostProcessorContext,
+  // The whole note, re-read on each call: a habit added in the window is a
+  // frontmatter write, and the next press must see it.
+  noteText: () => string
+): HTMLElement {
+  const cog = createEl("button", {
+    cls: "ca-habits-cog",
+    attr: { type: "button" },
+  });
+  setIcon(cog, "settings");
+  const hint = "Add a habit, or rename, reorder and remove the ones on this entry";
+  cog.setAttr("aria-label", hint);
+  cog.setAttr("title", hint);
+  // NOT ON A MANAGED TEMPLATE, which is the cell's own refusal and the same
+  // reason: a template's tracker list is generated from Settings, so a control
+  // that edited it would be writing something the next sync deletes.
+  if (isManagedTemplate(deps.plugin, ctx.sourcePath)) {
+    cog.disabled = true;
+    cog.setAttr(
+      "title",
+      "This is a stored template — open an entry to change its habits."
+    );
+    return cog;
+  }
+  cog.addEventListener("click", (evt) => {
+    // The bar folds the section on click. It must not, because a reader asked
+    // for the window — the separation every hosted control in a head makes.
+    evt.preventDefault();
+    evt.stopPropagation();
+    openHabitsWindow(deps, habitEntriesOn(deps, ctx, noteText()), ctx);
+  });
+  return cog;
+}
+
 // What the door says, which depends on whether there is anything behind it.
 //
 // ONE CONTROL, TWO VERBS. The window adds, renames, reorders and removes, so
@@ -197,14 +271,17 @@ function paintBar(
 export function buildHabitsSection(
   deps: EntryControlHost,
   ctx: MarkdownPostProcessorContext,
-  noteText: string
+  noteText: string,
+  // Whether this section's title row is carrying the cog (1.0.98). The row at
+  // the end is the fallback for a section with no head to put one on.
+  hosted = false
 ): HTMLElement {
   const plugin = deps.plugin;
   const app = plugin.app;
   const root = createDiv({ cls: "ca-habits-section" });
 
   const surface = noteSurfaceOf(app, plugin, ctx.sourcePath);
-  const entries = habitsOnNote(plugin.settings.trackers, noteText, surface);
+  const entries = habitEntriesOn(deps, ctx, noteText);
 
   // ── WHICH WEEK, AND WHEN THERE IS NONE ──────────────────────────────
   //
@@ -231,10 +308,14 @@ export function buildHabitsSection(
       emptyCallout(
         "check-check",
         "No habits on this entry yet.",
-        "Add one below, or in Settings → ChronoAnvil → Trackers."
+        // WHERE THE DOOR IS, SINCE IT MOVED (1.0.98). "below" was true of a
+        // section whose only control was the row under this callout.
+        hosted
+          ? "Add one with the cog on this section's bar, or in Settings → ChronoAnvil → Trackers."
+          : "Add one below, or in Settings → ChronoAnvil → Trackers."
       )
     );
-    drawDoor(root, deps, entries, ctx);
+    if (!hosted) drawDoor(root, deps, entries, ctx);
     return root;
   }
 
@@ -261,7 +342,7 @@ export function buildHabitsSection(
     for (const entry of numbers) drawNumRow(deps, list, entry, week, iso, ctx);
   }
 
-  drawDoor(root, deps, entries, ctx);
+  if (!hosted) drawDoor(root, deps, entries, ctx);
   return root;
 }
 
@@ -528,6 +609,11 @@ function drawNumRow(
 // Sunday — the Habits cell can pin one because its own top-right is empty by
 // construction (a short, left-aligned eyebrow), and this card's is not. A row
 // has room for a verb, which the corner never did.
+//
+// AND IT IS THE FALLBACK SINCE 1.0.98, not the only shape: the cog went onto
+// the section's TITLE ROW, which is not the card's corner — see
+// `buildHabitsCog`. This row is what a Habits section with no head of its own
+// still draws, which is a bare `habits` fence outside a band.
 function drawDoor(
   root: HTMLElement,
   deps: EntryControlHost,

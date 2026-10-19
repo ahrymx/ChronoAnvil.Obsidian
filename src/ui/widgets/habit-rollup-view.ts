@@ -536,31 +536,39 @@ function rollupFolds(plugin: ChronoAnvilPlugin): FoldStore {
   };
 }
 
-export function buildHabitRollup(
+// ── EVERYTHING THE CARD AND ITS DOOR BOTH KNOW (1.0.98) ──────────────────
+//
+// ONE FUNCTION BECAUSE THERE IS ONE ANSWER, which is the sentence that used to
+// sit over `seeds` inside the builder: *"the card's count of habits waiting for
+// a grain and the window's list of them must be one answer. Two functions
+// returning the same number is the shape that stays consistent until somebody
+// edits one of them."* The cog that replaced the foot door is built OUTSIDE the
+// live widget — see `buildHabitRollupCog` for why it has to be — so the two
+// readers are no longer one call, and the thing that keeps them one answer is
+// this being one function rather than a value passed down.
+//
+// NULL IS "NO PERIOD HERE", the single refusal both readers make.
+export interface RollupCardState {
+  period: NonNullable<ReturnType<typeof resolvePeriodBounds>>;
+  answer: HabitRollupAnswer;
+  todayIso: string;
+  all: HabitRollupRow[];
+  label: string;
+  seeds: HabitRollupSeed[];
+  registry: string[];
+  dash: TrackerClass | null;
+  // How many of the seeds are waiting to be told a grain, said as a phrase.
+  asking: string | null;
+}
+
+export function rollupCardState(
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
   rest: string
-): HTMLElement {
+): RollupCardState | null {
   const app = plugin.app;
-  const root = createDiv({ cls: "ca-hrollup" });
   const period = resolvePeriodBounds(plugin, ctx);
-
-  // REFUSING WITH A REASON BEATS A TRAILING WINDOW, which is `entry-rollup`'s
-  // own sentence and its own argument: this widget's whole scope is "the
-  // dashboard's period", and a silent default would draw a plausible,
-  // unrelated set of days. The registry's `needs: "period"` keeps it out of the
-  // add list everywhere this is the only thing it could say.
-  if (!period) {
-    root.appendChild(
-      emptyCallout(
-        "calendar-range",
-        "habit-rollup needs a dashboard period.",
-        "Put it on a note carrying week-start, month-start, quarter-start or year-start."
-      )
-    );
-    return root;
-  }
-
+  if (!period) return null;
   const answer = parseHabitRollupArg(rest);
   const todayIso = today();
   const habits = habitsForSurface(plugin.settings.trackers, null);
@@ -580,17 +588,42 @@ export function buildHabitRollup(
     dash
   );
   const label = formatPeriodLabel(period.unit, period.start);
-  // THE SEEDS ARE BUILT HERE AND NOT IN THE DOOR, because the card's count of
-  // habits waiting for a grain and the window's list of them must be one
-  // answer. Two functions returning the same number is the shape that stays
-  // consistent until somebody edits one of them.
   const seeds = rollupSeeds(habits, all, answer, dash);
   const registry = rollupRegistry(habits);
   const waiting = seeds.filter((s) => s.grain == null).length;
   const asking = waiting
     ? `${waiting} ${waiting === 1 ? "habit needs" : "habits need"} a grain`
     : null;
+  return { period, answer, todayIso, all, label, seeds, registry, dash, asking };
+}
 
+export function buildHabitRollup(
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext,
+  rest: string,
+  // Whether this card's section bar is carrying the cog (1.0.98). The foot's
+  // door is the fallback for a card with no bar to put one on — see `drawFoot`.
+  hosted = false
+): HTMLElement {
+  const root = createDiv({ cls: "ca-hrollup" });
+  const state = rollupCardState(plugin, ctx, rest);
+
+  // REFUSING WITH A REASON BEATS A TRAILING WINDOW, which is `entry-rollup`'s
+  // own sentence and its own argument: this widget's whole scope is "the
+  // dashboard's period", and a silent default would draw a plausible,
+  // unrelated set of days. The registry's `needs: "period"` keeps it out of the
+  // add list everywhere this is the only thing it could say.
+  if (!state) {
+    root.appendChild(
+      emptyCallout(
+        "calendar-range",
+        "habit-rollup needs a dashboard period.",
+        "Put it on a note carrying week-start, month-start, quarter-start or year-start."
+      )
+    );
+    return root;
+  }
+  const { period, answer, todayIso, all, label, seeds, asking } = state;
   if (!seeds.length) {
     root.appendChild(
       emptyCallout(
@@ -599,7 +632,7 @@ export function buildHabitRollup(
         "Add one in Settings → ChronoAnvil → Trackers, or on any diary entry, and it is reported here."
       )
     );
-    drawDoor(root, plugin, ctx, seeds, registry, dash, answer, label);
+    drawFoot(root, plugin, ctx, state, hosted);
     return root;
   }
 
@@ -622,12 +655,17 @@ export function buildHabitRollup(
         // vanished from this card with no sentence anywhere, which is the
         // defect this round exists to fix — so where that is what happened,
         // the refusal says so instead of blaming the vault.
+        // WHERE THE DOOR IS, SINCE IT MOVED (1.0.98). "below" was true of a
+        // card whose only control was the row under this callout; the cog is
+        // on the bar above it now wherever there is a bar, and a hint pointing
+        // the reader down at a row that is not there is worse than no hint.
+        // Both sentences are otherwise 1.0.56's, word for word.
         asking
-          ? `${asking} before it can be read — choose one below.`
-          : "The habits this rollup names are no longer in the vault — choose some below."
+          ? `${asking} before it can be read — ${doorHint(hosted, "one")}.`
+          : `The habits this rollup names are no longer in the vault — ${doorHint(hosted, "some")}.`
       )
     );
-    drawDoor(root, plugin, ctx, seeds, registry, dash, answer, label);
+    drawFoot(root, plugin, ctx, state, hosted);
     return root;
   }
 
@@ -733,15 +771,12 @@ export function buildHabitRollup(
     cover.partial && cover.started
       ? `${cover.elapsed} of ${cover.total} days so far`
       : null;
-  drawDoor(
+  drawFoot(
     root,
     plugin,
     ctx,
-    seeds,
-    registry,
-    dash,
-    answer,
-    label,
+    state,
+    hosted,
     // BOTH SENTENCES OR EITHER. The coverage note has been on this row since
     // 1.0.55 and the waiting count is the new one; they are both one short
     // phrase about the card as a whole, and the foot is where such a phrase
@@ -803,62 +838,162 @@ function drawRow(
   if (strip && row.slots.length) drawStrip(el, row);
 }
 
-// The door onto the window.
+// What the card says about where its own door is (1.0.98).
 //
-// A TRAILING ROW, NOT A COG ON THE BAR, and the reason is a defect this plugin
-// already shipped once: the Categories control is hosted by the `header:` line
-// above its fence, and a fence written without one had no door at all until
-// 1.0.49 §1 gave the field head a second slot. This section's bar is removable
-// — *Show as widget* takes it off — so a control that lived there would come
-// and go with it. A row inside the card is always inside the card.
-function drawDoor(
+// TWO SENTENCES BECAUSE THERE ARE TWO PLACES, and an empty card is the only
+// thing on screen that has to point at one: *"choose some below"* was written
+// when the door was always the row under the callout, and on a card whose bar
+// carries the cog it points at nothing.
+// AND THE NOUN IS THE CALLER'S, because the two refusals ask for two
+// different things: a habit waiting for a grain needs ONE grain chosen, and a
+// card naming habits the vault no longer has needs SOME habits. Both sentences
+// predate this round; only the place they point at is new.
+function doorHint(hosted: boolean, what: "one" | "some"): string {
+  return hosted
+    ? `choose ${what} with the cog on this section's bar`
+    : `choose ${what} below`;
+}
+
+// The refusal a stored template gets, which is the one both doors share.
+//
+// NOT ON A MANAGED TEMPLATE, which is the Habits cell's refusal and the same
+// reason: a stored template is regenerated, so an answer written into one is a
+// change the next sync deletes.
+const TEMPLATE_REFUSAL =
+  "This is a stored template — open a dashboard to choose its habits.";
+
+// ── THE COG ON THE SECTION'S BAR (1.0.98) ────────────────────────────────
+//
+// *"move 'Manage habits' and 'choose habits' into the sections title row next
+// to the chevron as a the cog icon used in many other sections with a settings
+// window"*. Attachments got that cog in 1.0.49 §3, What's below in 1.0.69 and a
+// prose block in 1.0.78; this is the fourth and fifth, and the slot, the glyph
+// and the kind of window behind it are all theirs.
+//
+// ── AND IT REVERSES THIS FILE'S OWN REFUSAL, WHICH HAD TWO HALVES ─────────
+//
+// 1.0.55 wrote: *"A TRAILING ROW, NOT A COG ON THE BAR … the Categories control
+// is hosted by the `header:` line above its fence, and a fence written without
+// one had no door at all until 1.0.49 §1 gave the field head a second slot.
+// This section's bar is removable — Show as widget takes it off — so a control
+// that lived there would come and go with it. A row inside the card is always
+// inside the card."*
+//
+// THE FACT IS STILL TRUE AND THE CONCLUSION WAS THE WRONG ONE, which 1.0.49
+// itself had already shown: the answer to "some fences have no bar" is the one
+// that round reached — the bar hosts the door where there IS a bar, and where
+// there is none the card hosts it itself. Both halves are kept, which is what
+// makes this a move rather than a trade: `widgets/index.ts` decides which, by
+// the same `headerOwning` walk that places the Categories door, and
+// `drawFoot`'s row is what a barless card still draws.
+//
+// BUILT OUTSIDE THE LIVE WIDGET, WHICH IS WHY IT TAKES NO STATE. This card is a
+// `liveScopedWidget` over every folder a diary entry can be in, so it rebuilds
+// its own subtree whenever any entry is written — and the bar is not in that
+// subtree. A cog appended to the bar from inside the build would be appended
+// again on every repaint. So the dispatcher builds this once, and it reads the
+// card through `rollupCardState` when it is PRESSED, which is `overflowButton`'s
+// rule for every hosted control in a head: *"the menu is built ON CLICK rather
+// than at draw time, so it describes the note as it is when opened"*.
+export function buildHabitRollupCog(
+  plugin: ChronoAnvilPlugin,
+  ctx: MarkdownPostProcessorContext,
+  // The `habit-rollup` line's own argument, which is the directive this cog
+  // writes back to. Read off the fence by the caller.
+  rest: string
+): HTMLElement {
+  const cog = createEl("button", {
+    cls: "ca-habits-cog",
+    attr: { type: "button" },
+  });
+  setIcon(cog, "settings");
+  const hint = "Choose which habits this card reports, and their grains";
+  cog.setAttr("aria-label", hint);
+  cog.setAttr("title", hint);
+  if (isManagedTemplate(plugin, ctx.sourcePath)) {
+    cog.disabled = true;
+    cog.setAttr("title", TEMPLATE_REFUSAL);
+    return cog;
+  }
+  cog.addEventListener("click", (evt) => {
+    // The bar folds the section on click. It must not, because a reader asked
+    // for the window — the separation every hosted control in a head makes.
+    evt.preventDefault();
+    evt.stopPropagation();
+    const state = rollupCardState(plugin, ctx, rest);
+    // THE SAME REFUSAL THE CARD DREW, and the only way to reach this is to
+    // press a cog on a note whose period property was removed since the card
+    // was painted. Saying nothing would read as a dead control.
+    if (!state) {
+      notify.fail(
+        "ChronoAnvil cannot choose habits here — this note carries no dashboard period."
+      );
+      return;
+    }
+    new HabitRollupEditor(
+      plugin.app,
+      plugin,
+      state.label,
+      state.seeds,
+      state.registry,
+      state.answer.strip,
+      state.dash,
+      (next: HabitRollupAnswer) => apply(plugin, ctx, cog, next)
+    ).open();
+  });
+  return cog;
+}
+
+// The card's foot: the coverage sentence, and the door where no bar has it.
+//
+// A ROW INSIDE THE CARD IS ALWAYS INSIDE THE CARD — 1.0.55's sentence, kept
+// for the case it is still the only answer to. `hosted` is the dispatcher's
+// answer to *"is a section bar carrying the cog"*; where it is, this row is the
+// coverage sentence and nothing else.
+function drawFoot(
   root: HTMLElement,
   plugin: ChronoAnvilPlugin,
   ctx: MarkdownPostProcessorContext,
-  seeds: readonly HabitRollupSeed[],
-  // Registry order, which is what an all-ticked list collapses to. Passed in
-  // rather than read here so the card's list and the window's are one list.
-  registry: readonly string[],
-  // This dashboard's own grain, which the window asks `resolveGrain` for again
-  // after every chooser.
-  dashboard: TrackerClass | null,
-  answer: HabitRollupAnswer,
-  label: string,
+  state: RollupCardState,
+  hosted: boolean,
   // The coverage sentence, which only a drawn rollup over a running period has.
   note: string | null = null
 ): void {
+  // AND NO EMPTY ROW. With the door on the bar and no sentence to say, the foot
+  // is a box with nothing in it and `--ca-space-2` of margin under the strip.
+  if (hosted && !note) return;
   const foot = root.createDiv({ cls: "ca-hrollup-foot" });
-  const text = seeds.length ? "Choose habits…" : "Add a habit";
-  // THE SAME DOOR AS THE HABITS SECTION'S, down to the class, because it is the
-  // same control in the same family: a dashed row at the foot of a habits card
-  // that opens the window behind it. Two spellings of one shape is what 1.0.49
-  // spent a round undoing.
-  const door = foot.createEl("button", {
-    cls: "ca-habits-door",
-    attr: { type: "button", "aria-label": text, title: text },
-  });
-  setIcon(door.createSpan({ cls: "ca-journal-btn-icon" }), "settings-2");
-  door.createSpan({ text });
-
-  // NOT ON A MANAGED TEMPLATE, which is the Habits cell's refusal and the same
-  // reason: a stored template is regenerated, so an answer written into one is
-  // a change the next sync deletes.
-  if (isManagedTemplate(plugin, ctx.sourcePath)) {
-    door.disabled = true;
-    door.setAttr("title", "This is a stored template — open a dashboard to choose its habits.");
-  } else {
-    door.addEventListener("click", () => {
-      new HabitRollupEditor(
-        plugin.app,
-        plugin,
-        label,
-        seeds,
-        registry,
-        answer.strip,
-        dashboard,
-        (next: HabitRollupAnswer) => apply(plugin, ctx, door, next)
-      ).open();
+  if (!hosted) {
+    const { seeds, registry, dash, answer, label } = state;
+    const text = seeds.length ? "Choose habits…" : "Add a habit";
+    // THE SAME DOOR AS THE HABITS SECTION'S, down to the class, because it is
+    // the same control in the same family: a dashed row at the foot of a habits
+    // card that opens the window behind it. Two spellings of one shape is what
+    // 1.0.49 spent a round undoing.
+    const door = foot.createEl("button", {
+      cls: "ca-habits-door",
+      attr: { type: "button", "aria-label": text, title: text },
     });
+    setIcon(door.createSpan({ cls: "ca-journal-btn-icon" }), "settings-2");
+    door.createSpan({ text });
+
+    if (isManagedTemplate(plugin, ctx.sourcePath)) {
+      door.disabled = true;
+      door.setAttr("title", TEMPLATE_REFUSAL);
+    } else {
+      door.addEventListener("click", () => {
+        new HabitRollupEditor(
+          plugin.app,
+          plugin,
+          label,
+          seeds,
+          registry,
+          answer.strip,
+          dash,
+          (next: HabitRollupAnswer) => apply(plugin, ctx, door, next)
+        ).open();
+      });
+    }
   }
 
   // AFTER THE DOOR, AND NOT BEHIND THE REFUSAL ABOVE IT. The template branch

@@ -590,7 +590,18 @@ describe("the gesture around it", () => {
     // Recorded at the append, where the element and the directive that produced
     // it are both in hand. A pass afterwards would be reading classes to guess
     // at directives.
-    expect(widgets).toContain("named.push({ el: widget, title: SECTION_TITLES[kind] })");
+    // The `kind` beside the title joined in 1.0.98, so the band frame built
+    // after this loop can ask which section it is wrapping before hanging the
+    // Habits cog on it. It is the same fact recorded at the same place.
+    // ALL THREE OF THEM, COUNTED — the row's card, the row's overview host and
+    // the plain append. A `toContain` is satisfied by any one of the three,
+    // and the one the band's cog reads is the third: the two-call-site trap
+    // (memory `chart-reduction-1-0-57`) with three call sites.
+    expect(
+      widgets.match(
+        /named\.push\(\{ el: (?:widget|overviewHost), title: SECTION_TITLES\[kind\], kind \}\)/g
+      )
+    ).toHaveLength(3);
 
     // WRAPPED BEFORE THE ROW IS LAID OUT, and in place: one wrapper where one
     // widget was, so the block keeps the same number of children in the same

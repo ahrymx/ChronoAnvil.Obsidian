@@ -461,7 +461,8 @@
    habit chip, the overflow count and the mood face. */
 .ca-journal-field-cats,
 .ca-journal-note-types-cog,
-.ca-prose-bar-cog {
+.ca-prose-bar-cog,
+.ca-habits-cog {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -480,35 +481,49 @@
 }
 .ca-journal-field-cats .svg-icon,
 .ca-journal-note-types-cog .svg-icon,
-.ca-prose-bar-cog .svg-icon {
+.ca-prose-bar-cog .svg-icon,
+.ca-habits-cog .svg-icon {
   width: 1.1em;
   height: 1.1em;
 }
 .ca-journal-field-cats:hover,
 .ca-journal-note-types-cog:hover,
-.ca-prose-bar-cog:hover {
+.ca-prose-bar-cog:hover,
+.ca-habits-cog:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
-/* ── THE SAME COG, ON THREE SECTIONS (1.0.69, 1.0.78) ────────────────────
+/* ── THE SAME COG, ON FIVE SECTIONS (1.0.69, 1.0.78, 1.0.98) ─────────────
  *
  * Attachments got it first, What's below second — *"just a cog wheel (matching
  * those other sections)"* — and a prose block third: *"I'm trying to remove
  * '...' for some sections, so far this has been done for attachments and what's
- * below. I think prose blocks could definetely benefit from the cog."* All
- * three sit on a section's title row, wear `settings`, and open a window onto
- * something that section owns.
+ * below. I think prose blocks could definetely benefit from the cog."* The
+ * habits pair came fourth and fifth, in the same words again: *"move 'Manage
+ * habits' and 'choose habits' into the sections title row next to the chevron
+ * as a the cog icon used in many other sections with a settings window"* — and
+ * "many other sections" is the three above, which is what makes this a list to
+ * join rather than a decision to take. All five sit on a section's title row,
+ * wear `settings`, and open a window onto something that section owns.
  *
- * SO THEY ARE SELECTORS ON ONE RULE AND NOT THREE BLOCKS OF IT. 1.0.69 said
+ * SO THEY ARE SELECTORS ON ONE RULE AND NOT FIVE BLOCKS OF IT. 1.0.69 said
  * exactly this and then wrote the second block anyway; the third is where it
  * costs something, because a second place for the 30px reset to be forgotten
  * in is how `obsidian-button-height` announces itself on a `<button>` in a
- * ~20px head. One list, twelve declarations, three cogs.
+ * ~20px head. One list, twelve declarations, five cogs — and the fourth and
+ * fifth cost nothing but a selector each, which is the measurement the rule
+ * was written to make possible.
+ *
+ * ONE CLASS FOR THE TWO HABITS SECTIONS, because they are the one pair here
+ * that is genuinely the same control: both open a habits window, both sit in a
+ * `headTools` slot, and a reader on a diary entry and a reader on a period
+ * dashboard see the same glyph in the same place. Two classes would be two
+ * names for one look.
  *
  * AND THE PROSE COG IS NOT IN `headTools`, which is the one thing it does not
  * share. A prose block has no fence and therefore no `sectionFrame` — its bar
  * is built by `ui/prose-bar.ts` out of a title and this button — so what the
- * three have in common is the control and its size, not the slot. */
+ * five have in common is the control and its size, not the slot. */
 /* THE STRIP'S SCALE, WHICH IS LEVEL 2'S AND IS NOW BOTH LEVELS'. 50-entry-
    header.css sized a nested bar's buttons down to `--ca-text-2xs` and argued it as
    a fact about level 2; the argument turns out to be about a PLACE — chrome under
