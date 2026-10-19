@@ -5,6 +5,35 @@ All notable changes to ChronoAnvil will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.97] - 2026-10-19
+
+### Changed
+
+- **The habit rollup's day strip uses the whole row.** A mark was capped at ten
+  pixels wide, which left a week card using 88 pixels of its 670 and a month
+  card 370 — the cap had been calibrated to the year card, whose marks are
+  almost exactly ten pixels wide anyway. The marks now share the row: seven long
+  cells on a week card, twenty-eight to thirty-one day cells on a month card.
+- **A quarter is thirteen weekly marks instead of ninety-two slivers.** Up to a
+  month the marks are days; past it a daily habit's marks are weeks, counted in
+  sevens from the period's own first day and shaded by what that week held — a
+  density for a yes/no habit, the mean of the days logged for a number. A
+  trailing remainder of fewer than four days joins the mark before it, so a
+  quarter is thirteen marks and the last of them covers eight days rather than
+  one. A year card is unchanged: it already drew one mark per week.
+- **The strip's grouping follows the habit, not the count.** A weekly-logged
+  habit draws one mark per reading at every period — one mark across the row on
+  a week card, thirteen on a quarter, fifty-two on a year — so a year of weekly
+  readings is never collapsed into runs of seven weeks.
+- **A day mark carries its day of the month.** Under the mark, not on it, and
+  only where it fits: a week card's seven marks are labelled at any width, a
+  month card's thirty-one once the card is wide enough to hold two digits, and
+  neither at phone width, where the date is still in each mark's tooltip. A mark
+  covering a week is never labelled — it belongs to no single date.
+- The counts above the strip are untouched: a quarter card still reads
+  "0 of 92 days" over its thirteen marks, and each mark names the week it covers
+  and its own tally.
+
 ## [1.0.96] - 2026-10-18
 
 ### Removed

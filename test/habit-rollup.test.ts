@@ -53,6 +53,7 @@ import {
   rollupRegistry,
   slotNoun,
   stripCells,
+  stripRuns,
   stripShade,
   valueRange,
 } from "../src/ui/widgets/habit-rollup-view";
@@ -72,7 +73,15 @@ import {
   type TrackerClass,
   type TrackerDef,
 } from "../src/trackers/trackers";
-import { readSrc, readCode, readCss, cssRule, cssRules, fnBody } from "./sources";
+import {
+  readSrc,
+  readCode,
+  readCss,
+  readAsset,
+  cssRule,
+  cssRules,
+  fnBody,
+} from "./sources";
 import { BUNDLED_ASSETS } from "../generated/bundled-assets";
 
 // A boolean tracker on one diary grain — a habit, which is what the type IS
@@ -763,30 +772,128 @@ describe("habitRollupRows", () => {
 });
 
 // ── THE STRIP ─────────────────────────────────────────────────────────────
+// Sequential real dates for the strip builders, which slice a day of the month
+// out of `slot.date` (1.0.97). `d0` would answer "0" for every mark.
+const isoDay = (i: number) =>
+  new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+
+describe("stripRuns", () => {
+  it("is one run per slot up to a month, and sevens past it", () => {
+    // *"a week overview should show 7 long cells, a month 28-31 small day
+    // cells. At a quarter overview using day cells stops making sense …
+    // averaging the days into one value per week."*
+    expect(stripRuns(7, "daily")).toHaveLength(7);
+    expect(stripRuns(28, "daily")).toHaveLength(28);
+    expect(stripRuns(31, "daily")).toHaveLength(31);
+    expect(stripRuns(31, "daily").every((r) => r.to - r.at === 1)).toBe(true);
+    // 31 IS THE RULE'S OWN EDGE, said as the calendar: a month is at most 31
+    // daily slots, so one more than that is the first count that groups.
+    expect(stripRuns(32, "daily")).toHaveLength(5);
+    expect(stripRuns(92, "daily")).toHaveLength(13);
+    expect(stripRuns(365, "daily")).toHaveLength(52);
+  });
+
+  it("folds a short trailing remainder into the mark before it", () => {
+    // A ONE-DAY MARK DRAWN THE WIDTH OF THE THIRTEEN BESIDE IT is exactly the
+    // misreading the grouping comment already argues against from the other
+    // end — *"a three-day stub shaded over three days reads as a bad week
+    // rather than a short one"*. 92 is thirteen sevens and one over, so the
+    // quarter is thirteen marks and the last covers eight days.
+    const quarter = stripRuns(92, "daily");
+    expect(quarter).toHaveLength(13);
+    expect(quarter[12]).toEqual({ at: 84, to: 92 });
+    // AND FOUR OR MORE STANDS ALONE, because folding it would make one mark
+    // nearly twice its neighbours.
+    const four = stripRuns(88, "daily");
+    expect(four).toHaveLength(13);
+    expect(four[12]).toEqual({ at: 84, to: 88 });
+    const three = stripRuns(87, "daily");
+    expect(three).toHaveLength(12);
+    expect(three[11]).toEqual({ at: 77, to: 87 });
+    // NO RUN IS EVER EMPTY OR OUT OF ORDER, at any count the four periods can
+    // produce, and the runs cover every slot exactly once.
+    for (const n of [1, 7, 28, 31, 32, 88, 90, 91, 92, 364, 365, 366]) {
+      const runs = stripRuns(n, "daily");
+      expect(runs[0].at).toBe(0);
+      expect(runs[runs.length - 1].to).toBe(n);
+      for (let i = 0; i < runs.length; i++) {
+        expect(runs[i].to).toBeGreaterThan(runs[i].at);
+        if (i) expect(runs[i].at).toBe(runs[i - 1].to);
+      }
+    }
+  });
+
+  it("never re-grains a row that is not daily, at any count", () => {
+    // A WEEKLY HABIT ON A YEAR CARD HAS 52 SLOTS, which a bare count cap would
+    // group into runs of seven WEEKS. The cap is the display-grain rule and a
+    // count alone cannot say it — this is the half of 1.0.97 that is not
+    // arithmetic.
+    for (const grain of ["weekly", "monthly", "quarterly", "yearly"] as const) {
+      expect(stripRuns(52, grain)).toHaveLength(52);
+      expect(stripRuns(92, grain)).toHaveLength(92);
+      expect(stripRuns(92, grain).every((r) => r.to - r.at === 1)).toBe(true);
+    }
+  });
+
+  it("gives a single reading one run, which is a mark across the row", () => {
+    // The reader's call: a weekly-logged habit on a week card has exactly one
+    // reading and that reading IS the week.
+    expect(stripRuns(1, "weekly")).toEqual([{ at: 0, to: 1 }]);
+    expect(stripRuns(0, "daily")).toEqual([]);
+  });
+});
+
 describe("stripCells", () => {
   const slots = (states: HabitState[]) =>
     states.map((state, i) => ({
       key: `k${i}`,
-      date: `d${i}`,
+      date: isoDay(i),
       label: `l${i}`,
       state,
       written: state != null,
     }));
 
   it("is one cell per slot while the period is short enough to be", () => {
-    // A month and a quarter are both under the cap, so every day gets its own
-    // mark — binary, because a day is done or not and shading it would invent a
-    // quantity it does not have.
-    const cells = stripCells(slots(Array(92).fill(1)));
-    expect(cells).toHaveLength(92);
+    // A WEEK AND A MONTH ARE UNDER THE CAP, so every day gets its own mark —
+    // binary, because a day is done or not and shading it would invent a
+    // quantity it does not have. A quarter is not: it is thirteen weeks as of
+    // 1.0.97, which the test below this one holds.
+    const cells = stripCells(slots(Array(31).fill(1)), "daily");
+    expect(cells).toHaveLength(31);
     expect(cells.every((c) => c.single)).toBe(true);
+    expect(stripCells(slots(Array(7).fill(1)), "daily")).toHaveLength(7);
+  });
+
+  it("draws a quarter as thirteen weeks, the last of them eight days (1.0.97)", () => {
+    // *"averaging the days into one value per week and then quarters become
+    // ~12 cells for each week."* 92 days: thirteen marks, every one of them a
+    // week of the quarter counted from its own first day.
+    const cells = stripCells(slots(Array(92).fill(1)), "daily");
+    expect(cells).toHaveLength(13);
+    expect(cells.every((c) => !c.single)).toBe(true);
+    expect(cells[12].label).toContain("l84");
+    expect(cells[12].label).toContain("l91");
+    expect(cells[12].label).toContain("8 of 8");
+  });
+
+  it("leaves a weekly row one mark per reading at every period (1.0.97)", () => {
+    // THE CAP IS A RULE ABOUT DAYS and this is what makes it one rather than a
+    // count. A weekly habit reads 1 on a week card, 4 or 5 on a month, 13 on a
+    // quarter and 52 on a year, all of them single marks — a count cap would
+    // have grouped the year's into runs of seven weeks and drawn a year of
+    // habit-keeping as seven and a half marks.
+    for (const n of [1, 5, 13, 52]) {
+      const cells = stripCells(slots(Array(n).fill(1)), "weekly");
+      expect(cells).toHaveLength(n);
+      expect(cells.every((c) => c.single)).toBe(true);
+    }
   });
 
   it("draws the empty slots rather than closing the gaps up", () => {
     // `drawStrip`'s own promise, kept: *"a strip that closed up its holes would
     // show a perfect month to somebody who logged four days"*. It is also why
     // `habitSlots` emits the empty days at all.
-    const cells = stripCells(slots([1, null, 1]));
+    const cells = stripCells(slots([1, null, 1]), "daily");
     expect(cells).toHaveLength(3);
     expect(cells[1]).toMatchObject({ single: true, state: null, written: false });
   });
@@ -797,7 +904,7 @@ describe("stripCells", () => {
     // same span: a calendar grouping gives the first bucket however many days
     // are left in the week it begins in, and a three-day stub shaded over three
     // days reads as a bad week rather than a short one.
-    const year = stripCells(slots(Array(364).fill(1)));
+    const year = stripCells(slots(Array(364).fill(1)), "daily");
     expect(year).toHaveLength(52);
     expect(year.every((c) => !c.single)).toBe(true);
     expect(year[0].ratio).toBe(1);
@@ -806,7 +913,7 @@ describe("stripCells", () => {
   it("shades a group by what it kept, and says nothing for an empty one", () => {
     const states: HabitState[] = Array(364).fill(null);
     for (let i = 0; i < 7; i++) states[i] = i < 3 ? 1 : 0;
-    const cells = stripCells(slots(states));
+    const cells = stripCells(slots(states), "daily");
     expect(cells[0].ratio).toBeCloseTo(3 / 7);
     // A group with no entry at all is `null`, not 0 — a week nobody logged is
     // not a week nobody kept, and the drawing has no class for the first.
@@ -815,7 +922,7 @@ describe("stripCells", () => {
   });
 
   it("names the span a grouped cell covers, since a 3px mark carries no date", () => {
-    const cells = stripCells(slots(Array(364).fill(1)));
+    const cells = stripCells(slots(Array(364).fill(1)), "daily");
     expect(cells[0].label).toContain("l0");
     expect(cells[0].label).toContain("l6");
     expect(cells[0].label).toContain("7 of 7");
@@ -851,9 +958,14 @@ describe("stripCells", () => {
   });
 
   it("drops no slot when the last group is short", () => {
-    const cells = stripCells(slots(Array(365).fill(1)));
-    expect(cells).toHaveLength(53);
-    expect(cells[52].ratio).toBe(1);
+    // 365 IS 52 SEVENS AND A DAY, and that day is drawn — in the mark before
+    // it, which `STRIP_STUB` folds it into rather than standing it up as a
+    // mark of its own. The slot is still shaded and still named.
+    const cells = stripCells(slots(Array(365).fill(1)), "daily");
+    expect(cells).toHaveLength(52);
+    expect(cells[51].ratio).toBe(1);
+    expect(cells[51].label).toContain("l364");
+    expect(cells[51].label).toContain("8 of 8");
   });
 
   // ── THE SLOTS NOBODY HAS REACHED (1.0.64) ───────────────────────────────
@@ -862,15 +974,15 @@ describe("stripCells", () => {
     // how many it appended and this function already walks by index. A
     // predicate would need a date and a today, which is a second clock inside a
     // pure function that has none.
-    const cells = stripCells(slots([1, 0, null, null]), 2);
+    const cells = stripCells(slots([1, 0, null, null]), "daily", 2);
     expect(cells.map((c) => c.ahead)).toEqual([false, false, true, true]);
     // AND AN UNREACHED SLOT IS NOT A MISSED ONE. They arrive identical —
     // `state: null, written: false` — so this flag is the only thing that tells
     // them apart, which is why the default has to be 0 and not something
     // derived.
-    expect(stripCells(slots([1, 0, null, null])).every((c) => !c.ahead)).toBe(
-      true
-    );
+    expect(
+      stripCells(slots([1, 0, null, null]), "daily").every((c) => !c.ahead)
+    ).toBe(true);
   });
 
   it("names an unlived group without tallying it", () => {
@@ -878,7 +990,7 @@ describe("stripCells", () => {
     // false one about this habit. A year card opened in January would otherwise
     // read forty-nine weeks of failure.
     const year = slots(Array(364).fill(1));
-    const cells = stripCells(year, 357);
+    const cells = stripCells(year, "daily", 357);
     expect(cells).toHaveLength(52);
     expect(cells[51].ahead).toBe(true);
     expect(cells[51].label).not.toContain("of 7");
@@ -897,11 +1009,106 @@ describe("stripCells", () => {
     // group's own length, so a partial group reads light rather than absent.
     const states: HabitState[] = Array(364).fill(null);
     for (let i = 0; i < 3; i++) states[i] = 1;
-    const cells = stripCells(slots(states), 361);
+    const cells = stripCells(slots(states), "daily", 361);
     expect(cells[0].ahead).toBe(false);
     expect(cells[0].ratio).toBeCloseTo(3 / 7);
     expect(cells[0].label).toContain("3 of 7");
     expect(cells[1].ahead).toBe(true);
+  });
+});
+
+describe("the day a mark carries (1.0.97)", () => {
+  // THE BUILDERS' HALF OF §3. The stylesheet's half — a second grid row, the
+  // dense gate and the phone-width fold — is in `the rollup's CSS` below.
+  it("labels a day mark with its day of the month, and nothing else", () => {
+    // *"also do this for day cells, if they fit."* The day of the month in both
+    // counts — 12..18 on a week card, 1..31 on a month — one rule for both, it
+    // never repeats inside a card, and the weekday a letter would give is
+    // already on the card's own title bar.
+    const week = stripCells(
+      [1, 0, null, 1, 1, 0, 1].map((state, i) => ({
+        key: `k${i}`,
+        date: `2026-10-${String(12 + i).padStart(2, "0")}`,
+        label: `l${i}`,
+        state: state as HabitState,
+        written: state != null,
+      })),
+      "daily"
+    );
+    expect(week.map((c) => c.short)).toEqual([
+      "12", "13", "14", "15", "16", "17", "18",
+    ]);
+    // NO LEADING ZERO, which is the only reason this is a slice and a `Number`
+    // rather than the slice alone: `01` beside `31` is two digits of width for
+    // one digit of information.
+    expect(stripCells(
+      [{ key: "k", date: "2026-03-01", label: "l", state: 1 as HabitState, written: true }],
+      "daily"
+    )[0].short).toBe("1");
+  });
+
+  it("gives no day to a mark that is not one day (1.0.97)", () => {
+    // A WEEK MARK BELONGS TO NO SINGLE DATE, which rules out both the grouped
+    // marks on a quarter or a year AND the single marks of a weekly-logged
+    // habit. The first is the reader's own reasoning for the grouping; the
+    // second is the half a `single` test would have got wrong.
+    const day = (i: number) => ({
+      key: `k${i}`,
+      date: isoDay(i),
+      label: `l${i}`,
+      state: 1 as HabitState,
+      written: true,
+    });
+    const quarter = stripCells(Array.from({ length: 92 }, (_, i) => day(i)), "daily");
+    expect(quarter.every((c) => c.short == null)).toBe(true);
+    const weekly = stripCells(Array.from({ length: 13 }, (_, i) => day(i)), "weekly");
+    expect(weekly.every((c) => c.single)).toBe(true);
+    expect(weekly.every((c) => c.short == null)).toBe(true);
+    // AND THE NUMBER BUILDER IS ASKED SEPARATELY, which a mutant had to find:
+    // its marks are NEVER `single` — the three-state vocabulary has nothing to
+    // say about 2 km — so a `single` test is vacuous there, and dropping the
+    // length check would label a quarter's thirteen weekly means with the first
+    // day of each. The test above holds the single-day half.
+    const nums = Array.from({ length: 92 }, (_, i) => ({
+      key: `k${i}`,
+      date: isoDay(i),
+      label: `l${i}`,
+      state: null,
+      value: i,
+      written: true,
+    })) as Parameters<typeof numberStripCells>[0];
+    const grouped = numberStripCells(nums, "km", "daily");
+    expect(grouped).toHaveLength(13);
+    expect(grouped.every((c) => c.short == null)).toBe(true);
+    expect(
+      numberStripCells(nums.slice(0, 31), "km", "daily").map((c) => c.short)
+    ).toEqual(Array.from({ length: 31 }, (_, i) => String(i + 1)));
+  });
+
+  it("pairs a quarter's thirteen marks with a count that still says 92 days", () => {
+    // NOTHING ABOVE THE STRIP CHANGED, AND THAT IS THE POINT. The counts, the
+    // rate and both runs divide by `row.slots` — the lived days at the
+    // TRACKER's own grain, 1.0.55's rule and 1.0.61's `logged/slots` — so a
+    // quarter card reads "0 of 92 days" over thirteen marks, and each mark's
+    // own tooltip names the week it covers and its tally. That pairing is the
+    // thing a reader will query, so it is one test.
+    const slots = habitSlots("daily", "2026-10-01", "2026-12-31");
+    expect(slots).toHaveLength(92);
+    const readings = slots.map((slot) => ({
+      ...slot,
+      state: null as HabitState,
+      value: null,
+      written: false,
+    }));
+    const cells = stripCells(readings, "daily");
+    expect(cells).toHaveLength(13);
+    expect(cells[0].label).toContain("–");
+    // AND THE SHIPPED DOCS SAY SO. The row used to promise the week grouping
+    // for the year alone, which was true before this round and is the one
+    // sentence a reader checks the quarter card against.
+    const docs = readAsset("documentation.md");
+    expect(docs).toContain("A quarter and a year draw one mark per week");
+    expect(docs).not.toContain("A year draws one mark per week instead of per day.");
   });
 });
 
@@ -1209,6 +1416,7 @@ describe("numberStripCells", () => {
   const slots = (values: (number | null)[]) =>
     values.map((v, i) => ({
       key: `k${i}`,
+      date: isoDay(i),
       label: `l${i}`,
       state: null,
       value: v,
@@ -1219,7 +1427,7 @@ describe("numberStripCells", () => {
     // A QUANTITY HAS NO done/not-done READING — 2 km is not "done" and 0 km is
     // not "not done" — so `single` is false at every width and `drawStrip`
     // takes the shade arm for all of them.
-    const cells = numberStripCells(slots([1, 5, 10]), null);
+    const cells = numberStripCells(slots([1, 5, 10]), null, "daily");
     expect(cells.map((c) => c.single)).toEqual([false, false, false]);
     expect(cells.map((c) => c.ratio)).toEqual([0, 4 / 9, 1]);
   });
@@ -1228,7 +1436,7 @@ describe("numberStripCells", () => {
     // AND THE DRAWING DOES NOT TREAT IT AS BLANK: the boolean arm's `> 0` is
     // what would, which is why `drawStrip` asks the type before it asks the
     // ratio.
-    const [least] = numberStripCells(slots([2, 9]), null);
+    const [least] = numberStripCells(slots([2, 9]), null, "daily");
     expect(least.ratio).toBe(0);
     expect(stripShade(least.ratio!)).toBe(1);
     expect(readCode("habit-rollup-view")).toContain(
@@ -1239,21 +1447,21 @@ describe("numberStripCells", () => {
   it("draws a flat window full rather than empty", () => {
     // `sparkFraction`'s OWN BOUNDARY, and the section's sparkline agrees with
     // it: "every day the same" is not "every day the least".
-    expect(numberStripCells(slots([4, 4, 4]), null).map((c) => c.ratio)).toEqual(
+    expect(numberStripCells(slots([4, 4, 4]), null, "daily").map((c) => c.ratio)).toEqual(
       [1, 1, 1]
     );
   });
 
   it("says nothing for a slot with no reading", () => {
-    const [, blank] = numberStripCells(slots([5, null]), null);
+    const [, blank] = numberStripCells(slots([5, null]), null, "daily");
     expect(blank.ratio).toBeNull();
     expect(blank.label).toContain("nothing logged");
   });
 
   it("names each mark with its value and its unit", () => {
-    const [one] = numberStripCells(slots([5.25]), "km");
+    const [one] = numberStripCells(slots([5.25]), "km", "daily");
     expect(one.label).toBe("l0: 5.3 km");
-    expect(numberStripCells(slots([5.25]), null)[0].label).toBe("l0: 5.3");
+    expect(numberStripCells(slots([5.25]), null, "daily")[0].label).toBe("l0: 5.3");
   });
 
   it("groups a year into sevens and averages each group's LOGGED slots", () => {
@@ -1261,12 +1469,25 @@ describe("numberStripCells", () => {
     // logged-not-written distinction the row's own mean makes.
     const year = Array<number | null>(364).fill(null);
     year[0] = 10;
-    const cells = numberStripCells(slots(year), "km");
+    const cells = numberStripCells(slots(year), "km", "daily");
     expect(cells).toHaveLength(52);
     expect(cells[0].label).toContain("l0");
     expect(cells[0].label).toContain("l6");
     expect(cells[0].label).toContain("10 km");
     expect(cells[1].ratio).toBeNull();
+  });
+
+  it("buckets a number row by the same rule as a boolean one (1.0.97)", () => {
+    // ONE GROUPING FOR BOTH BUILDERS, which is what `stripRuns` is for: a
+    // number row on a quarter card is thirteen weekly means and on a month
+    // card thirty-one days, and a weekly-logged number is never re-grained.
+    const quarter = Array<number | null>(92).fill(null);
+    quarter[0] = 10;
+    const cells = numberStripCells(slots(quarter), "km", "daily");
+    expect(cells).toHaveLength(13);
+    expect(cells[0].label).toContain("10 km");
+    expect(numberStripCells(slots(Array(31).fill(1)), null, "daily")).toHaveLength(31);
+    expect(numberStripCells(slots(Array(52).fill(1)), null, "weekly")).toHaveLength(52);
   });
 
   // ── THE SLOTS NOBODY HAS REACHED (1.0.64) ───────────────────────────────
@@ -1288,7 +1509,7 @@ describe("numberStripCells", () => {
     expect(fnBody("numberStripCells", "habit-rollup-view")).toContain(
       "valueRange(slots.slice(0, lived))"
     );
-    const cells = numberStripCells(slots([2, 9, null, null]), "km", 2);
+    const cells = numberStripCells(slots([2, 9, null, null]), "km", "daily", 2);
     expect(cells.map((c) => c.ahead)).toEqual([false, false, true, true]);
     expect(cells[0].ratio).toBe(0);
     expect(cells[1].ratio).toBe(1);
@@ -2060,8 +2281,10 @@ describe("the card's shape", () => {
     // `numberStripCells`' `ahead` parameter means. Reversed, every lived mark
     // would be drawn as unreached and the whole strip would go faint.
     expect(strip).toContain("const all = [...row.slots, ...rest];");
-    expect(strip).toContain("numberStripCells(all, row.unit, rest.length)");
-    expect(strip).toContain("stripCells(all, rest.length)");
+    expect(strip).toContain(
+      "numberStripCells(all, row.unit, row.grain, rest.length)"
+    );
+    expect(strip).toContain("stripCells(all, row.grain, rest.length)");
     // CONCATENATED BEFORE GROUPING AND NOT AFTER. Grouping each list on its own
     // would end the lived half in a stub — three days shaded over three days
     // reads as a bad week rather than a short one, which is the same argument
@@ -2336,20 +2559,25 @@ describe("the rollup's CSS", () => {
     // second week of nothing.
     expect(strip).toContain("grid-auto-flow: column");
     expect(strip).not.toContain("flex-wrap");
-    // ── A CELL HAS A CEILING (1.0.64) ───────────────────────────────────────
+    // ── AND THE MARK FILLS THE ROW AGAIN (1.0.97) ───────────────────────────
     //
-    // `minmax(0, 1fr)` SIZED A MARK BY THE CARD AND NOT BY THE CALENDAR, which
-    // is most of *"the rollup is visually messy"*: two slots on a week card
-    // drew two slabs three hundred pixels wide. `10px` is a mark's size, and
-    // the strip's LENGTH is what says how long the period is.
+    // *"tracker rollups should use the row for the day strip better."* 1.0.64
+    // capped this at `minmax(0, 10px)` because `1fr` *"sized a mark by the card
+    // and not by the calendar"* — two slots on a week card drew two slabs three
+    // hundred pixels wide. Two things removed that premise: 1.0.64's own
+    // `ahead`/`through` half, after which the strip always draws the whole
+    // period and a week card cannot have two marks; and `STRIP_DAY_CAP`, after
+    // which a card's marks are 7, 28-31, 13 or ~52 and sizing by the card and
+    // by the calendar are the same number.
     //
-    // `minmax(0, 10px)` AND NOT `10px`, so the ceiling is a ceiling: ninety-two
-    // marks at ten pixels is wider than any card, and a track whose maximum is
-    // fixed shares the space it actually has instead of overflowing. The
-    // left-alignment is arithmetic rather than a declaration — the tracks no
-    // longer add up to the row, so the leftover falls at the end.
-    expect(strip).toContain("grid-auto-columns: minmax(0, 10px);");
-    expect(strip).not.toContain("minmax(0, 1fr)");
+    // THE CEILING COST 88 PIXELS OF 670 ON A WEEK CARD and 370 of 670 on a
+    // month. Ten pixels is a YEAR mark's own natural width here, which is the
+    // evidence it was calibrated to the one card that did not need fixing.
+    expect(strip).toContain("grid-auto-columns: minmax(0, 1fr);");
+    expect(strip).not.toContain("10px");
+    // AND NOTHING IS LEFT TO ALIGN. `1fr` tracks add up to the row, so the
+    // leftover 1.0.64 let fall at the end does not exist.
+    expect(strip).not.toContain("justify-content");
   });
 
   it("gives a mark the three vocabularies its three meanings need", () => {
@@ -2380,6 +2608,93 @@ describe("the rollup's CSS", () => {
     expect(ahead).not.toContain("opacity");
     expect(ahead).not.toContain("height");
   });
+
+
+
+  it("asks the stylesheet whether a dense strip's labels fit (1.0.97)", () => {
+    // FIT TAKES BOTH SIDES AND NEITHER CAN ANSWER IT ALONE. `drawStrip` knows
+    // the mark COUNT and writes the flags; only a container query knows the
+    // WIDTH, which cannot be inferred from the count — the same card is 670px
+    // in a note and 240px in a sidebar.
+    const strip = fnBody("drawStrip", "habit-rollup-view");
+    expect(strip).toContain("const labelled = cells.some((cell) => cell.short != null)");
+    expect(strip).toContain('strip.addClass("is-labelled")');
+    expect(strip).toContain('if (cells.length > STRIP_DENSE) strip.addClass("is-dense")');
+    expect(readCode("habit-rollup-view")).toContain("const STRIP_DENSE = 10;");
+    // EVERY MARK GETS A LABEL OR NONE DO, because the second grid row aligns a
+    // label with its mark BY POSITION: a strip that labelled only some of them
+    // would put the rest of its marks in the label row.
+    expect(strip).toContain(
+      'strip.createDiv({ cls: "ca-hrollup-day", text: cell.short ?? "" })'
+    );
+    // AND BEFORE THE THREE ARMS, every one of which `continue`s. An unreached
+    // day is still a date — what is absent there is the reading, which
+    // `.is-ahead` already says — so the label cannot sit behind the `ahead`
+    // test.
+    expect(strip.indexOf("ca-hrollup-day")).toBeLessThan(
+      strip.indexOf("if (cell.ahead) {")
+    );
+  });
+
+  it("draws the labels as a second grid row, folded away with them (1.0.97)", () => {
+    // UNDER THE MARK AND NOT ON IT. The fills are the grain hue, four shades of
+    // the ramp, a hollow outline and a faint not-yet — six backgrounds a label
+    // would have to stay legible over. Under it the label has the card's own
+    // background, and every mark rule from 1.0.61 through 1.0.65 keeps the mark
+    // it was written for.
+    expect(cssRule(".ca-hrollup-strip.is-labelled")).toContain(
+      "grid-template-rows: auto auto;"
+    );
+    const day = cssRule(".ca-hrollup-day");
+    expect(day).toContain("font-size: var(--ca-text-3xs)");
+    expect(day).toContain("text-align: center");
+    expect(day).not.toContain("position: absolute");
+    // A MARK IS STILL 10px TALL, which is the half of 1.0.64 that was never
+    // the problem: the ceiling was a WIDTH.
+    expect(cssRule(".ca-hrollup-cell")).toContain("height: 10px;");
+    // DENSE IS HIDDEN UNTIL ASKED, and the row is folded with it — a
+    // `display: none` label on a two-row grid leaves the track and the gap
+    // under it, so both halves are declared in both directions.
+    expect(cssRule(".ca-hrollup-strip.is-dense")).toContain(
+      "grid-template-rows: auto;"
+    );
+    expect(cssRule(".ca-hrollup-strip.is-dense .ca-hrollup-day")).toContain(
+      "display: none;"
+    );
+    // 31 MARKS WITH 2px GAPS IN A 560px CARD IS 16px EACH, which is two digits
+    // of `--ca-text-3xs` with room to breathe. Seven marks are ~94px and are
+    // never dense, so they are never hidden by this gate.
+    const grant = readCss().match(
+      /@container \(min-width: 560px\) \{[\s\S]*?\n\}/
+    );
+    expect(grant).not.toBeNull();
+    expect(grant![0]).toContain(".ca-hrollup-strip.is-dense .ca-hrollup-day");
+    expect(grant![0]).toContain("display: block;");
+    expect(grant![0]).toContain("grid-template-rows: auto auto;");
+  });
+
+  it("drops the day labels and their row at phone width (1.0.97)", () => {
+    // AT 360px THE SUB LINE IS ALREADY GONE and seven marks are ~43px. The date
+    // is in every mark's own tooltip, so the labels go and the strip is exactly
+    // the one this card drew before this round.
+    const narrow = readCss().match(
+      /@container \(max-width: 360px\) \{[\s\S]*?\n\}/g
+    );
+    const block = narrow!.find((b) => b.includes(".ca-hrollup-strip"));
+    expect(block).toBeDefined();
+    // THE RULE BODY AND NOT THE BLOCK, which a mutant had to find: this block
+    // already hides `.ca-hrollup-sub`, so a bare `toContain("display: none")`
+    // passes with the day label left visible — `chart-reduction-1-0-57`'s
+    // two-call-site trap, in a stylesheet.
+    expect(block!).toMatch(/\.ca-hrollup-day \{\s*display: none;\s*\}/);
+    expect(block!).toMatch(
+      /\.ca-hrollup-strip\.is-labelled \{\s*grid-template-rows: auto;\s*\}/
+    );
+    // AND THE 1px GAP STAYS, which matters more now: 31 marks in a 360px card
+    // are ~10px each with a 1px gap between them.
+    expect(block!).toContain("gap: 1px;");
+  });
+
 
   it("gives both kinds of row one figure cell and no picture (1.0.64)", () => {
     // `.ca-hrollup-total` AND ITS `span 2` ARE GONE, from 1.0.61: a number used

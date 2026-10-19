@@ -1319,16 +1319,16 @@
 
    ONE TRACK PER MARK AND NO WRAPPING. `grid-auto-flow: column` with
    `minmax(0, 1fr)` tracks makes the strip exactly as wide as the card at every
-   width and every count: 7 marks on a week, 31 on a month, 92 on a quarter,
-   and ~52 on a year because `stripCells` groups a year into sevens. A
-   fixed-width mark with `flex-wrap` was the alternative and it reflows a month
-   into two and a half lines on a phone, which reads as a second week of
-   nothing. */
+   width and every count: 7 marks on a week, 28-31 on a month, 13 on a quarter
+   and ~52 on a year, because `stripRuns` groups a daily row past a month into
+   sevens. A fixed-width mark with `flex-wrap` was the alternative and it
+   reflows a month into two and a half lines on a phone, which reads as a
+   second week of nothing. */
 .ca-hrollup-strip {
   grid-column: 1 / -1;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 10px);
+  grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
   margin-bottom: var(--ca-space-2);
 }
@@ -1336,22 +1336,41 @@
    with no class is a day with no reading, so the gaps are drawn rather than
    closed up. A mark is a bar and not a disc because a month of discs with gaps
    between them is a dotted line, and the thing being compared is AREA. */
-/* ── A CELL HAS A CEILING (1.0.64) ────────────────────────────────────────
+/* ── AND THE CEILING IS OFF AGAIN (1.0.97), WHICH NEEDS THE ARGUMENT ──────
 
-   `minmax(0, 1fr)` SIZED A MARK BY THE CARD AND NOT BY THE CALENDAR, which is
-   the whole of *"the rollup is visually messy"*. Two slots on a week card drew
-   two slabs three hundred pixels wide; thirteen days of a quarter drew thirteen
-   bars. A mark is a mark — `10px` is its size, and the strip's LENGTH is what
-   says how long the period is.
+   *"tracker rollups should use the row for the day strip better. a week
+   overview should show 7 long cells, a month 28-31 small day cells."*
 
-   `minmax(0, 10px)` AND NOT `10px`, so the ceiling is a ceiling and not a
-   width: ninety-two marks at ten pixels is wider than any card, and a track
-   whose maximum is fixed shares the space it actually has instead of
-   overflowing. A quarter's marks come out thin, a week's come out square, and
-   neither is stretched.
+   1.0.64 CAPPED THIS AT `minmax(0, 10px)` AND WAS RIGHT ABOUT WHAT IT SAW:
+   `1fr` *"sized a mark by the card and not by the calendar"* — two slots on a
+   week card drew two slabs three hundred pixels wide, and thirteen days of a
+   quarter drew thirteen bars. A mark was a mark, `10px` was its size, and the
+   strip's LENGTH said how long the period was.
 
-   LEFT-ALIGNED BY ARITHMETIC, not by a declaration. The tracks no longer add up
-   to the row, so the leftover simply falls at the end. */
+   TWO THINGS HAVE SINCE REMOVED THAT PREMISE, and neither is a change of mind.
+   The first is 1.0.64's own second half: the same round gave the row its
+   `ahead` slots and the window its `through`, so the strip draws the WHOLE
+   period from the first morning of it. A daily habit on a week card cannot
+   draw two marks any more; it draws seven. The two-slab case was a CLIPPED
+   strip and the clip is gone. The second is `STRIP_DAY_CAP`: once a card's
+   marks are 7, 28-31, 13 or ~52, sizing by the card and sizing by the calendar
+   are the same number, and the ceiling was standing in for a rule about mark
+   COUNT that `stripRuns` now states directly.
+
+   WHAT THE CEILING COST, AND IS THE ASK: a week card used 88 pixels of 670 and
+   a month 370 of 670. Ten pixels is almost exactly a YEAR mark's natural width
+   here (~10.7px), which is the plainest evidence that the ceiling was
+   calibrated to the one card that did not need fixing.
+
+   THE ONE CASE WHERE CARD AND CALENDAR STILL DISAGREE is a weekly-logged habit
+   on a week card: one reading, one mark, the full row. That is the reader's
+   call — *"one cell spanning the row"* — and it is the shape the figure line
+   above it already has.
+
+   AND NOTHING IS LEFT TO ALIGN. 1.0.64 noted the strip was *"left-aligned by
+   arithmetic, not by a declaration"*, because capped tracks did not add up to
+   the row; `1fr` tracks do, so there is no leftover and that sentence is gone
+   rather than kept as a description of a mechanism. */
 .ca-hrollup-cell {
   height: 10px;
   min-width: 0;
@@ -1426,6 +1445,57 @@
   );
 }
 
+/* ── A DAY MARK CARRIES ITS DAY (1.0.97) ──────────────────────────────────
+
+   *"also do this for day cells, if they fit."* The day of the month, under the
+   mark, on a strip whose marks are one day each — so a week card reads
+   12..18 and a month card 1..31. A quarter's marks are weeks and a year's are
+   weeks; neither belongs to a single date and neither is labelled.
+
+   A SECOND GRID ROW, WHICH IS WHY THERE IS NO NEW CONTAINER. `grid-auto-flow:
+   column` fills each column downwards, so two rows over the same auto-columns
+   put each label in its mark's own track with no second grid to go out of step
+   — the trap the list's own block above is about. Every mark gets a label or
+   none do; `drawStrip` holds that invariant.
+
+   AND FIT TAKES BOTH SIDES. `drawStrip` knows the COUNT and writes
+   `is-labelled`, plus `is-dense` past ten marks; only a container query knows
+   the WIDTH, which is the thing that cannot be inferred from the count — the
+   same card is 670px in a note and 240px in a sidebar. So a dense strip asks
+   for its labels and this grants them at 560px: 31 marks with 2px gaps is
+   (560 - 60) / 31 = 16px each, which is two digits of `--ca-text-3xs` with
+   room to breathe. Below it the labels go and the row goes with them, so a
+   phone gets exactly the strip it had before this round. */
+.ca-hrollup-strip.is-labelled {
+  grid-template-rows: auto auto;
+}
+.ca-hrollup-day {
+  font-size: var(--ca-text-3xs);
+  line-height: 1;
+  color: var(--text-faint);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+/* DENSE IS HIDDEN UNTIL ASKED, and the row is folded away with it. A declared
+   `grid-template-rows: auto` is not the same as leaving it out here: the base
+   rule above has already set two rows on `.is-labelled`, and a `display: none`
+   label leaves the second track present and the `gap` under it. */
+.ca-hrollup-strip.is-dense {
+  grid-template-rows: auto;
+}
+.ca-hrollup-strip.is-dense .ca-hrollup-day {
+  display: none;
+}
+@container (min-width: 560px) {
+  .ca-hrollup-strip.is-dense {
+    grid-template-rows: auto auto;
+  }
+  .ca-hrollup-strip.is-dense .ca-hrollup-day {
+    display: block;
+  }
+}
+
 /* ── THE FOOT ─────────────────────────────────────────────────────────────
 
    THE DOOR AND THE COVERAGE SENTENCE SHARE ONE ROW. They are the only two
@@ -1467,6 +1537,16 @@
   }
   .ca-hrollup-strip {
     gap: 1px;
+  }
+  /* AND NO DAY LABELS AT ALL AT THIS WIDTH, dense or not: seven marks in a
+     360px card are ~43px and could hold the date, but the sub line is already
+     gone here and the date is in every mark's own tooltip. The row goes with
+     the labels — see the dense block for why that has to be said. */
+  .ca-hrollup-strip.is-labelled {
+    grid-template-rows: auto;
+  }
+  .ca-hrollup-day {
+    display: none;
   }
   .ca-hrollup-foot {
     align-items: flex-start;

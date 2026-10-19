@@ -59,21 +59,92 @@ import {
 import { HabitRollupEditor, type HabitRollupSeed } from "../habit-rollup-editor";
 import type { FoldStore } from "../section-frame";
 
-// Past this many slots the strip groups them, which on the only period that
-// reaches it means a year of days drawn as a year of weeks.
+// ── DAY CELLS UP TO A MONTH, WEEK CELLS BEYOND IT (1.0.97) ──────────────
 //
+// *"a week overview should show 7 long cells, a month 28-31 small day cells. At
+// a quarter overview using day cells stops making sense … averaging the days
+// into one value per week and then quarters become ~12 cells for each week."*
+//
+// THE MECHANISM WAS ALREADY HERE AND ONLY THE RULE CHANGED. This was a cap of
+// 100, which no period but the year reached — so a year already drew one mark
+// per week and a quarter drew ninety-two slivers. A month is at most 31 daily
+// slots, so 31 is where the rule actually sits, said as the calendar rather
+// than as a number nothing is measured against.
+//
+// AND IT IS ASKED OF A DAILY ROW ONLY, which a count alone cannot express: a
+// weekly habit on a year card has 52 slots and a bare cap would group them into
+// runs of seven WEEKS. A week cannot be split into days either, so a weekly row
+// is never re-grained in either direction — see `stripRuns`.
+const STRIP_DAY_CAP = 31;
+
 // GROUPED IN RUNS OF SEVEN FROM THE PERIOD'S OWN START, not into ISO weeks.
 // Every mark then covers the same span, which is what makes two of them
 // comparable — a calendar grouping gives the first bucket however many days are
 // left in the week it begins in, and a three-day stub shaded over three days
 // reads as a bad week rather than a short one.
-const STRIP_CELL_CAP = 100;
 const STRIP_GROUP = 7;
+
+// A trailing remainder shorter than this joins the mark before it (1.0.97).
+//
+// THE STUB THE LINE ABOVE ARGUES AGAINST, ARRIVING FROM THE OTHER END. Ninety-two
+// days is thirteen sevens and one day over, and a one-day mark drawn the same
+// width as the thirteen beside it is exactly the misreading — so the quarter is
+// thirteen marks, the last covering eight days, and its label says eight. A
+// remainder of four or more stands as its own shorter mark instead, because
+// folding it would make one mark nearly twice its neighbours.
+const STRIP_STUB = 4;
+
+// Past this many day marks the label needs the stylesheet's permission (1.0.97).
+const STRIP_DENSE = 10;
+
+// Which slots each mark covers, as half-open ranges over the slot array.
+//
+// ONE ANSWER FOR BOTH BUILDERS. `stripCells` and `numberStripCells` draw two
+// different things out of the same arithmetic, and a second copy of "where does
+// mark 3 start" is how the two come to disagree about what a quarter is — the
+// shape `fencesOf` is written around in `core/block-move.ts`, for the reason it
+// gives there.
+export function stripRuns(
+  count: number,
+  grain: TrackerClass
+): { at: number; to: number }[] {
+  if (grain !== "daily" || count <= STRIP_DAY_CAP) {
+    return Array.from({ length: count }, (_, at) => ({ at, to: at + 1 }));
+  }
+  const runs: { at: number; to: number }[] = [];
+  for (let at = 0; at < count; at += STRIP_GROUP) {
+    runs.push({ at, to: Math.min(at + STRIP_GROUP, count) });
+  }
+  const last = runs[runs.length - 1];
+  if (runs.length > 1 && last.to - last.at < STRIP_STUB) {
+    runs[runs.length - 2].to = last.to;
+    runs.pop();
+  }
+  return runs;
+}
+
+// The day of the month a single DAY cell is wide enough to carry (1.0.97).
+//
+// *"also do this for day cells, if they fit."* A slice of the ISO date and not
+// `labelForGrain`: that function is grain-aware because a label names a period,
+// and this names a day of the month in the one case where the slot IS a day —
+// so it is presentation and it stays in the view.
+//
+// THE DAY OF THE MONTH AND NOT A WEEKDAY LETTER, for both counts. One rule
+// serves 7 cells and 31, it never repeats inside a card, and the weekday a
+// letter would give is already on the card's own title bar.
+function dayMark(date: string): string {
+  return String(Number(date.slice(8, 10)));
+}
 
 interface StripCell {
   // 0..1 of the group that was kept, or null where nothing in it was written.
   ratio: number | null;
   label: string;
+  // The day of the month, where this mark IS one day of one month (1.0.97).
+  // Null on every grouped mark and on a weekly row's single marks alike: a
+  // mark covering seven days, or one covering a week, belongs to no one date.
+  short: string | null;
   // A single-slot cell says done / not done / nothing, which is 1.0.54's
   // vocabulary; a grouped cell has a density instead. One mark cannot mean both.
   single: boolean;
@@ -100,34 +171,37 @@ interface StripCell {
 // STRADDLES today is a lived group: it holds real readings.
 export function stripCells(
   slots: readonly HabitSlotReading[],
+  grain: TrackerClass,
   ahead = 0
 ): StripCell[] {
   const lived = slots.length - ahead;
-  if (slots.length <= STRIP_CELL_CAP) {
-    return slots.map((slot, at) => ({
-      ratio: slot.state === 1 ? 1 : 0,
-      label: slot.label,
-      single: true,
-      ahead: at >= lived,
-      state: slot.state,
-      written: slot.written,
-    }));
-  }
   const out: StripCell[] = [];
-  for (let at = 0; at < slots.length; at += STRIP_GROUP) {
-    const group = slots.slice(at, at + STRIP_GROUP);
+  for (const run of stripRuns(slots.length, grain)) {
+    const group = slots.slice(run.at, run.to);
+    if (group.length === 1) {
+      const slot = group[0];
+      out.push({
+        ratio: slot.state === 1 ? 1 : 0,
+        label: slot.label,
+        short: grain === "daily" ? dayMark(slot.date) : null,
+        single: true,
+        ahead: run.at >= lived,
+        state: slot.state,
+        written: slot.written,
+      });
+      continue;
+    }
     const done = group.filter((s) => s.state === 1).length;
     const written = group.some((s) => s.written);
+    const span = `${group[0].label} – ${group[group.length - 1].label}`;
     out.push({
       ratio: written ? done / group.length : null,
       // AN UNLIVED GROUP IS NAMED AND NOT TALLIED. "0 of 7" is a true sentence
       // about seven days nobody has reached and a false one about this habit.
-      label:
-        at >= lived
-          ? `${group[0].label} – ${group[group.length - 1].label}`
-          : `${group[0].label} – ${group[group.length - 1].label}: ${done} of ${group.length}`,
+      label: run.at >= lived ? span : `${span}: ${done} of ${group.length}`,
+      short: null,
       single: false,
-      ahead: at >= lived,
+      ahead: run.at >= lived,
       state: null,
       written,
     });
@@ -270,6 +344,7 @@ export function valueRange(
 export function numberStripCells(
   slots: readonly HabitSlotReading[],
   unit: string | null,
+  grain: TrackerClass,
   ahead = 0
 ): StripCell[] {
   const lived = slots.length - ahead;
@@ -278,33 +353,38 @@ export function numberStripCells(
   // reading the array whole would say it might, and the next hand to add a
   // default would find out it does.
   const range = valueRange(slots.slice(0, lived));
-  const step = slots.length <= STRIP_CELL_CAP ? 1 : STRIP_GROUP;
   const said = unit ? ` ${unit}` : "";
   const out: StripCell[] = [];
-  for (let at = 0; at < slots.length; at += step) {
-    const group = slots.slice(at, at + step);
+  for (const run of stripRuns(slots.length, grain)) {
+    const group = slots.slice(run.at, run.to);
+    const one = group.length === 1;
     const nums = group
       .map((s) => s.value)
       .filter((v): v is number => v != null);
     const mean = nums.length
       ? nums.reduce((sum, v) => sum + v, 0) / nums.length
       : null;
-    const span =
-      step === 1
-        ? group[0].label
-        : `${group[0].label} – ${group[group.length - 1].label}`;
+    const span = one
+      ? group[0].label
+      : `${group[0].label} – ${group[group.length - 1].label}`;
     out.push({
       ratio: mean == null || range == null
         ? null
         : sparkFraction(mean, range.lo, range.hi),
       label:
-        at >= lived
+        run.at >= lived
           ? span
           : mean == null
             ? `${span}: nothing logged`
             : `${span}: ${round1(mean)}${said}`,
+      // THE DAY IS THE SAME QUESTION FOR BOTH TYPES, and `single` is not it.
+      // A number's marks are never `single` — the three-state vocabulary has
+      // nothing to say about 2 km — but a number row on a month card draws
+      // thirty-one one-day marks exactly as a boolean row does, and the day
+      // each one covers is as true there as it is there.
+      short: one && grain === "daily" ? dayMark(group[0].date) : null,
       single: false,
-      ahead: at >= lived,
+      ahead: run.at >= lived,
       state: null,
       written: group.some((g) => g.written),
     });
@@ -331,10 +411,42 @@ function drawStrip(parent: HTMLElement, row: HabitRollupRow): void {
   }));
   const all = [...row.slots, ...rest];
   const cells = number
-    ? numberStripCells(all, row.unit, rest.length)
-    : stripCells(all, rest.length);
+    ? numberStripCells(all, row.unit, row.grain, rest.length)
+    : stripCells(all, row.grain, rest.length);
+  // THE LABELS ARE A SECOND GRID ROW, not text inside the marks (1.0.97).
+  //
+  // A MARK IS A COLOUR AND NOTHING MAY BE WRITTEN ON IT. The fills are the
+  // grain hue, four shades of the ramp, a hollow outline and a faint not-yet —
+  // six backgrounds a day label would have to stay legible over, which is six
+  // contrast problems rather than one. Under the mark it has the card's own
+  // background, every rule from 1.0.61 through 1.0.65 keeps the mark it was
+  // written for, and `.is-ahead` keeps declaring no height.
+  //
+  // SO EVERY MARK GETS A LABEL OR NONE DO. `grid-auto-flow: column` over two
+  // rows fills each column downwards, which aligns a label with its mark by
+  // POSITION — and a strip that labelled only some of its marks would put the
+  // rest of them in the label row. A run is one slot for every mark or for none
+  // of them, so the flag is the whole strip's; the empty string is the guard
+  // for the next hand that makes it per-mark.
+  const labelled = cells.some((cell) => cell.short != null);
+  if (labelled) {
+    strip.addClass("is-labelled");
+    // TEN IS WHERE TWO DIGITS STOP FITTING BY THEMSELVES. A week's seven marks
+    // are ~94px and carry a date at any pane width; a month's thirty-one are
+    // ~20px at full width and ~10px in a sidebar, so past this many the
+    // stylesheet asks a container query whether the card is wide enough. TS
+    // cannot see the width and CSS cannot count the marks, which is why the
+    // answer takes both — see `85-tracker-controls.css`.
+    if (cells.length > STRIP_DENSE) strip.addClass("is-dense");
+  }
   for (const cell of cells) {
     const el = strip.createDiv({ cls: "ca-hrollup-cell" });
+    // BEFORE THE BRANCHES, every one of which `continue`s. An unreached day is
+    // still a date — what is absent there is the reading, which `.is-ahead`
+    // already says — so the label cannot sit behind the `ahead` test.
+    if (labelled) {
+      strip.createDiv({ cls: "ca-hrollup-day", text: cell.short ?? "" });
+    }
     // A SLOT NOBODY HAS REACHED SAYS SO, and says it before anything else can
     // paint it: without this the days left in the month are drawn exactly like
     // the days that were missed, which is the misreading `rollupWindow`'s clip
