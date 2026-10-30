@@ -212,6 +212,7 @@ import {
   FIELD_KEYWORDS,
   SELF_FRAMED_KEYWORDS,
   hasToken,
+  splitDirective,
   WIDGET_TOKEN,
 } from "../../core/directive-grammar";
 import type { FrameValue } from "../../core/directive-grammar";
@@ -589,7 +590,10 @@ const FIELD_KINDS = FIELD_KEYWORDS;
 // it once is what keeps the head and the card from disagreeing about which
 // fence is a band.
 export function fieldBand(lines: readonly string[]): boolean {
-  return lines.some((l) => FIELD_KINDS.has(l.split("|")[0].split(":")[0].trim()));
+  return lines.some((l) => {
+    const k = splitDirective(l).keyword;
+    return FIELD_KINDS.has(k) || k === "habits";
+  });
 }
 
 // What this block's head calls it, when the block is one thing.
@@ -613,7 +617,8 @@ export function fieldBand(lines: readonly string[]): boolean {
 // failure it guards against — a head naming the wrong widget — is the kind that
 // gets noticed weeks later on somebody's dashboard.
 export function blockTitle(lines: readonly string[]): string | null {
-  const keywords = lines.map((l) => l.split("|")[0].split(":")[0].trim());
+  if (lines.some((l) => hasToken(l, WIDGET_TOKEN))) return null;
+  const keywords = lines.map((l) => splitDirective(l).keyword);
   // A BANNER IS NEVER NAMED BY A WIDGET INSIDE IT — see `BANNER_KINDS`. It names
   // the note, so a head above it is a second answer to the question it exists to
   // answer, and the head this drew was "🔗 Links" on every page whose banner
@@ -1576,7 +1581,7 @@ export class Widgets implements
 
       for (const [n, line] of lines.entries()) {
         drawn.push({ at: container.childElementCount, line: lineAt[n] });
-        const kind = line.split("|")[0].split(":")[0].trim();
+        const kind = splitDirective(line).keyword;
 
         // ── ONE NAVIGATOR PER FENCE, AND A BRIDGE OWNS IT (1.0.91) ──────
         //
@@ -2122,7 +2127,19 @@ export class Widgets implements
           } else {
             container.appendChild(widget);
             if (SECTION_TITLES[kind]) {
-              named.push({ el: widget, title: SECTION_TITLES[kind], kind });
+              if (hasToken(line, WIDGET_TOKEN)) {
+                buildHead(widget, SECTION_TITLES[kind]);
+                widget.addClass("has-head");
+                widget.addClass("ca-journal-widget-field");
+                named.push({
+                  el: widget,
+                  title: SECTION_TITLES[kind],
+                  kind,
+                  selfTitled: true,
+                });
+              } else {
+                named.push({ el: widget, title: SECTION_TITLES[kind], kind });
+              }
             } else if (FIELD_KINDS.has(kind)) {
               // A FIELD'S NAME IS ITS OWN `|Title` — see `selfTitled` above and
               // `fieldBand` for why there is nowhere else to read it from. Off
@@ -3333,7 +3350,7 @@ export class Widgets implements
     const body = barIdx === -1 ? spec : spec.slice(0, barIdx);
 
     const colon = body.indexOf(":");
-    const kind = colon === -1 ? body : body.slice(0, colon);
+    const kind = splitDirective(body).keyword;
     const rest = colon === -1 ? "" : body.slice(colon + 1);
 
     // ── A FIELD DRAWN AS A WIDGET WEARS ITS NAME ON A HOVER (1.0.42) ──

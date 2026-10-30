@@ -44,6 +44,7 @@
 // seven live beside `Section` because that is where a catalogue declares one.
 import type { SectionCategory } from "./sections";
 import {
+  FIELD_KEYWORDS,
   FRAME_KEYWORD,
   HEADER_KEYWORD,
   argSpanIn,
@@ -952,8 +953,11 @@ export function withFormTitle(
   // the same argument, read back by `hasToken`. `withLabel` puts the
   // catalogue's title back only where there is none — which is a line written
   // by the build that did cut it, repaired on the next Save either way.
+  const base = FIELD_KEYWORDS.has(form.directive)
+    ? withLabel(out[at[0]], form.bar)
+    : out[at[0]];
   out[at[0]] = withToken(
-    withLabel(out[at[0]], form.bar),
+    base,
     WIDGET_TOKEN,
     want === WIDGET_FORM
   );

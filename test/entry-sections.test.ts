@@ -1487,7 +1487,7 @@ describe("grouping a diary entry's fields (1.0.42)", () => {
     const added = "w:tasks-table#1";
     const applied = applyEntrySections(grouped, ctx, [
       ...detectEntrySections(grouped, ctx),
-      added,
+      { id: added, options: { form: "widget" } },
     ]);
     expect(applied).not.toBeNull();
     const want = partition(...apart.slice(0, 5), ["todo", "capture"], [added]);

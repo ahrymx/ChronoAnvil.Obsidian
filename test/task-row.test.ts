@@ -167,6 +167,27 @@ describe("the `#token` grammar, with one flag left to carry", () => {
     expect(withToken("tasks:|Tasks", WIDGET_TOKEN, true)).toBe("tasks:|Tasks");
   });
 
+  it("writes and reads a flag on a page widget directive's keyword head", () => {
+    // Page widgets have no region key — some are bare (`tasks-table`), some
+    // take a filter after `:` (`tasks-table:Work`), and some use `|` as their
+    // argument delimiter (`time-grid:events|3`). On all of them `#widget` sits
+    // on the keyword head before `:`, and `splitDirective` strips `#...` off
+    // `keyword` while `hasToken` and `withToken` round-trip it cleanly.
+    for (const line of ["tasks-table", "tasks-table:Work", "time-grid:events|3"]) {
+      const on = withToken(line, WIDGET_TOKEN, true);
+      expect(hasToken(on, WIDGET_TOKEN)).toBe(true);
+      expect(withToken(on, WIDGET_TOKEN, false)).toBe(line);
+      expect(hasToken(line, WIDGET_TOKEN)).toBe(false);
+    }
+    expect(withToken("tasks-table", WIDGET_TOKEN, true)).toBe("tasks-table#widget");
+    expect(withToken("tasks-table:Work", WIDGET_TOKEN, true)).toBe(
+      "tasks-table#widget:Work"
+    );
+    expect(withToken("time-grid:events|3", WIDGET_TOKEN, true)).toBe(
+      "time-grid#widget:events|3"
+    );
+  });
+
   it("is parsed by ONE reader, which is the reason it is in the grammar", () => {
     // The editor writes this and the renderer reads it, and they are on opposite
     // sides of the tree. `buildNote` had the parse first — `#collapse`, `#line` —
@@ -606,12 +627,12 @@ describe("the pill the row wears", () => {
   });
 
   it("falls back to the arrangement for a row with nothing to answer", () => {
-    // The rule every surface used for every row until now, kept for the rows
-    // that still have nothing else to say: a fence that is a column, or a
-    // section welded inside another block, has no head of its own either.
+    // A row with no form question (`widgetForm: null`, e.g. `habits` or `bridge`
+    // on a diary entry) is always a `"Section"` unless it is welded inside a
+    // multi-directive block (`joined`).
     const base = { fixed: false, widgetForm: null };
     expect(rowForm({ ...base, column: false, joined: false })).toBe("Section");
-    expect(rowForm({ ...base, column: true, joined: false })).toBe("Widget");
+    expect(rowForm({ ...base, column: true, joined: false })).toBe("Section");
     expect(rowForm({ ...base, column: false, joined: true })).toBe("Widget");
   });
 

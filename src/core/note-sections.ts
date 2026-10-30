@@ -114,6 +114,7 @@ import {
   isWideLine,
   parseWide,
   argSpansIn,
+  FIELD_KEYWORDS,
   hasToken,
   WIDGET_TOKEN,
   labelOf,
@@ -1758,7 +1759,8 @@ export function answersOn(
       //   that is plainly bare on the page. Lines written by the one build that
       //   cut labels arrive here too, and read as what they look like.
       out[q.key] = q.titled
-        ? hasToken(lines[line] ?? "", WIDGET_TOKEN) || !labelOf(lines[line] ?? "")
+        ? hasToken(lines[line] ?? "", WIDGET_TOKEN) ||
+          (FIELD_KEYWORDS.has(q.directive ?? "") && !labelOf(lines[line] ?? ""))
           ? WIDGET_FORM
           : SECTION_FORM
         : formAt(lines, line);

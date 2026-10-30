@@ -1162,7 +1162,7 @@ describe("whether the group draws a head — 5.21", () => {
     // agree, and they do only by asking one question rather than two walks
     // written to match.
     expect(readCode("note-sections")).toContain(
-      'hasToken(lines[line] ?? "", WIDGET_TOKEN) || !labelOf(lines[line] ?? "")'
+      'hasToken(lines[line] ?? "", WIDGET_TOKEN) ||\n          (FIELD_KEYWORDS.has(q.directive ?? "") && !labelOf(lines[line] ?? ""))'
     );
     // AND `loose` IS UNTOUCHED, so **Take out of the group** stays live on a row
     // that already holds one — the one control that repairs the note.

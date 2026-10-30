@@ -1070,8 +1070,10 @@ export function splitDirective(line: string): DirectiveParts {
   const body = bar === -1 ? line : line.slice(0, bar);
   const label = bar === -1 ? null : line.slice(bar + 1);
   const colon = body.indexOf(":");
+  const head = (colon === -1 ? body : body.slice(0, colon)).trim();
+  const hash = head.indexOf("#");
   return {
-    keyword: (colon === -1 ? body : body.slice(0, colon)).trim(),
+    keyword: (hash > 0 ? head.slice(0, hash) : head).trim(),
     argument: colon === -1 ? "" : body.slice(colon + 1),
     label,
   };
@@ -1285,6 +1287,13 @@ export function splitPicks(answer: string): string[] {
 
 // Whether this directive's line carries the flag.
 export function hasToken(line: string, token: string): boolean {
+  const bar = line.indexOf("|");
+  const body = bar === -1 ? line : line.slice(0, bar);
+  const colon = body.indexOf(":");
+  const head = (colon === -1 ? body : body.slice(0, colon)).trim();
+  if (!head.startsWith("#") && splitArgHead(head).tokens.includes(token)) {
+    return true;
+  }
   return splitArgHead(splitDirective(line).argument).tokens.includes(token);
 }
 
@@ -1298,12 +1307,25 @@ export function hasToken(line: string, token: string): boolean {
 // A LINE WITH NO ARGUMENT HAS NOWHERE TO PUT ONE. `tasks` alone is not a
 // directive this plugin composes — every field names its region — and inventing
 // `tasks:#compact` for it would be writing a region key of "" into a reader's
-// note to record a preference.
+// note to record a preference. A page widget in a shared band has no region key
+// to hang a token on and may use `|` inside its argument (`time-grid`), so its
+// `#widget` token sits on the keyword head before `:`.
 export function withToken(line: string, token: string, on: boolean): string {
+  const { keyword } = splitDirective(line);
+  if (!keyword) return line;
   const bar = line.indexOf("|");
   const body = bar === -1 ? line : line.slice(0, bar);
   const label = bar === -1 ? "" : line.slice(bar);
   const colon = body.indexOf(":");
+  if (!FIELD_KEYWORDS.has(keyword) && !SELF_FRAMED_KEYWORDS.has(keyword)) {
+    const head = colon === -1 ? body : body.slice(0, colon);
+    const rest = colon === -1 ? "" : body.slice(colon);
+    const { key, tokens } = splitArgHead(head);
+    if (!key) return line;
+    if (tokens.includes(token) === on) return line;
+    const next = on ? [...tokens, token] : tokens.filter((t) => t !== token);
+    return `${[key, ...next].join("#")}${rest}${label}`;
+  }
   if (colon === -1) return line;
   const { key, tokens, tail } = splitArgHead(body.slice(colon + 1));
   if (!key) return line;

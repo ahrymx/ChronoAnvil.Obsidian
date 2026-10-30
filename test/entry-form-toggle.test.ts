@@ -397,4 +397,39 @@ describe("the two halves that must agree", () => {
       "new RegExp(`^${keyword}:${escapeForLine(section.id)}\\\\b`, \"m\")"
     );
   });
+
+  it("never offers or marks habits as a widget, while page widgets offer Show as widget", () => {
+    const model = entrySectionModel(DAILY);
+    const base = composeEntryTemplate("daily");
+    const withHabitsAndWidget = applyEntrySections(base, DAILY, [
+      ...detectEntrySections(base, DAILY),
+      "habits",
+      "w:tasks-table#1",
+    ])!;
+    const sections = model.sections(withHabitsAndWidget);
+    const habits = sections.find((s) => s.id === "habits")!;
+    const table = sections.find((s) => s.id === "w:tasks-table#1")!;
+
+    // Habits is section-only: no form question, never in `column`.
+    expect(habits.questions?.some((q) => q.kind === "form") ?? false).toBe(false);
+    expect(habits.answered?.form).toBeUndefined();
+
+    // Page widgets on an entry start as Section and offer Show as widget.
+    expect(table.questions?.some((q) => q.kind === "form")).toBe(true);
+    expect(table.answered?.form).toBe("section");
+
+    const blocksBefore = model.blocks!(withHabitsAndWidget);
+    for (const b of blocksBefore) {
+      expect(b.column).not.toContain("habits");
+      expect(b.column).not.toContain("w:tasks-table#1");
+    }
+
+    // Toggling the page widget to Widget writes `#widget` and adds it to `column`.
+    const toggled = save(withHabitsAndWidget, { "w:tasks-table#1": "widget" });
+    expect(toggled).toContain("tasks-table#widget");
+    expect(formOn(toggled, "w:tasks-table#1")).toBe("widget");
+    const blocksAfter = model.blocks!(toggled);
+    expect(blocksAfter.some((b) => b.column.includes("w:tasks-table#1"))).toBe(true);
+    expect(blocksAfter.some((b) => b.column.includes("habits"))).toBe(false);
+  });
 });

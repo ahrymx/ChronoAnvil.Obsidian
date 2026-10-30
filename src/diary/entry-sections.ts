@@ -77,7 +77,7 @@ import {
 import type { Section } from "../core/sections";
 import { bindSection } from "../core/sections";
 import type { FlatSection } from "../core/note-sections";
-import { WIDGETS } from "../core/widget-registry";
+import { isPageWidget, WIDGETS } from "../core/widget-registry";
 import type { VaultLists } from "../core/widget-registry";
 import {
   instanceId,
@@ -420,6 +420,9 @@ const formToggleFor = (
   const line = directiveFor(section, { ...ctx, extra: [section.id] });
   if (line == null) return [];
   const { keyword, label } = splitDirective(line);
+  if (isPageWidget(keyword)) {
+    return [titledFormQuestion(keyword, WIDGETS[keyword].bar)];
+  }
   if (!FIELD_KEYWORDS.has(keyword) || !(label ?? "").trim()) return [];
   return [titledFormQuestion(keyword, (label ?? "").trim())];
 };
@@ -3195,8 +3198,13 @@ const readBand = (shape: EntryShape, lines: readonly string[]): BandRead | null 
 // the renderer arrives at the same place by having no title to hang. Asking the
 // answer's question is what keeps the tick box and the link icon agreeing —
 // they disagree only if two walks are written to match rather than to ask.
-const fieldIsWidget = (line: string): boolean =>
+const fieldLineIsWidget = (line: string): boolean =>
   hasToken(line, WIDGET_TOKEN) || !labelOf(line);
+const fieldIsWidget = (line: string): boolean => {
+  const { keyword } = splitDirective(line);
+  if (isPageWidget(keyword)) return hasToken(line, WIDGET_TOKEN);
+  return FIELD_KEYWORDS.has(keyword) && fieldLineIsWidget(line);
+};
 
 // The band's fields, as blocks.
 //

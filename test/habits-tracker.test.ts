@@ -1643,22 +1643,18 @@ describe("the catalogue offers the section, and nothing composes it", () => {
     expect(model.regroup(moved!, groups)).toBe(text);
   });
 
-  it("is joinable as a widget, and a titled field is still refused one", () => {
-    // THE 1.0.42 RULE, AND THIS SECTION IS ON THE PERMITTED SIDE OF IT: a row
-    // is columns side by side, so its members must be widgets — a field
-    // wearing a permanent title bar brings a head the row has no room for.
-    // `habits` is a widget line, so the editor offers it the join; `capture` is
-    // a titled field, so the pair is refused WHOLE rather than trimmed to the
-    // part that would render, which would drop a directive on the floor.
+  it("is never joinable as a widget, and a titled field is still refused one", () => {
+    // Habits is a section-only tracker line (never in `WIDGETS`, never offered
+    // `Show as widget`), so `mine.column` is empty and the editor neither labels
+    // it `Widget` nor enables the group link icon on it.
     const ctx = { grain: "daily" } as const;
     const model = entrySectionModel(ctx);
     const text = addSectionToNote(composeEntryTemplate("daily"), ctx, sec)!;
     const blocks = model.blocks(text);
     const mine = blocks[blocks.length - 1];
     expect(mine.ids).toEqual(["habits"]);
-    expect(mine.column).toEqual(["habits"]);
-    // The fields beside it are loose and not joinable, which is what makes the
-    // line above a claim about this section rather than about the band.
+    expect(mine.column).toEqual([]);
+    // The fields beside it are loose and not joinable either until ticked to widget.
     expect(blocks[1].column).toEqual([]);
     const groups = blocks.map((b) => [...b.ids]);
     const pairedWithAField = model.regroup(text, [

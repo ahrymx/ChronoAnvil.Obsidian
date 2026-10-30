@@ -246,11 +246,10 @@ export interface SectionEditorSpec {
 //   pixels below it is the report this came from.
 //
 //   OTHERWISE THE FILE ANSWERS. A section with no form question still has a
-//   shape: a fence `widgetRun` calls a column, or one welded inside another
-//   block, has no head of its own — which is the same question the form asks,
-//   read off the arrangement rather than off a control. This is what every
-//   surface used to use for every row, and it is right for the rows that have
-//   nothing else to say.
+//   shape when it is welded inside another block (`joined`), which has no head
+//   of its own — the same question the form asks, read off the arrangement
+//   rather than off a control. Standalone sections without a form question
+//   always wear a section header and are always `"Section"`.
 export function rowForm(row: {
   fixed: boolean;
   // The form answer, or null where the section has no form question.
@@ -260,7 +259,7 @@ export function rowForm(row: {
 }): "Section" | "Widget" | null {
   if (row.fixed) return null;
   if (row.widgetForm !== null) return row.widgetForm ? "Widget" : "Section";
-  return row.column || row.joined ? "Widget" : "Section";
+  return row.joined ? "Widget" : "Section";
 }
 
 // Whether the cells of a group SHARE ONE BAR, which is the premise behind every
